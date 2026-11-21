@@ -77,6 +77,32 @@ fn system_parts(value: &Value) -> Result<Vec<Value>, AppError> {
         .collect()
 }
 
+/// 选择可承载客户端系统文本的首条普通用户消息。
+/// @param body 转换后的 Messages 正文。
+/// @return 仅在有系统文本及普通用户消息时返回内容索引。
+pub(super) fn system_reminder_target(body: &Value) -> Option<usize> {
+    let has_system = body["systemInstruction"]["parts"]
+        .as_array()?
+        .iter()
+        .any(|part| {
+            part["text"]
+                .as_str()
+                .is_some_and(|text| !text.trim().is_empty())
+        });
+    if !has_system {
+        return None;
+    }
+    // 工具结果可能分多条用户消息交付。普通提醒不能插入它们之间。
+    body["contents"].as_array()?.iter().position(|content| {
+        content["role"] == "user"
+            && content["parts"].as_array().is_some_and(|parts| {
+                parts
+                    .iter()
+                    .all(|part| part.get("functionResponse").is_none())
+            })
+    })
+}
+
 fn append_turn_context(contents: &mut [Value], turn_context: &mut Vec<Value>) {
     if let Some(parts) = contents
         .last_mut()
@@ -701,12 +727,46 @@ pub(super) fn stream_response(
 
 #[cfg(test)]
 mod tests {
-    use super::{AGENT_SUMMARY_EXAMPLES, AGENT_SUMMARY_HEADER, response_text, thinking_tier};
+    use super::{
+        AGENT_SUMMARY_EXAMPLES, AGENT_SUMMARY_HEADER, response_text, system_reminder_target,
+        thinking_tier,
+    };
     use crate::error::AppError;
     use serde_json::{Value, json};
 
     fn convert_request(request: &Value) -> Result<Value, AppError> {
         super::convert_request(request).map(|(body, _)| body)
+    }
+
+    #[test]
+    fn system_reminder_target_skips_tool_results_and_blank_system_text() {
+        let mut request = json!({
+            "system": "样本规则",
+            "messages": [
+                {"role": "assistant", "content": [
+                    {"type": "tool_use", "id": "sample", "name": "lookup", "input": {}},
+                ]},
+                {"role": "user", "content": [
+                    {"type": "tool_result", "tool_use_id": "sample", "content": "结果"},
+                ]},
+            ],
+        });
+        assert_eq!(
+            system_reminder_target(&convert_request(&request).unwrap()),
+            None
+        );
+        request["messages"].as_array_mut().unwrap().push(json!({
+            "role": "user", "content": "查询新样本",
+        }));
+        assert_eq!(
+            system_reminder_target(&convert_request(&request).unwrap()),
+            Some(2)
+        );
+        request["system"] = json!(" \n ");
+        assert_eq!(
+            system_reminder_target(&convert_request(&request).unwrap()),
+            None
+        );
     }
 
     #[test]

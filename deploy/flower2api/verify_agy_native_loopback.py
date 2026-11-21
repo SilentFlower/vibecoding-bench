@@ -66,6 +66,7 @@ class Upstream(BaseHTTPRequestHandler):
     model_mappings = {MODEL: SHARED_MODELS[MODEL]}
     held_requests = {}
     messages_search = False
+    system_reminder = False
     search_held = threading.Event()
     search_release = threading.Event()
     receipt_side_barrier = threading.Barrier(2)
@@ -191,6 +192,8 @@ class Upstream(BaseHTTPRequestHandler):
             self.end_headers()
             self.close_connection=True
             tool_id='call_'+('a1b2'*8) if self.png_support else 'synthetic-call'
+            if self.system_reminder:
+                tool_id = f'call_{len(self.calls):032x}'
             if deadline_chain:tool_id=f'call_{returned+1:032x}'
             if receipt_result_count is not None:tool_id=f'call_{receipt_result_count+1:032x}'
             arguments = SCHEMA_TOOL_ARGS if 'TLS_SYNTHETIC_TOOL_SCHEMA' in encoded else {'x':1}
@@ -374,6 +377,11 @@ class Binding(BaseHTTPRequestHandler):
         """通过产品写入器核对独立入口旁路，不触发模型。@return 无。"""
         from agy_runtime.capture import save_ingress
         require(self.headers.get('authorization')=='Bearer '+SECRET,'入口旁路鉴权错误')
+        if self.path.partition('?')[0] == '/internal/v3/agy-environments/1':
+            self.send_response(404)
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+            return
         if self.path == '/internal/v3/agy-capacity/1' and Upstream.held_requests:
             self.capacity_edit()
             return
@@ -1679,21 +1687,34 @@ def verify_claude_code_search(wait_idle):
         return counts[0]
 
 
+def model_attempt(request, root):
+    """读取指定根下的唯一真实发送尝试。@param request 网关入口。@param root HTTP 根。@return 尝试详情。"""
+    until = time.monotonic() + 8
+    while time.monotonic() < until:
+        status, raw = request('/admin/request-diagnostics/' + root, admin=True)
+        attempts = json.loads(raw).get('attempts', []) if status == 200 else []
+        if len(attempts) == 1 and attempts[0].get('context', {}).get('native_model_calls'):
+            return attempts[0]
+        time.sleep(.04)
+    raise ValueError('续轮样本缺少真实尝试记录')
+
+
+def cancel_original_tool_turn(request, root, database):
+    """通过本地发送器确认原工具请求退出。@param request 网关入口。@param root HTTP 根。@param database 合成库。@return 无。"""
+    prior = model_attempt(request, root)
+    token_id = database.execute("SELECT id FROM api_tokens WHERE token='synthetic-key'").fetchone()[0]
+    command = Request('http://127.0.0.1:8091/internal/agy/cancel',
+        data=json.dumps({'account_id': 1, 'environment_id': ENVIRONMENT, 'generation': 1,
+            'request_id': prior['attempt_id'], 'api_token_id': token_id}).encode(),
+        headers={'authorization': 'Bearer ' + SECRET, 'content-type': 'application/json'})
+    with urlopen(command, timeout=5) as response:
+        require(response.status == 204, '未登记隔离旧原生轮退出')
+
+
 def verify_continuation_modes(request, wait_idle, database, request_ids):
     """通过真实网关、发送器和原版内核验证三种续轮及空流。@param request 网关入口。@param wait_idle 原生收口。@param database 合成库。@param request_ids 请求根。@return 脱敏验收摘要。"""
     path='/v1/messages'
     observed={}
-
-    def attempt(root):
-        """读取指定根下的唯一发送尝试。@param root HTTP 根。@return 尝试详情。"""
-        until=time.monotonic()+8
-        while time.monotonic()<until:
-            status,raw=request('/admin/request-diagnostics/'+root,admin=True)
-            attempts=json.loads(raw).get('attempts',[]) if status==200 else []
-            if len(attempts)==1 and attempts[0].get('context',{}).get('native_model_calls'):
-                return attempts[0]
-            time.sleep(.04)
-        raise ValueError('续轮样本缺少真实尝试记录')
 
     def issue(label):
         """交付完整工具回调并构造真实客户端回填。@param label 合成标记。@return 原请求和回填。"""
@@ -1764,14 +1785,7 @@ Bad (branch name): "Analyzed adam/background-summary branch diff"'''
         old_contents=Upstream.calls[-1]['body']['request']['contents']
         closed_at=time.monotonic()
         if close_worker:
-            prior=attempt(root)
-            token_id=database.execute("SELECT id FROM api_tokens WHERE token='synthetic-key'").fetchone()[0]
-            command=Request('http://127.0.0.1:8091/internal/agy/cancel',
-                data=json.dumps({'account_id':1,'environment_id':ENVIRONMENT,'generation':1,
-                    'request_id':prior['attempt_id'],'api_token_id':token_id}).encode(),
-                headers={'authorization':'Bearer '+SECRET,'content-type':'application/json'})
-            with urlopen(command,timeout=5) as response:
-                require(response.status==204,'未登记隔离旧原生轮退出')
+            cancel_original_tool_turn(request, root, database)
         if expected_path=='history':wait_idle()
         closed_ms=round(1000*(time.monotonic()-closed_at)) if expected_path=='history' else None
         Binding.continuation_mode='claim'
@@ -1797,7 +1811,7 @@ Bad (branch name): "Analyzed adam/background-summary branch diff"'''
             conflicting['messages'][-1]['content'][0]['content']='不同的合成工具结果'
             require(request(path,foreign_session)[0]==400 and request(path,conflicting)[0]==400
                 and len(Upstream.calls)==start+2,'历史重读接受了其他会话或不同正文')
-        sample=attempt(continuation_root)
+        sample=model_attempt(request, continuation_root)
         context=sample['context']
         require(context['tool_continuation_mode']==mode and context['tool_continuation_path']==expected_path,
             '保存新配置影响已发出工具批次')
@@ -1823,13 +1837,144 @@ Bad (branch name): "Analyzed adam/background-summary branch diff"'''
             require(b'event: error' in raw and b'event: message_stop' not in raw,'有效正文后的错误终态丢失')
         else:
             require(json.loads(raw)['type']=='error','首块前没有返回 Messages HTTP 错误')
-        fields=attempt(root)['context']
+        fields=model_attempt(request, root)['context']
         require(fields.get('observed_control_http_status')==source_status
             and fields.get('native_source_terminal') is False and fields.get('native_receive_ended') is True,
             '原生收流证据缺少实际控制状态')
         if source_status==500:
             require(fields.get('control_error_detail')=='unexpected_eof','截断未保留原生响应读取错误')
     return {'continuation_modes':observed,'agent_summary':True,'empty_streams':True,'real_model_submissions':0}
+
+
+def verify_system_reminder(request, wait_idle, database, request_ids):
+    """比较账号开关的原生出站与续轮。@param request 网关入口。@param wait_idle 原生收口。@param database 合成库。@param request_ids 请求根。@return 脱敏结果。"""
+    option = 'agy_system_prompt_as_user_reminder'
+    homoglyph = 'agy_system_prompt_homoglyph_enabled'
+    account_path = '/admin/accounts/1'
+    messages_path = '/v1/messages'
+    neutral = "Use the provided context to answer the user's request."
+    sample = ['ABC system', '中文 {x: 3}']
+    converted = ['ΑΒС ѕуѕtеm', '中文 {х: 3}']
+    user_prompt = 'TLS_SYNTHETIC_TOOL read a sample record'
+    result_text = 'SYNTHETIC_RECORD_OK'
+
+    def save(enabled, glyphs):
+        status, raw = request(account_path, {option: enabled, homoglyph: glyphs}, admin=True)
+        require(status == 200 and json.loads(raw)[option] is enabled
+            and json.loads(raw)[homoglyph] is glyphs, '账号开关未保存')
+
+    def verify_wire(body, texts, moved):
+        sys_text = '\n'.join(part.get('text', '') for part in body['systemInstruction']['parts'])
+        user_text = '\n'.join(part.get('text', '') for part in body['contents'][0]['parts'])
+        source = '\n'.join(texts)
+        wrapped = f'<system-reminder>\n{source}\n</system-reminder>'
+        require(body['contents'][0]['role'] == 'user' and user_prompt in user_text, '首条用户消息内容异常')
+        require(sys_text == (neutral if moved else source)
+            and user_text.count(wrapped) == int(moved), '实际 TLS 的系统文本及提醒位置异常')
+
+    status, raw = request(account_path, admin=True)
+    require(status == 200 and json.loads(raw)[option] is False, '已创建账号的试验开关默认值错误')
+    declarations = []
+    observed = {}
+    configured = (False, False)
+    cases = [
+        ('off', 'claim', False, False, False, False),
+        ('on', 'claim', True, True, False, False),
+        ('homoglyph_only', 'claim', False, False, True, False),
+        ('both', 'claim', True, True, True, False),
+        ('close_while_waiting', 'claim', True, False, False, False),
+        ('open_while_waiting', 'history', False, True, False, False),
+        ('history_fallback', 'claim_with_history', True, True, True, True),
+    ]
+    for label, mode, original, current, glyphs, forced_exit in cases:
+        if configured != (original, glyphs):
+            save(original, glyphs)
+        Binding.continuation_mode = mode
+        session_id = f'synthetic-reminder-{label}'
+        body = {
+            'model': MODEL, 'max_tokens': 128,
+            'system': [{'type': 'text', 'text': text} for text in sample],
+            'messages': [{'role': 'user', 'content': user_prompt}],
+            'tools': [{'name': 'synthetic_tool', 'input_schema': {
+                'type': 'object', 'properties': {'x': {'type': 'integer'}},
+            }}],
+        }
+        first = len(Upstream.calls)
+        status, raw = request(messages_path, body, session_id=session_id)
+        require(status == 200, f'{label} 原工具轮请求失败 {status} {raw[:180]!r}')
+        root = request_ids[-1]
+        output = json.loads(raw)
+        calls = [block for block in output['content'] if block['type'] == 'tool_use']
+        require(output['stop_reason'] == 'tool_use' and len(calls) == 1
+            and calls[0]['name'] == 'synthetic_tool'
+            and calls[0]['input'] == {'x': 1}, f'{label} 客户端工具调用不完整')
+        initial = Upstream.calls[first]['body']['request']
+        declarations.append(initial['tools'])
+        expected = converted if glyphs else sample
+        verify_wire(initial, expected, original)
+        body['messages'].extend([
+            {'role': 'assistant', 'content': output['content']},
+            {'role': 'user', 'content': [
+                {'type': 'tool_result', 'tool_use_id': calls[0]['id'], 'content': result_text},
+            ]},
+        ])
+        next_texts = expected
+        if label == 'close_while_waiting':
+            next_texts = ['Synthetic instruction for the next generation.']
+            body['system'] = next_texts[0]
+        if current != original:
+            save(current, glyphs)
+        configured = (current, glyphs)
+        if forced_exit:
+            cancel_original_tool_turn(request, root, database)
+        expected_path = 'history' if mode == 'history' or forced_exit else 'claim'
+        if expected_path == 'history':
+            wait_idle()
+
+        status, raw = request(messages_path, body, session_id=session_id)
+        continuation = request_ids[-1]
+        require(status == 200, f'{label} 回填失败 {status} {raw[:180]!r}')
+        response = json.loads(raw)
+        text = ''.join(block.get('text', '') for block in response['content'] if block['type'] == 'text')
+        require(response['stop_reason'] == 'end_turn' and text == '本地TLS回复', f'{label} 缺少有效回填终态')
+        wait_idle()
+        context = model_attempt(request, continuation)['context']
+        replay_status, replay_raw = request(messages_path, body, session_id=session_id)
+        require(replay_status == 200 and json.loads(replay_raw)['content'] == response['content']
+            and len(Upstream.calls) == first + 2,
+            f'{label} 回填重读异常 {replay_status} 提交次数 {len(Upstream.calls) - first} {replay_raw[:180]!r}')
+        require(context['tool_continuation_mode'] == mode
+            and context['tool_continuation_path'] == expected_path, f'{label} 实际续轮模式异常')
+        policy = context['system_prompt_policy']
+        require(policy['source'] == ('cortex_user_reminder' if current else 'cortex_custom_system')
+            and policy['changed'] is glyphs, f'{label} 原生处理回执来源或转换标记异常')
+        if forced_exit:
+            require(context.get('tool_continuation_reason') == 'original_closed', '历史兜底缺少退出确认')
+
+        wire = Upstream.calls[first + 1]['body']['request']
+        verify_wire(wire, next_texts, current)
+        parts = [part for content in wire['contents'] for part in content['parts']]
+        actual_calls = [part for part in parts if 'functionCall' in part]
+        actual_results = [part['functionResponse'] for part in parts if 'functionResponse' in part]
+        require(len(actual_calls) == len(actual_results) == 1
+            and actual_calls[0]['thoughtSignature'] == 'c3ludGhldGljLXNpZw=='
+            and actual_results[0]['id'] == actual_calls[0]['functionCall']['id']
+            and actual_results[0]['name'] == 'synthetic_tool'
+            and result_text in json.dumps(actual_results[0]), f'{label} 真实调用、签名或结果错误')
+        observed[label] = {'path': expected_path, 'synthetic_model_calls': 2}
+    require(all(definitions == declarations[0] for definitions in declarations), '两组工具声明存在差异')
+
+    start = len(Upstream.calls)
+    status, _ = request(f'/v1beta/models/{MODEL}:generateContent', {
+        'systemInstruction': {'parts': [{'text': sample[0]}]},
+        'contents': [{'role': 'user', 'parts': [{'text': 'Inspect the synthetic sample.'}]}],
+    })
+    wait_idle()
+    require(status == 200 and len(Upstream.calls) == start + 1, 'Gemini 原生直连接口执行异常')
+    wire = Upstream.calls[-1]['body']['request']
+    require(wire['systemInstruction']['parts'] == [{'text': converted[0]}],
+        'Messages 账号开关改变了 Gemini 直连系统段')
+    return {'system_reminder': observed, 'gemini_direct': True, 'real_model_submissions': 0}
 
 
 def verify_tool_receipts(request, wait_idle, database, request_ids):
@@ -1934,12 +2079,14 @@ def verify_tool_receipts(request, wait_idle, database, request_ids):
 
 
 def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,kernel_selection=False,tool_deadlines=False,parallel_tools=False,
-           *, shared_models=False, live_capacity=False, messages_search=False, continuation_modes=False, tool_receipts=False):
+           *, shared_models=False, live_capacity=False, messages_search=False, continuation_modes=False,
+           tool_receipts=False, system_reminder=False):
     """执行真实公共业务。@param homoglyph 检验系统策略。@param capture_off 验证关闭采集。@param png 核对图片与工具历史。@param installed_adapter 使用镜像内适配器。@param kernel_selection 验证内核切换。@param tool_deadlines 验证跨首轮期限的工具链。@param parallel_tools 验证同名工具。@return 脱敏验证摘要。"""
     require(os.geteuid()==1001,'原生业务探针必须使用UID1001')
     os.umask(0o077)
     Upstream.png_support=png
     Upstream.messages_search=messages_search
+    Upstream.system_reminder=system_reminder
     if messages_search:
         Upstream.model_mappings = {**Upstream.model_mappings, MESSAGES_LOW_MODEL: SHARED_MODELS['gemini-3.8-flash-low']}
     if shared_models:
@@ -1967,11 +2114,12 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
             command=['/opt/verify-lib/ld-linux-x86-64.so.2','--library-path','/opt/verify-lib',executable]
         children.append(subprocess.Popen(command,stdout=output,stderr=subprocess.STDOUT))
     request_ids=[]
-    def request(path,body=None,admin=False,first_tool_frame=False,token='synthetic-key'):
-        """通过真实公共 HTTP 执行一次请求。@param path 路径。@param body Gemini 正文。@param admin 是否管理调用。@param first_tool_frame 是否在首条工具事件后退出。@param token 合成入口令牌。@return 状态与正文。"""
+    def request(path,body=None,admin=False,first_tool_frame=False,token='synthetic-key',*,session_id=None):
+        """通过真实公共 HTTP 执行一次请求。@param path 路径。@param body Gemini 正文。@param admin 是否管理调用。@param first_tool_frame 是否在首条工具事件后退出。@param token 合成入口令牌。@param session_id 独立的合成会话。@return 状态与正文。"""
         headers={'x-api-key':'synthetic-admin' if admin else token,'content-type':'application/json'}
         if not admin:headers['X-Synthetic-Ingress']='never-upstream'
-        if (messages_search or continuation_modes or tool_receipts) and path=='/v1/messages':
+        if session_id is not None:headers['X-Session-Id']=session_id
+        if (messages_search or continuation_modes or tool_receipts or system_reminder) and path=='/v1/messages':
             headers['user-agent']='claude-cli/2.1.293 (external, cli)' if body.get('stream') else 'python-httpx/0.28.1'
         value=Request('http://127.0.0.1:5674'+path,data=json.dumps(body).encode() if body is not None else None,headers=headers,
             method='PUT' if body is not None and (path=='/admin/settings' or path.startswith('/admin/accounts/')) else None)
@@ -2020,6 +2168,10 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
                 database.execute('UPDATE accounts SET concurrency=3 WHERE id=1')
         require(request('/admin/settings',{'request_diagnostics_log_mode':'debug'},admin=True)[0]==200,'测试日志模式设置失败')
         base='/v1beta/models/'+MODEL+':'
+        if system_reminder:
+            result = verify_system_reminder(request, wait_idle, database, request_ids)
+            database.close()
+            return result
         if tool_receipts:
             result=verify_tool_receipts(request,wait_idle,database,request_ids)
             database.close()
@@ -2241,13 +2393,15 @@ def main():
     parser.add_argument('--messages-search', action='store_true')
     parser.add_argument('--continuation-modes', action='store_true')
     parser.add_argument('--tool-receipts', action='store_true')
+    parser.add_argument('--system-reminder', action='store_true')
     parser.add_argument('--claude-code', type=Path)
     args=parser.parse_args()
     installed_adapter=args.installed_adapter or args.png or args.kernel_selection
     if args.inside:
         result = inside(args.homoglyph,args.capture_off,args.png,installed_adapter,args.kernel_selection,args.tool_deadlines,args.parallel_tools,
             shared_models=args.shared_models,live_capacity=args.live_capacity,messages_search=args.messages_search,
-            continuation_modes=args.continuation_modes,tool_receipts=args.tool_receipts)
+            continuation_modes=args.continuation_modes,tool_receipts=args.tool_receipts,
+            system_reminder=args.system_reminder)
         print(json.dumps(result, ensure_ascii=False))
         return
     require(bool(args.image),'需要明确的固定原版测试镜像')
@@ -2315,7 +2469,8 @@ def main():
                 ('--installed-adapter',installed_adapter),('--kernel-selection',args.kernel_selection),('--parallel-tools',args.parallel_tools),
                 ('--tool-deadlines',args.tool_deadlines),('--shared-models',args.shared_models),
                 ('--live-capacity',args.live_capacity),('--messages-search',args.messages_search),
-                ('--continuation-modes',args.continuation_modes),('--tool-receipts',args.tool_receipts)):
+                ('--continuation-modes',args.continuation_modes),('--tool-receipts',args.tool_receipts),
+                ('--system-reminder', args.system_reminder)):
             if enabled:probe.append(flag)
         container=client.containers.run(args.image,probe,entrypoint=['python3'],detach=True,
             user='1001:1001',network_mode='none',read_only=True,cap_drop=['ALL'],security_opt=['no-new-privileges:true'],
@@ -2329,6 +2484,7 @@ def main():
         logs=container.logs().decode(errors='replace')
         evidence=root/('.trellis/.runtime/agy-continuation-modes-private' if args.continuation_modes else '.trellis/.runtime/agy-messages-search-private' if args.messages_search else '.trellis/.runtime/agy-live-capacity-private' if args.live_capacity else '.trellis/.runtime/agy-shared-models-private' if args.shared_models else '.trellis/.runtime/agy-parallel-tools-private' if args.parallel_tools else '.trellis/.runtime/agy-tool-deadlines-private' if args.tool_deadlines else '.trellis/.runtime/agy-kernel-selection-private' if args.kernel_selection else '.trellis/.runtime/agy-png-loopback-private' if args.png else '.trellis/.runtime/agy-homoglyph-capture-off-private' if args.capture_off else '.trellis/.runtime/agy-homoglyph-loopback-private' if args.homoglyph else '.trellis/.runtime/agy-runtime-loopback-private')
         if args.tool_receipts:evidence=root/'.trellis/.runtime/agy-tool-receipts-private'
+        if args.system_reminder:evidence=root/'.trellis/.runtime/agy-system-reminder-private'
         if evidence.exists():shutil.rmtree(evidence)
         shutil.copytree(folder,evidence,ignore=lambda directory,names:[name for name in names
             if not (Path(directory)/name).is_file() and not (Path(directory)/name).is_dir()])

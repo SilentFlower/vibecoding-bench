@@ -699,6 +699,7 @@ impl AccountService {
             "priority",
             "rpm_limit",
             "agy_system_prompt_homoglyph_enabled",
+            "agy_system_prompt_as_user_reminder",
             "agy_gif_frames_enabled",
             "agy_disable_safety_filtering",
         ];

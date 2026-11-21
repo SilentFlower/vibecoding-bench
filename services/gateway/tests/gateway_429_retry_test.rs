@@ -38,6 +38,7 @@ async fn create_test_account(svc: &AccountService, email: &str, priority: i32) -
         agy_system_prompt_homoglyph_enabled: false,
         agy_gif_frames_enabled: false,
         agy_disable_safety_filtering: false,
+        agy_system_prompt_as_user_reminder: false,
         id: 0,
         name: "test".into(),
         email: email.into(),

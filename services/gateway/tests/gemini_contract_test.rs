@@ -33,6 +33,31 @@ fn system_prompt_receipt_is_bound_to_frozen_policy() {
     );
 }
 
+/// 位置试验独立冻结，并要求原生回执确认实际用户段来源。
+#[test]
+fn system_prompt_reminder_requires_a_receipt_even_without_homoglyphs() {
+    let mut policy = AgySystemPromptPolicy::new(false);
+    assert!(policy.is_disabled());
+    assert!(
+        serde_json::to_value(&policy)
+            .unwrap()
+            .get("user_reminder_index")
+            .is_none()
+    );
+    policy.user_reminder_index = Some(0);
+    assert!(!policy.is_disabled());
+    assert_eq!(
+        serde_json::to_value(&policy).unwrap()["user_reminder_index"],
+        0
+    );
+    let mut report = json!({"schema_version":1,"enabled":false,"rule_version":"new-api-homoglyph-v1",
+        "source":"cortex_custom_system","rule_sha256":"a".repeat(64),
+        "changed":false,"replaced_codepoints":0,"system_codepoints":10});
+    assert!(!policy.matches_report(&report));
+    report["source"] = json!("cortex_user_reminder");
+    assert!(policy.matches_report(&report));
+}
+
 /// 四种令牌来源兼容，冲突和重复查询密钥受控拒绝。@return 无。
 #[test]
 fn token_sources_cannot_override_each_other() {

@@ -36,6 +36,7 @@ class Fixture(BaseHTTPRequestHandler):
     refreshes=0
     cancelled=threading.Event()
     policy_failed=False
+    reminder_failed=False
     binding_gate = None
     binding_prepared = threading.Event()
     binding_candidates = []
@@ -61,6 +62,12 @@ class Fixture(BaseHTTPRequestHandler):
 
     def do_POST(self):
         """按真实私有信封输出源帧、HTTP终态和物理收口。@return 无。"""
+        if self.path.partition('?')[0] in ('/internal/v3/agy-environments/1', '/internal/v3/agy-environments/2'):
+            require(self.headers.get('Authorization') == 'Bearer ' + SECRET, '环境登记证明错误')
+            self.send_response(404)
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+            return
         if self.path=='/internal/v3/agy-auth/refresh':
             require(self.headers.get('Authorization')=='Bearer '+SECRET,'管理证明错误')
             value=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
@@ -100,8 +107,10 @@ class Fixture(BaseHTTPRequestHandler):
         self.send_response(200);self.send_header('content-type','application/x-ndjson');self.end_headers()
         mode=contents[0]['parts'][0].get('text','')
         policy=value.get('system_prompt_policy',{'schema_version':1,'enabled':False,'rule_version':'new-api-homoglyph-v1'})
-        report={**policy,'source':'cortex_custom_system','rule_sha256':'c'*64,'changed':False,
+        prompt_source = 'cortex_user_reminder' if 'user_reminder_index' in policy else 'cortex_custom_system'
+        report={**policy,'source':prompt_source,'rule_sha256':'c'*64,'changed':False,
             'replaced_codepoints':0,'system_codepoints':len('\n'.join(part.get('text','') for part in body.get('systemInstruction',{}).get('parts',[])))}
+        report.pop('user_reminder_index', None)
         if mode=='policy-wrong-receipt':report['rule_version']='unknown'
         native('request_accepted',parameter_policy=[{'field':'generationConfig.temperature','policy':'native_default'}],
             **({} if mode=='policy-no-receipt' else {'system_prompt_policy':report}))
@@ -126,6 +135,11 @@ class Fixture(BaseHTTPRequestHandler):
             Fixture.policy_failed=True
             with sqlite3.connect('/state/gateway.sqlite') as database:
                 database.execute('UPDATE accounts SET agy_system_prompt_homoglyph_enabled=0 WHERE id=1')
+        reminder_auth = mode == 'reminder-auth-recover' and not Fixture.reminder_failed
+        if reminder_auth:
+            Fixture.reminder_failed = True
+            with sqlite3.connect('/state/gateway.sqlite') as database:
+                database.execute('UPDATE accounts SET agy_system_prompt_as_user_reminder=0 WHERE id=1')
         if mode=='cancel-stream':
             frame={'candidates':[{'content':{'role':'model','parts':[{'text':'合成首帧'}]}}]}
             native('gemini_response',data={'data_base64':base64.b64encode(json.dumps(frame).encode()).decode()})
@@ -136,7 +150,7 @@ class Fixture(BaseHTTPRequestHandler):
             except OSError:
                 Fixture.cancelled.set()
             return
-        auth_error=policy_auth or mode=='auth-always' or mode=='auth-recover' and value['credential_snapshot']['credential_generation']==2 or mode=='auth-after-frame'
+        auth_error=policy_auth or reminder_auth or mode=='auth-always' or mode=='auth-recover' and value['credential_snapshot']['credential_generation']==2 or mode=='auth-after-frame'
         if auth_error or mode=='capacity-error':
             if mode=='auth-after-frame':
                 frame={'candidates':[{'content':{'role':'model','parts':[{'text':'已经交付的合成片段'}]}}]}
@@ -246,6 +260,8 @@ def inside() -> dict:
     child=subprocess.Popen(['/opt/gateway'],stdout=output,stderr=subprocess.STDOUT)
     def request(path,body=None,key='synthetic-key',admin=False,*,method=None,session_id=None,request_ids=None):
         headers={'x-api-key':'synthetic-admin' if admin else key}
+        if path == '/v1/messages':
+            headers['user-agent'] = 'python-httpx/0.28.1'
         if body is not None:headers['content-type']='application/json'
         if session_id is not None:headers['x-session-id']=session_id
         value=Request('http://127.0.0.1:5674'+path,data=json.dumps(body).encode() if body is not None else None,headers=headers,method=method)
@@ -445,6 +461,37 @@ def inside() -> dict:
         require(len(Fixture.calls)==before+2 and all(value['system_prompt_policy']['enabled'] for value in Fixture.calls[before:]),'认证恢复重新读取了变化后的开关')
         require(database.execute('SELECT agy_system_prompt_homoglyph_enabled FROM accounts WHERE id=1').fetchone()[0]==0,'并发开关变化未进入真实存储')
         require(request(base+'generateContent',candidate)[0]==200 and 'system_prompt_policy' not in Fixture.calls[-1],'后续HTTP没有读取关闭策略')
+        with database:
+            database.execute('UPDATE accounts SET agy_system_prompt_as_user_reminder=1 WHERE id=1')
+        messages = {
+            'model': 'gemini-synthetic',
+            'max_tokens': 128,
+            'system': 'A synthetic application instruction.',
+            'messages': [{'role': 'user', 'content': 'reminder-role-fixture'}],
+        }
+        for key, account in [('synthetic-key', 1), ('synthetic-two-key', 2)]:
+            require(request('/v1/messages', messages, key=key)[0] == 200, '两账号 Messages 对照请求失败')
+            sent = Fixture.calls[-1]
+            require(sent['request']['account_id'] == account, 'Messages 实际出站账号不符')
+            sent_body = sent['body']
+            if account == 1:
+                require(sent['system_prompt_policy']['user_reminder_index'] == 0, '启用账号缺少用户提醒位置')
+            else:
+                require('system_prompt_policy' not in sent, '关闭账号采用了其它账号的试验设置')
+            require(sent_body['systemInstruction']['parts'] == [{'text': messages['system']}]
+                and len(sent_body['contents'][0]['parts']) == 1, '私有信封未保留原始历史')
+        before, refreshes = len(Fixture.calls), Fixture.refreshes
+        messages['messages'][0]['content'] = 'reminder-auth-recover'
+        require(request('/v1/messages', messages)[0] == 200, '试验模式的认证恢复失败')
+        attempts = Fixture.calls[before:]
+        require(len(attempts) == 2 and Fixture.refreshes == refreshes + 1
+            and attempts[0]['body'] == attempts[1]['body']
+            and attempts[0]['system_prompt_policy'] == attempts[1]['system_prompt_policy']
+            and attempts[1]['system_prompt_policy']['user_reminder_index'] == 0, '认证恢复改变了本次 HTTP 的用户提醒')
+        messages['messages'][0]['content'] = 'reminder-role-fixture'
+        require(request('/v1/messages', messages)[0] == 200
+            and 'system_prompt_policy' not in Fixture.calls[-1],
+            '后续 HTTP 未读取认证恢复期间保存的关闭值')
         with database:database.execute('UPDATE accounts SET agy_system_prompt_homoglyph_enabled=1 WHERE id=1')
         for mode in ['policy-no-receipt','policy-wrong-receipt']:
             current=copy.deepcopy(candidate);current['contents'][0]['parts'][0]['text']=mode
@@ -471,12 +518,15 @@ def inside() -> dict:
             time.sleep(.02)
         require(len(attempts)==len(Fixture.calls),'真实发送和持久尝试计数不一致')
         by_id={value['request']['request_id']:value for value in Fixture.calls}
+        message_roots = set()
         for attempt in attempts:
             source=by_id[attempt['attempt_id']];context=attempt.get('context',{})
+            mode = source['body']['contents'][0]['parts'][0].get('text')
+            if mode in ('reminder-role-fixture', 'reminder-auth-recover'):
+                message_roots.add(attempt['request_id'])
             require(context.get('platform')=='antigravity' and context.get('entry_protocol')=='gemini','持久平台或协议被模型名覆盖')
             require(context.get('credential_generation')==source['credential_snapshot']['credential_generation'],'尝试凭据代次漂移')
             require(attempt['account_id']==source['request']['account_id'],'持久尝试跨账号')
-            mode = source['body']['contents'][0]['parts'][0].get('text')
             if mode in ('control-400', 'control-502', 'control-after-frame'):
                 require(attempt['status_code'] == (502 if mode == 'control-502' else 400)
                     and attempt['error_stage'] == 'native_control', '请求记录遗漏控制状态或阶段')
@@ -486,6 +536,9 @@ def inside() -> dict:
         recovered=[a for a in attempts if a.get('retry_reason')=='oauth_recovery']
         require(len(recovered)>=3,'401恢复尝试原因缺失')
         roots={row[0]:json.loads(row[1]) for row in database.execute('SELECT request_id,summary_json FROM request_diagnostics')}
+        require(len(message_roots) == 4 and all(
+            roots[root].get('context', {}).get('entry_protocol') == 'anthropic_messages'
+            for root in message_roots), 'Messages 原始 HTTP 协议记录错误')
         replayed = [root for root in roots.values() if root.get('context', {}).get('replay_of_request_id')]
         require(bool(replayed), '工具重放根记录缺失')
         for root in replayed:
@@ -503,6 +556,7 @@ def inside() -> dict:
                 '明确401仅恢复一次','容量错误零恢复','SSE首帧后零重放','SSE断连关闭原发送和释放许可',
                 '原生控制状态在HTTP、SSE尾帧及诊断中一致',
                 '两账号策略隔离','认证恢复冻结策略','后续HTTP采用新开关','缺失和错误策略回执拒绝','原始入站视图保持',
+                'Messages 提示词位置按账号隔离并冻结到同一 HTTP 的认证恢复',
                 '真实SQLite尝试计数和凭据代次','401同根两尝试及恢复原因','AGY调用Claude平台保持',
                 '双账号会话绑定、并发首轮、显式头、Token隔离、暂停和过期','工具重放保留派生会话']}
     finally:

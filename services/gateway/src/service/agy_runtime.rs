@@ -502,7 +502,7 @@ impl AgyPool {
             "api_token_id":submission.api_token_id,"credential_snapshot":submission.credential_snapshot,
             "model":submission.model,"native_model":submission.native_model,"body":submission.body,
             "deadline_unix_ms":submission.request.deadline_unix_ms,"capture_enabled":submission.capture_enabled});
-        if submission.system_prompt_policy.enabled {
+        if !submission.system_prompt_policy.is_disabled() {
             value["system_prompt_policy"] = serde_json::to_value(&submission.system_prompt_policy)
                 .map_err(|_| unavailable())?;
         }

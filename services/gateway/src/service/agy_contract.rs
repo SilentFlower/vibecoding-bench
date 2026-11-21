@@ -54,6 +54,9 @@ pub struct AgySystemPromptPolicy {
     pub schema_version: u8,
     pub enabled: bool,
     pub rule_version: String,
+    /// 普通 Messages 用户段的受信位置。未选择时沿独立系统段。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_reminder_index: Option<usize>,
 }
 
 impl Default for AgySystemPromptPolicy {
@@ -70,12 +73,13 @@ impl AgySystemPromptPolicy {
             schema_version: 1,
             enabled,
             rule_version: AGY_SYSTEM_PROMPT_RULE.into(),
+            user_reminder_index: None,
         }
     }
 
     /// 关闭策略省略私有扩展以保持历史默认发送兼容。@return 是否关闭。
     pub fn is_disabled(&self) -> bool {
-        !self.enabled
+        !self.enabled && self.user_reminder_index.is_none()
     }
 
     /// 拒绝未知规则并保持发送前失败。@return 合同校验结果。
@@ -91,10 +95,15 @@ impl AgySystemPromptPolicy {
         let Some(replaced) = report["replaced_codepoints"].as_u64() else {
             return false;
         };
+        let source = if self.user_reminder_index.is_some() {
+            "cortex_user_reminder"
+        } else {
+            "cortex_custom_system"
+        };
         report["schema_version"].as_u64() == Some(u64::from(self.schema_version))
             && report["enabled"].as_bool() == Some(self.enabled)
             && report["rule_version"].as_str() == Some(self.rule_version.as_str())
-            && report["source"].as_str() == Some("cortex_custom_system")
+            && report["source"].as_str() == Some(source)
             && report["changed"].as_bool() == Some(replaced > 0)
             && (self.enabled || replaced == 0)
             && report["system_codepoints"]

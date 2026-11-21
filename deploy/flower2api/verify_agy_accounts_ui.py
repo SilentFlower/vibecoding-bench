@@ -91,23 +91,31 @@ async def main():
         await expect(first.locator('.agy-gateway-windows')).to_have_count(0)
         await expect(first.locator('.account-work-status')).to_have_count(0)
         await expect(second.locator('.agy-account-usage')).to_contain_text('未刷新')
-        await expect(first.locator('.account-routing')).to_contain_text('低负载优先')
+        await expect(first.locator('.account-routing')).to_contain_text('原生运行时 Antigravity')
         await expect(first.locator('.account-live-metrics button')).to_have_count(4)
         await expect(first.locator('.account-live-metrics button').nth(1)).to_contain_text('5')
         await expect(first.locator('.account-live-metrics button').nth(3)).to_contain_text('在途请求')
         await first.get_by_role('button',name='编辑',exact=True).click()
         dialog = page.get_by_role('dialog')
         switch = dialog.get_by_role('checkbox',name='系统提示词同形体转换')
+        reminder = dialog.get_by_role('checkbox', name='系统提示词移入用户消息（试验）')
         await expect(switch).not_to_be_checked()
+        await expect(reminder).not_to_be_checked()
         await expect(dialog.get_by_role('combobox',name='账号平台')).to_be_disabled()
         await switch.check()
+        await reminder.check()
         await asyncio.sleep(5.2)
         await expect(switch).to_be_checked()
+        await expect(reminder).to_be_checked()
         await dialog.get_by_role('button',name='保存修改',exact=True).click()
         await expect(dialog).to_have_count(0)
-        assert fixture.writes[-1]['body']=={'agy_system_prompt_homoglyph_enabled':True},fixture.writes[-1]
+        assert fixture.writes[-1]['body'] == {
+            'agy_system_prompt_homoglyph_enabled': True,
+            'agy_system_prompt_as_user_reminder': True,
+        }, fixture.writes[-1]
         await second.get_by_role('button',name='编辑',exact=True).click()
         await expect(switch).not_to_be_checked()
+        await expect(reminder).not_to_be_checked()
         await dialog.get_by_role('button',name='取消',exact=True).click()
         await first.get_by_role('button',name='详情',exact=True).click()
         await expect(dialog.locator('.account-model-list')).to_be_hidden()
@@ -163,6 +171,9 @@ async def main():
         await page.get_by_role('option',name='Claude Code',exact=True).click()
         await expect(page.locator('.account-card')).to_have_count(1)
         await expect(page.locator('.account-card')).to_contain_text('CC兼容账号')
+        await page.locator('.account-card').get_by_role('button', name='编辑', exact=True).click()
+        await expect(reminder).to_have_count(0)
+        await dialog.get_by_role('button', name='取消', exact=True).click()
         await page.get_by_role('combobox',name='平台筛选').click()
         await page.get_by_role('option',name='Antigravity',exact=True).click()
         await expect(page.locator('.account-card')).to_have_count(2)
@@ -170,6 +181,7 @@ async def main():
         await first.get_by_role('button',name='编辑',exact=True).click()
         assert await dialog.evaluate('e=>e.scrollWidth<=e.clientWidth+1')
         await expect(switch).to_be_checked()
+        await expect(reminder).to_be_checked()
         output = ROOT/'.trellis/.runtime/agy-account-ui-390.png'
         await page.screenshot(path=str(output))
         assert not errors,errors

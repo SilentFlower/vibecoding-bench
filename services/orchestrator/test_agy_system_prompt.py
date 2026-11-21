@@ -5,7 +5,10 @@ import unittest
 
 from agy_runtime.contract import InputError
 from agy_runtime.gemini_contract import decode_request
-from agy_runtime.system_prompt import RULE_VERSION, decode_policy, default_policy, transform_system
+from agy_runtime.system_prompt import (
+    POLICY_SOURCE, REMINDER_SYSTEM_INSTRUCTION, RULE_VERSION, USER_REMINDER_SOURCE,
+    decode_policy, default_policy, transform_system,
+)
 
 
 class AgySystemPromptTests(unittest.TestCase):
@@ -63,10 +66,55 @@ class AgySystemPromptTests(unittest.TestCase):
         self.assertNotIn('ABC system', report)
         self.assertNotIn('ABC-id', report)
 
+    def test_reminder_and_homoglyph_policies_compose_before_native_history(self):
+        """核对四种组合、原始历史、工具和回执来源。@return 无。"""
+        body = {
+            'systemInstruction': {'parts': [{'text': 'ABC system'}, {'text': '中文 {x: 3}'}]},
+            'contents': [
+                {'role': 'user', 'parts': [{'text': 'ABC user'}, {'text': '<system-reminder>ABC</system-reminder>'}]},
+                {'role': 'model', 'parts': [
+                    {'functionCall': {'id': 'sample', 'name': 'lookup', 'args': {'x': 'ABC'}}, 'thoughtSignature': 'c2ln'},
+                ]},
+                {'role': 'user', 'parts': [
+                    {'functionResponse': {'id': 'sample', 'name': 'lookup', 'response': {'value': 'ABC'}}},
+                ]},
+            ],
+        }
+        original = copy.deepcopy(body)
+        raw = {'schema_version': 1, 'type': 'gemini_request', 'request_id': 'synthetic',
+            'model': 'gemini-synthetic', 'native_model': 'MODEL_PLACEHOLDER_M36', 'body': body}
+        original_steps = decode_request(raw)['native_steps']
+        expected = ('ABC system\n中文 {x: 3}', 'ΑΒС ѕуѕtеm\n中文 {х: 3}')
+        for glyphs in (False, True):
+            for reminder in (False, True):
+                with self.subTest(glyphs=glyphs, reminder=reminder):
+                    policy = {**default_policy(), 'enabled': glyphs}
+                    if reminder:
+                        policy['user_reminder_index'] = 0
+                    decoded = decode_request({**raw, 'system_prompt_policy': policy})
+                    self.assertEqual(body, original)
+                    self.assertEqual(decoded['gemini_body'], original)
+                    self.assertEqual(decoded['native_steps'][1:], original_steps[1:])
+                    self.assertEqual(decoded['system'], REMINDER_SYSTEM_INSTRUCTION if reminder else expected[glyphs])
+                    user = decoded['native_steps'][0]['userInput']['userResponse']
+                    original_user = original_steps[0]['userInput']['userResponse']
+                    self.assertEqual(user, original_user + (
+                        f'\n<system-reminder>\n{expected[glyphs]}\n</system-reminder>' if reminder else ''
+                    ))
+                    report = decoded['system_prompt_policy']
+                    self.assertEqual(report['source'], USER_REMINDER_SOURCE if reminder else POLICY_SOURCE)
+                    self.assertEqual(report['changed'], glyphs)
+                    self.assertNotIn('user_reminder_index', report)
+
+        for index in (1, 2, 3):
+            with self.subTest(index=index), self.assertRaisesRegex(InputError, 'invalid_system_reminder_target'):
+                decode_request({**raw, 'system_prompt_policy': {**default_policy(), 'user_reminder_index': index}})
+
     def test_malformed_or_unknown_policy_never_becomes_truthy_configuration(self):
         """未知规则及畸形布尔显式拒绝，缺省仅由调用边界解释。@return 无。"""
         for value in [None, True, {}, {**self.enabled, 'enabled': 'false'}, {**self.enabled, 'schema_version': True},
-                {**self.enabled, 'rule_version': 'unknown'}, {**self.enabled, 'source': 'public'}]:
+                {**self.enabled, 'rule_version': 'unknown'}, {**self.enabled, 'source': 'public'},
+                {**self.enabled, 'user_reminder_index': True}, {**self.enabled, 'user_reminder_index': -1}]:
             with self.subTest(value=value), self.assertRaises(InputError):
                 decode_policy(value)
 

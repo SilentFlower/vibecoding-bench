@@ -7,7 +7,7 @@ from .contract import InputError, decode_gemini_bytes, text, tools
 from .tool_schema import normalize
 from .input_media import gif_budget, media_part
 from .models import valid_model_mapping
-from .system_prompt import decode_policy, default_policy, transform_system
+from .system_prompt import default_policy, prepare_system
 
 BYPASS_SIGNATURE='context_engineering_is_the_way_to_go'
 SAFETY_CATEGORIES={'HARM_CATEGORY_HARASSMENT','HARM_CATEGORY_HATE_SPEECH','HARM_CATEGORY_SEXUALLY_EXPLICIT','HARM_CATEGORY_DANGEROUS_CONTENT'}
@@ -252,12 +252,17 @@ def decode_request(raw, *, fixed_model: tuple[str, str | int] | None = None):
     full_egress=raw.get('full_egress',False)
     if type(full_egress) is not bool:raise InputError('invalid_capture_policy')
     changes=[];notices=[];declared=definitions(body,changes)
-    steps=native_history(body.get('contents'), (tool['name'] for tool in declared), gif_budget(body,enabled), native_model=native_model);system=[]
+    system=[]
     if 'systemInstruction' in body:
         value=body['systemInstruction'];checked_fields(value,{'role','parts'},'/body/systemInstruction')
         if value.get('role','user') not in ['user','system']:raise InputError('unsupported_system_role')
         if not isinstance(value.get('parts'),list) or not value['parts']:raise InputError('invalid_system_parts')
         for part in value['parts']:checked_fields(part,{'text'},'/body/systemInstruction/parts');system.append(text(part.get('text')))
+    policy = raw.get('system_prompt_policy', default_policy())
+    submitted, contents, report = prepare_system('\n'.join(system), body.get('contents'), policy)
+    steps = native_history(
+        contents, (tool['name'] for tool in declared), gif_budget(body, enabled), native_model=native_model,
+    )
     completion={}
     if 'generationConfig' in body:
         value=body['generationConfig'];checked_fields(value,{'maxOutputTokens','temperature','topP','responseModalities'},'/body/generationConfig')
@@ -302,8 +307,6 @@ def decode_request(raw, *, fixed_model: tuple[str, str | int] | None = None):
         # 现有 new-api 会丢弃历史函数 ID；请求单工具生成可避免同名并发结果错配。
         completion['disableParallelToolCalls']=True
         notices.append({'field':'parallel_tool_calls','policy':'native_disable_requested;ordered_same_name_results','reason':'new-api removes function IDs'})
-    policy=decode_policy(raw.get('system_prompt_policy',default_policy()))
-    submitted,report=transform_system('\n'.join(system),policy)
     return {'request_id':ident,'prompt':'','messages':[],'history_id':None,'system':submitted,'system_prompt_policy':report,'model':native_model,'tools':declared,'max_generations':1,
         'request_format':'gemini','gemini_body':copy.deepcopy(body),'native_completion':completion,'native_steps':steps,'schema_changes':changes,'compatibility_notes':notices,
         'safety_egress_rules':safety_egress_rules,'full_egress':full_egress}

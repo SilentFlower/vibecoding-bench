@@ -13,8 +13,9 @@ use crate::config::Config;
 use crate::store::database_schema::migrate_legacy;
 use crate::store::db::init_db;
 use crate::store::{
-    account_platform_schema, account_work_schema, agy_media_schema, agy_safety_schema, proxy_schema,
-    proxy_sync_schema, request_records_schema, session_policy_block_schema,
+    account_platform_schema, account_work_schema, agy_media_schema, agy_safety_schema,
+    agy_system_reminder_schema, proxy_schema, proxy_sync_schema, request_records_schema,
+    session_policy_block_schema,
 };
 
 /// 返回初始迁移源码摘要，测试代码不进入持久合同。
@@ -41,6 +42,13 @@ fn registry() -> Result<Value, sqlx::Error> {
         return Err(sqlx::Error::Protocol("迁移定义与登记不符".into()));
     }
     for (index, step) in steps.iter().enumerate() {
+        if step["id"] == "gateway.agy-system-reminder.10"
+            && step["checksum"] != agy_system_reminder_schema::checksum()
+        {
+            return Err(sqlx::Error::Protocol(
+                "AGY 提示词位置迁移定义与登记不符".into(),
+            ));
+        }
         if step["id"] == "gateway.agy-safety.9" && step["checksum"] != agy_safety_schema::checksum() {
             return Err(sqlx::Error::Protocol("AGY 原生安全迁移定义与登记不符".into()));
         }
@@ -278,6 +286,9 @@ pub async fn plan(pool: &AnyPool, target: Option<usize>) -> Result<Value, sqlx::
     if rows.len() >= 9 {
         agy_safety_schema::verify(pool).await?;
     }
+    if rows.len() >= 10 {
+        agy_system_reminder_schema::verify(pool).await?;
+    }
     for step in &mut steps {
         step["state"] = json!(
             if step["version"].as_u64().unwrap_or(u64::MAX) <= rows.len() as u64 {
@@ -310,6 +321,7 @@ pub async fn migrate(pool: &AnyPool, driver: &str) -> Result<(), sqlx::Error> {
         account_work_schema::apply(&mut transaction).await?;
         agy_media_schema::apply(&mut transaction, driver).await?;
         agy_safety_schema::apply(&mut transaction, driver).await?;
+        agy_system_reminder_schema::apply(&mut transaction, driver).await?;
         transaction.commit().await?;
         return Ok(());
     }
@@ -352,7 +364,8 @@ pub async fn apply(
                 | "gateway.request-records.6"
                 | "gateway.account-work.7"
                 | "gateway.agy-media.8"
-                | "gateway.agy-safety.9",
+                | "gateway.agy-safety.9"
+                | "gateway.agy-system-reminder.10",
             ) => {}
             _ => return Err(sqlx::Error::Protocol("迁移实现尚未登记".into())),
         }
@@ -383,6 +396,9 @@ pub async fn apply(
         }
         if step["id"] == "gateway.agy-safety.9" {
             agy_safety_schema::apply(&mut transaction, "sqlite").await?;
+        }
+        if step["id"] == "gateway.agy-system-reminder.10" {
+            agy_system_reminder_schema::apply(&mut transaction, "sqlite").await?;
         }
         sqlx::query("CREATE TABLE IF NOT EXISTS system_schema_migrations (migration_id TEXT PRIMARY KEY,version INTEGER NOT NULL UNIQUE,checksum TEXT NOT NULL,applied_at TEXT NOT NULL,operation_id TEXT NOT NULL)")
             .execute(&mut *transaction).await?;
@@ -460,6 +476,51 @@ mod tests {
             .unwrap()
     }
 
+    /// 旧账号补齐关闭值，重复执行保留已保存的设置。
+    #[tokio::test]
+    async fn account_system_reminder_migration_preserves_account_and_saved_value() {
+        let database = pool().await;
+        let operation = Uuid::new_v4().to_string();
+        apply(&database, &operation, Some(9)).await.unwrap();
+        sqlx::query(
+            "INSERT INTO accounts(id,email,token,device_id,platform) VALUES(17,'fixture@example.test','synthetic','fixture','antigravity')",
+        )
+        .execute(&database)
+        .await
+        .unwrap();
+        let upgrade = apply(&database, &Uuid::new_v4().to_string(), None)
+            .await
+            .unwrap();
+        assert_eq!(upgrade["current_version"], 10);
+        let value: (i64, String, i32) = sqlx::query_as(
+            "SELECT id,platform,agy_system_prompt_as_user_reminder FROM accounts WHERE id=17",
+        )
+        .fetch_one(&database)
+        .await
+        .unwrap();
+        assert_eq!(value, (17, "antigravity".into(), 0));
+        sqlx::query("UPDATE accounts SET agy_system_prompt_as_user_reminder=1 WHERE id=17")
+            .execute(&database)
+            .await
+            .unwrap();
+        apply(&database, &Uuid::new_v4().to_string(), None)
+            .await
+            .unwrap();
+        assert_eq!(
+            sqlx::query_scalar::<_, i32>(
+                "SELECT agy_system_prompt_as_user_reminder FROM accounts WHERE id=17",
+            )
+            .fetch_one(&database)
+            .await
+            .unwrap(),
+            1,
+        );
+        assert_eq!(
+            plan(&database, Some(9)).await.unwrap()["state"],
+            "compatible_newer"
+        );
+    }
+
     /// 从已发布版本6追加工作控制，保留原台账与平台结构。
     /// @return 无。
     #[tokio::test]
@@ -483,7 +544,7 @@ mod tests {
         let result = apply(&database, &Uuid::new_v4().to_string(), None)
             .await
             .unwrap();
-        assert_eq!(result["current_version"], 9);
+        assert_eq!(result["current_version"], 10);
         let preserved: Vec<(String, String, String, String)> = sqlx::query_as(
             "SELECT migration_id,CAST(version AS TEXT),checksum,operation_id FROM system_schema_migrations WHERE version<=6 ORDER BY version",
         )
@@ -514,7 +575,7 @@ mod tests {
         let result = apply(&database, &Uuid::new_v4().to_string(), None)
             .await
             .unwrap();
-        assert_eq!(result["current_version"], 9);
+        assert_eq!(result["current_version"], 10);
         let duration: String = sqlx::query_scalar(
             "SELECT value FROM settings WHERE key='session_policy_block_duration_minutes'",
         )
@@ -552,7 +613,7 @@ mod tests {
         let result = apply(&database, &Uuid::new_v4().to_string(), None)
             .await
             .unwrap();
-        assert_eq!(result["current_version"], 9);
+        assert_eq!(result["current_version"], 10);
         let original: String =
             sqlx::query_scalar("SELECT operation_id FROM system_schema_migrations")
                 .fetch_one(&database)

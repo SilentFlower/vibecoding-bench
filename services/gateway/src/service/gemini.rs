@@ -1649,8 +1649,12 @@ async fn execute(
             config.remove("thinkingConfig");
         }
     }
-    let system_prompt_policy =
+    let mut system_prompt_policy =
         AgySystemPromptPolicy::new(current.agy_system_prompt_homoglyph_enabled);
+    if matches!(protocol, ResponseProtocol::Messages) && current.agy_system_prompt_as_user_reminder
+    {
+        system_prompt_policy.user_reminder_index = messages::system_reminder_target(&body);
+    }
     let disable_safety_filtering = current.agy_disable_safety_filtering;
     let request_id = Uuid::new_v4().to_string();
     let trace = diagnostics::current_trace();
@@ -2212,7 +2216,7 @@ async fn drive(
     let mut attempt_id = initial_attempt_id;
     let mut attempted_recovery = false;
     let mut forwarded = 0;
-    let mut policy_acknowledged = !system_prompt_policy.enabled;
+    let mut policy_acknowledged = system_prompt_policy.is_disabled();
     let mut ingress_sent = false;
     let mut cutting_over = false;
     let mut history_closure: Option<HistoryClosure> = None;
@@ -2334,7 +2338,7 @@ async fn drive(
             tool_execution_id = native["tool_execution_id"].as_str(),
             event_type = native["type"].as_str(),
             native_model_calls = native["native_model_calls"].as_u64(),
-            system_prompt_requested = system_prompt_policy.enabled,
+            system_prompt_requested = !system_prompt_policy.is_disabled(),
             system_prompt_rule = system_prompt_policy.rule_version.as_str(),
             system_prompt_source = native["system_prompt_policy"]["source"].as_str(),
             system_prompt_changed = native["system_prompt_policy"]["changed"].as_bool(),
@@ -2357,7 +2361,7 @@ async fn drive(
                         return Err(AppError::BadGateway("AGY系统文本策略回执不符".into()));
                     }
                     policy_acknowledged = true;
-                } else if system_prompt_policy.enabled {
+                } else if !system_prompt_policy.is_disabled() {
                     return Err(AppError::BadGateway("AGY执行端缺少系统文本策略支持".into()));
                 }
             }
@@ -2491,7 +2495,7 @@ async fn drive(
                         return Err(AppError::ServiceUnavailable("AGY认证恢复提交失败".into()));
                     }
                     snapshot = refreshed;
-                    policy_acknowledged = !system_prompt_policy.enabled;
+                    policy_acknowledged = system_prompt_policy.is_disabled();
                     ingress_sent = false;
                     reader = EventReader {
                         stream: Box::pin(retry.bytes_stream()),

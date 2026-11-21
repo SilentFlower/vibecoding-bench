@@ -43,10 +43,19 @@ def main():
         def do_POST(self):
             """处理受信白名单操作。@return 无。"""
             assert self.headers['Authorization']=='Bearer '+SECRET
+            path = self.path.partition('?')[0]
+            if path.startswith('/internal/v3/agy-environments/'):
+                self.send_response(404)
+                self.send_header('Content-Length', '0')
+                self.end_headers()
+                return
             body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
-            action = self.path.rsplit('/',1)[-1]
+            action = path.rsplit('/',1)[-1]
             status = 200
-            if action=='verify':
+            if path.startswith('/internal/v3/quiesce/'):
+                assert body['owner'].startswith('gateway-config:') and body['generation']
+                result = {'ok': True}
+            elif action=='verify':
                 email = tokens[body['document']['token']['access_token']]
                 result = native(email, body['document']['token']['access_token'])
             elif action=='start':
@@ -154,12 +163,32 @@ def main():
             assert request('GET','/admin/accounts')['total']==1
             assert request('GET','/admin/accounts?platform=all')['total']==2
             assert request('GET','/admin/accounts?platform=antigravity&page=2&page_size=1')['data']==[]
+            reminder = 'agy_system_prompt_as_user_reminder'
+            assert created[reminder] is False and cc[reminder] is False
+            request('POST', '/admin/accounts', {
+                'email': 'fixture-cc@example.test', 'setup_token': 'synthetic-cc', reminder: True,
+            }, 400)
+            request('PUT', f"/admin/accounts/{cc['id']}", {reminder: True}, 400)
+            request('PUT', f'/admin/accounts/{account}', {reminder: 'true'}, 400)
+            assert request('PUT', f'/admin/accounts/{account}', {reminder: True})[reminder] is True
+            native('experiment@example.test', 'synthetic-experiment-at')
+            experiment = request('POST', '/admin/accounts', {
+                'platform': 'antigravity', 'email': 'experiment@example.test', 'auth_type': 'oauth',
+                'access_token': 'synthetic-experiment-at', 'refresh_token': 'synthetic-rt1',
+                'expires_at': 4070908800000, reminder: True,
+            }, 201)
+            assert experiment[reminder] is True
+            request('PUT', f"/admin/accounts/{experiment['id']}", {reminder: False})
+            listed = request('GET', '/admin/accounts?platform=antigravity')['data']
+            assert {row['id']: row[reminder] for row in listed} == {account: True, experiment['id']: False}
             request('PUT',f'/admin/accounts/{account}',{'platform':'claude_code'},400)
             request('PUT',f'/admin/accounts/{account}',{'proxy_url':'invalid-proxy'},400)
             request('POST','/admin/oauth/generate-auth-url',{'platform':'antigravity','proxy_url':'invalid-proxy'},400)
             request('POST','/admin/accounts',{'platform':'unknown','email':'unknown@example.test'},400)
             request('POST','/admin/oauth/generate-setup-token-url',{'platform':'antigravity'},400)
-            request('GET',f'/admin/runtime/accounts/{account}/config',expected=400)
+            runtime = request('GET', f'/admin/runtime/accounts/{account}/config')
+            assert runtime['account_id'] == account and runtime['platform'] == 'antigravity'
+            assert 'access_token' not in runtime and 'refresh_token' not in runtime
             request('PUT',f'/admin/accounts/{account}',{'agy_system_prompt_homoglyph_enabled':True})
             assert request('GET',f'/admin/accounts/{account}')['agy_system_prompt_homoglyph_enabled']
             path=f'/admin/accounts/{account}/oauth-credentials/resolve'
@@ -191,6 +220,7 @@ def main():
             exchanged=request('POST','/admin/oauth/exchange-code',{'session_id':generated['session_id'],'code':'synthetic-code'})
             current=request('GET',f'/admin/accounts/{account}')
             assert current['agy_system_prompt_homoglyph_enabled'] and current['id']==account
+            assert current[reminder] is True
             assert current['usage_data']['capabilities']==exchanged['capabilities']
             assert current['usage_data']['capabilities']!=created['usage_data']['capabilities'] and current['usage_fetched_at']
             wrong=request('POST','/admin/oauth/generate-auth-url',{'platform':'antigravity','account_id':account})

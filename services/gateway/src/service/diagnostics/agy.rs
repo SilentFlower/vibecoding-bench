@@ -283,7 +283,7 @@ impl AgyAttemptTrace {
                 enabled: self.policy.enabled,
                 rule_version: self.policy.rule_version.clone(),
                 rule_sha256: report["rule_sha256"].as_str().map(str::to_owned),
-                source: Some("cortex_custom_system".into()),
+                source: report["source"].as_str().map(str::to_owned),
                 changed: report["changed"].as_bool(),
                 replaced_codepoints: report["replaced_codepoints"].as_u64(),
                 system_codepoints: report["system_codepoints"].as_u64(),

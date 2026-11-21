@@ -1999,6 +1999,45 @@ transport.submit(prepared, body, ttfb_timeout).await
 - 同一回环核对思考选号、目录缺档、显式档位和改 effort 后的同账号工具续轮。用同一图片源核对 Messages JSON 和 SSE 的 Markdown 数据及顺序，以及原生 Gemini 两种响应的原始 `inlineData` 和终态。
 - 加 `--claude-code <可执行文件>` 核对真实客户端 `searchCount=1`、来源链接和后续生成。真实 Google 联网由有授权的测试账号单独验收。
 
+## Scenario: AGY Messages 账号级系统提示词位置
+
+### 1. Scope / Trigger
+
+- 修改 AGY 账号的 Messages 系统提示词位置、同形体组合、私有策略或相应采集来源时适用。未选择用户提醒时，沿[独立系统段的同形体合同](../../orchestrator/backend/account-runtime-v3.md#scenario-agy账号系统文本同形体策略)。
+
+### 2. Signatures
+
+- `POST /admin/accounts`、`PUT /admin/accounts/{id}` 和账号读回使用 `agy_system_prompt_as_user_reminder: boolean`。账号表存为 `INTEGER NOT NULL DEFAULT 0`。SQLite 由 `gateway.agy-system-reminder.10` 追加，PostgreSQL 初始化沿同名列。
+- `AgySubmission.system_prompt_policy` 的 `schema_version=1` 增加可选 `user_reminder_index`，为 `contents` 的非负下标。启用同形体仍由 `enabled` 表示。原生回执沿现有字段，用户提醒落点使用 `source="cortex_user_reminder"`。
+
+### 3. Contracts
+
+- 账号管理页独立保存两个布尔值，新旧账号的位置开关默认关闭。网关按实际选中的 AGY 账号冻结设置。普通 Messages 生成有独立系统文本时选择第一条不含函数结果的用户内容，公开请求正文不提供策略索引。
+- 原生入口以换行合并系统文本，先执行现有 `transform_system`，再按可选索引追加一个 `<system-reminder>` 文本块。此时独立系统段使用 `Use the provided context to answer the user's request.`。字符映射只处理原系统文本。标签、固定中性指令和已有消息逐字保留。Gemini 原生直连沿独立系统段。
+- 领取和历史续轮依据投影前正文及原有工具签名、调用 ID 和结果定位。新生成采用当前账号值。同一 HTTP 的认证恢复复用首次策略。开启位置或同形体时，网关先核对实际落点和转换回执再交付源帧。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 省略位置字段或保存关闭 | 私有信封省略索引。两个策略均关闭时省略策略扩展 |
+| 系统文本为空或缺少普通用户内容 | 沿独立系统段，保留同形体开关语义 |
+| 非 AGY 账号启用或更新字段类型无效 | 管理请求受控拒绝 |
+| 私有索引畸形、越界或指向工具结果 | 原生组装前拒绝 |
+| 运行组件缺少位置策略支持或回执不符 | 受控失败，公开响应不交付未经验证的源帧 |
+
+### 5. Scenarios and Examples
+
+- 两项开启时，`system = "ABC system"` 在用户消息追加 `<system-reminder>\nΑΒС ѕуѕtеm\n</system-reminder>`，独立系统段留下中性指令。仅启用位置时，同一标签承载 `ABC system` 原文。
+- 工具等待期间关闭位置开关。原工具结果按既有归属收口，回填后的新模型请求使用独立系统段，同一回填重读复用原终态。
+- 直接对整个用户消息执行同形体替换会改变原输入。配套实现先转换独立系统文本，再将结果作为新文本块追加。
+
+### 6. Tests Required
+
+- 真实管理 HTTP、SQLite 和浏览器覆盖两个账号独立保存、旧账号默认关闭、非 AGY 约束、重新编辑与 390px 布局。迁移核对旧版本台账、重跑幂等与原数据。
+- `verify_agy_native_loopback.py --system-reminder` 在断网容器核对四种组合的实际原生 TLS 体和回执来源。覆盖领取、历史续轮、历史兜底、待回填切换、签名及单次回填。
+- `verify_agy_gemini.py` 覆盖两个账号的私有快照、首次冻结及认证恢复。Python 单测覆盖已存在提醒、工具历史、非法索引及快照读回。
+
 ## Scenario: 反重力工具续轮与开流失败边界
 
 ### 1. Scope / Trigger

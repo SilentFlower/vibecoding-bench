@@ -615,6 +615,7 @@ async fn list_accounts(
 struct CreateAccountRequest {
     platform: Option<String>,
     agy_system_prompt_homoglyph_enabled: Option<bool>,
+    agy_system_prompt_as_user_reminder: Option<bool>,
     agy_gif_frames_enabled: Option<bool>,
     agy_disable_safety_filtering: Option<bool>,
     cli_identity: Option<CliIdentityImport>,
@@ -1160,6 +1161,11 @@ async fn create_account(
     if platform == "claude_code" && req.agy_system_prompt_homoglyph_enabled == Some(true) {
         return Err(AppError::BadRequest("同形体开关仅适用于 AGY 账号".into()));
     }
+    if platform != "antigravity" && req.agy_system_prompt_as_user_reminder == Some(true) {
+        return Err(AppError::BadRequest(
+            "提示词位置试验仅适用于 AGY 账号".into(),
+        ));
+    }
     if platform == "antigravity"
         && (req.cli_identity.is_some()
             || req.credential_ownership.is_some()
@@ -1189,6 +1195,9 @@ async fn create_account(
         agy_system_prompt_homoglyph_enabled: req
             .agy_system_prompt_homoglyph_enabled
             .unwrap_or(false),
+        agy_system_prompt_as_user_reminder: req
+            .agy_system_prompt_as_user_reminder
+            .unwrap_or_default(),
         agy_gif_frames_enabled: req.agy_gif_frames_enabled.unwrap_or_default(),
         agy_disable_safety_filtering: req.agy_disable_safety_filtering.unwrap_or_default(),
         id: 0,
@@ -1503,6 +1512,11 @@ async fn update_account(
     }
     if updates.get("agy_disable_safety_filtering").is_some() {
         return Err(AppError::BadRequest("原生安全开关仅适用于 AGY 账号".into()));
+    }
+    if updates.get("agy_system_prompt_as_user_reminder").is_some() {
+        return Err(AppError::BadRequest(
+            "提示词位置试验仅适用于 AGY 账号".into(),
+        ));
     }
     if let Some(value) = updates.get("agy_system_prompt_homoglyph_enabled") {
         if !existing.is_antigravity() {
