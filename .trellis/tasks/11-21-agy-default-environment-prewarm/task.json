@@ -14,7 +14,7 @@
   "completedAt": "2026-11-21",
   "closeout": {
     "status": "closed",
-    "closedAt": "2026-11-21T14:54:42Z",
+    "closedAt": "2026-11-21T15:09:51Z",
     "blockers": []
   },
   "branch": null,
@@ -6090,13 +6090,11 @@
   },
   "progress": {
     "completedSteps": [
-      "实现 OAuth 就绪的反重力账号默认登记、存量环境补齐与后台补热",
-      "通过网关、编排定向、浏览器及原版 AGY 隔离验收",
-      "发布 v1.31.0 并核对签名目录、发行附件及双库兼容演练"
+      "三处补热修复及跨层验收"
     ],
     "partialStep": null,
-    "nextStep": "已完成",
-    "notes": "预热不提交模型调用。编排器全量测试中途终止，官方发布测试与 AGY 定向测试通过。",
-    "updatedAt": "2026-11-21T14:54:42Z"
+    "nextStep": "按原发布流程交付",
+    "updatedAt": "2026-11-21T15:09:51Z",
+    "notes": ""
   }
 }
