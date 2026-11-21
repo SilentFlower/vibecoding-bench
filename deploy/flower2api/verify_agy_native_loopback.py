@@ -32,6 +32,7 @@ ENVIRONMENT='a'*32
 SECRET='synthetic-internal-proof-at-least-32-bytes'
 MODEL='gemini-3.1-pro-preview'
 SHARED_MODELS = {MODEL: 'MODEL_PLACEHOLDER_M36', 'gemini-3.8-flash-low': 'MODEL_PLACEHOLDER_M320'}
+MESSAGES_LOW_MODEL = MODEL + '-low'
 SOURCE_SHA='39816d49d5ab92229952987225c23ea3fed7580699dcb4a444e0388e0ac1ce43'
 SCHEMA_TOOL_ARGS = {'x': 1, 'action': 'query', 'where': [['count', '>=', 7], ['ready', '==', True]]}
 SEARCH_QUERY = 'IANA Example Domains'
@@ -44,6 +45,11 @@ def require(condition, message):
     """校验隔离验收条件。@param condition 实际条件。@param message 固定说明。@return 无。"""
     if not condition:
         raise ValueError(message)
+
+
+def sse_frames(raw):
+    """读取隔离回包事件。@param raw SSE 字节。@return 原顺序的事件。"""
+    return [json.loads(line[6:]) for line in raw.splitlines() if line.startswith(b'data: ')]
 
 
 class Upstream(BaseHTTPRequestHandler):
@@ -173,6 +179,9 @@ class Upstream(BaseHTTPRequestHandler):
             part={'functionCall':{'name':'synthetic_tool','args':arguments,'id':tool_id},'thoughtSignature':'c3ludGhldGljLXNpZw=='} if tool else {'text':'本地TLS回复'}
             frames=[{'candidates':[{'index':0,'content':{'role':'model','parts':[part]}}]}]
             if self.messages_search:
+                if 'Messages image response fixture' in encoded:
+                    image = {'inlineData': {'mimeType': 'image/png', 'data': fixture_png((19, 73, 211))}}
+                    frames[0]['candidates'][0]['content']['parts'] = [{'text': '图片前文'}, image, {'text': '图片后文'}]
                 names = {entry['name'] for tool in tools for entry in tool.get('functionDeclarations', [])}
                 if 'search_web' in names:
                     require(names <= {'search_web','manage_task'}, '独立搜索继承了普通执行工具')
@@ -1321,24 +1330,102 @@ def verify_live_capacity(request, wait_idle, base):
     return {'passed': True, 'capacity': [3, 4, 3], 'same_supervisor': True, 'model_submissions': len(Upstream.calls)}
 
 
+def verify_messages_thinking_and_images(request, wait_idle, database):
+    """核对 Messages 选号及两种协议下的图片回包。@param request 公共入口。
+    @param wait_idle 发送器回收检查。@param database 合成账号库。@return 验证摘要。"""
+    messages_path = '/v1/messages'
+    gemini_base = '/v1beta/models/' + MODEL + ':'
+    body = {'model': MODEL, 'max_tokens': 128, 'messages': [{'role': 'user', 'content': 'Messages reasoning fixture'}]}
+    tier_cases = [
+        ({}, MODEL),
+        ({'thinking': {'type': 'enabled', 'budget_tokens': 1024}}, MESSAGES_LOW_MODEL),
+        ({'thinking': {'type': 'adaptive'}, 'output_config': {'effort': 'low'}}, MESSAGES_LOW_MODEL),
+        ({'thinking': {'type': 'enabled', 'budget_tokens': 1024}, 'output_config': {'effort': 'high'}}, MESSAGES_LOW_MODEL),
+        ({'model': MESSAGES_LOW_MODEL, 'output_config': {'effort': 'high'}}, MESSAGES_LOW_MODEL),
+        ({'output_config': {'effort': 'unknown'}}, MODEL),
+    ]
+    for config, expected in tier_cases:
+        status, raw = request(messages_path, {**body, **config})
+        require(status == 200 and Upstream.calls[-1]['body']['model'] == expected,
+            f'Messages 思考档位未匹配原生目录：{config!r} {status} {raw[:350]!r}')
+        wait_idle()
+
+    native_body = {'contents': [{'role': 'user', 'parts': [{'text': 'Messages reasoning fixture'}]}],
+        'generationConfig': {'maxOutputTokens': 128, 'thinkingConfig': {'thinkingLevel': 'LOW'}}}
+    status, raw = request(gemini_base + 'generateContent', native_body)
+    require(status == 200 and Upstream.calls[-1]['body']['model'] == MESSAGES_LOW_MODEL,
+        f'原生 Gemini 思考档位回归失败：{status} {raw[:350]!r}')
+    wait_idle()
+
+    # 暂时只保留一个低档变体，分别验证 Messages 的可用性和 Gemini 的原匹配合同。
+    usage, = database.execute("SELECT usage_data FROM accounts WHERE id=1").fetchone()
+    variant_only = json.loads(usage)
+    variant_only['capabilities']['model_mappings'].pop(MODEL)
+    try:
+        with database:
+            database.execute("UPDATE accounts SET usage_data=? WHERE id=1", (json.dumps(variant_only),))
+        status, raw = request(messages_path, {**body, 'output_config': {'effort': 'max'}})
+        require(status == 200 and Upstream.calls[-1]['body']['model'] == MESSAGES_LOW_MODEL,
+            f'Messages 目录缺档时未沿用原候选：{status} {raw[:350]!r}')
+        wait_idle()
+        before = len(Upstream.calls)
+        native_body['generationConfig']['thinkingConfig'] = {'thinkingLevel': 'XHIGH'}
+        status, raw = request(gemini_base + 'generateContent', native_body)
+        require(status == 404 and len(Upstream.calls) == before and json.loads(raw)['error']['status'] == 'NOT_FOUND',
+            f'原生 Gemini 的显式缺档语义改变：{status} {raw[:350]!r}')
+    finally:
+        with database:
+            database.execute("UPDATE accounts SET usage_data=? WHERE id=1", (usage,))
+
+    prompt = 'Messages image response fixture'
+    image = {'mimeType': 'image/png', 'data': fixture_png((19, 73, 211))}
+    expected_text = ['图片前文', f"![image](data:image/png;base64,{image['data']})", '图片后文']
+    for streaming in (False, True):
+        status, raw = request(messages_path, {**body, 'stream': streaming, 'messages': [{'role': 'user', 'content': prompt}]})
+        require(status == 200, f'Messages 图片回包失败：{status} {raw[:350]!r}')
+        if streaming:
+            events = sse_frames(raw)
+            text = [frame['delta']['text'] for frame in events
+                if frame['type'] == 'content_block_delta' and frame['delta']['type'] == 'text_delta']
+            require(events[-1]['type'] == 'message_stop' and events[-2]['delta']['stop_reason'] == 'end_turn',
+                'Messages 图片流终态不完整')
+        else:
+            result = json.loads(raw)
+            text = [part['text'] for part in result['content'] if part['type'] == 'text' and part['text']]
+            require(result['stop_reason'] == 'end_turn', 'Messages 图片 JSON 终态不完整')
+        require([part for part in text if part] == expected_text, 'Messages 图片数据或文本顺序发生变化')
+        wait_idle()
+
+        method = 'streamGenerateContent?alt=sse' if streaming else 'generateContent'
+        status, raw = request(gemini_base + method, {'contents': [{'role': 'user', 'parts': [{'text': prompt}]}]})
+        require(status == 200, f'原生 Gemini 图片回包失败：{status} {raw[:350]!r}')
+        frames = sse_frames(raw) if streaming else [json.loads(raw)]
+        responses = [candidate for frame in frames for candidate in frame.get('candidates', [])]
+        parts = [part for candidate in responses for part in candidate['content']['parts'] if part != {'text': ''}]
+        require(parts == [{'text': '图片前文'}, {'inlineData': image}, {'text': '图片后文'}]
+            and responses[-1]['finishReason'] == 'STOP', '原生 Gemini 的 Part 或终态发生变化')
+        wait_idle()
+    return {'messages_thinking_cases': len(tier_cases) + 1, 'messages_image_response': 'json_and_sse',
+        'gemini_native_format': 'json_and_sse'}
+
+
 def verify_messages_search(request, wait_idle, database):
     """运行真实 Messages、同名工具回填和原版 WebSearch。@param request 公共 HTTP 入口。
     @param wait_idle 发送器回收检查。@param database 隔离账号库。@return 验证摘要。"""
     path = '/v1/messages'
     metadata = {'user_id':json.dumps({'session_id':'synthetic-messages-session'})}
     main = {'model':MODEL,'metadata':metadata,'max_tokens':128,'stream':True,
+        'thinking':{'type':'adaptive'},'output_config':{'effort':'medium'},
         'system':[{'type':'text','text':'Messages system fixture'}],
         'messages':[{'role':'user','content':'Messages search fixture'},
             {'role':'system','content':[{'type':'text','text':'Trailing environment fixture'}]}],
         'tools':[{'name':'WebSearch','input_schema':{'type':'object','properties':{'query':{'type':'string'}}}},
             {'name':'mcp__fixture__read_item','input_schema':{'type':'object','properties':{'n':{'type':'integer'}}}}]}
 
-    def sse(raw):
-        return [json.loads(line[6:]) for line in raw.splitlines() if line.startswith(b'data: ')]
-
     status, raw = request(path, main)
     require(status==200, f'Messages 主请求失败：{status} {raw[:350]!r}')
-    events=sse(raw)
+    require(Upstream.calls[-1]['body']['model'] == MODEL, '无目标档位时未选原同名模型')
+    events=sse_frames(raw)
     require(events[0]['type']=='message_start' and events[-1]['type']=='message_stop', 'Messages SSE 事件边界错误')
     calls=[item['content_block'].copy() for item in events if item['type']=='content_block_start'
         and item['content_block']['type']=='tool_use']
@@ -1366,12 +1453,12 @@ def verify_messages_search(request, wait_idle, database):
     require(status in (403,404,503), '另一个令牌取得了原搜索许可')
     status,raw=request(path,{**search(SEARCH_QUERY,allowed_domains=['iana.org']),'stream':True})
     require(status==200, f'关联 WebSearch 失败：{status} {raw[:350]!r}')
-    blocks=[item['content_block'] for item in sse(raw) if item['type']=='content_block_start']
+    blocks=[item['content_block'] for item in sse_frames(raw) if item['type']=='content_block_start']
     require([item['type'] for item in blocks]==['server_tool_use','web_search_tool_result'] and blocks[0]['id']==blocks[1]['tool_use_id'],
         'WebSearch SSE 调用和回执没有成对')
     require(isinstance(blocks[1]['content'],list) and [(item['title'],item['url']) for item in blocks[1]['content']]==[(SEARCH_QUERY,SEARCH_URL)],
         'WebSearch 原生来源不正确：'+str(blocks[1]['content']))
-    require(sse(raw)[-2]['usage']['server_tool_use']['web_search_requests']==1,'WebSearch 计数不正确')
+    require(sse_frames(raw)[-2]['usage']['server_tool_use']['web_search_requests']==1,'WebSearch 计数不正确')
     domain_cases=[
         ({'blocked_domains':['iana.org']},[]),
         ({'blocked_domains':['example.org']},[(SEARCH_QUERY,SEARCH_URL)]),
@@ -1389,12 +1476,14 @@ def verify_messages_search(request, wait_idle, database):
 
     response_parts=[{'type':'tool_result','tool_use_id':calls[i]['id'],'content':[{'type':'text','text':f'callback-{i}'}]}
         for i in (3,2,0,1)]
-    continuation={**main,'stream':False,'messages':main['messages']+[
+    continuation={**main,'stream':False,'output_config':{'effort':'low'},'messages':main['messages']+[
         {'role':'assistant','content':calls},{'role':'user','content':response_parts}]}
     status, raw = request(path, continuation)
     require(status==200 and json.loads(raw)['type']=='message' and json.loads(raw)['stop_reason']=='end_turn',
         f'Messages 回填未继续生成：{status} {raw[:350]!r}')
     wait_idle()
+    require(Upstream.calls[-1]['body']['model'] == MODEL
+        and Upstream.calls[-1]['authorization'] == 'Bearer synthetic-at-1', '不同 effort 的回填改变原账号或原生型号')
     sent=Upstream.calls[-1]['body']['request']['contents']
     results=[part['functionResponse'] for message in sent for part in message['parts'] if 'functionResponse' in part]
     require([item['id'] for item in results]==[item['id'] for item in calls], '工具回填没有按原调用身份归位')
@@ -1430,6 +1519,7 @@ def verify_messages_search(request, wait_idle, database):
     wait_idle()
     result={'passed':True,'messages_sse_json':True,'parallel_results':4,'grounded_searches':4,'domain_filter_cases':1+len(domain_cases),
         'single_concurrency':True,'original_session_id':True,'image/png':True,'cancellation':True,'fixed_native_version':'1.5.9'}
+    result.update(verify_messages_thinking_and_images(request, wait_idle, database))
     if Path('/opt/claude-code').is_file():
         result['claude_code_search_count']=verify_claude_code_search(wait_idle)
     status,raw=request('/admin/request-diagnostics?platform=antigravity&entry_protocol=anthropic_messages&page_size=50',admin=True)
@@ -1492,6 +1582,8 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
     os.umask(0o077)
     Upstream.png_support=png
     Upstream.messages_search=messages_search
+    if messages_search:
+        Upstream.model_mappings = {**Upstream.model_mappings, MESSAGES_LOW_MODEL: SHARED_MODELS['gemini-3.8-flash-low']}
     if shared_models:
         Upstream.model_mappings = SHARED_MODELS
     context=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)

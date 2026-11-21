@@ -1,19 +1,31 @@
 //! Anthropic Messages 与现有 AGY Gemini 执行边界的双向转换。
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt::Write;
-use std::io::Error as IoError;
+use std::io::{Error as IoError, copy, sink};
 use std::mem::replace;
 
 use axum::Json;
 use axum::body::{Body, Bytes};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
+use base64::alphabet;
+use base64::engine::DecodePaddingMode;
+use base64::engine::general_purpose::{GeneralPurpose, GeneralPurposeConfig};
+use base64::read::DecoderReader;
 use futures_util::{Stream, StreamExt, stream};
 use serde_json::{Map, Value, json};
 use uuid::Uuid;
 
 use crate::error::AppError;
+
+use super::{AGY_IMAGE_MIME_TYPES, gemini_thinking_budget_tier, gemini_thinking_level_tier};
+
+const IMAGE_BASE64: GeneralPurpose = GeneralPurpose::new(
+    &alphabet::STANDARD,
+    GeneralPurposeConfig::new().with_decode_padding_mode(DecodePaddingMode::Indifferent),
+);
 
 fn invalid(message: &str) -> AppError {
     AppError::BadRequest(message.into())
@@ -195,6 +207,26 @@ pub(super) fn convert_request(request: &Value) -> Result<Value, AppError> {
     Ok(body)
 }
 
+/// 读取供原生目录选号的思考档位。@param request Claude 请求。@return 可映射的档位。
+pub(super) fn thinking_tier(request: &Value) -> Option<&'static str> {
+    let thinking = &request["thinking"];
+    if thinking["type"] == "enabled"
+        && let Some(budget) = thinking["budget_tokens"]
+            .as_i64()
+            .filter(|budget| *budget > 0)
+    {
+        return gemini_thinking_budget_tier(budget);
+    }
+    let effort = request.pointer("/output_config/effort")?.as_str()?.trim();
+    if effort.eq_ignore_ascii_case("max") {
+        Some("xhigh")
+    } else if effort.eq_ignore_ascii_case("none") {
+        Some("low")
+    } else {
+        gemini_thinking_level_tier(effort)
+    }
+}
+
 /// 核对 Messages 的流式选项。@param request 原始请求。@return 是否使用 SSE。
 pub(super) fn streaming(request: &Value) -> Result<bool, AppError> {
     request.get("stream").map_or(Ok(false), |v| {
@@ -227,6 +259,30 @@ fn stop_reason(reason: Option<&str>, used_tool: bool) -> &'static str {
     }
 }
 
+fn response_text(part: &Value) -> Option<Cow<'_, str>> {
+    if let Some(text) = part["text"].as_str() {
+        return Some(Cow::Borrowed(text));
+    }
+    let image = part.get("inlineData").or_else(|| part.get("inline_data"))?;
+    let mime = image
+        .get("mimeType")
+        .or_else(|| image.get("mime_type"))
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if !mime.is_empty() && !mime.starts_with("image/") {
+        return None;
+    }
+    let data = image["data"].as_str().unwrap_or_default();
+    // 分块校验编码，避免为图片正文再分配一份解码缓冲区。
+    let mut decoder = DecoderReader::new(data.as_bytes(), &IMAGE_BASE64);
+    if !AGY_IMAGE_MIME_TYPES.contains(&mime) || !matches!(copy(&mut decoder, &mut sink()), Ok(1..))
+    {
+        tracing::warn!("AGY Messages 收到格式无效或不支持的内嵌图片");
+        return None;
+    }
+    Some(Cow::Owned(format!("![image](data:{mime};base64,{data})")))
+}
+
 fn content_block(part: &Value) -> Option<Value> {
     if let Some(call) = part.get("functionCall") {
         Some(
@@ -238,9 +294,7 @@ fn content_block(part: &Value) -> Option<Value> {
             "signature": part["thoughtSignature"].as_str().unwrap_or("")}),
         )
     } else {
-        part["text"]
-            .as_str()
-            .map(|text| json!({"type": "text", "text": text}))
+        response_text(part).map(|text| json!({"type": "text", "text": text}))
     }
 }
 
@@ -433,7 +487,7 @@ impl MessageStream {
                     );
                     self.close_block(output);
                 }
-            } else if let Some(text) = part["text"].as_str() {
+            } else if let Some(text) = response_text(part) {
                 if self.open != Some("text") {
                     self.start_block(output, "text", json!({"type":"text","text":""}));
                 }
@@ -499,4 +553,49 @@ pub(super) fn stream_response(
         Body::from_stream(stream),
     )
         .into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{response_text, thinking_tier};
+    use serde_json::json;
+
+    #[test]
+    fn messages_thinking_tier_prefers_valid_manual_budget() {
+        for (budget, expected) in [(1024, "low"), (1025, "medium"), (8193, "high")] {
+            let request = json!({
+                "thinking": {"type": "enabled", "budget_tokens": budget},
+                "output_config": {"effort": "max"},
+            });
+            assert_eq!(thinking_tier(&request), Some(expected));
+        }
+        let adaptive = json!({
+            "thinking": {"type": "adaptive", "display": "updates"},
+            "output_config": {"effort": "max"},
+        });
+        assert_eq!(thinking_tier(&adaptive), Some("xhigh"));
+        assert_eq!(
+            thinking_tier(&json!({"output_config": {"effort": "unknown"}})),
+            None
+        );
+        assert_eq!(thinking_tier(&json!({})), None);
+    }
+
+    #[test]
+    fn image_text_preserves_large_data_and_rejects_malformed_parts() {
+        // 让校验跨过解码缓冲区边界，并保留末尾无填充字节。
+        let data = "YWJj".repeat(16_384) + "YQ";
+        let part = json!({"inlineData": {"mimeType": "image/png", "data": data}});
+        let expected = format!("![image](data:image/png;base64,{data})");
+        assert_eq!(response_text(&part).as_deref(), Some(expected.as_str()));
+
+        for (mime, data) in [
+            ("image/svg+xml", "YQ=="),
+            ("image/png", "YQ==)"),
+            ("image/png", ""),
+        ] {
+            let part = json!({"inlineData": {"mimeType": mime, "data": data}});
+            assert!(response_text(&part).is_none());
+        }
+    }
 }

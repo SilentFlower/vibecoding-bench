@@ -51,6 +51,16 @@ use websearch::{SearchRequest, SearchTurn};
 pub(crate) const BODY_LIMIT: usize = 16 * 1024 * 1024;
 const FRAME_LIMIT: usize = 64 * 1024 * 1024;
 const AGY_TOOL_WAIT_LIMIT: Duration = Duration::from_secs(3600);
+const AGY_IMAGE_MIME_TYPES: [&str; 8] = [
+    "image/png",
+    "image/jpeg",
+    "image/jpg",
+    "image/gif",
+    "image/webp",
+    "image/bmp",
+    "image/tiff",
+    "image/avif",
+];
 
 /// 随原生工具轮保留的许可，下一HTTP请求共享同一份所有权。
 struct Admission {
@@ -93,6 +103,7 @@ struct GenerationInput {
     full_egress: bool,
     streaming: bool,
     protocol: ResponseProtocol,
+    messages_tier: Option<&'static str>,
     search: Option<SearchRequest>,
 }
 
@@ -497,6 +508,26 @@ fn gemini_variant_base(model: &str) -> Option<&str> {
         .then_some(base)
 }
 
+fn gemini_thinking_level_tier(level: &str) -> Option<&'static str> {
+    match level.to_ascii_lowercase().as_str() {
+        "minimal" | "low" => Some("low"),
+        "medium" => Some("medium"),
+        "high" => Some("high"),
+        "xhigh" => Some("xhigh"),
+        _ => None,
+    }
+}
+
+fn gemini_thinking_budget_tier(budget: i64) -> Option<&'static str> {
+    // 沿用 Sub2API 的预算区间，只选择档位，原生执行仍由目录型号决定。
+    match budget {
+        -1 | 8193.. => Some("high"),
+        0..=1024 => Some("low"),
+        1025..=8192 => Some("medium"),
+        _ => None,
+    }
+}
+
 fn gemini_thinking_tier(config: &Value) -> Result<Option<&'static str>, AppError> {
     let config = config
         .as_object()
@@ -514,26 +545,20 @@ fn gemini_thinking_tier(config: &Value) -> Result<Option<&'static str>, AppError
     }
     let level = config
         .get("thinkingLevel")
-        .map(
-            |value| match value.as_str().map(str::to_ascii_lowercase).as_deref() {
-                Some("minimal" | "low") => Ok("low"),
-                Some("medium") => Ok("medium"),
-                Some("high") => Ok("high"),
-                Some("xhigh") => Ok("xhigh"),
-                _ => Err(invalid("Gemini thinkingLevel 无效")),
-            },
-        )
+        .map(|value| {
+            value
+                .as_str()
+                .and_then(gemini_thinking_level_tier)
+                .ok_or_else(|| invalid("Gemini thinkingLevel 无效"))
+        })
         .transpose()?;
     let budget_tier = config
         .get("thinkingBudget")
         .map(|value| {
-            // 沿用 Sub2API 的预算区间，只选择档位，原生执行仍由目录型号决定。
-            match value.as_i64() {
-                Some(-1 | 8193..) => Ok("high"),
-                Some(0..=1024) => Ok("low"),
-                Some(1025..=8192) => Ok("medium"),
-                _ => Err(invalid("Gemini thinkingBudget 无效")),
-            }
+            value
+                .as_i64()
+                .and_then(gemini_thinking_budget_tier)
+                .ok_or_else(|| invalid("Gemini thinkingBudget 无效"))
         })
         .transpose()?;
     Ok(level.or(budget_tier))
@@ -569,15 +594,7 @@ fn has_tool_result(body: &Value) -> bool {
 }
 
 fn requested_media(body: &Value) -> Result<BTreeSet<&str>, AppError> {
-    let supported = [
-        "image/png",
-        "image/jpeg",
-        "image/jpg",
-        "image/gif",
-        "image/webp",
-        "image/bmp",
-        "image/tiff",
-        "image/avif",
+    let supported_non_images = [
         "audio/wav",
         "audio/x-wav",
         "audio/mpeg",
@@ -614,7 +631,9 @@ fn requested_media(body: &Value) -> Result<BTreeSet<&str>, AppError> {
                             field,
                         });
                     };
-                    if !supported.contains(&mime) {
+                    if !AGY_IMAGE_MIME_TYPES.contains(&mime)
+                        && !supported_non_images.contains(&mime)
+                    {
                         return Err(AppError::AgyInput {
                             reason: "AGY_UNSUPPORTED_MEDIA_TYPE",
                             message: "AGY 入口不支持该媒体类型",
@@ -1015,6 +1034,7 @@ async fn generate_inner(
             full_egress,
             streaming,
             protocol: ResponseProtocol::Gemini,
+            messages_tier: None,
             search: None,
         },
     )
@@ -1038,10 +1058,13 @@ pub(super) async fn generate_messages(
         validate_model(model)?;
         let streaming = messages::streaming(&input.request)?;
         let search = SearchRequest::from_messages(&input.request)?;
-        let body = if search.is_some() {
-            Value::Null
+        let (body, messages_tier) = if search.is_some() {
+            (Value::Null, None)
         } else {
-            messages::convert_request(&input.request)?
+            (
+                messages::convert_request(&input.request)?,
+                messages::thinking_tier(&input.request),
+            )
         };
         execute(
             service,
@@ -1058,6 +1081,7 @@ pub(super) async fn generate_messages(
                 full_egress: input.full_egress,
                 streaming,
                 protocol: ResponseProtocol::Messages,
+                messages_tier,
                 search,
             },
         )
@@ -1105,6 +1129,7 @@ async fn execute(
         full_egress,
         streaming,
         protocol,
+        messages_tier,
         search,
     } = input;
     let ingress_headers = headers
@@ -1192,7 +1217,15 @@ async fn execute(
         None => None,
     };
 
-    let model_names = gemini_model_names(model, requested_tier);
+    let mut model_names = gemini_model_names(model, messages_tier.or(requested_tier));
+    if messages_tier.is_some() {
+        // Claude 客户端可默认发送 effort。目录缺少该档位时保留 Messages 原来可用的型号。
+        for candidate in gemini_model_names(model, None) {
+            if !model_names.contains(&candidate) {
+                model_names.push(candidate);
+            }
+        }
+    }
     let log_mode = diagnostics::current_log_mode();
     let capture_requested = log_mode == RequestLogMode::Debug;
     let full_egress = capture_requested && full_egress;
