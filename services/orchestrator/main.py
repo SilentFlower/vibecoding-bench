@@ -14365,17 +14365,21 @@ def _v3_environment_summary(row: dict, ownerships: dict, native_preparations: di
     agy = lookup_environment(account_runtime, row['environment_id'])
     if agy:
         result = agy_placement.summary(agy) if agy_placement else agy_summary(account_runtime, agy)
-        observation = native_preparations.get(agy['gateway_account_id'], {})
+        gateway_id = agy['gateway_account_id']
+        observation = native_preparations.get(gateway_id, {})
         runtime = result.setdefault('agy_runtime', {})
-        if (observation.get('environment_id') == result['environment_id']
-                and observation.get('generation') == result['generation']
-                and not result['busy'] and not runtime.get('active')):
-            if observation.get('state') == 'disabled':
+        same_environment = (observation.get('environment_id') == result['environment_id']
+                            and observation.get('generation') == result['generation'])
+        if not result['busy'] and not runtime.get('active'):
+            if same_environment and observation.get('state') == 'disabled':
                 runtime.update(state='disabled', preparation_reason='account_disabled')
             elif (runtime.get('state') in ('unprepared', 'ready', 'unknown')
-                    and runtime.get('idle_workers', 0) == 0
                     and observation.get('state') in ('unprepared', 'failed')):
-                runtime.update(state=observation['state'], preparation_reason=observation.get('reason'))
+                if same_environment and runtime.get('idle_workers', 0) == 0:
+                    runtime.update(state=observation['state'], preparation_reason=observation.get('reason'))
+                elif observation.get('scope') == 'account' and observation.get('account_id') == gateway_id:
+                    # 账号层只能说明凭据或编排为何暂不可用，进程状态继续以原环境观测为准。
+                    runtime['preparation_reason'] = observation.get('reason')
         return result
     account = None
     row['credential_ownership'] = ownerships.get(row['account_id'])

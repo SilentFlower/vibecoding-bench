@@ -48,6 +48,12 @@ async def run() -> dict:
         await expect(card.get_by_role('heading', level=2)).to_contain_text(account_name)
         await expect(card.get_by_text('网关账号 #17', exact=True)).to_be_visible()
         await expect(card.get_by_text('等待准备 · 等待节点容量', exact=True)).to_be_visible()
+        for reason, label in [('credentials_not_ready', '等待凭据就绪'),
+                              ('agy_environment_unavailable', '环境登记或绑定暂不可用'),
+                              ('orchestrator_upgrade_required', '编排服务需升级')]:
+            row['agy_runtime']['preparation_reason'] = reason
+            await page.evaluate("document.dispatchEvent(new Event('visibilitychange'))")
+            await expect(card.get_by_text(f'等待准备 · {label}', exact=True)).to_be_visible()
         row['agy_runtime'].update(state='failed', preparation_reason='agy_warm_failed')
         await page.evaluate("document.dispatchEvent(new Event('visibilitychange'))")
         await expect(card.get_by_text('准备失败 · 热进程启动失败', exact=True)).to_be_visible()

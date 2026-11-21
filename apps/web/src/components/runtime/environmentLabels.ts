@@ -33,6 +33,8 @@ export const agyPreparationReasons: Record<string, string> = {
   node_paused: '所属节点已暂停接单',
   node_transition: '所属节点正在切换',
   environment_unavailable: '环境状态待核对',
+  agy_environment_unavailable: '环境登记或绑定暂不可用',
+  orchestrator_upgrade_required: '编排服务需升级',
   environment_prepare_failed: '运行组件启动失败',
   agy_status_failed: '读取进程状态失败',
   agy_credentials_unavailable: '运行凭据暂不可用',

@@ -1009,6 +1009,8 @@ class Supervisor:
             search = self.jobs.get(job.get('headless_request'))
             if search:
                 search['cancelled'].set()
+            # 预热可能仍在等容量，此时没有 worker 来触发唤醒。
+            self.condition.notify_all()
             if job['worker'] and 'identity' in job:
                 job['worker'].send({'schema_version': 1, 'type': 'cancel', **job['identity']})
                 job['cancel_sent'] = True

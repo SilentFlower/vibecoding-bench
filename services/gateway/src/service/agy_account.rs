@@ -442,6 +442,9 @@ impl AccountService {
         }
         .await;
         self.cache.release_lock(&key, &owner).await;
+        if result.is_ok() {
+            self.notify_native_change(id, true);
+        }
         result
     }
 
@@ -472,6 +475,9 @@ impl AccountService {
         }
         .await;
         self.cache.release_lock(&key, &owner).await;
+        if outcome.is_ok() {
+            self.notify_native_change(id, true);
+        }
         outcome
     }
 
@@ -483,6 +489,7 @@ impl AccountService {
             } else {
                 self.store.reconcile_agy_credentials(id, operation).await?;
             }
+            self.notify_native_change(id, true);
         }
         Ok(())
     }
@@ -498,6 +505,7 @@ impl AccountService {
                 let result = agy_request("retire", &json!({"operation_id":operation,"account_id":id,"generation":state.generation})).await?;
                 verify_retirement(id, &operation, state.generation, &result)?;
                 self.store.retire_agy_credentials(id, &operation, state.generation).await?;
+                self.notify_native_change(id, true);
             }
             self.agy_state(id).await
         }.await;
@@ -524,6 +532,7 @@ impl AccountService {
             self.store
                 .retire_agy_credentials(id, &operation, state.generation)
                 .await?;
+            self.notify_native_change(id, true);
         } else {
             self.finish_agy_operation(id, &operation, &result).await?;
         }
@@ -608,8 +617,14 @@ impl AccountService {
     /// 按提交差异修改 AGY 账号，当前凭据在锁内重读。@param id 账号。@param updates 已解析代理的字段差异。@return 当前账号。
     pub async fn update_agy_fields(&self, id: i64, updates: &Value) -> Result<Account, AppError> {
         let (key, owner) = self.acquire_oauth_credential_lock(id).await?;
-        let result = self.update_agy_fields_locked(id, updates).await;
+        let mut preparation_changed = false;
+        let result = self
+            .update_agy_fields_locked(id, updates, &mut preparation_changed)
+            .await;
         self.cache.release_lock(&key, &owner).await;
+        if preparation_changed {
+            self.notify_native_change(id, true);
+        }
         result
     }
 
@@ -659,10 +674,12 @@ impl AccountService {
         Ok(())
     }
 
+    /// 保存账号差异。@param id 账号。@param updates 配置差异。@param preparation_changed 是否已写入影响准备的状态。@return 当前账号。
     async fn update_agy_fields_locked(
         &self,
         id: i64,
         updates: &Value,
+        preparation_changed: &mut bool,
     ) -> Result<Account, AppError> {
         let current = self.store.get_by_id(id).await?;
         let fields = updates
@@ -753,6 +770,8 @@ impl AccountService {
                 .store
                 .begin_agy_credentials(&current, &operation, "reauth")
                 .await?;
+            // 即便随后进入对账，已提交的凭据阶段也使旧准备失效。
+            *preparation_changed = true;
             let prepared = agy_request(
                 "prepare",
                 &json!({"operation_id":operation,"account_id":id,
@@ -802,7 +821,9 @@ impl AccountService {
             self.store.update_options(&candidate, &options).await?;
         }
         if fields.contains_key("status") {
+            let status_changed = current.status != candidate.status;
             self.store.update_status(id, candidate.status).await?;
+            *preparation_changed |= status_changed;
         }
         self.store.get_by_id(id).await
     }

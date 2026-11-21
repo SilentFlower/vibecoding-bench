@@ -55,14 +55,18 @@
 - `POST /internal/v3/agy-environments/{account_id}?prepare=false|true` 使用编排服务鉴权。缺省为 `false`。回执含 `environment_id,generation,state`。状态为 `registered`、`bound`、`unprepared` 或 `failed`。仅 `bound` 携带私有 `binding`。
 - `POST /internal/agy/warm` 使用当前发送器绑定鉴权。请求固定为 `account_id,environment_id,generation,request_id,deadline_unix_ms,credential_snapshot,capture_enabled`。受管 SSH 节点通过同一归属的发送隧道转发。
 - 热准备以 `prepared` 和 `job_finalized` 两条私有事件收口。前者在 `ready` 时携带实际 `native_pid`，业务占用时回报 `busy`。两条事件均绑定原请求和环境代次。
+- `GET /admin/native-preparations` 返回按 `account_id` 归属的状态数组。缺少可信绑定时，`scope="account"` 携带受控账号原因。
 
 ### 3. Contracts
 
 - 网关先提交账号与 OAuth 状态，再幂等登记 `platform_api_environments`。重复触发和首次业务共用网关账号唯一绑定。登记失败的账号由全平台启动扫描和 20 秒巡检补齐。
+- AGY 状态变更、重授权、代理变更和删除的持久结果沿原 `notify_native_change(id, true)` 失效旧准备。协调器清除原退避，撤销在途准备并重读权威账号。确认账号已经删除后清除该账号的准备快照。
 - 新环境在内部指纹保存 `agy_initial_preparation_pending=true`。后台在代次为零、有首启资格且节点容量有余量时启动。角色就绪或显式停止会收口首启资格。首次启动前的配置静默保留该资格。历史指纹缺此字段时沿原状态判定。
 - 运行环境的后台准备沿实际节点及环境代次，遵守节点分配、账号和 OAuth 状态、工作控制及系统维护门禁。首次后台启动走 `allow_eviction=False`。
 - 网关复用已生效的业务采集模式和同代 AT-only 快照。监督器复用实际热进程池和原握手。所有后台准备的模型调用数为零。正在运行或等待工具回填的业务优先使用物理工位。单名额用于一个实际热进程，可恢复的同代模板须完成恢复才计入空闲 PID。
 - `GET /api/environments` 以发送器实测空闲进程为热就绪依据。等待容量及失败回执只投影到相同环境代次。发送器空闲关停由原监督器写实际停止回执，正常重启后从同一环境重新补热。
+- `scope="account"` 的 `credentials_not_ready`、`agy_environment_unavailable` 和 `orchestrator_upgrade_required` 只补充同账号空闲卡片的 `agy_runtime.preparation_reason`。物理状态、PID 和代次以实际环境观测为准。
+- 监督器登记取消时在同一条件锁下唤醒容量等待。预热在原截止内收到取消后以 `request_cancelled` 收口。
 
 ### 4. Validation & Error Matrix
 
@@ -71,7 +75,9 @@
 | 首次登记完成且节点容量充足 | 后台申请绑定并建立热进程 |
 | 节点容量已用满 | 保留卡片，返回 `unprepared / waiting_capacity`，后续巡检重试 |
 | 账号、节点暂停或切换 | 后台准备等待原门禁开放 |
+| 凭据待核对或登记绑定失败 | 网关返回受控账号级原因，同账号卡片展示该原因 |
 | 显式停止或历史环境已停止 | 保持休眠，依原业务入口唤醒 |
+| 降容后容量等待中收到取消 | 唤醒已登记的预热请求，沿原请求输出终态 |
 | 错账号、错代次或已过截止 | 私有发送器拒绝本次准备 |
 | 原监督器缺实际停止回执 | 环境进入对账流程，保留原业务收口保护 |
 
@@ -79,10 +85,12 @@
 
 - 正常。保存一个 OAuth 就绪账号，调用登记入口取得同一个环境 ID。容量释放后用 `prepare=true` 获取当前绑定，应用同代快照开始零模型准备。
 - 边界。并发额度为 1。原工具轮等待回填时热准备回报 `busy`，下次空闲巡检补位。
+- 边界。`{"account_id":17,"scope":"account","state":"unprepared","reason":"credentials_not_ready"}` 给账号 17 的等待卡片补充原因。重授权完成后的即时检查刷新账号原因。
 - 错误用法。拿上一次环境代次的准备回执标记当前环境为热就绪。重新读取当前绑定和实测空闲 PID 后更新卡片。
 
 ### 6. Tests Required
 
 - 编排层用 `test_agy_capture_api`、`test_agy_environment` 和 `test_agy_node_migration` 验证账号唯一、容量等待、停止与当前代次投影。
+- `agy_account_changes_recheck_prewarm_before_backoff_expires` 核对启停、重授权、换代理、账号删除和受控失败原因。`test_cancel_warm_wakes_the_capacity_waiter` 核对降容等待的取消和零模型提交。
 - `test_agy_supervisor` 验证数字为 1 的物理额度、旧工具轮优先及凭据换代。隔离 `verify_agy_prewarm.py` 核对首笔热命中、实际进程退出、换代、发送器正常重启、网关启动扫描及模型调用总数。
 - `verify_agy_environment_ui.py` 核对等待准备、容量原因、准备失败和真实热进程就绪文案。

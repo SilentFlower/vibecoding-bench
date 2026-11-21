@@ -118,6 +118,17 @@ class AgyCaptureApiTests(unittest.TestCase):
             card, = [row for row in cards if row.get('gateway_account_id') == account_id]
             self.assertEqual(card['agy_runtime']['state'], 'unprepared')
             self.assertNotIn('preparation_reason', card['agy_runtime'])
+            for state, reason in [('unprepared', 'credentials_not_ready'), ('failed', 'agy_environment_unavailable'),
+                                  ('failed', 'orchestrator_upgrade_required')]:
+                observations[0] = {'account_id': account_id, 'scope': 'account', 'state': state, 'reason': reason}
+                cards = self.client.get('/api/environments', headers=self.headers).json()
+                card, = [row for row in cards if row.get('gateway_account_id') == account_id]
+                self.assertEqual(card['agy_runtime']['state'], 'unprepared')
+                self.assertEqual(card['agy_runtime']['preparation_reason'], reason)
+            observations[0]['account_id'] = account_id + 1
+            cards = self.client.get('/api/environments', headers=self.headers).json()
+            card, = [row for row in cards if row.get('gateway_account_id') == account_id]
+            self.assertNotIn('preparation_reason', card['agy_runtime'])
 
 
 if __name__=='__main__':unittest.main()

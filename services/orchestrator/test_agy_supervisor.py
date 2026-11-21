@@ -194,6 +194,42 @@ class AgySupervisorTests(unittest.TestCase):
             self.assertEqual(self.supervisor.status()['idle_identity'][0]['credential_generation'], 2)
             self.assertEqual([item for item in WorkerFixture.order if item[0] == 'model'], [('model', 1)])
 
+    def test_cancel_warm_wakes_the_capacity_waiter(self):
+        """降容后等待的预热在取消后立即收口。@return 无。"""
+        config = {**self.config, 'work_root': str(Path(self.temporary.name) / 'cancel-warm')}
+        # 固定降容后的等待现场，避免回收线程替取消路径发出通知。
+        with patch.object(Supervisor, 'reap_idle'):
+            supervisor = Supervisor(config, self.output)
+        self.addCleanup(supervisor.close)
+        value = self.submission()
+        with supervisor.condition:
+            supervisor.workers = [WorkerFixture(supervisor, value) for _ in range(2)]
+            for worker in supervisor.workers:
+                worker.start(time.monotonic() + 10)
+                worker.busy = False
+        for field in ('api_token_id', 'model', 'native_model', 'body'):
+            value.pop(field)
+        value['type'] = 'warm'
+        waiting = threading.Event()
+        condition = supervisor.condition
+        wait = condition.wait
+
+        def record_capacity_wait(timeout=None):
+            """等实际进入按请求截止计时的等待，避免取消先于等待。@param timeout 等待秒数。@return 条件通知。"""
+            if timeout is not None and timeout > 10:
+                waiting.set()
+            return wait(timeout)
+
+        with patch.object(condition, 'wait', record_capacity_wait):
+            supervisor.submit(value)
+            self.assertTrue(waiting.wait(2))
+            self.assertTrue(supervisor.cancel(value['request_id'], 0))
+            error = self.output.wait(value['request_id'], 'error')
+            self.assertEqual(error['code'], 'request_cancelled')
+            self.output.wait(value['request_id'], 'job_finalized')
+        self.assertEqual(len(supervisor.workers), 2)
+        self.assertFalse(any(kind == 'model' for kind, _ in WorkerFixture.order))
+
     def test_v1_finite_and_unlimited_budgets_pass_supervisor_admission(self):
         """真实v1文件读取结果进入监督器准入，有限和明确无限均保持可用。@return 无。"""
         root=Path(self.temporary.name)/'cgroup'

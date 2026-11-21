@@ -261,6 +261,13 @@ impl NativePrewarmer {
                     completed = jobs.join_next(), if !jobs.is_empty() => {
                         if let Some(Ok((id, preparation_id, wake, result))) = completed {
                             let cancelled = matches!(active.remove(&id), Some(None));
+                            if !cancelled && matches!(result, Err(AppError::NotFound)) {
+                                // 账号删除后，清除旧观测及退避，不把已删除账号记成准备失败。
+                                states.lock().unwrap().remove(&id);
+                                failures.remove(&id);
+                                pending.remove(&id);
+                                continue;
+                            }
                             let mut result = if cancelled { json!({"state":"cancelled","reason":"invalidated"}) }
                                 else { result.unwrap_or_else(|_| json!({"state":"failed","reason":"preparation_failed"})) };
                             result["preparation_id"] = json!(preparation_id);
@@ -555,6 +562,17 @@ async fn check_one(
     }
 }
 
+/// 将无已验证绑定的控制错误投影为账号级原因。@param error 控制面错误。@return 安全的准备观测。
+fn agy_environment_failure(error: AppError) -> Value {
+    let reason = match error {
+        AppError::ServiceUnavailable(reason) if reason == "orchestrator_upgrade_required" => {
+            "orchestrator_upgrade_required"
+        }
+        _ => "agy_environment_unavailable",
+    };
+    json!({"scope":"account","state":"failed","reason":reason,"checked_at_ms":now_ms()})
+}
+
 async fn check_agy(
     accounts: &AccountService,
     account: Account,
@@ -576,7 +594,10 @@ async fn check_agy(
         account.status == AccountStatus::Active && work.work_enabled && work.api_accepting;
     let credential = accounts.agy_state(id).await?;
     if account.auth_type != AccountAuthType::Oauth || credential["phase"] != "ready" {
-        return Ok(json!({"state":"unprepared","reason":"credentials_not_ready"}));
+        return Ok(
+            json!({"scope":"account","state":"unprepared","reason":"credentials_not_ready",
+            "checked_at_ms":now_ms()}),
+        );
     }
     let queue = accounts.get_or_create_queue(id, account.concurrency).await;
     let mut observation;
@@ -586,7 +607,11 @@ async fn check_agy(
             _ = cutover.cancelled() => return Ok(system_maintenance()),
             _ = &mut cancellation => return Ok(cancelled()),
             _ = queue.runtime_gate.wait_exclusive() => return Ok(maintenance()),
-            result = agy_environment(id, enabled && work.admitted_requests == 0, deadline.saturating_duration_since(Instant::now())) => result?,
+            result = agy_environment(id, enabled && work.admitted_requests == 0, deadline.saturating_duration_since(Instant::now())) => result,
+        };
+        let preparation = match preparation {
+            Ok(preparation) => preparation,
+            Err(error) => return Ok(agy_environment_failure(error)),
         };
         observation = json!({"environment_id":preparation.environment_id,"generation":preparation.generation,
             "state":preparation.state,"reason":preparation.reason,"checked_at_ms":now_ms()});
@@ -607,8 +632,10 @@ async fn check_agy(
         if !enabled {
             return Ok(json!({"state":"disabled","reason":"account_disabled"}));
         }
-        let Some(transport) = prepare_existing(&account).await? else {
-            return Ok(json!({"state":"sleeping"}));
+        let transport = match prepare_existing(&account).await {
+            Ok(Some(transport)) => transport,
+            Ok(None) => return Ok(json!({"state":"sleeping"})),
+            Err(error) => return Ok(agy_environment_failure(error)),
         };
         let location = transport
             .execution_location()

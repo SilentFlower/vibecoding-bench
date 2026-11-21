@@ -1122,6 +1122,9 @@ impl AccountService {
             }
             .await;
             self.cache.release_lock(&key, &owner).await;
+            if result.is_ok() {
+                self.notify_native_change(id, true);
+            }
             return result;
         }
         if let Some(scheduler) = &self.scheduler {

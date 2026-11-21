@@ -5,7 +5,7 @@ use std::fs;
 use std::future::pending;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU16, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -16,6 +16,7 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::serve;
+use chrono::{TimeDelta, Utc};
 use serde_json::{Value, from_value, json};
 use sqlx::any::{AnyPoolOptions, install_default_drivers};
 use std::collections::HashMap;
@@ -61,6 +62,143 @@ async fn wait_state(
         assert!(Instant::now() < deadline, "等待 {state}，实际 {status}");
         sleep(Duration::from_millis(10)).await;
     }
+}
+
+/// 用真实账号写入驱动准备协调器，并验证无绑定失败的脱敏归属。@return 无。
+#[tokio::test]
+async fn agy_account_changes_recheck_prewarm_before_backoff_expires() {
+    if var_os("CCGW_AGY_PREWARM_TEST").is_none() {
+        let output = timeout(
+            Duration::from_secs(20),
+            Command::new(current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "service::native_prewarm::tests::agy_account_changes_recheck_prewarm_before_backoff_expires",
+                    "--nocapture",
+                ])
+                .env("CCGW_AGY_PREWARM_TEST", "1")
+                .env_remove("V3_UPDATE_GATE_DIR")
+                .env("V3_INTERNAL_TOKEN", "synthetic-agy-prewarm-test-token")
+                .kill_on_drop(true)
+                .output(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert!(
+            output.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return;
+    }
+
+    let control_status = Arc::new(AtomicU16::new(404));
+    let control_reply = control_status.clone();
+    let router = Router::new()
+        .route("/internal/v3/agy-environments/:id", post(move || {
+            let status = StatusCode::from_u16(control_reply.load(Ordering::SeqCst)).unwrap();
+            async move { (status, Json(json!({"environment_id":"synthetic-agy-env","generation":3,"state":"registered"}))) }
+        }))
+        .route("/internal/v3/agy-auth/prepare", post(|Json(input): Json<Value>| async move {
+            Json(json!({"email_address":"agy-prewarm@example.test","document":input["document"],"proxy_url":input["proxy_url"]}))
+        }));
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    // 独立测试进程仅在启动控制面及数据库任务前设置回环地址。
+    unsafe {
+        set_var(
+            "V3_RUNTIME_URL",
+            format!("http://{}", listener.local_addr().unwrap()),
+        )
+    };
+    let server = spawn(async move { serve(listener, router).await.unwrap() });
+    install_default_drivers();
+    let pool = AnyPoolOptions::new()
+        .max_connections(1)
+        .connect("sqlite::memory:")
+        .await
+        .unwrap();
+    migrate(&pool, "sqlite").await.unwrap();
+    let store = Arc::new(AccountStore::new(pool.clone(), "sqlite".into()));
+    let accounts = Arc::new(AccountService::new(
+        store.clone(),
+        Arc::new(MemoryStore::new()),
+        Arc::new(SettingsStore::new(pool)),
+    ));
+    let mut account: Account = from_value(json!({"id":0,"name":"反重力测试","email":"agy-prewarm@example.test",
+        "platform":"antigravity","auth_type":"oauth","status":"active","access_token":"synthetic-at",
+        "refresh_token":"synthetic-rt","device_id":"synthetic-device","canonical_env":{},"canonical_prompt_env":{},
+        "canonical_process":{},"billing_mode":"strip","created_at":"2026-11-21T00:00:00Z","updated_at":"2026-11-21T00:00:00Z"})).unwrap();
+    let expiry = Utc::now() + TimeDelta::hours(1);
+    account.expires_at = Some(expiry);
+    store.create(&mut account).await.unwrap();
+    let id = account.id;
+    let prewarmer = NativePrewarmer::new(accounts.clone(), Default::default());
+    // 此处只允许真实变更通知触发即时重检，排除启动补偿与周期巡检。
+    prewarmer.start_with_retries([3600, 7200, 10800]);
+    let status = wait_state(&prewarmer, id, "failed", None).await;
+    assert_eq!(status["scope"], "account");
+    assert_eq!(status["reason"], "orchestrator_upgrade_required");
+    assert!(status.get("generation").is_none());
+
+    control_status.store(503, Ordering::SeqCst);
+    accounts
+        .update_agy_fields(id, &json!({"status":"disabled"}))
+        .await
+        .unwrap();
+    let status = wait_state(&prewarmer, id, "failed", Some(&status["preparation_id"])).await;
+    assert_eq!(status["reason"], "agy_environment_unavailable");
+    control_status.store(200, Ordering::SeqCst);
+    accounts
+        .update_agy_fields(id, &json!({"status":"active"}))
+        .await
+        .unwrap();
+    wait_state(&prewarmer, id, "registered", None).await;
+
+    let operation = Uuid::new_v4().simple().to_string();
+    accounts.begin_agy_reauth(id, &operation).await.unwrap();
+    let status = wait_state(&prewarmer, id, "unprepared", None).await;
+    assert_eq!(status["scope"], "account");
+    assert_eq!(status["reason"], "credentials_not_ready");
+    accounts
+        .finish_agy_operation(
+            id,
+            &operation,
+            &json!({"email_address":account.email,
+        "document":{"token":{"access_token":"new-synthetic-at","expiry":expiry.to_rfc3339()}}}),
+        )
+        .await
+        .unwrap();
+    let registered = wait_state(&prewarmer, id, "registered", None).await;
+    assert_eq!(registered["environment_id"], "synthetic-agy-env");
+    assert!(registered.get("scope").is_none());
+    accounts
+        .update_agy_fields(id, &json!({"proxy_url":"http://127.0.0.1:12345"}))
+        .await
+        .unwrap();
+    wait_state(
+        &prewarmer,
+        id,
+        "registered",
+        Some(&registered["preparation_id"]),
+    )
+    .await;
+
+    accounts.delete_account(id).await.unwrap();
+    timeout(Duration::from_secs(3), async {
+        while prewarmer
+            .statuses()
+            .iter()
+            .any(|status| status["account_id"] == id)
+        {
+            sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    drop(prewarmer);
+    server.abort();
 }
 
 #[tokio::test]
