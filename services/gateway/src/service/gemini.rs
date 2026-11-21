@@ -1234,17 +1234,7 @@ pub(super) async fn generate_messages(
             // 摘要重带已经完成的结果，只生成本地状态。工具归属和响应缓存继续由主请求持有。
             diagnostics::error_stage("agy_agent_summary");
             diagnostics::local_outcome("local_response");
-            let frame = json!({"candidates":[{
-                "content":{"parts":[{"text":summary}]},"finishReason":"STOP"
-            }]});
-            return Ok(if streaming {
-                messages::stream_response(
-                    futures_util::stream::once(async { Ok(frame) }),
-                    model.into(),
-                )
-            } else {
-                messages::json_response(&frame, model)
-            });
+            return Ok(messages::agent_summary_response(summary, model, streaming));
         }
         execute(
             service,

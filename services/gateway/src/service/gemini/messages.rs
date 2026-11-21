@@ -8,7 +8,7 @@ use std::mem::replace;
 
 use axum::Json;
 use axum::body::{Body, Bytes};
-use axum::http::StatusCode;
+use axum::http::{HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use base64::alphabet;
 use base64::engine::DecodePaddingMode;
@@ -462,6 +462,24 @@ fn content_block(part: &Value) -> Option<Value> {
     }
 }
 
+/// 返回本地工具进度及供计费网关识别的回执。
+/// @param summary 已生成的标签。@param model 公开模型。@param streaming 是否使用 SSE。@return Messages 响应。
+pub(super) fn agent_summary_response(summary: String, model: &str, streaming: bool) -> Response {
+    let frame = json!({"candidates":[{
+        "content":{"parts":[{"text":summary}]},"finishReason":"STOP"
+    }]});
+    let mut response = if streaming {
+        stream_response(stream::once(async { Ok(frame) }), model.into())
+    } else {
+        json_response(&frame, model)
+    };
+    response.headers_mut().insert(
+        "x-flower2api-local-response",
+        HeaderValue::from_static("agy_agent_summary"),
+    );
+    response
+}
+
 /// 输出原生结果对应的 Messages JSON。@param output 已聚合的 Gemini 帧。@param model 公开模型。@return Anthropic 响应。
 pub(super) fn json_response(output: &Value, model: &str) -> Response {
     let candidate = &output["candidates"][0];
@@ -728,14 +746,56 @@ pub(super) fn stream_response(
 #[cfg(test)]
 mod tests {
     use super::{
-        AGENT_SUMMARY_EXAMPLES, AGENT_SUMMARY_HEADER, response_text, system_reminder_target,
-        thinking_tier,
+        AGENT_SUMMARY_EXAMPLES, AGENT_SUMMARY_HEADER, agent_summary_response, json_response,
+        response_text, stream_response, system_reminder_target, thinking_tier,
     };
     use crate::error::AppError;
+    use axum::body::to_bytes;
+    use axum::http::StatusCode;
+    use futures_util::stream;
     use serde_json::{Value, json};
 
     fn convert_request(request: &Value) -> Result<Value, AppError> {
         super::convert_request(request).map(|(body, _)| body)
+    }
+
+    #[tokio::test]
+    async fn agent_summary_response_provides_local_receipt_and_zero_usage() {
+        let header = "x-flower2api-local-response";
+        let label = "Reading sample file";
+        let model = "fixture-model";
+        let zero = json!({"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0});
+        let response = agent_summary_response(label.into(), model, false);
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()[header], "agy_agent_summary");
+        let body = to_bytes(response.into_body(), 4096).await.unwrap();
+        let json: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["usage"], zero);
+        assert_eq!(json["content"][0]["text"], label);
+        assert_eq!(json["stop_reason"], "end_turn");
+
+        let response = agent_summary_response(label.into(), model, true);
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()[header], "agy_agent_summary");
+        let body = to_bytes(response.into_body(), 4096).await.unwrap();
+        let events: Vec<Value> = std::str::from_utf8(&body)
+            .unwrap()
+            .lines()
+            .filter_map(|line| line.strip_prefix("data: "))
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert_eq!(events[0]["message"]["usage"], zero);
+        assert!(events.iter().any(|event| event["delta"]["text"] == label));
+        assert_eq!(events[events.len() - 2]["usage"], zero);
+        assert_eq!(events.last().unwrap()["type"], "message_stop");
+
+        let ordinary = json!({"candidates":[{
+            "content":{"parts":[{"text":"普通响应"}]},"finishReason":"STOP"
+        }],"usageMetadata":{"promptTokenCount":42,"candidatesTokenCount":7}});
+        let ordinary_json = json_response(&ordinary, model);
+        assert!(!ordinary_json.headers().contains_key(header));
+        let streamed = stream_response(stream::once(async { Ok(ordinary) }), model.into());
+        assert!(!streamed.headers().contains_key(header));
     }
 
     #[test]

@@ -2081,3 +2081,37 @@ transport.submit(prepared, body, ttfb_timeout).await
 - `verify_agy_native_loopback.py --continuation-modes` 核对原版 1.5.9 四条接续路径、配置冻结、错误会话与签名拒绝、正文重读、缓存前缀及首帧前后错误。`--messages-search` 核对历史偏好下的 WebSearch 回调与 Read 截断前缀。
 - `usage_prefix_retains_http_error_until_the_first_deliverable_frame` 核对首帧之前的错误、开流后 SSE 终态和缓存用量保留。`history_closure_requires_the_original_worker_and_request` 核对回执归属和缺失证明。
 - `verify_agy_native_loopback.py --tool-receipts` 以两笔重叠的原版调用验证 Scanner 帧归属，并重放一笔侧调用的空会话。核对完整主工具批次、真实 EOF 失败的 16 次重读及超过 120 秒的原尝试回执。`--tool-deadlines` 核对长工具等待和已回收响应的 410。
+
+## Scenario: AGY 本地进度标签回执
+
+### 1. Scope / Trigger
+
+- 修改 `/v1/messages` 的本地工具进度回包或供外层计费网关使用的回执时适用。
+
+### 2. Signatures
+
+- `agent_summary_response(summary: String, model: &str, streaming: bool) -> Response`
+- HTTP 200，响应头 `X-Flower2API-Local-Response: agy_agent_summary`。
+
+### 3. Contracts
+
+- 鉴权、固定摘要模板与工具结果配对、可用候选校验通过后，本地标签分支生成回执。此时上游模型尝试为 0。
+- JSON 返回文本、`stop_reason=end_turn` 和明确的零输入、零输出、零缓存读取用量。SSE 在 `message_start` 和 `message_delta` 都提供相同的零用量，并以 `message_stop` 收尾。
+- 外层计费网关从受信任渠道的实际响应中取得回执，用它区分明确零用量与缺失用量。只有本地进度标签成功响应携带此值。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 本地进度标签匹配且账号候选可用 | HTTP 200、局部生成的标签和回执 |
+| 本地进度标签匹配但候选为空 | 503 |
+| 普通模型响应 | 模型内容和供应方用量 |
+
+### 5. Scenarios and Examples
+
+- 正常示例。匹配后台摘要的工具历史在本地生成 `Reading sample file`，两种响应形式都携带回执。
+- 误用示例。给普通生成的空用量帧添加回执会把缺失用量解释为零消费。应由成功生成标签的本地分支签发回执。
+
+### 6. Tests Required
+
+- `agent_summary_response_provides_local_receipt_and_zero_usage` 核对流式及非流式的回执、内容、零用量与完整终态，并验证普通生成响应头。
