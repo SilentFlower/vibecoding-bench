@@ -1,5 +1,5 @@
 {
   "schema_version": 1,
-  "version": "v1.29.0",
-  "changes": "反重力与 Claude Messages\n\n- `/v1/messages` 支持反重力 Gemini 的多轮对话、内嵌图片、并行工具调用和按原调用 ID 回填。响应支持 Claude JSON 和 SSE，请求记录显示原始会话 ID。\n- Claude Code WebSearch 由原版 AGY 1.5.9 执行，返回来源标题和链接。域名规则按可核对的来源域生效，关联搜索和回填使用原账号。\n- Claude 的思考预算和 `effort` 映射到可用的 Gemini 档位。模型返回的图片在 Messages 中转换为 Markdown。原生 Gemini 按原协议返回图片 `inlineData`。\n\n安装\n\n- 数据库版本为 Bench 6、Gateway 9。通过后台「系统更新」检查和安装。安装前收口进行中的 AGY 节点迁移，并按更新器提示迁回仍在远程运行的 AGY 账号。\n- 搜索和图片回包已通过固定版 AGY 的隔离回归。真实 Google 联网和生图以授权账号的实际验收为准。"
+  "version": "v1.29.1",
+  "changes": "反重力与 Claude Messages\n\n- 修复 Claude Code 续轮时，UserPromptSubmit 补充上下文被并入全局系统指令导致缓存前缀变化的问题。补充上下文随当轮用户消息发出，排在分批返回的工具结果之后。\n\n安装\n\n- 数据库版本为 Bench 6、Gateway 9。通过后台「系统更新」检查和安装。安装前收口进行中的 AGY 节点迁移，并按更新器提示迁回仍在远程运行的 AGY 账号。"
 }
