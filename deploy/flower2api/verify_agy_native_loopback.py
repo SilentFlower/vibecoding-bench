@@ -39,6 +39,7 @@ SEARCH_QUERY = 'IANA Example Domains'
 SEARCH_URL = 'https://www.iana.org/help/example-domains'
 SEARCH_REDIRECT = 'https://vertexaisearch.cloud.google.com/grounding-api-redirect/fixture'
 SEARCH_REDIRECT_TITLE = 'IANA Redirect Fixture'
+MESSAGES_READ_PATH = '/fixture/large.txt'
 
 
 def require(condition, message):
@@ -201,6 +202,10 @@ class Upstream(BaseHTTPRequestHandler):
                     if 'mcp__fixture__read_item' in names:
                         parts.extend({'functionCall':{'name':'mcp__fixture__read_item','args':{'n':n},'id':f'call_msg_read_{n}'}} for n in (1,2,3))
                     frames = [{'candidates':[{'index':0,'content':{'role':'model','parts':parts}}]}]
+                elif 'Read' in names and 'Messages Read truncation fixture' in encoded and not results:
+                    part = {'functionCall': {'name': 'Read', 'args': {'file_path': MESSAGES_READ_PATH},
+                        'id': 'call_msg_truncated_read'}}
+                    frames[0]['candidates'][0]['content']['parts'] = [part]
             if tool and (parallel_chain or replay_chain):
                 part['functionCall']['id']=f'call_{returned+1:032x}'
                 part['functionCall']['args']={'x':returned+1}
@@ -1409,6 +1414,51 @@ def verify_messages_thinking_and_images(request, wait_idle, database):
         'gemini_native_format': 'json_and_sse'}
 
 
+def verify_messages_read_truncation(request, wait_idle):
+    """核对截断提示及旧前缀在真实 AGY 出站中的位置。@param request 公共 HTTP 入口。@param wait_idle 发送器回收检查。@return 实际请求数。"""
+    path = '/v1/messages'
+    initial_count = len(Upstream.calls)
+    main = {'model': MODEL, 'max_tokens': 128, 'system': '固定的合成系统提示',
+        'metadata': {'user_id': json.dumps({'session_id': 'synthetic-read-truncation'})},
+        'messages': [{'role': 'user', 'content': 'Messages Read truncation fixture'}],
+        'tools': [{'name': 'Read', 'input_schema': {'type': 'object', 'properties': {'file_path': {'type': 'string'}}}}]}
+    status, raw = request(path, main)
+    require(status == 200, f'Read 首轮失败：{status} {raw[:350]!r}')
+    calls = [block for block in json.loads(raw)['content'] if block['type'] == 'tool_use']
+    require(len(calls) == 1 and calls[0]['name'] == 'Read', '首轮未返回 Read 工具调用')
+    notice = (f'[Truncated: {MESSAGES_READ_PATH}. Showing lines 1–200 of 420 total (24000 tokens). '
+        'Read with offset=201 limit=200 for the next portion.]')
+    returned = '合成文件片段'
+    history = main['messages'] + [{'role': 'assistant', 'content': calls}, {'role': 'user', 'content': [
+        {'type': 'tool_result', 'tool_use_id': calls[0]['id'], 'content': returned}]}]
+    continuation = {**main, 'messages': history + [{'role': 'system', 'content': [
+        {'type': 'text', 'text': notice, 'cache_control': {'type': 'ephemeral'}}]}]}
+    status, raw = request(path, continuation)
+    require(status == 200, f'带截断提示的续轮失败：{status} {raw[:350]!r}')
+    reply = json.loads(raw)['content']
+    wait_idle()
+    later = {**main, 'messages': history + [{'role': 'system', 'content': notice},
+        {'role': 'assistant', 'content': reply}, {'role': 'user', 'content': '继续读取。'}]}
+    status, raw = request(path, later)
+    require(status == 200, f'带历史截断提示的下一轮失败：{status} {raw[:350]!r}')
+    wait_idle()
+    sent = [item['body']['request'] for item in Upstream.calls[initial_count:]]
+    require(len(sent) == 3, 'Read 三轮的实际上游发送次数错误')
+    for previous, current in zip(sent, sent[1:]):
+        require(all(current[key] == previous[key] for key in ('systemInstruction', 'tools', 'sessionId')),
+            '截断提示改变了出站系统提示、工具声明或会话')
+        prefix = previous['contents']
+        require(current['contents'][:len(prefix)] == prefix, 'Read 续轮改变了已发送的历史前缀')
+        parts = [part for message in current['contents'] for part in message['parts']]
+        results = [(index, part['functionResponse']) for index, part in enumerate(parts) if 'functionResponse' in part]
+        notices = [index for index, part in enumerate(parts) if notice in part.get('text', '')]
+        require(len(results) == 1 and len(notices) == 1 and results[0][0] < notices[0], '截断提示未唯一追加在工具回填之后')
+        result = results[0][1]
+        require(result['id'] == calls[0]['id'] and json.loads(result['response']['output'])['result'] == returned,
+            'Read 续轮改变了工具 ID 或回填正文')
+    return len(sent)
+
+
 def verify_messages_search(request, wait_idle, database):
     """运行真实 Messages、同名工具回填和原版 WebSearch。@param request 公共 HTTP 入口。
     @param wait_idle 发送器回收检查。@param database 隔离账号库。@return 验证摘要。"""
@@ -1520,6 +1570,7 @@ def verify_messages_search(request, wait_idle, database):
     result={'passed':True,'messages_sse_json':True,'parallel_results':4,'grounded_searches':4,'domain_filter_cases':1+len(domain_cases),
         'single_concurrency':True,'original_session_id':True,'image/png':True,'cancellation':True,'fixed_native_version':'1.5.9'}
     result.update(verify_messages_thinking_and_images(request, wait_idle, database))
+    result['read_truncation_rounds'] = verify_messages_read_truncation(request, wait_idle)
     if Path('/opt/claude-code').is_file():
         result['claude_code_search_count']=verify_claude_code_search(wait_idle)
     status,raw=request('/admin/request-diagnostics?platform=antigravity&entry_protocol=anthropic_messages&page_size=50',admin=True)

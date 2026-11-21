@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::fmt::Write;
 use std::io::{Error as IoError, copy, sink};
 use std::mem::replace;
+use std::sync::LazyLock;
 
 use axum::Json;
 use axum::body::{Body, Bytes};
@@ -15,6 +16,7 @@ use base64::engine::DecodePaddingMode;
 use base64::engine::general_purpose::{GeneralPurpose, GeneralPurposeConfig};
 use base64::read::DecoderReader;
 use futures_util::{Stream, StreamExt, stream};
+use regex::Regex;
 use serde_json::{Map, Value, json};
 use uuid::Uuid;
 
@@ -27,6 +29,12 @@ const IMAGE_BASE64: GeneralPurpose = GeneralPurpose::new(
     GeneralPurposeConfig::new().with_decode_padding_mode(DecodePaddingMode::Indifferent),
 );
 const USER_PROMPT_SUBMIT_CONTEXT_PREFIX: &str = "UserPromptSubmit hook additional context: ";
+static READ_TRUNCATION_NOTICE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"^\[Truncated: .*\blines [0-9]+[-–][0-9]+ of [0-9]+ total\b.*\bRead with offset=[0-9]+ limit=[0-9]+\b.*\]$",
+    )
+    .unwrap()
+});
 
 fn invalid(message: &str) -> AppError {
     AppError::BadRequest(message.into())
@@ -75,6 +83,15 @@ fn append_turn_context(contents: &mut [Value], turn_context: &mut Vec<Value>) {
     }
 }
 
+fn has_read_result_in_user_turn(contents: &[Value]) -> bool {
+    contents
+        .iter()
+        .rev()
+        .take_while(|content| content["role"] == "user")
+        .flat_map(|content| content["parts"].as_array().into_iter().flatten())
+        .any(|part| part["functionResponse"]["name"] == "Read")
+}
+
 /// 投影已识别的 Messages 请求。@param request 原始请求。@return Gemini 正文。
 pub(super) fn convert_request(request: &Value) -> Result<Value, AppError> {
     let messages = request["messages"]
@@ -103,11 +120,13 @@ pub(super) fn convert_request(request: &Value) -> Result<Value, AppError> {
                     .is_some_and(|content| content["role"] == "user");
                 for part in system_parts(&message["content"])? {
                     if has_user_turn
-                        && part["text"]
-                            .as_str()
-                            .is_some_and(|text| text.starts_with(USER_PROMPT_SUBMIT_CONTEXT_PREFIX))
+                        && part["text"].as_str().is_some_and(|text| {
+                            text.starts_with(USER_PROMPT_SUBMIT_CONTEXT_PREFIX)
+                                || (READ_TRUNCATION_NOTICE.is_match(text)
+                                    && has_read_result_in_user_turn(&contents))
+                        })
                     {
-                        // 本轮钩子上下文排在工具结果之后，既保留回填边界，也保持全局缓存前缀稳定。
+                        // 当轮补充文本随工具结果发送，使旧的系统提示和对话前缀可继续复用。
                         turn_context.push(part);
                     } else {
                         system.push(part);
@@ -664,6 +683,75 @@ mod tests {
         );
         assert_eq!(converted["contents"][3]["parts"][1]["text"], context);
         assert_eq!(converted["contents"][4]["role"], "model");
+    }
+
+    #[test]
+    fn messages_read_truncation_notice_keeps_its_position_across_tool_turns() {
+        let notice = "[Truncated: /fixture/large.txt. Showing lines 1–200 of 420 total (24000 tokens). Read with offset=201 limit=200 for the next portion.]";
+        let main = json!({
+            "system": "固定规则",
+            "messages": [
+                {"role": "user", "content": "读取资料"},
+                {"role": "system", "content": "项目环境"}
+            ],
+            "tools": [
+                {"name": "Read", "input_schema": {"type": "object"}},
+                {"name": "Bash", "input_schema": {"type": "object"}}
+            ]
+        });
+        let previous = convert_request(&main).unwrap();
+        let mut continuation = main;
+        continuation["messages"].as_array_mut().unwrap().extend([
+            json!({"role": "assistant", "content": [
+                {"type": "tool_use", "id": "read", "name": "Read", "input": {"file_path": "/fixture/large.txt"}},
+                {"type": "tool_use", "id": "check", "name": "Bash", "input": {}}
+            ]}),
+            json!({"role": "user", "content": [
+                {"type": "tool_result", "tool_use_id": "read", "content": "文件片段"},
+                {"type": "tool_result", "tool_use_id": "check", "content": "检查结果"}
+            ]}),
+            json!({"role": "system", "content": [{"type": "text", "text": notice, "cache_control": {"type": "ephemeral"}}]}),
+        ]);
+
+        let mut unrelated = continuation.clone();
+        unrelated["messages"][2]["content"][0]["name"] = json!("Bash");
+        let unrelated = convert_request(&unrelated).unwrap();
+        assert_eq!(unrelated["systemInstruction"]["parts"][2]["text"], notice);
+        assert_eq!(
+            unrelated["contents"][2]["parts"].as_array().unwrap().len(),
+            2
+        );
+
+        let converted = convert_request(&continuation).unwrap();
+        let contents = converted["contents"].as_array().unwrap();
+        assert_eq!(
+            converted["systemInstruction"],
+            previous["systemInstruction"]
+        );
+        assert_eq!(converted["tools"], previous["tools"]);
+        assert_eq!(contents.len(), 3);
+        assert_eq!(contents[0], previous["contents"][0]);
+        assert_eq!(
+            contents[2]["parts"],
+            json!([
+                {"functionResponse": {"id": "read", "name": "Read", "response": {"result": "文件片段"}}},
+                {"functionResponse": {"id": "check", "name": "Bash", "response": {"result": "检查结果"}}},
+                {"text": notice}
+            ])
+        );
+
+        continuation["messages"][4]["content"] = json!(notice);
+        continuation["messages"].as_array_mut().unwrap().extend([
+            json!({"role": "assistant", "content": "已读取。"}),
+            json!({"role": "user", "content": "继续读取。"}),
+        ]);
+        let next = convert_request(&continuation).unwrap();
+        assert_eq!(next["systemInstruction"], converted["systemInstruction"]);
+        assert_eq!(next["tools"], converted["tools"]);
+        assert_eq!(
+            &next["contents"].as_array().unwrap()[..contents.len()],
+            contents
+        );
     }
 
     #[test]
