@@ -1,6 +1,5 @@
 //! 数据库版本台账及离线维护入口，保持原 PostgreSQL 初始化语义。
 use std::collections::BTreeMap;
-use std::path::Path;
 
 use chrono::Utc;
 use serde_json::{Value, json};
@@ -11,7 +10,7 @@ use uuid::Uuid;
 
 use crate::config::Config;
 use crate::store::database_schema::migrate_legacy;
-use crate::store::db::init_db;
+use crate::store::db::{connect_sqlite, sqlite_connection_options};
 use crate::store::{
     account_platform_schema, account_work_schema, agy_media_schema, agy_safety_schema,
     agy_system_reminder_schema, agy_tool_receipts_schema, proxy_schema, proxy_sync_schema,
@@ -450,18 +449,20 @@ pub async fn maintenance(arguments: &[String]) -> Result<Value, String> {
     if config.database.driver() != "sqlite" {
         return Err("离线维护仅支持本部署 SQLite".into());
     }
-    let dsn = config.database.dsn();
-    if Path::new(&dsn).is_symlink() {
+    let write = arguments[2] == "apply";
+    let (options, filename) = sqlite_connection_options(&config.database.dsn(), !write)
+        .map_err(|_| "数据库维护连接失败".to_string())?;
+    if filename.is_symlink() {
         return Err("数据库维护路径无效".into());
     }
     sqlx::any::install_default_drivers();
-    let pool = if arguments[2] == "apply" {
-        init_db("sqlite", &dsn).await
+    let pool = if write {
+        connect_sqlite(options, &filename).await
     } else {
-        AnyPool::connect(&format!("sqlite:{dsn}?mode=ro")).await
+        AnyPool::connect_with(options).await
     }
     .map_err(|_| "数据库维护连接失败".to_string())?;
-    let result = if arguments[2] == "apply" {
+    let result = if write {
         apply(&pool, &arguments[4], Some(target)).await
     } else {
         plan(&pool, Some(target)).await

@@ -4,7 +4,11 @@ use claude_code_gateway::store::db;
 use claude_code_gateway::store::proxy_store::ProxyStore;
 use sqlx::AnyPool;
 use std::env::temp_dir;
-use std::fs::remove_dir_all;
+use std::fs::{create_dir, remove_dir_all};
+#[cfg(unix)]
+use std::os::unix::fs::symlink;
+use std::path::Path;
+use std::process::{Command, Output};
 use uuid::Uuid;
 
 async fn assert_child_owners(pool: &AnyPool, accounts: &[i64], proxies: &[&str]) {
@@ -96,5 +100,72 @@ async fn sqlite_pool_enforces_foreign_keys_during_concurrent_deletes() {
     assert_child_owners(&pool, &[2], &["two"]).await;
     drop(held);
     pool.close().await;
+    remove_dir_all(root).unwrap();
+}
+
+#[tokio::test]
+async fn sqlite_pool_creates_the_decoded_dsn_path() {
+    sqlx::any::install_default_drivers();
+    let root = temp_dir().join(format!("gateway-sqlite-dsn-{}", Uuid::new_v4()));
+    let database = root.join("with space").join("gateway.sqlite");
+    let dsn = format!(
+        "sqlite:{}?cache=private",
+        database.display().to_string().replace(' ', "%20")
+    );
+    let pool = db::init_db("sqlite", &dsn).await.unwrap();
+    pool.close().await;
+    assert!(database.is_file());
+    remove_dir_all(root).unwrap();
+}
+
+fn run_migration(workdir: &Path, dsn: &str, action: &str) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_claude-code-gateway"))
+        .current_dir(workdir)
+        .env("DATABASE_DRIVER", "sqlite")
+        .env("DATABASE_DSN", dsn)
+        .args([
+            "database-migrations",
+            action,
+            "--operation-id",
+            "10000000-0000-4000-8000-000000000001",
+            "--target-version",
+            "1",
+        ])
+        .output()
+        .unwrap()
+}
+
+#[test]
+fn sqlite_migrations_resolve_dsn_before_opening_the_file() {
+    let root = temp_dir().join(format!("gateway-sqlite-migration-{}", Uuid::new_v4()));
+    create_dir(&root).unwrap();
+    let database = root.join("gateway.sqlite");
+    let dsn = format!("sqlite:{}?mode=rwc&cache=private", database.display());
+    assert!(!run_migration(&root, &dsn, "plan").status.success());
+    assert!(!database.exists());
+
+    for action in ["apply", "verify"] {
+        let result = run_migration(&root, &dsn, action);
+        assert!(
+            result.status.success(),
+            "{action}: {}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+    }
+    assert!(database.is_file());
+    assert!(!root.join("sqlite:").exists());
+    #[cfg(unix)]
+    {
+        let alias = root.join("link.sqlite");
+        symlink(&database, &alias).unwrap();
+        for action in ["apply", "verify"] {
+            let result = run_migration(&root, &format!("sqlite:{}", alias.display()), action);
+            assert!(!result.status.success());
+            assert_eq!(
+                String::from_utf8_lossy(&result.stderr).trim(),
+                "数据库维护路径无效"
+            );
+        }
+    }
     remove_dir_all(root).unwrap();
 }

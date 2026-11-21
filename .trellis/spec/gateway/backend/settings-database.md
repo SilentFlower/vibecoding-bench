@@ -24,7 +24,7 @@
 
 SQLite 固定维护入口为 `claude-code-gateway database-migrations plan|apply|verify --operation-id <UUID> --target-version <N>`。迁移台账、签名证据、两库恢复及错误合同统一见[平台自动迁移规范](../../platform/deploy/platform-online-update.md#scenario-自动数据库迁移与原操作恢复)。
 
-## Scenario: Gateway SQLite 池连接外键
+## Scenario: Gateway SQLite 连接路径与外键
 
 ### 1. Scope / Trigger
 
@@ -32,26 +32,31 @@ SQLite 固定维护入口为 `claude-code-gateway database-migrations plan|apply
 
 ### 2. Signatures
 
-- `init_db(driver: &str, dsn: &str) -> Result<AnyPool, sqlx::Error>` 为 async。Gateway 启动及 SQLite 迁移验证复用此入口。
+- `init_db(driver: &str, dsn: &str) -> Result<AnyPool, sqlx::Error>` 为 async。Gateway 启动和 SQLite 离线迁移共用 `sqlite_connection_options` 解析 `DATABASE_DSN`。启动与 apply 共用 `connect_sqlite`。
 
 ### 3. Contracts
 
 - SQLite 分支在每条物理连接建好后、交给业务前执行 `PRAGMA foreign_keys=ON`，覆盖首次、扩容和替换连接。已有库和新建库共用回调。
+- `DATABASE_DSN` 接受裸文件路径和 SQLx SQLite URI。启动与 apply 的默认模式为 `rwc`，显式模式由 URI 提供。创建父目录以 SQLx 解码后的 SQLite 文件路径为准。
+- 离线 plan 和 verify 强制 `mode=ro`。离线维护在打开连接前检查解析出的文件路径并拒绝符号链接。
 - WAL 按 SQLite 文件设置。PostgreSQL 走原 DSN 连接路径。
 
 ### 4. Validation & Error Matrix
 
 - SQLite 建连及回调成功时交付连接。回调执行失败按 SQLx 建连错误处理，出错连接不交给业务。
 - 删除账号或代理时，由对应 SQLite 外键清理关联子行。
+- 无效 SQLite DSN 返回配置或建连错误。离线只读查询遇目标文件缺失即失败。指向符号链接的离线请求返回「数据库维护路径无效」。
 
 ### 5. Scenarios and Examples
 
 - 多条连接在并发删除时各自执行外键约束。被替换连接的后继连接也执行约束。
 - 在池上执行一次外键 PRAGMA 只处理该次查询借到的连接。连接级设置放在 `after_connect`。
+- `sqlite:/data/nested%20name/gateway.sqlite` 以 `/data/nested name` 为父目录。用原始 URI 建目录会在当前工作目录留下字面量路径。
 
 ### 6. Tests Required
 
 - `sqlite_pool_enforces_foreign_keys_during_concurrent_deletes` 检查池中每条连接及替换连接的外键状态，在真实迁移后的库中并发删除账号与代理。断言其子行清空，其它实体的子行保留。
+- `sqlite_pool_creates_the_decoded_dsn_path` 检查带前缀及编码的实际落盘路径。`sqlite_migrations_resolve_dsn_before_opening_the_file` 运行真实离线 CLI，覆盖缺库只读失败、apply 创建及 verify、带前缀的符号链接拒绝。
 
 ## Settings Key 契约
 
