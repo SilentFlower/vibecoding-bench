@@ -3,7 +3,7 @@ use axum::Error as AxumError;
 use axum::body::Body;
 use axum::extract::Request;
 use axum::http::{
-    HeaderMap, HeaderValue, StatusCode,
+    HeaderMap, HeaderValue, Method, StatusCode,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE, TRANSFER_ENCODING},
     response::Parts,
 };
@@ -46,6 +46,7 @@ use crate::service::account::{
 use crate::service::diagnostics::{
     self, CURRENT_TRACE, RequestDiagnosticsConfig, RequestTraceGuard, TraceContext,
 };
+use crate::service::gemini::{self, GeminiService, MessagesIngress};
 use crate::service::native_contract::NativeSourceVersion;
 use crate::service::native_contract::validate_idle_timeout;
 use crate::service::native_error::{REJECTION_CAPTURE_HEADER, REJECTION_HEADER, rejection_reason};
@@ -1760,7 +1761,10 @@ impl GatewayService {
             .as_ref()
             .filter(|_| req.uri().path() == "/v1/messages")
         else {
-            return match self.handle_request_inner(req, api_token).await {
+            return match self
+                .handle_request_inner(req, api_token, full_rejected_ingress)
+                .await
+            {
                 Ok(resp) => resp,
                 Err(e) => {
                     if self.account_svc.scheduler().is_some() {
@@ -1779,7 +1783,10 @@ impl GatewayService {
         );
         let guard = RequestTraceGuard::new(trace.clone());
         let response = match CURRENT_TRACE
-            .scope(trace, self.handle_request_inner(req, api_token))
+            .scope(
+                trace,
+                self.handle_request_inner(req, api_token, full_rejected_ingress),
+            )
             .await
         {
             Ok(resp) => resp,
@@ -2078,11 +2085,14 @@ impl GatewayService {
         &self,
         req: Request,
         api_token: Option<&ApiToken>,
+        full_egress: bool,
     ) -> Result<Response, AppError> {
         let req_start = std::time::Instant::now();
         let method = req.method().clone();
         let path = req.uri().path().to_string();
         let query = req.uri().query().unwrap_or("").to_string();
+        let gemini = req.extensions().get::<Arc<GeminiService>>().cloned();
+        let cutover: Option<InferenceCutover> = req.extensions().get().cloned();
 
         let mut native_header_map = req.headers().clone();
         // 提取 header
@@ -2157,6 +2167,45 @@ impl GatewayService {
         } else {
             serde_json::from_slice(&body_bytes).unwrap_or(serde_json::json!({}))
         };
+
+        let agy = gemini.zip(api_token).filter(|_| {
+            method == Method::POST
+                && path == "/v1/messages"
+                && body_map["model"]
+                    .as_str()
+                    .is_some_and(|model| model.starts_with("gemini-"))
+        });
+        if let Some((service, token)) = agy {
+            let session = RequestSession::agy_messages(token.id, &native_header_map, &body_map);
+            diagnostics::request_context(
+                "antigravity",
+                "anthropic_messages",
+                body_map["model"].as_str(),
+            );
+            diagnostics::record_request_session(session.original(), session.derived());
+            if let Some(response) = self
+                .session_policy_block_svc
+                .begin(token.id, &body_map)
+                .await?
+            {
+                return Ok(response);
+            }
+            return Ok(gemini::generate_messages(
+                service,
+                self.account_svc.clone(),
+                token.clone(),
+                MessagesIngress {
+                    request: body_map,
+                    raw: body_bytes,
+                    headers: native_header_map,
+                    session,
+                    started: req_start.into(),
+                    cutover,
+                    full_egress,
+                },
+            )
+            .await);
+        }
 
         let scheduler = self
             .account_svc

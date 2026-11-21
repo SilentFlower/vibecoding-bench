@@ -1,5 +1,7 @@
 //! Gemini入口的账号许可、原生帧保真与跨HTTP工具轮归属。
+mod messages;
 mod replay;
+mod websearch;
 
 use std::collections::{BTreeSet, HashMap};
 use std::io::Error as IoError;
@@ -31,7 +33,8 @@ use crate::service::account::{
     AccountService, AccountSlotPermit, CredentialActivity, DEFAULT_REQUEST_SLOT_UNITS,
 };
 use crate::service::agy_contract::{
-    AGY_REQUEST_SECONDS, AGY_SOURCE_SHA256, AgyAccessSnapshot, AgyModelId, AgySystemPromptPolicy,
+    AGY_REQUEST_SECONDS, AGY_SOURCE_SHA256, AgyAccessSnapshot, AgyModelId, AgyOperation,
+    AgySystemPromptPolicy,
 };
 use crate::service::diagnostics::agy::AgyAttemptTrace;
 use crate::service::diagnostics::{
@@ -43,6 +46,7 @@ use crate::service::system_update::{self, InferenceCutover, UpdateActivity};
 use crate::service::v3_scheduling::{RequestPhase, SchedulingRequest};
 use crate::service::{native_capture, runtime_bridge};
 use replay::{ReplayKey, ToolReplay};
+use websearch::{SearchRequest, SearchTurn};
 
 pub(crate) const BODY_LIMIT: usize = 16 * 1024 * 1024;
 const FRAME_LIMIT: usize = 64 * 1024 * 1024;
@@ -60,6 +64,36 @@ struct Admission {
 struct RoutedModel {
     requested: String,
     resolved: String,
+}
+
+#[derive(Clone, Copy)]
+enum ResponseProtocol {
+    Gemini,
+    Messages,
+}
+
+/// 已通过 Messages 鉴权和正文解码的输入。
+pub(super) struct MessagesIngress {
+    pub request: Value,
+    pub raw: Bytes,
+    pub headers: HeaderMap,
+    pub session: RequestSession,
+    pub started: Instant,
+    pub cutover: Option<InferenceCutover>,
+    pub full_egress: bool,
+}
+
+struct GenerationInput {
+    raw: Bytes,
+    headers: HeaderMap,
+    body: Value,
+    session: RequestSession,
+    started: Instant,
+    cutover: Option<InferenceCutover>,
+    full_egress: bool,
+    streaming: bool,
+    protocol: ResponseProtocol,
+    search: Option<SearchRequest>,
 }
 
 /// 完成账号、凭据与发送器准备的生成请求。
@@ -85,6 +119,7 @@ struct ToolTurn {
     contents: Value,
     runtime_contents: Option<Value>,
     calls: Vec<Value>,
+    call_signatures: Vec<Option<String>>,
     deadline: Instant,
     admission: Arc<Admission>,
     transport: Arc<PreparedTransport>,
@@ -93,6 +128,7 @@ struct ToolTurn {
     retained: bool,
     claimed: bool,
     cutover: Option<InferenceCutover>,
+    search: Option<SearchTurn>,
 }
 
 struct ContinuationClaim {
@@ -736,7 +772,10 @@ fn runtime_tool_contents(turn: &ToolTurn, body: &Value, indices: &[usize]) -> Op
             (missing_id || response["name"] != call["name"]).then_some((part_index, call_index))
         })
         .collect();
-    if corrections.is_empty() && turn.runtime_contents.is_none() {
+    if corrections.is_empty()
+        && turn.runtime_contents.is_none()
+        && !turn.call_signatures.iter().any(Option::is_some)
+    {
         return None;
     }
 
@@ -751,11 +790,17 @@ fn runtime_tool_contents(turn: &ToolTurn, body: &Value, indices: &[usize]) -> Op
     let mut calls: Vec<_> = model["parts"]
         .as_array_mut()?
         .iter_mut()
-        .filter_map(|part| part.get_mut("functionCall"))
+        .filter(|part| part.get("functionCall").is_some())
         .collect();
+    for (part, signature) in calls.iter_mut().zip(&turn.call_signatures) {
+        if let Some(signature) = signature {
+            // Claude 客户端只会回传标准 tool_use 字段，补回原生调用的签名。
+            part["thoughtSignature"] = json!(signature);
+        }
+    }
     for (part_index, call_index) in corrections {
         let expected = &turn.calls[call_index];
-        calls[call_index]["id"] = expected["id"].clone();
+        calls[call_index]["functionCall"]["id"] = expected["id"].clone();
         let response = &mut user["parts"][part_index]["functionResponse"];
         response["id"] = expected["id"].clone();
         response["name"] = expected["name"].clone();
@@ -828,6 +873,13 @@ impl GeminiService {
             .turns
             .get_mut(key)
             .ok_or_else(|| invalid("工具轮已结束"))?;
+        if turn
+            .search
+            .as_ref()
+            .is_some_and(|search| search.active != 0)
+        {
+            return Err(AppError::AdmissionLimited { retry_after: 1 });
+        }
         if turn.claimed || turn.deadline <= Instant::now() {
             return Err(invalid("工具轮已领取或到期"));
         }
@@ -931,6 +983,100 @@ async fn generate_inner(
     let (model, action) = action
         .rsplit_once(':')
         .ok_or_else(|| invalid("Gemini动作无效"))?;
+    validate_model(model)?;
+    let streaming = match action {
+        "generateContent" => false,
+        "streamGenerateContent" => true,
+        _ => return Err(AppError::NotFound),
+    };
+    diagnostics::request_context("antigravity", "gemini", Some(model));
+    let (parts, ingress_body) = request.into_parts();
+    let raw = axum::body::to_bytes(ingress_body, BODY_LIMIT)
+        .await
+        .map_err(|_| invalid("Gemini正文超过上限"))?;
+    diagnostics::remember_ingress_body(&raw);
+    let body: Value = serde_json::from_slice(&raw).map_err(|_| invalid("Gemini正文必须为JSON"))?;
+    if !body.is_object() || !body["contents"].is_array() {
+        return Err(invalid("Gemini contents无效"));
+    }
+    let session = RequestSession::gemini(token.id, &parts.headers, model, &body);
+    execute(
+        state.gemini_svc,
+        state.account_svc,
+        token,
+        model,
+        GenerationInput {
+            raw,
+            headers: parts.headers,
+            body,
+            session,
+            started,
+            cutover,
+            full_egress,
+            streaming,
+            protocol: ResponseProtocol::Gemini,
+            search: None,
+        },
+    )
+    .await
+}
+
+/// 在原准入边界执行 Messages 请求。@param service 当前会话服务。@param account_svc 账号服务。
+/// @param token 已认证的访问范围。@param input 已解码入站。@return Anthropic Messages 响应。
+pub(super) async fn generate_messages(
+    service: Arc<GeminiService>,
+    account_svc: Arc<AccountService>,
+    token: ApiToken,
+    input: MessagesIngress,
+) -> Response {
+    let result = async {
+        if token.status != ApiTokenStatus::Active {
+            return Err(AppError::Unauthorized);
+        }
+        diagnostics::error_stage("messages_conversion");
+        let model = input.request["model"].as_str().unwrap_or_default();
+        validate_model(model)?;
+        let streaming = messages::streaming(&input.request)?;
+        let search = SearchRequest::from_messages(&input.request)?;
+        let body = if search.is_some() {
+            Value::Null
+        } else {
+            messages::convert_request(&input.request)?
+        };
+        execute(
+            service,
+            account_svc,
+            token,
+            model,
+            GenerationInput {
+                raw: input.raw,
+                headers: input.headers,
+                body,
+                session: input.session,
+                started: input.started,
+                cutover: input.cutover,
+                full_egress: input.full_egress,
+                streaming,
+                protocol: ResponseProtocol::Messages,
+                search,
+            },
+        )
+        .await
+    }
+    .await;
+    match result {
+        Ok(response) => response,
+        Err(error) => {
+            let (status, body) = gemini_error_body(error);
+            messages::error_response(
+                status,
+                body["error"]["message"].as_str().unwrap_or("AGY 请求失败"),
+            )
+        }
+    }
+}
+
+fn validate_model(model: &str) -> Result<(), AppError> {
     if model.is_empty()
         || model.len() > 128
         || !model
@@ -939,15 +1085,29 @@ async fn generate_inner(
     {
         return Err(invalid("模型名称无效"));
     }
-    let streaming = match action {
-        "generateContent" => false,
-        "streamGenerateContent" => true,
-        _ => return Err(AppError::NotFound),
-    };
-    diagnostics::request_context("antigravity", "gemini", Some(model));
-    let (parts, ingress_body) = request.into_parts();
-    let ingress_headers = parts
-        .headers
+    Ok(())
+}
+
+async fn execute(
+    service: Arc<GeminiService>,
+    account_svc: Arc<AccountService>,
+    token: ApiToken,
+    model: &str,
+    input: GenerationInput,
+) -> Result<Response, AppError> {
+    let GenerationInput {
+        raw,
+        headers,
+        mut body,
+        session,
+        started,
+        cutover,
+        full_egress,
+        streaming,
+        protocol,
+        search,
+    } = input;
+    let ingress_headers = headers
         .iter()
         .filter_map(|(name, value)| {
             value
@@ -956,16 +1116,6 @@ async fn generate_inner(
                 .map(|value| (name.as_str().to_string(), value.to_string()))
         })
         .collect::<Vec<_>>();
-    let raw = axum::body::to_bytes(ingress_body, BODY_LIMIT)
-        .await
-        .map_err(|_| invalid("Gemini正文超过上限"))?;
-    diagnostics::remember_ingress_body(&raw);
-    let mut body: Value =
-        serde_json::from_slice(&raw).map_err(|_| invalid("Gemini正文必须为JSON"))?;
-    if !body.is_object() || !body["contents"].is_array() {
-        return Err(invalid("Gemini contents无效"));
-    }
-    let session = RequestSession::gemini(token.id, &parts.headers, model, &body);
     let media = requested_media(&body)?;
     let thinking_config = body
         .pointer("/generationConfig/thinkingConfig")
@@ -977,10 +1127,37 @@ async fn generate_inner(
     let has_thinking_config = thinking_config.is_some();
     diagnostics::error_stage("account_selection");
     // 原工具轮按原截止完成。新一轮模型生成使用本次 HTTP 的时间预算。
-    let deadline = started + Duration::from_secs(AGY_REQUEST_SECONDS as u64);
+    let mut deadline = started + Duration::from_secs(AGY_REQUEST_SECONDS as u64);
+    let explicit_session = session.original().and(session.key());
+    let search_binding = search
+        .as_ref()
+        .map(|search| service.claim_search(&token, model, explicit_session, &search.query))
+        .transpose()?
+        .flatten();
+    let mut search_receipts = if let Some(binding) = &search_binding {
+        deadline = deadline.min(binding.deadline);
+        Some(
+            timeout_at(deadline, binding.receipts.lock())
+                .await
+                .map_err(|_| AppError::AdmissionLimited { retry_after: 1 })?,
+        )
+    } else {
+        None
+    };
+    if let Some(search) = &search
+        && let Some(receipt) = search_receipts
+            .as_ref()
+            .and_then(|results| results.get(&search.query))
+    {
+        if let Some(binding) = &search_binding {
+            diagnostics::selected_account(binding.account.id);
+        }
+        diagnostics::local_outcome("agy_search_replayed");
+        return Ok(search.response(model, receipt.as_ref(), streaming));
+    }
     let http_request_id =
         diagnostics::current_request_id().unwrap_or_else(|| Uuid::new_v4().to_string());
-    let continuation = state.gemini_svc.continuation(
+    let continuation = service.continuation(
         &token,
         model,
         &body,
@@ -1007,7 +1184,7 @@ async fn generate_inner(
                     trace.agy_replay_failed();
                 }
             });
-            return gemini_response(stream, replay.deadline, streaming).await;
+            return gemini_response(stream, replay.deadline, streaming, protocol, model).await;
         }
         Some(Continuation::Generate(account, admission, claim)) => {
             Some((account, admission, claim))
@@ -1038,7 +1215,7 @@ async fn generate_inner(
                 let current = if media.is_empty() {
                     account
                 } else {
-                    state.account_svc.get_account(account.id).await?
+                    account_svc.get_account(account.id).await?
                 };
                 let support = AccountService::agy_media_support(
                     &current,
@@ -1049,27 +1226,32 @@ async fn generate_inner(
                 if support != Some(true) {
                     return Err(AccountService::agy_media_error(&media, support.is_none()));
                 }
-                let scheduling =
-                    state
-                        .account_svc
-                        .begin_agy_scheduling(None, &resolved_model, streaming);
+                let scheduling = account_svc.begin_agy_scheduling(None, &resolved_model, streaming);
                 scheduling.selected(&current, None);
                 (current, admission, Some(claim), resolved_model, scheduling)
+            } else if let Some(binding) = &search_binding {
+                let scheduling =
+                    account_svc.begin_agy_scheduling(None, &binding.resolved_model, streaming);
+                scheduling.selected(&binding.account, None);
+                (
+                    binding.account.clone(),
+                    binding.admission.clone(),
+                    None,
+                    binding.resolved_model.clone(),
+                    scheduling,
+                )
             } else {
                 let (model_index, account, scheduling) = timeout_at(deadline, async {
-                    let accounts = state
-                        .account_svc
+                    let accounts = account_svc
                         .agy_candidates(&token, &model_names, &media)
                         .await?;
-                    state
-                        .account_svc
+                    account_svc
                         .select_agy_smart(session.key(), &model_names, accounts, streaming)
                         .await
                 })
                 .await
                 .map_err(|_| AppError::AdmissionLimited { retry_after: 1 })??;
-                let queue = state
-                    .account_svc
+                let queue = account_svc
                     .get_or_create_queue(account.id, account.concurrency)
                     .await;
                 let slot = queue
@@ -1081,7 +1263,7 @@ async fn generate_inner(
                     .map_err(|_| AppError::AdmissionLimited { retry_after: 1 })?;
                 let admission = Arc::new(Admission {
                     _slot: slot,
-                    credentials: state.account_svc.upstream_activity(account.id).await?,
+                    credentials: account_svc.upstream_activity(account.id).await?,
                     _maintenance: system_update::admission()?,
                 });
                 (
@@ -1103,7 +1285,7 @@ async fn generate_inner(
         diagnostics::error_stage("credentials");
         let snapshot = timeout_at(
             deadline,
-            state.account_svc.resolve_agy_access_with_admission(
+            account_svc.resolve_agy_access_with_admission(
                 account.id,
                 false,
                 Some(&admission.credentials),
@@ -1111,7 +1293,7 @@ async fn generate_inner(
         )
         .await
         .map_err(|_| AppError::ServiceUnavailable("AGY凭据等待超时".into()))??;
-        let current = state.account_svc.get_account(account.id).await?;
+        let current = account_svc.get_account(account.id).await?;
         let media_support =
             AccountService::agy_media_support(&current, &resolved_model, &media, gif_frames);
         if media_support != Some(true) {
@@ -1120,27 +1302,35 @@ async fn generate_inner(
                 media_support.is_none(),
             ));
         }
-        let ingress = native_capture::ingress(
-            log_mode,
-            &ingress_headers,
-            &raw,
-            &body,
-            &snapshot.access_token,
-        );
+        let ingress = (search.is_none())
+            .then(|| {
+                native_capture::ingress(
+                    log_mode,
+                    &ingress_headers,
+                    &raw,
+                    &body,
+                    &snapshot.access_token,
+                )
+            })
+            .flatten();
         let native_model =
             AccountService::agy_model(&current, &resolved_model).ok_or(AppError::NotFound)?;
         diagnostics::error_stage("runtime_prepare");
-        let transport = Arc::new(
-            timeout_at(
-                deadline,
-                runtime_transport::prepare(
-                    &current,
-                    deadline.saturating_duration_since(Instant::now()),
-                ),
+        let transport = if let Some(binding) = &search_binding {
+            binding.transport.clone()
+        } else {
+            Arc::new(
+                timeout_at(
+                    deadline,
+                    runtime_transport::prepare(
+                        &current,
+                        deadline.saturating_duration_since(Instant::now()),
+                    ),
+                )
+                .await
+                .map_err(|_| AppError::ServiceUnavailable("AGY环境准备超时".into()))??,
             )
-            .await
-            .map_err(|_| AppError::ServiceUnavailable("AGY环境准备超时".into()))??,
-        );
+        };
         let sticky = scheduling.key().is_some();
         if sticky {
             diagnostics::error_stage("account_selection");
@@ -1154,9 +1344,7 @@ async fn generate_inner(
         // 绑定竞争失败的候选不会占用发送次数，已有绑定等本账号的临时限流。
         timeout_at(
             deadline,
-            state
-                .account_svc
-                .acquire_account_rpm(&current, sticky, scheduling.key().unwrap_or("")),
+            account_svc.acquire_account_rpm(&current, sticky, scheduling.key().unwrap_or("")),
         )
         .await
         .map_err(|_| AppError::AdmissionLimited { retry_after: 1 })??;
@@ -1176,6 +1364,49 @@ async fn generate_inner(
             ingress,
         };
     };
+    if let Some(search) = search {
+        diagnostics::error_stage("agy_web_search");
+        let request_id = Uuid::new_v4().to_string();
+        let previous = search_binding
+            .as_ref()
+            .map(|binding| binding.previous_request_id.as_str());
+        let mut closing = search_binding
+            .as_ref()
+            .and_then(|binding| binding.cutover.clone())
+            .or(cutover);
+        if let Some(receipts) = search_receipts.as_mut() {
+            // 上游接收状态不明时，同一原工具查询保留一次执行归属。
+            receipts.insert(search.query.clone(), None);
+        }
+        scheduling.phase(RequestPhase::Running);
+        let result = tokio::select! {
+            biased;
+            _ = async {
+                match closing.as_mut() {
+                    Some(signal) => signal.cancelled().await,
+                    None => std::future::pending().await,
+                }
+            } => None,
+            result = async {
+                let upstream = transport.send_agy(
+                    &request_id, token.id, snapshot, &model.resolved, native_model,
+                    json!({"query":search.query,"previous_request_id":previous}),
+                    AgySystemPromptPolicy::default(), deadline, false, false, false, false,
+                    AgyOperation::Search,
+                ).await.ok()?;
+                websearch::read_receipt(upstream, &request_id, current.id, deadline).await
+            } => result,
+        };
+        diagnostics::local_outcome(if result.is_some() {
+            "agy_search_completed"
+        } else {
+            "agy_search_failed"
+        });
+        if let Some(receipts) = search_receipts.as_mut() {
+            receipts.insert(search.query.clone(), result.clone());
+        }
+        return Ok(search.response(&model.requested, result.as_ref(), streaming));
+    }
     // 发送器直接执行已选的目录型号。只在原始入站采集后消费路由字段，兼容现有运行镜像。
     if has_thinking_config {
         if let Some(config) = body
@@ -1194,8 +1425,7 @@ async fn generate_inner(
         .as_ref()
         .and_then(|claim| claim.key.as_ref())
         .and_then(|key| {
-            state
-                .gemini_svc
+            service
                 .registry()
                 .turns
                 .get(key)
@@ -1228,7 +1458,10 @@ async fn generate_inner(
         primary: Some(sender),
         replay: claim.as_mut().and_then(ContinuationClaim::begin_submission),
     };
-    let service = state.gemini_svc.clone();
+    let response_model = model.requested.clone();
+    let search_session = matches!(protocol, ResponseProtocol::Messages)
+        .then(|| explicit_session.map(str::to_owned))
+        .flatten();
     tokio::spawn(async move {
         let closing = cutover.clone();
         let result = async {
@@ -1243,7 +1476,7 @@ async fn generate_inner(
                 upstream = transport.send_agy(
                     &request_id, token.id, snapshot.clone(), &model.resolved, native_model.clone(),
                     body.clone(), system_prompt_policy.clone(), deadline, capture_requested,
-                    full_egress, gif_frames, disable_safety_filtering,
+                    full_egress, gif_frames, disable_safety_filtering, AgyOperation::Generate,
                 ) => upstream,
             };
             let upstream = match upstream {
@@ -1283,7 +1516,7 @@ async fn generate_inner(
                 deadline,
                 admission,
                 transport,
-                state.account_svc,
+                account_svc,
                 snapshot,
                 native_model,
                 system_prompt_policy,
@@ -1291,6 +1524,8 @@ async fn generate_inner(
                 disable_safety_filtering,
                 scheduling,
                 derived_session_id,
+                protocol,
+                search_session,
                 cutover,
                 &mut output,
             )
@@ -1310,16 +1545,25 @@ async fn generate_inner(
             registry.turns.remove(&http_request_id);
         }
     });
-    gemini_response(ReceiverStream::new(receiver), deadline, streaming).await
+    gemini_response(
+        ReceiverStream::new(receiver),
+        deadline,
+        streaming,
+        protocol,
+        &response_model,
+    )
+    .await
 }
 
 /// 首发与重读使用相同的公开 SSE 和 JSON 聚合。
 /// @param frames 响应帧。@param deadline 原截止。@param streaming 是否返回事件流。
-/// @return Gemini HTTP 响应或首帧前错误。
+/// @param protocol 入口协议。@param model 公开模型。@return HTTP 响应或首帧前错误。
 async fn gemini_response(
     frames: impl Stream<Item = Result<Value, AppError>> + Send + 'static,
     deadline: Instant,
     streaming: bool,
+    protocol: ResponseProtocol,
+    model: &str,
 ) -> Result<Response, AppError> {
     let mut frames = Box::pin(frames);
     let first = timeout_at(deadline, frames.next())
@@ -1327,9 +1571,11 @@ async fn gemini_response(
         .map_err(|_| AppError::ServiceUnavailable("AGY响应超时".into()))?
         .ok_or_else(|| AppError::BadGateway("AGY响应提前结束".into()))??;
     if streaming {
-        let stream = futures_util::stream::once(async { Ok(first) })
-            .chain(frames)
-            .map(|event| {
+        let stream = futures_util::stream::once(async { Ok(first) }).chain(frames);
+        if matches!(protocol, ResponseProtocol::Messages) {
+            return Ok(messages::stream_response(stream, model.to_owned()));
+        }
+        let stream = stream.map(|event| {
                 let value = match event {
                     Ok(value) => value,
                     Err(error @ (AppError::AgyUpstreamQuota | AppError::AgyControl(_) | AppError::AgyToolReplayUnavailable)) => gemini_error_body(error).1,
@@ -1362,7 +1608,10 @@ async fn gemini_response(
         }
         aggregate(&mut output, event)?;
     }
-    Ok(Json(output).into_response())
+    Ok(match protocol {
+        ResponseProtocol::Gemini => Json(output).into_response(),
+        ResponseProtocol::Messages => messages::json_response(&output, model),
+    })
 }
 
 struct EventReader {
@@ -1536,6 +1785,8 @@ async fn drive(
     disable_safety_filtering: bool,
     scheduling: SchedulingRequest,
     derived_session_id: Option<String>,
+    protocol: ResponseProtocol,
+    search_session: Option<String>,
     mut cutover: Option<InferenceCutover>,
     output: &mut GeminiOutput,
 ) -> Result<(), AppError> {
@@ -1545,6 +1796,7 @@ async fn drive(
         deadline,
     };
     let mut calls = Vec::new();
+    let mut call_signatures = Vec::new();
     let mut pending_tool_frames = Vec::new();
     let mut pending_tool_bytes = 0;
     let mut completed = false;
@@ -1798,6 +2050,7 @@ async fn drive(
                             full_egress,
                             gif_frames,
                             disable_safety_filtering,
+                            AgyOperation::Generate,
                         )
                         .await?;
                     if let Some(observer) = observation.as_mut() {
@@ -1827,6 +2080,10 @@ async fn drive(
                     {
                         if let Some(call) = part.get("functionCall") {
                             calls.push(call.clone());
+                            if matches!(protocol, ResponseProtocol::Messages) {
+                                call_signatures
+                                    .push(part["thoughtSignature"].as_str().map(str::to_owned));
+                            }
                         }
                     }
                 }
@@ -1880,6 +2137,7 @@ async fn drive(
                                 .take()
                                 .unwrap_or_else(|| body["contents"].clone()),
                             calls: calls.clone(),
+                            call_signatures: call_signatures.clone(),
                             deadline: tool_deadline,
                             admission: admission.clone(),
                             transport: transport.clone(),
@@ -1888,6 +2146,9 @@ async fn drive(
                             retained: false,
                             claimed: false,
                             cutover: cutover.clone(),
+                            search: search_session
+                                .clone()
+                                .and_then(|session| SearchTurn::new(session, &calls)),
                         },
                     );
                     let weak = Arc::downgrade(&service);

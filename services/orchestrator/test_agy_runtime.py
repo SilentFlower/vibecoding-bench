@@ -341,6 +341,7 @@ class AgyRuntimeTests(unittest.TestCase):
                     'native_model':'MODEL_PLACEHOLDER_M36','capture_enabled':False}
                 supervisor=Supervisor.__new__(Supervisor)
                 supervisor.condition=threading.Condition();supervisor.closed=False
+                supervisor.search_slots=0
                 supervisor.restore_enabled=False
                 supervisor.config={'max_workers':1 if mode=='capacity' else 3,'proxy_url':'synthetic'}
                 supervisor.credential_generation=value['credential_snapshot']['credential_generation']
@@ -392,6 +393,7 @@ class AgyRuntimeTests(unittest.TestCase):
             'native_model':'MODEL_PLACEHOLDER_M36'}
         supervisor=Supervisor.__new__(Supervisor)
         supervisor.condition=threading.Condition();supervisor.closed=False
+        supervisor.search_slots=0
         supervisor.config={'max_workers':1,'proxy_url':'synthetic'}
         supervisor.credential_generation=snapshot['credential_generation']
         supervisor.workers=[];supervisor.template_failure=None
@@ -424,6 +426,7 @@ class AgyRuntimeTests(unittest.TestCase):
         supervisor = Supervisor.__new__(Supervisor)
         supervisor.condition = threading.Condition()
         supervisor.closed = False
+        supervisor.search_slots = 0
         supervisor.credential_generation = 1
         supervisor.config = {'max_workers': 4}
         supervisor.restore_allowed = True

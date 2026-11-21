@@ -21,6 +21,7 @@ from .contract import InputError
 from .credentials import publish_access_document, read_private
 from .criu import CONTROL as CRIU_CONTROL, failure_detail, read_failure
 from .gemini_contract import continuation_results
+from .headless_search import run_search
 from .input_media import preflight_gif
 from .image_pool import Broker, ImagePool
 from .models import valid_model_mapping
@@ -46,7 +47,7 @@ def validate_submission(value: dict, config: dict) -> dict:
     expected = {'schema_version', 'type', 'request_id', 'account_id', 'environment_id',
         'environment_generation', 'api_token_id', 'credential_snapshot', 'model', 'native_model',
         'body', 'deadline_unix_ms'}
-    if not isinstance(value, dict) or set(value)-{'capture_enabled','system_prompt_policy','gif_frames','disable_safety_filtering','full_egress'} != expected or type(value['schema_version']) is not int or value['schema_version'] != 1 or value['type'] not in ['submit', 'prepare']:
+    if not isinstance(value, dict) or set(value)-{'capture_enabled','system_prompt_policy','gif_frames','disable_safety_filtering','full_egress'} != expected or type(value['schema_version']) is not int or value['schema_version'] != 1 or value['type'] not in ['submit', 'prepare', 'search']:
         raise InputError('invalid_submission')
     for key in ['account_id', 'environment_id', 'environment_generation']:
         if type(value[key]) is not type(config[key]) or value[key] != config[key]:
@@ -67,6 +68,17 @@ def validate_submission(value: dict, config: dict) -> dict:
         raise InputError('invalid_access_snapshot')
     if not valid_model_mapping(value['model'], value['native_model']) or not isinstance(value['body'], dict):
         raise InputError('invalid_model_or_body')
+    if value['type'] == 'search':
+        body = value['body']
+        if set(body) != {'query', 'previous_request_id'} or not isinstance(body['query'], str) or not body['query'].strip():
+            raise InputError('invalid_search_submission')
+        parent = body['previous_request_id']
+        if parent is not None:
+            try:
+                if not isinstance(parent, str) or str(uuid.UUID(parent)) != parent:
+                    raise ValueError()
+            except ValueError:
+                raise InputError('invalid_search_parent') from None
     if type(value.get('capture_enabled',False)) is not bool:
         raise InputError('invalid_capture_policy')
     if type(value.get('full_egress',False)) is not bool:
@@ -283,6 +295,7 @@ class Supervisor:
         verify_resources()
         self.condition = threading.Condition(threading.RLock())
         self.workers = []
+        self.search_slots = 0
         self.jobs = {}
         self.credential_generation=0
         self.credential_identity=None
@@ -335,7 +348,7 @@ class Supervisor:
                         retained_templates.add(worker.key)
                     else:
                         retained_warm = True
-                excess = len(self.workers) - len(idle) - self.config['max_workers']
+                excess = len(self.workers) + self.search_slots - len(idle) - self.config['max_workers']
                 if excess > 0:
                     # 缩容优先回收模板和最久未使用的空闲实例，保留执行和待回填实例。
                     available = [worker for worker in self.workers if not worker.busy and worker not in idle]
@@ -374,7 +387,7 @@ class Supervisor:
                 # 旧代退役也消费原请求预算，截止后禁止复用或启动下一代。
                 if time.monotonic() >= until:
                     raise InputError('request_deadline_exceeded')
-                if len(self.workers) > self.config['max_workers']:
+                if len(self.workers) + self.search_slots > self.config['max_workers']:
                     self.condition.wait(until - time.monotonic())
                     continue
                 # 优先复用已经启动的进程，把单次快照留给需要扩容的请求。
@@ -393,7 +406,7 @@ class Supervisor:
                 stale = next((worker for worker in self.workers if not worker.busy), None)
                 if stale:
                     stale.busy = True
-                elif len(self.workers) < self.config['max_workers']:
+                elif len(self.workers) + self.search_slots < self.config['max_workers']:
                     worker = Worker(self, value)
                     worker.seed_template=seed and value['type']=='prepare' and self.can_seed_template()
                     requested_template=worker.seed_template
@@ -449,7 +462,7 @@ class Supervisor:
                 if template:
                     if not self.can_seed_template():
                         return
-                elif self.config['max_workers']<2 or self.workers!=[source] or not source.busy:
+                elif self.config['max_workers']<2+self.search_slots or self.workers!=[source] or not source.busy:
                     return
                 # 暖进程先登记到同一个物理池，业务与后台同时启动时共用并发上限。
                 worker=Worker(self, value)
@@ -488,7 +501,7 @@ class Supervisor:
 
     def can_seed_template(self):
         """在池锁内检查模板租约和剩余进程名额。@return 是否可启动零业务模板。"""
-        return (self.restore_available() and len(self.workers)<self.config['max_workers']
+        return (self.restore_available() and len(self.workers)+self.search_slots<self.config['max_workers']
             and not any(getattr(worker,'seed_template',False) for worker in self.workers))
 
     def continuation(self, value, until):
@@ -519,7 +532,7 @@ class Supervisor:
                     raise InputError('tool_continuation_identity')
                 return
             job = matches[0]
-            if job.get('claimed'):
+            if job.get('claimed') or job.get('headless_request'):
                 raise InputError('tool_continuation_already_claimed')
             job['claimed'] = True
             identity = job['identity']
@@ -533,6 +546,14 @@ class Supervisor:
         with self.condition:
             if self.closed or value['request_id'] in self.jobs:
                 raise InputError('request_already_registered')
+            previous = value['body'].get('previous_request_id') if value['type'] == 'search' else None
+            parent = self.jobs.get(previous) if previous else None
+            if previous and (not parent or not parent['waiting'] or parent.get('claimed') or parent['cancelled'].is_set()
+                    or parent.get('headless_request') or parent['until'] <= time.monotonic()
+                    or parent['value']['api_token_id'] != value['api_token_id'] or parent['value']['model'] != value['model']
+                    or not any(call.get('name') in ('WebSearch', 'web_search') and isinstance(call.get('args', {}).get('query'), str)
+                        and call['args']['query'].strip() == value['body']['query'] for call in parent['calls'])):
+                raise InputError('search_parent_mismatch')
             generation=value['credential_snapshot']['credential_generation']
             identity=hashlib.sha256(value['credential_snapshot']['access_token'].encode()).digest()
             if generation<self.credential_generation or generation==self.credential_generation and identity!=self.credential_identity:
@@ -545,7 +566,80 @@ class Supervisor:
             self.credential_identity=identity
             self.jobs[value['request_id']] = {'value': value, 'until': until, 'received': time.monotonic(), 'finished': threading.Event(),
                 'cancelled': threading.Event(), 'worker': None, 'calls': [], 'waiting': False}
-        threading.Thread(target=self.execute, args=(value, until), daemon=True).start()
+            if parent:
+                parent['headless_request'] = value['request_id']
+        if value['type'] == 'search':
+            try:
+                threading.Thread(target=self.execute_search, args=(value, until, parent), daemon=True).start()
+            except RuntimeError:
+                with self.condition:
+                    self.jobs.pop(value['request_id'], None)
+                    if parent:
+                        parent.pop('headless_request', None)
+                raise InputError('search_start_failed') from None
+        else:
+            threading.Thread(target=self.execute, args=(value, until), daemon=True).start()
+
+    def reserve_search_slot(self, until, cancelled):
+        """独立搜索占用现有物理容量。@param until 原单调截止。@param cancelled 原取消通知。@return 无。"""
+        while True:
+            with self.condition:
+                if self.closed or cancelled.is_set():
+                    raise InputError('request_cancelled')
+                remaining = until - time.monotonic()
+                if remaining <= 0:
+                    raise InputError('request_deadline_exceeded')
+                if len(self.workers) + self.search_slots < self.config['max_workers']:
+                    self.search_slots += 1
+                    return
+                idle = next((worker for worker in self.workers if not worker.busy), None)
+                if idle is None:
+                    self.condition.wait(min(remaining, .25))
+                    continue
+                idle.busy = True
+            idle.close()
+            with self.condition:
+                if idle in self.workers:
+                    self.workers.remove(idle)
+                self.condition.notify_all()
+
+    def execute_search(self, value, until, parent):
+        """在独立或原等待许可内执行原版搜索。@param value 已核验查询。
+        @param until 原单调截止。@param parent 已核验的待回填任务或空。@return 无。"""
+        request_id = value['request_id']
+        job = self.jobs[request_id]
+        reserved = False
+        status = 'error'
+        try:
+            if parent is None:
+                self.reserve_search_slot(until, job['cancelled'])
+                reserved = True
+            # 有原回合时原 worker 正在等待客户端，headless 与回填共享许可并串行执行。
+            image = self.pool.acquire()
+            try:
+                with tempfile.TemporaryDirectory(prefix='search-', dir=self.root) as folder:
+                    result = run_search(image, private_dir(folder), value['model'], value['credential_snapshot'],
+                        self.config['proxy_url'], value['body']['query'], until, job['cancelled'])
+            finally:
+                os.close(image)
+            if job['cancelled'].is_set():
+                raise InputError('request_cancelled')
+            self.emit('search_result', request_id, result=result)
+            status = 'completed'
+        except Exception as error:
+            self.emit('error', request_id, code=str(error) if isinstance(error, InputError) else 'headless_search_failed')
+        finally:
+            with self.condition:
+                if reserved:
+                    self.search_slots -= 1
+                if parent:
+                    parent.pop('headless_request', None)
+                job['value'] = {key: value[key] for key in ('request_id', 'api_token_id', 'model')}
+                self.condition.notify_all()
+            try:
+                self.emit('job_finalized', request_id, status=status)
+            finally:
+                self.record_finished(job)
 
     def finish_tools_command(self, value):
         """只投递原工具结果，保持零模型发送和原截止。@param value 无凭据控制信封。@return 无。"""
@@ -575,7 +669,7 @@ class Supervisor:
                 if job.get('continuation_digest'):
                     if job['continuation_digest']!=digest:raise InputError('tool_completion_receipt_mismatch')
                 else:
-                    if not job['waiting'] or job.get('claimed'):raise InputError('tool_turn_not_waiting')
+                    if not job['waiting'] or job.get('claimed') or job.get('headless_request'):raise InputError('tool_turn_not_waiting')
                     continuation_results(job['value']['body'],job['calls'],value['body'])
                     job['claimed']=True;job['continuation_digest']=digest
                     job['worker'].send({'schema_version':1,'type':'finish_tool_turn',**job['identity'],'body':value['body']})
@@ -722,6 +816,13 @@ class Supervisor:
             failed = True
             self.emit('error', value['request_id'], code=str(error) if isinstance(error, InputError) else 'supervisor_execution_failed')
         finally:
+            with self.condition:
+                job['waiting'] = False
+                search = self.jobs.get(job.get('headless_request'))
+                if search:
+                    search['cancelled'].set()
+            if search:
+                search['finished'].wait(max(0, search['until']-time.monotonic()))
             if worker:
                 if failed:
                     worker.close()
@@ -739,18 +840,22 @@ class Supervisor:
             try:
                 self.emit('job_finalized', value['request_id'], status=job.get('final_status', 'error' if failed else 'prepared'))
             finally:
-                with self.condition:
-                    # 收口事件先进入唯一输出游标，再唤醒续轮和关闭器，避免退出时丢失最后回执。
-                    job['finished'].set()
-                    completed = [key for key, item in self.jobs.items() if item['finished'].is_set()]
-                    for key in completed[:-256]:
-                        self.jobs.pop(key, None)
-                    self.condition.notify_all()
+                self.record_finished(job)
+
+    def record_finished(self, job):
+        """关闭退出通知并修剪终态回执。@param job 已发布收口的作业。@return 无。"""
+        with self.condition:
+            # 收口事件先进入唯一输出游标，再唤醒续轮和关闭器，避免退出时丢失最后回执。
+            job['finished'].set()
+            completed = [key for key, item in self.jobs.items() if item['finished'].is_set()]
+            for key in completed[:-256]:
+                self.jobs.pop(key, None)
+            self.condition.notify_all()
 
     def status(self):
         """返回实际进程、工具等待与资源分项，读取不唤醒。@return 脱敏状态。"""
         with self.condition:
-            active=sum(worker.busy for worker in self.workers)
+            active=sum(worker.busy for worker in self.workers)+self.search_slots
             idle=[worker for worker in self.workers if not worker.busy and not worker.closed and worker.ready is not None
                 and not getattr(worker,'parked',False) and worker.process is not None and worker.process.poll() is None]
             available=self.restore_available()
@@ -771,11 +876,12 @@ class Supervisor:
             else:
                 restore_state, restore_reason = 'waiting', None
             return {'state': 'busy' if active else 'ready', 'capacity_protocol': 1,
-                'allocated_workers': len(self.workers),
+                'allocated_workers': len(self.workers)+self.search_slots,
                 'workers': sum(not getattr(worker,'parked',False) for worker in self.workers), 'active': active, 'idle_workers': len(idle),
                 'idle_pid': idle[0].ready['native_pid'] if idle else None,
                 'warming_workers': sum(worker.prewarming for worker in self.workers),
                 'tool_waiting': sum(job['waiting'] for job in self.jobs.values()), 'max_workers': self.config['max_workers'],
+                'headless_searches': sum(job['value'].get('type')=='search' for job in self.jobs.values()),
                 'controller': memory(os.getpid()), 'image_bytes': self.pool.decoded_bytes,
                 'cgroup_memory':cgroup_memory(),
                 'image_decode_calls': self.pool.decode_calls, 'image_scope': 'account_workers',
@@ -804,6 +910,9 @@ class Supervisor:
             if not job or job['value']['api_token_id'] != api_token_id or job['finished'].is_set():
                 return False
             job['cancelled'].set()
+            search = self.jobs.get(job.get('headless_request'))
+            if search:
+                search['cancelled'].set()
             if job['worker'] and 'identity' in job:
                 job['worker'].send({'schema_version': 1, 'type': 'cancel', **job['identity']})
                 job['cancel_sent'] = True
@@ -864,7 +973,7 @@ def main():
                 if not isinstance(value, dict) or type(value.get('schema_version')) is not int or value['schema_version'] != 1:
                     raise InputError('invalid_supervisor_input')
                 kind = value.get('type')
-                if kind in ['submit', 'prepare']:
+                if kind in ['submit', 'prepare', 'search']:
                     supervisor.submit(value)
                 elif kind=='finish_tools':
                     supervisor.finish_tools_command(value)

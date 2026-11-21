@@ -13,6 +13,34 @@ pub const AGY_SOURCE_SHA256: &str =
 /// 公共生成请求共用的原生执行预算。
 pub(super) const AGY_REQUEST_SECONDS: i64 = 120;
 
+/// 账号发送器中区分生成、预热和原版搜索的操作。
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum AgyOperation {
+    Generate,
+    Prepare,
+    Search,
+}
+
+impl AgyOperation {
+    /// 返回绑定环境内的专用路由。@return 固定私有路径。
+    pub(super) fn path(self) -> &'static str {
+        match self {
+            Self::Generate => "/internal/agy/generate",
+            Self::Prepare => "/internal/agy/prepare",
+            Self::Search => "/internal/agy/search",
+        }
+    }
+
+    /// 返回监督器分派的操作名。@return 固定 NDJSON 指令。
+    pub(super) fn supervisor_command(self) -> &'static str {
+        match self {
+            Self::Generate => "submit",
+            Self::Prepare => "prepare",
+            Self::Search => "search",
+        }
+    }
+}
+
 /// 首版固定映射标识，字符表由原生适配的受管理资源持有。
 pub const AGY_SYSTEM_PROMPT_RULE: &str = "new-api-homoglyph-v1";
 

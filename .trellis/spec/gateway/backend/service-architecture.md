@@ -1948,3 +1948,40 @@ transport.submit(prepared, body, ttfb_timeout).await
 - verify_agy_accounts_api.py：真实HTTP/SQLite配合合成原生服务，断连、重启、错账号、未落盘恢复及重授权、能力回读、新代理到期刷新和丢回执。
 - 前端构建与verify_accounts_design.py、verify_agy_accounts_ui.py、verify_account_filters_ui.py：旧CC载荷、两账号开关、草稿/焦点、取消与迟到结果、组合筛选及390/720/1440/1920px。
 - 原生OOB启动/取消与合成身份回执分别记证据。真实Google登录、身份及刷新由具备授权测试账号的外部验收独立记录，不能用合成通过冒充真实验收，模型提交预算为0。
+
+## Scenario: 反重力 Messages 与 WebSearch
+
+### 1. Scope / Trigger
+
+- 修改 Flower2API 的 Anthropic Messages 到反重力 Gemini 转换、会话或工具续轮、独立搜索执行及来源过滤时适用。账号、凭据和环境许可沿[账号环境共同合同](../../orchestrator/backend/account-runtime-v3.md#scenario-agy账号运行环境与gemini业务接入)。
+
+### 2. Signatures
+
+- 已鉴权的 `POST /v1/messages` 按正文中的 `gemini-*` 模型进入反重力。`stream: true` 返回 Anthropic SSE，缺省返回 Anthropic JSON。目录模型与账号权限沿现有 Gemini 准入校验。
+- 唯一工具声明 `{"type":"web_search_20250305","name":"web_search"}` 时，解析最后一条用户消息的文本查询及可选的 `allowed_domains` 或 `blocked_domains`。兼容 Claude Code 的 `Perform a web search for the query: ` 前缀。
+- 发送器私有 `POST /internal/agy/search` 使用已有 `AgySubmission`、Bearer 和环境归属。操作正文为 `{"query":<非空字符串>,"previous_request_id":<原作业 UUID 或 null>}`。监督器命令为 `search`，成功时先发 `search_result`，再发同请求的 `job_finalized`。
+
+### 3. Contracts
+
+- 顶层 `system` 和消息列表中的 `system` 文本按顺序并为 Gemini 系统提示。图片沿原生媒体校验。普通函数调用和工具回填按 `tool_use_id` 对应，续轮补回已匹配原调用的真实模型签名。
+- 会话依次使用正文中合法的显式值、`X-Claude-Code-Session-Id`、`X-Session-Id`。网关在反重力域内结合 API 令牌派生选号键，管理诊断显示原始 Session ID。待回填轮的搜索复用同令牌、显式会话、模型和查询所对应的原账号许可。该轮的相同查询复用原搜索回执，每次回包按请求的域名规则过滤。
+- 发送器以固定原版 `agy 1.5.9` 的 `-p` 和 `stream-json` 输入、输出执行 `search_web`。只读取本次成功工具步骤的 SQLite 轨迹结构，使用原生标题和 URL。外部回包在收口后生成同 ID 的 `server_tool_use` 和 `web_search_tool_result`。一次成功搜索计为 `usage.server_tool_use.web_search_requests = 1`。
+- 来源规则按域名和子域匹配。固定原版对 `vertexaisearch.cloud.google.com` 的 Google 跳转只保存跳转地址和标题。存在非空允许域或禁止域列表时省略这类链接。无域名规则时保留原链接。来源标题仅用于显示。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 空查询、无效域名或同时声明允许域与禁止域 | HTTP 400 |
+| 域规则过滤掉全部来源 | 成功的 `web_search_tool_result`，`content` 为 `[]` |
+| 原作业失败或无法核验来源回执终态 | `web_search_tool_result_error`，`error_code` 为 `unavailable` |
+
+### 5. Scenarios and Examples
+
+- 正常查询 `IANA Example Domains`。声明 `allowed_domains: ["iana.org"]` 时保留 `www.iana.org` 直链。声明 `blocked_domains: ["iana.org"]` 时过滤该直链。
+- 把 Google 跳转域填入允许列表无法确认来源站点。需要域名约束时应声明来源站点域名，回包仅包含同规则匹配且来源域可核对的结果。
+
+### 6. Tests Required
+
+- `verify_agy_native_loopback.py --image <离线测试镜像> --messages-search` 核对来源直链与跳转、允许域与禁止域、无域规则、重复查询、账号和工具回填 ID、取消清理。
+- 加 `--claude-code <可执行文件>` 核对真实客户端 `searchCount=1`、来源链接和后续生成。真实 Google 联网由有授权的测试账号单独验收。

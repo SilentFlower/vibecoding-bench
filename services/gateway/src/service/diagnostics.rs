@@ -98,11 +98,11 @@ pub(crate) struct TraceContext {
 }
 
 impl TraceContext {
-    /// 创建内部请求 UUID 并记录采集开始。
+    /// 创建 Messages 请求 UUID，平台由正文解码后的路由确定。
     /// @param store 独立诊断存储。
     /// @return 当前请求的观测上下文。
     pub(crate) fn new(store: Arc<DiagnosticsStore>) -> Self {
-        Self::for_protocol(store, "claude_code", "anthropic_messages")
+        Self::new_for_entry(store, None, "anthropic_messages")
     }
 
     /// 在首次入队前冻结真实入口，保持筛选投影一致。@param store 诊断存储。@param platform 已知平台。@param protocol 已知入口。@return 根上下文。
@@ -111,6 +111,10 @@ impl TraceContext {
         platform: &str,
         protocol: &str,
     ) -> Self {
+        Self::new_for_entry(store, Some(platform), protocol)
+    }
+
+    fn new_for_entry(store: Arc<DiagnosticsStore>, platform: Option<&str>, protocol: &str) -> Self {
         let request_id = Uuid::new_v4().to_string();
         let retention = store.track_request(&request_id);
         let trace = Self {
@@ -120,7 +124,7 @@ impl TraceContext {
                 retention: Some(retention),
                 request: RequestDiagnostic {
                     context: Some(DiagnosticContext {
-                        platform: Some(platform.into()),
+                        platform: platform.map(str::to_owned),
                         entry_protocol: Some(protocol.into()),
                         ..Default::default()
                     }),
@@ -312,6 +316,12 @@ impl TraceContext {
             }
             if state.request.outcome == "local_rejected" && state.request.error_stage.is_none() {
                 state.request.error_stage = Some("admission".into());
+            }
+            if let Some(context) = state.request.context.as_mut()
+                && context.entry_protocol.as_deref() == Some("anthropic_messages")
+            {
+                // 正文解码前终结的请求沿现有 Messages 入口平台记账。
+                context.platform.get_or_insert_with(|| "claude_code".into());
             }
             state.request.finished_at = Some(now());
             state.retention.take();

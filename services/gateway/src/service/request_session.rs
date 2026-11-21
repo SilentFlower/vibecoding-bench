@@ -43,6 +43,29 @@ impl RequestSession {
         }))
     }
 
+    /// 在 Messages 入口读取反重力会话。@param token_id 入口令牌。@param headers 原始头。
+    /// @param body Messages 正文。@return 供反重力调度和原始会话展示的上下文。
+    pub(super) fn agy_messages(token_id: i64, headers: &HeaderMap, body: &Value) -> Self {
+        let explicit = extract_session_id_from_body(body)
+            .filter(|id| valid_id(id))
+            .or_else(|| header_id(headers, "x-claude-code-session-id"))
+            .or_else(|| header_id(headers, SESSION_HEADER));
+        if let Some(id) = explicit {
+            let key = explicit_key(GEMINI_EXPLICIT_DOMAIN, token_id, &id);
+            return Self::explicit(id, Some(key));
+        }
+        Self::from_content((|| {
+            let first = first_user_content(body.get("messages")?, "content", false)?;
+            content_key(
+                GEMINI_CONTENT_DOMAIN,
+                token_id,
+                body.get("model")?.as_str()?.trim(),
+                [body.get("tools"), body.get("system"), Some(first)],
+                true,
+            )
+        })())
+    }
+
     /// 解析 Gemini 入口头与稳定首轮内容。
     /// @param token_id 入口令牌 ID。@param headers 原始头。@param model URL 请求模型。@param body 入站正文。
     /// @return 在账号选择、改写和重试间共用的会话。

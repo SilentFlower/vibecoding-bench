@@ -392,11 +392,12 @@ fn hello_response(include_body: bool) -> Response {
 }
 
 /// 网关透传 fallback：鉴权 + 代理上游
-async fn gateway_fallback(State(state): State<AppState>, req: Request) -> Response {
+async fn gateway_fallback(State(state): State<AppState>, mut req: Request) -> Response {
     let api_token = match authenticate_gateway_token(&state, extract_key(&req)).await {
         Ok(t) => t,
         Err(resp) => return resp,
     };
+    req.extensions_mut().insert(state.gemini_svc.clone());
     state
         .gateway_svc
         .handle_request(req, Some(&api_token))

@@ -36,8 +36,8 @@ use crate::error::AppError;
 use crate::model::account::Account;
 use crate::model::request_diagnostics::{ExecutionLocation, RequestLogMode};
 use crate::service::agy_contract::{
-    AgyAccessSnapshot, AgyModelId, AgySenderConfig, AgySubmission, AgySystemPromptPolicy,
-    AgyToolCompletion,
+    AgyAccessSnapshot, AgyModelId, AgyOperation, AgySenderConfig, AgySubmission,
+    AgySystemPromptPolicy, AgyToolCompletion,
 };
 use crate::service::agy_runtime::AgyPool;
 use crate::service::gemini::agy_input_rejection;
@@ -372,8 +372,8 @@ impl PreparedTransport {
         }
         Ok(())
     }
-    /// 在既有受信绑定中提交AGY请求。@param request_id 公共请求身份。@param api_token_id 调用方。@param snapshot AT-only快照。@param model 公开模型。@param native_model 观测枚举。@param body Gemini正文。@param system_prompt_policy 本HTTP冻结的账号策略。@param deadline 原单调截止。@param capture 采集策略。@param full_egress 保存完整脱敏出站正文。@param gif_frames 冻结的 GIF 策略。@param disable_safety_filtering 冻结的原生安全策略。@return 持续到原生作业收口的私有事件流。
-    pub async fn send_agy(
+    /// 在既有受信绑定中提交AGY请求。@param request_id 公共请求身份。@param api_token_id 调用方。@param snapshot AT-only快照。@param model 公开模型。@param native_model 观测枚举。@param body 操作正文。@param system_prompt_policy 本HTTP冻结的账号策略。@param deadline 原单调截止。@param capture 采集策略。@param full_egress 保存完整脱敏出站正文。@param gif_frames 冻结的 GIF 策略。@param disable_safety_filtering 冻结的原生安全策略。@param operation 目标操作。@return 持续到原生作业收口的私有事件流。
+    pub(super) async fn send_agy(
         &self,
         request_id: &str,
         api_token_id: i64,
@@ -387,6 +387,7 @@ impl PreparedTransport {
         full_egress: bool,
         gif_frames: bool,
         disable_safety_filtering: bool,
+        operation: AgyOperation,
     ) -> Result<reqwest::Response, AppError> {
         let PreparedRoute::V3 { client, binding } = &self.route else {
             return Err(AppError::ServiceUnavailable(
@@ -423,7 +424,7 @@ impl PreparedTransport {
             disable_safety_filtering,
         };
         let mut request = client
-            .post(format!("{}/internal/agy/generate", binding.endpoint))
+            .post(format!("{}{}", binding.endpoint, operation.path()))
             .bearer_auth(&binding.secret)
             .json(&submission);
         if full_egress {
@@ -1648,12 +1649,12 @@ async fn native_prepare_cancel(
     Ok(Json(serde_json::json!({"cancelled":true})))
 }
 
-/// 沿现有账号鉴权和环境准入分派AGY私有请求。@param state 发送器。@param headers 服务证明。@param submission 冻结信封。@param prepare 是否仅准备。@return 原生私有事件流。
+/// 沿现有账号鉴权和环境准入分派AGY私有请求。@param state 发送器。@param headers 服务证明。@param submission 冻结信封。@param operation 目标操作。@return 原生私有事件流。
 async fn agy_operation(
     state: SenderState,
     headers: HeaderMap,
     mut submission: AgySubmission,
-    prepare: bool,
+    operation: AgyOperation,
 ) -> Response {
     let mut started = false;
     let result = async {
@@ -1677,9 +1678,10 @@ async fn agy_operation(
         }
         state.active.fetch_add(1, Ordering::SeqCst);
         let guard = ActiveRequest(state.active.clone());
-        submission.capture_enabled =
-            submission.capture_enabled && config.native_capture_dir.is_some();
-        submission.full_egress = !prepare
+        submission.capture_enabled = submission.capture_enabled
+            && operation != AgyOperation::Search
+            && config.native_capture_dir.is_some();
+        submission.full_egress = operation == AgyOperation::Generate
             && submission.capture_enabled
             && headers
                 .get("x-v3-agy-egress-body")
@@ -1687,7 +1689,7 @@ async fn agy_operation(
         started = true;
         let response = state
             .agy_pool
-            .submit(&config, &state.config_path, submission, deadline, prepare)
+            .submit(&config, &state.config_path, submission, deadline, operation)
             .await?;
         let (parts, body) = response.into_parts();
         let stream = unfold(
@@ -1720,7 +1722,7 @@ async fn agy_prepare(
     headers: HeaderMap,
     Json(submission): Json<AgySubmission>,
 ) -> Response {
-    agy_operation(state, headers, submission, true).await
+    agy_operation(state, headers, submission, AgyOperation::Prepare).await
 }
 
 /// 验证原环境并完成工具回填，独立于新凭据发布。@param state 发送器。@param headers 受信证明。@param input 原工具归属。@return 真实收口回执。
@@ -1774,7 +1776,17 @@ async fn agy_generate(
     headers: HeaderMap,
     Json(submission): Json<AgySubmission>,
 ) -> Response {
-    agy_operation(state, headers, submission, false).await
+    agy_operation(state, headers, submission, AgyOperation::Generate).await
+}
+
+/// 执行同代账号的原版搜索。@param state 发送器。@param headers 服务证明。
+/// @param submission 查询和账号归属。@return 搜索收口事件流。
+async fn agy_search(
+    State(state): State<SenderState>,
+    headers: HeaderMap,
+    Json(submission): Json<AgySubmission>,
+) -> Response {
+    agy_operation(state, headers, submission, AgyOperation::Search).await
 }
 
 #[derive(Deserialize, Serialize)]
@@ -1940,6 +1952,7 @@ pub fn sender_router(config_path: String) -> Router {
         .route("/internal/send", post(forward))
         .route("/internal/agy/prepare", post(agy_prepare))
         .route("/internal/agy/generate", post(agy_generate))
+        .route("/internal/agy/search", post(agy_search))
         .route("/internal/agy/tools", post(agy_tools))
         .route("/internal/agy/cancel", post(agy_cancel))
         .route("/internal/agy/capacity", post(agy_capacity))

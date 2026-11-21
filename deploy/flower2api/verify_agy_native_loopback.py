@@ -20,6 +20,7 @@ import time
 import wave
 import zlib
 from concurrent.futures import ThreadPoolExecutor
+from http.client import HTTPConnection
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError
@@ -33,6 +34,10 @@ MODEL='gemini-3.1-pro-preview'
 SHARED_MODELS = {MODEL: 'MODEL_PLACEHOLDER_M36', 'gemini-3.8-flash-low': 'MODEL_PLACEHOLDER_M320'}
 SOURCE_SHA='39816d49d5ab92229952987225c23ea3fed7580699dcb4a444e0388e0ac1ce43'
 SCHEMA_TOOL_ARGS = {'x': 1, 'action': 'query', 'where': [['count', '>=', 7], ['ready', '==', True]]}
+SEARCH_QUERY = 'IANA Example Domains'
+SEARCH_URL = 'https://www.iana.org/help/example-domains'
+SEARCH_REDIRECT = 'https://vertexaisearch.cloud.google.com/grounding-api-redirect/fixture'
+SEARCH_REDIRECT_TITLE = 'IANA Redirect Fixture'
 
 
 def require(condition, message):
@@ -53,6 +58,9 @@ class Upstream(BaseHTTPRequestHandler):
     model_catalog_host=None
     model_mappings = {MODEL: SHARED_MODELS[MODEL]}
     held_requests = {}
+    messages_search = False
+    search_held = threading.Event()
+    search_release = threading.Event()
 
     def log_message(self,*args):
         """避免将请求头体输出到公共日志。@param args 日志参数。@return 无。"""
@@ -85,6 +93,28 @@ class Upstream(BaseHTTPRequestHandler):
         record={'path':self.path,'body':body,'authorization':self.headers.get('authorization')}
         self.requests.append(record)
         Path('/state/upstream.json').write_text(json.dumps(self.requests))
+        if self.messages_search and ':generateContent' in self.path:
+            request = body['request']
+            require(any('googleSearch' in tool for tool in request['tools']), 'AGY 搜索没有调用原版的联网工具')
+            text = request['contents'][0]['parts'][0]['text']
+            if text=='Cancelled search fixture':
+                self.search_held.set()
+                self.search_release.wait(20)
+                self.send_response(503);self.send_header('content-length','0');self.end_headers()
+                return
+            candidate = {'content': {'role':'model','parts':[{'text':'IANA explains reserved example domains.'}]},
+                'index':0, 'finishReason':'STOP', 'groundingMetadata': {'webSearchQueries':[text],
+                    'groundingChunks':[{'web':{'uri':SEARCH_URL,'title':SEARCH_QUERY}},
+                        {'web':{'uri':SEARCH_REDIRECT,'title':SEARCH_REDIRECT_TITLE,'domain':'www.iana.org'}}],
+                    'groundingSupports':[{'segment':{'startIndex':0,'endIndex':37},'groundingChunkIndices':[0,1]}]}}
+            if text == 'Empty search fixture':
+                candidate['groundingMetadata']['groundingChunks'] = []
+                candidate['groundingMetadata']['groundingSupports'] = []
+            envelope = {'response':{'candidates':[candidate]}} if text != 'Failed search fixture' else {'response':{}}
+            raw = json.dumps(envelope).encode()
+            self.send_response(200);self.send_header('content-type','application/json')
+            self.send_header('content-length',str(len(raw)));self.end_headers();self.wfile.write(raw)
+            return
         if ':streamGenerateContent' in self.path:
             record['request_headers']={name.lower():value for name,value in self.headers.items()
                 if name.lower() in ('host','content-type','content-length','content-encoding','transfer-encoding',
@@ -142,6 +172,26 @@ class Upstream(BaseHTTPRequestHandler):
             arguments = SCHEMA_TOOL_ARGS if 'TLS_SYNTHETIC_TOOL_SCHEMA' in encoded else {'x':1}
             part={'functionCall':{'name':'synthetic_tool','args':arguments,'id':tool_id},'thoughtSignature':'c3ludGhldGljLXNpZw=='} if tool else {'text':'本地TLS回复'}
             frames=[{'candidates':[{'index':0,'content':{'role':'model','parts':[part]}}]}]
+            if self.messages_search:
+                names = {entry['name'] for tool in tools for entry in tool.get('functionDeclarations', [])}
+                if 'search_web' in names:
+                    require(names <= {'search_web','manage_task'}, '独立搜索继承了普通执行工具')
+                    if not results and len(body['request']['contents']) == 1:
+                        prompt = body['request']['contents'][0]['parts'][0]['text']
+                        query = json.loads(prompt.split('</USER_REQUEST>',1)[0].splitlines()[-1])
+                        parts = [{'functionCall':{'name':'search_web','args':{'query':query},'id':'call_search'}}]
+                        if query=='Tool isolation fixture':
+                            parts = [{'functionCall':{'name':'run_command','args':{
+                                'CommandLine':'touch /state/forbidden-search-probe','Cwd':'/state'},'id':'call_denied'}}]
+                    else:
+                        parts = [{'text':'模型总结中的伪造网址 https://irrelevant.example.invalid'}]
+                    frames = [{'candidates':[{'index':0,'content':{'role':'model','parts':parts}}]}]
+                elif 'WebSearch' in names and 'Messages search fixture' in encoded and not results:
+                    parts = [{'functionCall':{'name':'WebSearch','args':{'query':SEARCH_QUERY},'id':'call_msg_search'},
+                        'thoughtSignature':'c3ludGhldGljLXNpZw=='}]
+                    if 'mcp__fixture__read_item' in names:
+                        parts.extend({'functionCall':{'name':'mcp__fixture__read_item','args':{'n':n},'id':f'call_msg_read_{n}'}} for n in (1,2,3))
+                    frames = [{'candidates':[{'index':0,'content':{'role':'model','parts':parts}}]}]
             if tool and (parallel_chain or replay_chain):
                 part['functionCall']['id']=f'call_{returned+1:032x}'
                 part['functionCall']['args']={'x':returned+1}
@@ -189,6 +239,10 @@ class Upstream(BaseHTTPRequestHandler):
             value={'cloudaicompanionProject':'synthetic-project','currentTier':{'id':'standard-tier','name':'Standard'}}
         elif ':fetchAvailableModels' in self.path:
             value = {'models': {name: {'model': native, 'displayName': name} for name, native in self.model_mappings.items()}}
+            if self.messages_search:
+                value.update(defaultAgentModelId=MODEL, webSearchModelIds=[MODEL], agentModelSorts=[{
+                    'displayName':'Gemini','groups':[{'displayName':'Gemini','modelIds':[MODEL]}]}])
+                value['models'][MODEL]['supportedMimeTypes'] = {'image/png':True}
             if self.png_support:
                 value['models'][MODEL]['supportedMimeTypes']={mime:True for mime in ('image/png','image/jpeg','image/gif','audio/wav')}
                 value['defaultAgentModelId']=MODEL
@@ -372,15 +426,18 @@ def homoglyph_cases(database, request, base, wait_idle):
     return ['固定同形映射实际出站','普通和SSE一致','用户及历史保护','重复经过幂等','预算内大文本及超限零提交','暖worker复用','工具下一HTTP策略','源缓存及思考用量','策略账本与入站视图']
 
 
+def fixture_png(color):
+    """生成可核对的像素输入。@param color RGB 像素。@return Base64 PNG。"""
+    def chunk(kind, data):
+        return struct.pack('>I', len(data))+kind+data+struct.pack('>I', zlib.crc32(kind+data))
+    pixels=(b'\0'+bytes(color)*32)*32
+    png=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',32,32,8,2,0,0,0))
+    png+=chunk(b'IDAT',zlib.compress(pixels))+chunk(b'IEND',b'')
+    return base64.b64encode(png).decode('ascii')
+
+
 def verify_png(request, request_ids, wait_idle, database, base):
     """验证历史恢复、工具续轮与真实图片出站。@param request 真实网关入口。@param request_ids 公共请求标识。@param wait_idle 排空观察。@param database 合成账号库。@param base Gemini 路径。@return 脱敏结果。"""
-    def image(color):
-        def chunk(kind, data):
-            return struct.pack('>I', len(data))+kind+data+struct.pack('>I', zlib.crc32(kind+data))
-        pixels=(b'\0'+bytes(color)*32)*32
-        png=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',32,32,8,2,0,0,0))
-        png+=chunk(b'IDAT',zlib.compress(pixels))+chunk(b'IEND',b'')
-        return base64.b64encode(png).decode('ascii')
 
     def set_support(value):
         capabilities={'model_mappings':{MODEL:'MODEL_PLACEHOLDER_M36'}}
@@ -389,7 +446,7 @@ def verify_png(request, request_ids, wait_idle, database, base):
         with database:
             database.execute('UPDATE accounts SET usage_data=? WHERE id=1',(json.dumps({'capabilities':capabilities}),))
 
-    historical,current=image((255,0,0)),image((0,0,255))
+    historical,current=fixture_png((255,0,0)),fixture_png((0,0,255))
     urlsafe=str.maketrans('+/','-_')
     first={'role':'user','parts':[{'text':'历史图'},{'inlineData':{'mimeType':'image/png','data':historical.translate(urlsafe)}}]}
     last={'role':'user','parts':[{'inline_data':{'mime_type':'image/png','data':current.translate(urlsafe).rstrip('=')}}]}
@@ -1264,12 +1321,177 @@ def verify_live_capacity(request, wait_idle, base):
     return {'passed': True, 'capacity': [3, 4, 3], 'same_supervisor': True, 'model_submissions': len(Upstream.calls)}
 
 
+def verify_messages_search(request, wait_idle, database):
+    """运行真实 Messages、同名工具回填和原版 WebSearch。@param request 公共 HTTP 入口。
+    @param wait_idle 发送器回收检查。@param database 隔离账号库。@return 验证摘要。"""
+    path = '/v1/messages'
+    metadata = {'user_id':json.dumps({'session_id':'synthetic-messages-session'})}
+    main = {'model':MODEL,'metadata':metadata,'max_tokens':128,'stream':True,
+        'system':[{'type':'text','text':'Messages system fixture'}],
+        'messages':[{'role':'user','content':'Messages search fixture'},
+            {'role':'system','content':[{'type':'text','text':'Trailing environment fixture'}]}],
+        'tools':[{'name':'WebSearch','input_schema':{'type':'object','properties':{'query':{'type':'string'}}}},
+            {'name':'mcp__fixture__read_item','input_schema':{'type':'object','properties':{'n':{'type':'integer'}}}}]}
+
+    def sse(raw):
+        return [json.loads(line[6:]) for line in raw.splitlines() if line.startswith(b'data: ')]
+
+    status, raw = request(path, main)
+    require(status==200, f'Messages 主请求失败：{status} {raw[:350]!r}')
+    events=sse(raw)
+    require(events[0]['type']=='message_start' and events[-1]['type']=='message_stop', 'Messages SSE 事件边界错误')
+    calls=[item['content_block'].copy() for item in events if item['type']=='content_block_start'
+        and item['content_block']['type']=='tool_use']
+    arguments=[json.loads(item['delta']['partial_json']) for item in events if item['type']=='content_block_delta'
+        and item['delta']['type']=='input_json_delta']
+    require([call['name'] for call in calls]==['WebSearch']+['mcp__fixture__read_item']*3, 'Messages 并行函数声明不完整')
+    require([call['id'] for call in calls]==['call_msg_search','call_msg_read_1','call_msg_read_2','call_msg_read_3'], 'Messages 原生调用 ID 不一致')
+    for call, args in zip(calls, arguments):
+        call['input']=args
+
+    with database:
+        usage=json.dumps({'capabilities':{'model_mappings':Upstream.model_mappings}})
+        database.execute("INSERT INTO accounts(id,name,email,platform,token,device_id,auth_type,access_token,refresh_token,oauth_expires_at,concurrency,auto_telemetry,auto_poll_usage,usage_data) VALUES(2,'alternate','alternate@example.test','antigravity','','','oauth','synthetic-alternate','synthetic-rt','2099-01-01T00:00:00Z',1,0,0,?)", (usage,))
+        database.execute("INSERT INTO account_credential_states(account_id,generation,phase,updated_at_ms) VALUES(2,1,'ready',1)")
+        database.execute("UPDATE api_tokens SET allowed_accounts='1,2' WHERE token='synthetic-key'")
+        database.execute("INSERT INTO api_tokens(name,token,allowed_accounts,status) VALUES('other','synthetic-other','999','active')")
+
+    def search(query, **tool_options):
+        return {'model':MODEL,'metadata':metadata,'max_tokens':128,
+            'messages':[{'role':'user','content':[{'type':'text','text':'Perform a web search for the query: '+query}]}],
+            'tools':[{'name':'web_search','type':'web_search_20250305','max_uses':8,**tool_options}]}
+
+    require(request(path, search('Different query'))[0]==400, '同会话查询串到了未关联的工具')
+    status,_=request(path, search(SEARCH_QUERY), token='synthetic-other')
+    require(status in (403,404,503), '另一个令牌取得了原搜索许可')
+    status,raw=request(path,{**search(SEARCH_QUERY,allowed_domains=['iana.org']),'stream':True})
+    require(status==200, f'关联 WebSearch 失败：{status} {raw[:350]!r}')
+    blocks=[item['content_block'] for item in sse(raw) if item['type']=='content_block_start']
+    require([item['type'] for item in blocks]==['server_tool_use','web_search_tool_result'] and blocks[0]['id']==blocks[1]['tool_use_id'],
+        'WebSearch SSE 调用和回执没有成对')
+    require(isinstance(blocks[1]['content'],list) and [(item['title'],item['url']) for item in blocks[1]['content']]==[(SEARCH_QUERY,SEARCH_URL)],
+        'WebSearch 原生来源不正确：'+str(blocks[1]['content']))
+    require(sse(raw)[-2]['usage']['server_tool_use']['web_search_requests']==1,'WebSearch 计数不正确')
+    domain_cases=[
+        ({'blocked_domains':['iana.org']},[]),
+        ({'blocked_domains':['example.org']},[(SEARCH_QUERY,SEARCH_URL)]),
+        ({'allowed_domains':['vertexaisearch.cloud.google.com']},[]),
+        ({},[(SEARCH_QUERY,SEARCH_URL),(SEARCH_REDIRECT_TITLE,SEARCH_REDIRECT)]),
+    ]
+    for rules,expected in domain_cases:
+        status,raw=request(path,search(SEARCH_QUERY,**rules))
+        require(status==200, f'带域名规则的查询重读失败：{status} {raw[:350]!r}')
+        found=json.loads(raw)['content'][1]['content']
+        require(isinstance(found,list) and [(item['title'],item['url']) for item in found]==expected,
+            f'域名过滤结果异常：{rules!r} {found!r}')
+    grounded=[item for item in Upstream.requests if ':generateContent' in item['path']]
+    require(len(grounded)==1 and grounded[0]['authorization']=='Bearer synthetic-at-1','WebSearch 未沿原账号执行或重复调用')
+
+    response_parts=[{'type':'tool_result','tool_use_id':calls[i]['id'],'content':[{'type':'text','text':f'callback-{i}'}]}
+        for i in (3,2,0,1)]
+    continuation={**main,'stream':False,'messages':main['messages']+[
+        {'role':'assistant','content':calls},{'role':'user','content':response_parts}]}
+    status, raw = request(path, continuation)
+    require(status==200 and json.loads(raw)['type']=='message' and json.loads(raw)['stop_reason']=='end_turn',
+        f'Messages 回填未继续生成：{status} {raw[:350]!r}')
+    wait_idle()
+    sent=Upstream.calls[-1]['body']['request']['contents']
+    results=[part['functionResponse'] for message in sent for part in message['parts'] if 'functionResponse' in part]
+    require([item['id'] for item in results]==[item['id'] for item in calls], '工具回填没有按原调用身份归位')
+    require([json.loads(item['response']['output'])['result'][0]['text'] for item in results]==[f'callback-{i}' for i in range(4)],
+        '同名工具回填串值')
+    require(any(part.get('thoughtSignature')=='c3ludGhldGljLXNpZw==' and part.get('functionCall',{}).get('id')==calls[0]['id']
+        for message in sent for part in message['parts']), 'Messages 回填丢失了原生函数签名')
+
+    status,raw=request(path,{'model':MODEL,'metadata':metadata,'max_tokens':128,
+        'messages':[{'role':'user','content':'Next sticky turn fixture'}]})
+    require(status==200 and Upstream.calls[-1]['authorization']=='Bearer synthetic-at-1','原始 Session ID 未延续选中账号')
+    wait_idle()
+    with database:
+        database.execute("UPDATE api_tokens SET allowed_accounts='1' WHERE token='synthetic-key'")
+        usage=json.dumps({'capabilities':{'model_mappings':Upstream.model_mappings,'media_inputs':{MODEL:{'image/png':True}}}})
+        database.execute("UPDATE accounts SET usage_data=? WHERE id=1", (usage,))
+    for query, success in [('Empty search fixture',True),('Failed search fixture',False),('Tool isolation fixture',False)]:
+        status,raw=request(path,search(query))
+        require(status==200, f'独立 WebSearch 未正常结束：{status} {raw[:350]!r}')
+        content=json.loads(raw)['content'][1]['content']
+        require(content==([] if success else {'type':'web_search_tool_result_error','error_code':'unavailable'}),
+            f'搜索空结果和故障合同异常：{content!r}')
+        wait_idle()
+    require(not list(Path('/state/native').glob('*/state/search-*')), '搜索凭据目录未回收')
+    require(not Path('/state/forbidden-search-probe').exists(), '独立 WebSearch 运行了未授权的命令工具')
+    verify_messages_search_cancel(search('Cancelled search fixture'))
+    data=fixture_png((231,194,7))
+    status, raw=request(path,{'model':MODEL,'max_tokens':128,'messages':[{'role':'user','content':[
+        {'type':'text','text':'After search fixture'},{'type':'image','source':{'type':'base64','media_type':'image/png','data':data}}]}]})
+    require(status==200 and json.loads(raw)['content'][0]['text']=='本地TLS回复',f'搜索后图片请求未恢复：{status} {raw[:350]!r}')
+    require(any(part.get('inlineData')=={'mimeType':'image/png','data':data}
+        for message in Upstream.calls[-1]['body']['request']['contents'] for part in message['parts']), '图片没有进入真实 AGY 请求')
+    wait_idle()
+    result={'passed':True,'messages_sse_json':True,'parallel_results':4,'grounded_searches':4,'domain_filter_cases':1+len(domain_cases),
+        'single_concurrency':True,'original_session_id':True,'image/png':True,'cancellation':True,'fixed_native_version':'1.5.9'}
+    if Path('/opt/claude-code').is_file():
+        result['claude_code_search_count']=verify_claude_code_search(wait_idle)
+    status,raw=request('/admin/request-diagnostics?platform=antigravity&entry_protocol=anthropic_messages&page_size=50',admin=True)
+    require(status==200 and any(row.get('original_session_id')=='synthetic-messages-session' for row in json.loads(raw)['items']),
+        'Messages 诊断没有原始 Session ID')
+    return result
+
+
+def verify_messages_search_cancel(body):
+    """在搜索上游待回包时关闭客户端。@param body 独立搜索请求。@return 无。"""
+    connection=HTTPConnection('127.0.0.1',5674,timeout=15)
+    try:
+        connection.request('POST','/v1/messages',json.dumps({**body,'stream':True}),{
+            'x-api-key':'synthetic-key','content-type':'application/json','user-agent':'claude-cli/2.1.293 (external, cli)'})
+        require(Upstream.search_held.wait(12),'取消试验未达到真实搜索上游')
+        connection.close()
+        until=time.monotonic()+8
+        request=Request('http://127.0.0.1:8091/internal/status',headers={'authorization':'Bearer '+SECRET})
+        while time.monotonic()<until:
+            with urlopen(request,timeout=3) as reply:
+                if json.load(reply)['active']==0:
+                    break
+            time.sleep(.1)
+        else:
+            raise ValueError('客户端断开后发送器仍持有搜索活动')
+        require(not list(Path('/state/native').glob('*/state/search-*')), '取消搜索留下凭据工作目录')
+    finally:
+        connection.close()
+        Upstream.search_release.set()
+
+
+def verify_claude_code_search(wait_idle):
+    """真实客户端沿隔离网关执行一次搜索。@param wait_idle 发送器清理检查。@return 客户端已识别的搜索数。"""
+    with tempfile.TemporaryDirectory(dir='/state') as directory:
+        env={'HOME':directory,'PATH':'/usr/bin:/bin','TERM':'dumb','LANG':'C.UTF-8',
+            'ANTHROPIC_BASE_URL':'http://127.0.0.1:5674','ANTHROPIC_API_KEY':'synthetic-key',
+            'ANTHROPIC_MODEL':MODEL,'ANTHROPIC_DEFAULT_HAIKU_MODEL':MODEL,
+            'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC':'1','DISABLE_AUTOUPDATER':'1'}
+        prompt='Messages search fixture. Use WebSearch for IANA Example Domains and report the source.'
+        completed=subprocess.run(['/opt/claude-code','--print',prompt,'--model',MODEL,
+            '--allowedTools','WebSearch','--output-format','stream-json','--verbose',
+            '--no-session-persistence'],cwd=directory,env=env,text=True,capture_output=True,timeout=90)
+        Path('/state/claude-code-stream.jsonl').write_text(completed.stdout,encoding='utf-8')
+        events=[json.loads(line) for line in completed.stdout.splitlines()]
+        callbacks=[block for event in events if event.get('type')=='user' for block in event['message']['content']
+            if isinstance(block,dict) and block['type']=='tool_result']
+        actual=sum(block.get('tool_use_id')=='call_msg_search' and SEARCH_URL in json.dumps(block) for block in callbacks)
+        counts=[event['tool_use_result'].get('searchCount') for event in events if event.get('type')=='user'
+            and isinstance(event.get('tool_use_result'),dict) and event['tool_use_result'].get('query')==SEARCH_QUERY]
+        require(completed.returncode==0 and actual==1 and counts==[1] and events[-1].get('subtype')=='success',
+            'Claude Code 未识别搜索回填或未继续生成：'+json.dumps(events[-2:],ensure_ascii=False)[:1800]+completed.stderr[:350])
+        wait_idle()
+        return counts[0]
+
+
 def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,kernel_selection=False,tool_deadlines=False,parallel_tools=False,
-           *, shared_models=False, live_capacity=False):
+           *, shared_models=False, live_capacity=False, messages_search=False):
     """执行真实公共业务。@param homoglyph 检验系统策略。@param capture_off 验证关闭采集。@param png 核对图片与工具历史。@param installed_adapter 使用镜像内适配器。@param kernel_selection 验证内核切换。@param tool_deadlines 验证跨首轮期限的工具链。@param parallel_tools 验证同名工具。@return 脱敏验证摘要。"""
     require(os.geteuid()==1001,'原生业务探针必须使用UID1001')
     os.umask(0o077)
     Upstream.png_support=png
+    Upstream.messages_search=messages_search
     if shared_models:
         Upstream.model_mappings = SHARED_MODELS
     context=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -1284,7 +1506,7 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
         'allowed_origin':'https://cloudcode-pa.googleapis.com','native_capture_dir':'/state/capture',
         'agy':{'protocol_version':1,'source_sha256':SOURCE_SHA,'module_root':'/opt/v3/python' if installed_adapter else '/opt/orchestrator',
             'binary_path':'/usr/local/bin/agy-1.5.9','work_root':'/state/native',
-            'max_workers':3 if live_capacity else 1,'memory_mib':1536 if png or live_capacity else 768}}
+            'max_workers':3 if live_capacity else 1,'memory_mib':1536 if png or live_capacity or Path('/opt/claude-code').is_file() else 768}}
     if capture_off:config.pop('native_capture_dir')
     Path('/state/sender.json').write_text(json.dumps(config))
     outputs=[];children=[]
@@ -1299,6 +1521,8 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
         """通过真实公共 HTTP 执行一次请求。@param path 路径。@param body Gemini 正文。@param admin 是否管理调用。@param first_tool_frame 是否在首条工具事件后退出。@param token 合成入口令牌。@return 状态与正文。"""
         headers={'x-api-key':'synthetic-admin' if admin else token,'content-type':'application/json'}
         if not admin:headers['X-Synthetic-Ingress']='never-upstream'
+        if messages_search and path=='/v1/messages':
+            headers['user-agent']='claude-cli/2.1.293 (external, cli)' if body.get('stream') else 'python-httpx/0.28.1'
         value=Request('http://127.0.0.1:5674'+path,data=json.dumps(body).encode() if body is not None else None,headers=headers,
             method='PUT' if body is not None and (path=='/admin/settings' or path.startswith('/admin/accounts/')) else None)
         try:
@@ -1346,6 +1570,10 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
                 database.execute('UPDATE accounts SET concurrency=3 WHERE id=1')
         require(request('/admin/settings',{'request_diagnostics_log_mode':'debug'},admin=True)[0]==200,'测试日志模式设置失败')
         base='/v1beta/models/'+MODEL+':'
+        if messages_search:
+            result=verify_messages_search(request,wait_idle,database)
+            database.close()
+            return result
         if live_capacity:
             database.close()
             return verify_live_capacity(request, wait_idle, base)
@@ -1549,11 +1777,13 @@ def main():
     parser.add_argument('--parallel-tools',action='store_true')
     parser.add_argument('--shared-models', action='store_true')
     parser.add_argument('--live-capacity', action='store_true')
+    parser.add_argument('--messages-search', action='store_true')
+    parser.add_argument('--claude-code', type=Path)
     args=parser.parse_args()
     installed_adapter=args.installed_adapter or args.png or args.kernel_selection
     if args.inside:
         result = inside(args.homoglyph,args.capture_off,args.png,installed_adapter,args.kernel_selection,args.tool_deadlines,args.parallel_tools,
-            shared_models=args.shared_models,live_capacity=args.live_capacity)
+            shared_models=args.shared_models,live_capacity=args.live_capacity,messages_search=args.messages_search)
         print(json.dumps(result, ensure_ascii=False))
         return
     require(bool(args.image),'需要明确的固定原版测试镜像')
@@ -1594,6 +1824,9 @@ def main():
             str(folder/'trust.pem'):{'bind':'/etc/ssl/certs/ca-certificates.crt','mode':'ro'}}
         if installed_adapter:
             del volumes[str(package/'agy_runtime')]
+        if args.claude_code:
+            require(args.messages_search,'Claude Code 验证需要 Messages 搜索场景')
+            volumes[str(args.claude_code.resolve(strict=True))]={'bind':'/opt/claude-code','mode':'ro'}
         python_package='/opt/v3/python' if installed_adapter else '/opt/orchestrator'
         if args.loader_root:
             # 开发机调试产物可能依赖较新glibc，加载器只作用于测试Rust进程。
@@ -1604,11 +1837,11 @@ def main():
         for flag,enabled in (('--homoglyph',args.homoglyph),('--capture-off',args.capture_off),('--png',args.png),
                 ('--installed-adapter',installed_adapter),('--kernel-selection',args.kernel_selection),('--parallel-tools',args.parallel_tools),
                 ('--tool-deadlines',args.tool_deadlines),('--shared-models',args.shared_models),
-                ('--live-capacity',args.live_capacity)):
+                ('--live-capacity',args.live_capacity),('--messages-search',args.messages_search)):
             if enabled:probe.append(flag)
         container=client.containers.run(args.image,probe,entrypoint=['python3'],detach=True,
             user='1001:1001',network_mode='none',read_only=True,cap_drop=['ALL'],security_opt=['no-new-privileges:true'],
-            mem_limit='1536m' if args.png or args.live_capacity else '768m',pids_limit=512,extra_hosts={host:'127.0.0.1'},tmpfs={'/tmp':'rw,nosuid,nodev,size=128m'},
+            mem_limit='1536m' if args.png or args.live_capacity or args.claude_code else '768m',pids_limit=512,extra_hosts={host:'127.0.0.1'},tmpfs={'/tmp':'rw,nosuid,nodev,size=128m'},
             volumes=volumes,environment={'PYTHONPATH':python_package+':/usr/local/bin','DATABASE_DRIVER':'sqlite',
                 'DATABASE_DSN':'/state/gateway.sqlite','ADMIN_PASSWORD':'synthetic-admin','V3_SENDER_CONFIG':'/state/sender.json',
                 'V3_RUNTIME_URL':'http://127.0.0.1:8765','V3_INTERNAL_TOKEN':SECRET,'V3_DEPLOYMENT_ID':'synthetic',
@@ -1616,7 +1849,7 @@ def main():
             labels={'vibebench.test-task':'agy-request-records'})
         result=container.wait(timeout=540)
         logs=container.logs().decode(errors='replace')
-        evidence=root/('.trellis/.runtime/agy-live-capacity-private' if args.live_capacity else '.trellis/.runtime/agy-shared-models-private' if args.shared_models else '.trellis/.runtime/agy-parallel-tools-private' if args.parallel_tools else '.trellis/.runtime/agy-tool-deadlines-private' if args.tool_deadlines else '.trellis/.runtime/agy-kernel-selection-private' if args.kernel_selection else '.trellis/.runtime/agy-png-loopback-private' if args.png else '.trellis/.runtime/agy-homoglyph-capture-off-private' if args.capture_off else '.trellis/.runtime/agy-homoglyph-loopback-private' if args.homoglyph else '.trellis/.runtime/agy-runtime-loopback-private')
+        evidence=root/('.trellis/.runtime/agy-messages-search-private' if args.messages_search else '.trellis/.runtime/agy-live-capacity-private' if args.live_capacity else '.trellis/.runtime/agy-shared-models-private' if args.shared_models else '.trellis/.runtime/agy-parallel-tools-private' if args.parallel_tools else '.trellis/.runtime/agy-tool-deadlines-private' if args.tool_deadlines else '.trellis/.runtime/agy-kernel-selection-private' if args.kernel_selection else '.trellis/.runtime/agy-png-loopback-private' if args.png else '.trellis/.runtime/agy-homoglyph-capture-off-private' if args.capture_off else '.trellis/.runtime/agy-homoglyph-loopback-private' if args.homoglyph else '.trellis/.runtime/agy-runtime-loopback-private')
         if evidence.exists():shutil.rmtree(evidence)
         shutil.copytree(folder,evidence,ignore=lambda directory,names:[name for name in names
             if not (Path(directory)/name).is_file() and not (Path(directory)/name).is_dir()])

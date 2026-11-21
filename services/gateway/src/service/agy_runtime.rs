@@ -25,7 +25,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use uuid::Uuid;
 
 use crate::error::AppError;
-use crate::service::agy_contract::{AgySubmission, AgyToolCompletion};
+use crate::service::agy_contract::{AgyOperation, AgySubmission, AgyToolCompletion};
 use crate::service::runtime_transport::{SenderConfig, now_ms, read_config};
 
 /// 单账号监督进程池；热配置更换前要求原活动已收口。
@@ -472,14 +472,14 @@ impl AgyPool {
         Ok(controller)
     }
 
-    /// 发送独立AGY请求并交付原生私有事件流。@param config 原账号配置。@param config_path 私有配置入口。@param submission 已准入信封。@param deadline 原单调截止。@param prepare 是否只准备。@return 私有NDJSON响应。
-    pub async fn submit(
+    /// 发送独立AGY请求并交付原生私有事件流。@param config 原账号配置。@param config_path 私有配置入口。@param submission 已准入信封。@param deadline 原单调截止。@param operation 冻结的操作。@return 私有NDJSON响应。
+    pub(super) async fn submit(
         &self,
         config: &SenderConfig,
         config_path: &str,
         submission: AgySubmission,
         deadline: Instant,
-        prepare: bool,
+        operation: AgyOperation,
     ) -> Result<Response, AppError> {
         submission.validate(now_ms())?;
         let controller = timeout_at(deadline, self.controller(config, config_path))
@@ -510,7 +510,7 @@ impl AgyPool {
             api_token_id: submission.api_token_id,
             complete,
         };
-        let mut value = json!({"schema_version":1,"type":if prepare {"prepare"} else {"submit"},
+        let mut value = json!({"schema_version":1,"type":operation.supervisor_command(),
             "request_id":request_id,"account_id":submission.request.account_id,
             "environment_id":submission.request.environment_id,"environment_generation":submission.request.generation,
             "api_token_id":submission.api_token_id,"credential_snapshot":submission.credential_snapshot,
