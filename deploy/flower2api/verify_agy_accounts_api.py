@@ -25,6 +25,7 @@ def main():
     counts = {'refresh':0,'proxy_refresh':0,'observation':0}
     fail_reply = threading.Event()
     fail_before_start = threading.Event()
+    verify_identity_only = threading.Event()
 
     def native(email, access, refresh='synthetic-rt1'):
         """生成合成原生回执。@param email 已核验身份。@param access AT。@param refresh RT。@return 私有结果。"""
@@ -79,6 +80,8 @@ def main():
                 time.sleep(.3)
                 result = native(tokens[body['document']['token']['access_token']], 'synthetic-refreshed-'+str(counts['refresh']),
                     'synthetic-rotated-'+str(counts['refresh']))
+                if verify_identity_only.is_set():
+                    result.pop('capabilities')
                 receipts[body['operation_id']] = result
                 if fail_reply.is_set(): status=503
             elif action=='prepare':
@@ -264,9 +267,29 @@ def main():
             assert saved['proxy_url']=='http://new-proxy.example.test:8080' and saved['refresh_token']=='synthetic-proxy-rt'
             assert saved['usage_data']['capabilities']==receipts[next(reversed(receipts))]['capabilities'] and saved['usage_fetched_at']
             assert request('GET',f'/admin/accounts/{account}/agy-credentials')['phase']=='ready'
+            # 只核验身份的续期与丢失回执恢复都保留已有额度、能力和采集时刻。
+            with sqlite3.connect(folder/'gateway.sqlite') as database:
+                database.execute("UPDATE accounts SET usage_fetched_at='2001-01-01T00:00:00Z' WHERE id=?", (account,))
+            prior_usage = request('GET', f'/admin/accounts/{account}')
+            state_path = f'/admin/accounts/{account}/agy-credentials'
+            generation = request('GET', state_path)['generation']
+            fail_reply.clear()
+            verify_identity_only.set()
+            request('POST', path, {'force_refresh': True})
+            assert request('GET', state_path)['generation'] == generation + 1
+            fail_reply.set()
+            request('POST', path, {'force_refresh': True}, 503)
+            assert request('GET', state_path)['phase'] == 'reconcile'
+            request('POST', state_path + '/recover', {})
+            state = request('GET', state_path)
+            assert (state['phase'], state['generation']) == ('ready', generation + 2)
+            recovered = request('GET', f'/admin/accounts/{account}')
+            assert counts['refresh'] == 4 and recovered['refresh_token'] == 'synthetic-rotated-4'
+            assert recovered['usage_data'] == prior_usage['usage_data']
+            assert recovered['usage_fetched_at'] == prior_usage['usage_fetched_at']
             print(json.dumps({'passed':True,'evidence':'gateway_http_sqlite_synthetic_native',
                 'capabilities_persisted':True,'missing_operation_recovered':True,'missing_operation_reauthorized':True,
-                'expired_proxy_refresh_recovered':True,
+                'expired_proxy_refresh_recovered':True, 'identity_only_refresh_kept_usage':True,
                 'concurrent_refresh_calls':1,'lost_reply_recovered':True,'restart_recovered':True,'wrong_identity_rejected':True,'manual_import_recovered':True,'reauth_original_account':True,'model_submissions':0}))
         finally:
             process.terminate()
