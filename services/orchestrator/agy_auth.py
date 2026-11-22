@@ -368,7 +368,8 @@ class AgyAuthManager:
                     document = native_document(self._read(path))
                     self._stop(state)
                     verified = self.verify(document, state['proxy_url'])
-                    result = {'document': document, **verified}
+                    # 对账读取同一份核验回执，避免依赖重启后丢失的网关会话。
+                    result = {'document': document, **verified, 'proxy_url': state['proxy_url']}
                     atomic_json(folder / 'result.json', result)
                     state['phase'] = 'completed'
                     atomic_json(folder / 'state.json', state)
@@ -590,7 +591,12 @@ with ThreadPoolExecutor(max_workers=len(sys.argv[3:])) as pool:
             if state.get('phase') in ('retired', 'not_started'):
                 return self._retired_result(state)
             if state.get('phase') == 'completed':
-                return self._read(folder / 'result.json')
+                result = self._read(folder / 'result.json')
+                if state['kind'] == 'authorization':
+                    if result.get('proxy_url', state['proxy_url']) != state['proxy_url']:
+                        raise ValueError('AGY 原授权回执线路不符')
+                    result['proxy_url'] = state['proxy_url']
+                return result
             if state.get('kind') == 'authorization' and not state.get('code_digest'):
                 raise ValueError('AGY 原授权码尚待提交')
             # 先结束原唯一 RT 进程，再核对已原子保存的当前材料；恢复仅使用 AT。
@@ -607,13 +613,39 @@ with ThreadPoolExecutor(max_workers=len(sys.argv[3:])) as pool:
             atomic_json(folder / 'state.json', state)
             return outcome
 
+    def authorization_proxy_references(self, operations: list[str]) -> dict:
+        """读取网关仍持有的授权线路。@param operations 原凭据操作。@return 内部目录引用。"""
+        if not isinstance(operations, list) or any(not isinstance(item, str) for item in operations):
+            raise ValueError('AGY 原授权操作无效')
+        references = []
+        for identity in operations:
+            try:
+                state = self._read(self._folder(identity) / 'state.json')
+            except FileNotFoundError:
+                # 授权驱动先保存状态再返回会话；未启动的刷新或导入没有已冻结的授权线路。
+                continue
+            if state.get('operation_id') != identity:
+                raise ValueError('AGY 原操作归属不符')
+            if state.get('kind') != 'authorization' or state.get('phase') not in (
+                    'starting', 'authorizing', 'code_pending', 'completed', 'reconcile'):
+                continue
+            if state['proxy_url']:
+                references.append([identity, state['proxy_url']])
+        return {'references': references}
+
     def handle(self, action: str, value: dict) -> dict:
         """分派受信管理请求，严格限定每类输入。@param action 固定操作。@param value 私有请求。@return 原生结果。"""
         allowed = {'start': {'proxy_url', 'account_id', 'generation'}, 'exchange': {'session_id', 'code'}, 'cancel': {'session_id'},
             'verify': {'document', 'proxy_url'}, 'refresh': {'operation_id', 'account_id', 'generation', 'document', 'proxy_url'},
             'prepare': {'operation_id', 'account_id', 'generation', 'document', 'proxy_url'},
-            'recover': {'operation_id', 'account_id', 'generation'}, 'retire': {'operation_id', 'account_id', 'generation'}}
-        if action not in allowed or not isinstance(value, dict) or set(value) != allowed[action]:
+            'recover': {'operation_id', 'account_id', 'generation'}, 'retire': {'operation_id', 'account_id', 'generation'},
+            'proxy-references': {'operations'}}
+        if not isinstance(value, dict) or action not in allowed:
+            raise ValueError('AGY 管理输入无效')
+        fields = allowed[action]
+        if action == 'start' and value.get('replace_proxy') is True and value.get('account_id') is not None:
+            fields = fields | {'replace_proxy'}
+        if set(value) != fields:
             raise ValueError('AGY 管理输入无效')
         if 'proxy_url' in value and (not isinstance(value['proxy_url'], str) or len(value['proxy_url']) > 8192 or any(ord(c) < 32 for c in value['proxy_url'])):
             raise ValueError('AGY 代理配置无效')
@@ -631,4 +663,6 @@ with ThreadPoolExecutor(max_workers=len(sys.argv[3:])) as pool:
             return self.retire(value['operation_id'], value['account_id'], value['generation'])
         if action == 'prepare':
             return self.prepare_import(value['operation_id'], value['account_id'], value['generation'], value['document'], value['proxy_url'])
+        if action == 'proxy-references':
+            return self.authorization_proxy_references(value['operations'])
         return self.recover(value['operation_id'], value['account_id'], value['generation'])

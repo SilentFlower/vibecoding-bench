@@ -150,10 +150,21 @@ mod tests {
         assert_ne!(first.is_ok(), second.is_ok());
         let state = store.agy_credential_state(account.id).await.unwrap();
         let operation = state.operation_id.unwrap();
+        assert!(
+            store
+                .pending_agy_credential_operations()
+                .await
+                .unwrap()
+                .is_empty()
+        );
         store
             .reconcile_agy_credentials(account.id, &operation)
             .await
             .unwrap();
+        assert_eq!(
+            store.pending_agy_credential_operations().await.unwrap(),
+            vec![operation.clone()]
+        );
         assert!(
             store
                 .begin_agy_credentials(&account, "operation-c", "refresh_pending")
@@ -367,6 +378,17 @@ mod tests {
 }
 
 impl AccountStore {
+    /// 读取仍可能产生账号变更的原凭据操作。@return 待核对的非空操作标识。
+    pub async fn pending_agy_credential_operations(&self) -> Result<Vec<String>, AppError> {
+        let operations = sqlx::query_scalar(
+            "SELECT operation_id FROM account_credential_states
+             WHERE phase IN ('reauth','reconcile') AND operation_id IS NOT NULL",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(operations)
+    }
+
     /// 查找同一持久操作的账号。@param operation 原操作。@return 绑定账号或空值。
     pub async fn agy_operation_account(&self, operation: &str) -> Result<Option<i64>, AppError> {
         Ok(sqlx::query_scalar(
@@ -491,7 +513,7 @@ impl AccountStore {
                 .await?;
         }
         let committed_query = format!(
-            "SELECT COUNT(*) FROM accounts a JOIN account_credential_states s ON s.account_id=a.id WHERE a.id=$1 AND a.platform='antigravity' AND a.email=$2 AND a.access_token=$3 AND a.refresh_token=$4 AND s.operation_id=$5 AND s.generation=$6 AND s.phase='ready' AND a.oauth_expires_at={}",
+            "SELECT COUNT(*) FROM accounts a JOIN account_credential_states s ON s.account_id=a.id WHERE a.id=$1 AND a.platform='antigravity' AND a.email=$2 AND a.access_token=$3 AND a.refresh_token=$4 AND s.operation_id=$5 AND s.generation=$6 AND s.phase='ready' AND a.oauth_expires_at={} AND ($8=0 OR a.proxy_url=$9)",
             self.ts(7)
         );
         let committed: i64 = sqlx::query_scalar(&committed_query)
@@ -502,6 +524,12 @@ impl AccountStore {
             .bind(operation)
             .bind(generation + 1)
             .bind(self.fmt_time(expiry))
+            .bind(i32::from(observation.is_some()))
+            .bind(
+                observation
+                    .map(|value| value.proxy_url.as_str())
+                    .unwrap_or(""),
+            )
             .fetch_one(&mut *transaction)
             .await?;
         if committed == 1 {

@@ -24,6 +24,7 @@ def main():
     sessions, tokens, receipts, retired = {}, {}, {}, {}
     counts = {'refresh':0,'proxy_refresh':0,'observation':0}
     fail_reply = threading.Event()
+    fail_exchange_reply = threading.Event()
     fail_before_start = threading.Event()
     verify_identity_only = threading.Event()
 
@@ -40,6 +41,17 @@ def main():
 
         def log_message(self, *_):
             """测试日志保持脱敏。@return 无。"""
+
+        def do_GET(self):
+            """提供合成任务线路引用。@return 无。"""
+            assert self.headers['Authorization']=='Bearer '+SECRET
+            assert self.path=='/internal/v3/proxy-references'
+            payload = b'{"complete":true,"references":[]}'
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
 
         def do_POST(self):
             """处理受信白名单操作。@return 无。"""
@@ -64,10 +76,18 @@ def main():
                 sessions[identity] = body
                 result = {'session_id':identity,'auth_url':'https://accounts.google.com/synthetic'}
             elif action=='exchange':
-                target = sessions[body['session_id']]['account_id']
-                sessions[body['session_id']]['code_sent'] = True
+                identity = body['session_id']
+                session = sessions[identity]
+                target = session['account_id']
+                session['code_sent'] = True
                 email = 'wrong@example.test' if body['code']=='synthetic-wrong-account' else 'same@example.test' if target else 'new@example.test'
-                result = native(email,'synthetic-auth-'+body['session_id'])
+                result = native(email, 'synthetic-auth-'+identity)
+                result['proxy_url'] = session['proxy_url']
+                receipts[identity] = result
+                if fail_exchange_reply.is_set(): status=503
+            elif action=='proxy-references':
+                result = {'references': [[identity, sessions[identity]['proxy_url']]
+                    for identity in body['operations'] if sessions.get(identity, {}).get('proxy_url')]}
             elif action=='cancel':
                 session = sessions.get(body['session_id'],{})
                 result = {'phase':'reconcile' if session.get('code_sent') else 'cancelled','cancelled':True}
@@ -141,8 +161,9 @@ def main():
             except HTTPError as error:
                 response=error
             with response:
-                assert response.status==expected,(path,response.status,expected)
-                return json.load(response)
+                result = json.load(response)
+                assert response.status==expected,(path,response.status,expected,result.get('error'))
+                return result
 
         try:
             for _ in range(600):
@@ -287,8 +308,52 @@ def main():
             assert counts['refresh'] == 4 and recovered['refresh_token'] == 'synthetic-rotated-4'
             assert recovered['usage_data'] == prior_usage['usage_data']
             assert recovered['usage_fetched_at'] == prior_usage['usage_fetched_at']
+            # 候选线路在原生回包丢失及网关重启后仍能通过原凭据操作提交。
+            proxy_input = {'name':'合成线路','protocol':'http','host':'reauth-proxy.example.test','port':8080}
+            proxy_id = request('POST','/admin/proxies',proxy_input)['id']
+            proxy = next(row for row in request('GET','/admin/proxies?usage=false')['data'] if row['id']==proxy_id)
+            target = {'platform':'antigravity','account_id':account,'replace_proxy':True,'proxy_id':proxy_id,
+                'proxy_revision':proxy['revision']}
+            generate = '/admin/oauth/generate-auth-url'
+            exchange = '/admin/oauth/exchange-code'
+            request('POST', generate, {**target,'proxy_revision':'stale'}, 400)
+            chosen = request('POST', generate, target)['session_id']
+            assert sessions[chosen]['proxy_url']=='http://reauth-proxy.example.test:8080'
+            assert sessions[chosen]['replace_proxy'] is True
+            assert request('GET',f'/admin/accounts/{account}')['proxy_url']==recovered['proxy_url']
+            fail_exchange_reply.set()
+            request('POST', exchange, {'session_id':chosen,'code':'synthetic-code'}, 503)
+            process.terminate()
+            process.wait(timeout=10)
+            process=subprocess.Popen([str(ROOT/'services/gateway/target/debug/claude-code-gateway')],cwd=folder,
+                env=environment,stdout=log,stderr=log)
+            for _ in range(600):
+                try:
+                    request('GET','/admin/accounts')
+                    break
+                except OSError: time.sleep(.1)
+            else: raise RuntimeError('隔离网关恢复启动超时')
+            protected = next(row for row in request('GET','/admin/proxies')['data'] if row['id']==proxy_id)
+            assert any(item['kind']=='authorization' and item['id']==chosen for item in protected['users']), protected
+            request('DELETE',f'/admin/proxies/{proxy_id}',{'revision':proxy['revision']},400)
+            request('PUT',f'/admin/proxies/{proxy_id}',{**proxy_input,'revision':proxy['revision'],'port':8081},400)
+            request('POST',state_path+'/recover',{})
+            changed = request('GET',f'/admin/accounts/{account}')
+            assert changed['id']==account and changed['proxy_url']==sessions[chosen]['proxy_url']
+            assert changed['access_token']=='synthetic-auth-'+chosen
+            fail_exchange_reply.clear()
+            original = request('POST', generate, {'platform':'antigravity','account_id':account})['session_id']
+            assert sessions[original]['proxy_url']==changed['proxy_url']
+            request('POST','/admin/oauth/'+original+'/cancel?platform=antigravity',{})
+            direct = request('POST', generate, {'platform':'antigravity','account_id':account,
+                'replace_proxy':True,'proxy_url':''})['session_id']
+            exchange_result = request('POST', exchange, {'session_id':direct,'code':'synthetic-code'})
+            assert 'proxy_url' not in exchange_result
+            assert request('GET',f'/admin/accounts/{account}')['proxy_url']==''
+            request('DELETE',f'/admin/proxies/{proxy_id}',{'revision':proxy['revision']})
             print(json.dumps({'passed':True,'evidence':'gateway_http_sqlite_synthetic_native',
                 'capabilities_persisted':True,'missing_operation_recovered':True,'missing_operation_reauthorized':True,
+                'reauth_proxy_after_restart':True,'proxy_revision_rejected':True,'reauth_direct':True,
                 'expired_proxy_refresh_recovered':True, 'identity_only_refresh_kept_usage':True,
                 'concurrent_refresh_calls':1,'lost_reply_recovered':True,'restart_recovered':True,'wrong_identity_rejected':True,'manual_import_recovered':True,'reauth_original_account':True,'model_submissions':0}))
         finally:

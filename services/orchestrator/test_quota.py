@@ -27,6 +27,16 @@ def quota_headers(now, five=None, seven=None, rejected=False):
     return headers
 
 
+def weekly_warning_headers(now):
+    """构造短窗拒绝、周额度仅预警的混合 429，返回响应头。"""
+    return {
+        **quota_headers(now, five=3600, seven=86400, rejected=True),
+        "anthropic-ratelimit-unified-7d-status": "allowed_warning",
+        "anthropic-ratelimit-unified-7d-utilization": "0.78",
+        "anthropic-ratelimit-unified-7d-surpassed-threshold": "0.75",
+    }
+
+
 class QuotaProtocolTests(unittest.TestCase):
     """验证响应事实的解析与窗口合并。"""
 
@@ -68,6 +78,23 @@ class QuotaProtocolTests(unittest.TestCase):
         self.assertTrue(merge_quota_observation(state, old)["windows"]["five_hour"]["exhausted"])
         partial = quota_observation(quota_headers(now + 1, seven=100), 200, now + 1)
         self.assertTrue(merge_quota_observation(state, partial)["windows"]["five_hour"]["exhausted"])
+
+    def test_weekly_warning_overrides_only_legacy_same_sample_inference(self) -> None:
+        """周预警保留用量并纠正旧推断，真实新旧拒绝仍受保护。"""
+        now = time.time()
+        warning = quota_observation(weekly_warning_headers(now), 429, now)
+        self.assertEqual(["five_hour"], quota_decision(warning, now)["exhausted"])
+        weekly = warning["windows"]["seven_day"]
+        self.assertEqual(78, weekly["utilization"])
+        legacy = {"windows": {"seven_day": {
+            **{key: value for key, value in weekly.items() if key != "upstream_status"},
+            "rejected": True, "exhausted": True}}, "observed_at": now}
+        for first, second in ((legacy, warning), (warning, legacy)):
+            self.assertFalse(merge_quota_observation(first, second)["windows"]["seven_day"]["rejected"])
+        for observed in (now, now + 1):
+            actual = quota_observation(quota_headers(observed, seven=86400, rejected=True), 429, observed)
+            for first, second in ((actual, warning), (warning, actual)):
+                self.assertTrue(merge_quota_observation(first, second)["windows"]["seven_day"]["rejected"])
 
     def test_invalid_headers_and_time_units(self) -> None:
         """非法数值不形成完整窗口，毫秒及带时区时间正常解析。"""
@@ -195,6 +222,69 @@ class QuotaGuardTests(unittest.TestCase):
             conn.execute("UPDATE runs SET quota_resume_at=? WHERE status='quota_wait'", (time.time() - 1,))
         conn.close()
         self.guard._publish(self.account)
+
+    def test_startup_corrects_consumed_weekly_warning_and_rechecks_original_schedule(self):
+        """已消费的原样本只修正对应窗口，保留已用许可、游标和人工阻塞。"""
+        now = time.time() - 7200
+        identity = main._quota_identity(self.account)
+        source = "api:fixture"
+        headers = weekly_warning_headers(now)
+        observation = quota_observation({**headers, "anthropic-ratelimit-unified-7d-status": ""}, 429, now)
+        for window in observation["windows"].values():
+            window.pop("upstream_status", None)
+        succeeded_at = now + 5400
+        observation["observed_at"] = succeeded_at
+        observation["windows"]["five_hour"].update(
+            observed_at=succeeded_at, rejected=False, exhausted=False)
+        sample = self.base / "observations.jsonl"
+        sample.write_text(json.dumps({"status": 429, "ts": now, "source": source, "origin": "api",
+                                      "identity": identity, "headers": headers}) + "\n")
+        stat = sample.stat()
+        offset = stat.st_size
+        due = observation["windows"]["seven_day"]["reset_at"]
+        with main.get_db() as conn:
+            conn.execute("INSERT INTO quota_observation_cursors VALUES(?,?,?,?,?,?)",
+                         (source, 1, identity, str(sample), f"{stat.st_dev}:{stat.st_ino}", offset))
+            conn.execute("INSERT INTO account_quota_states VALUES(?,?,?,?,?)",
+                         (1, identity, json.dumps(observation), "原恢复机会", now))
+            for table, status in (("projects_agents", "paused"), ("warmup_projects_agents", "waiting")):
+                conn.execute(f"INSERT INTO {table}(account_id,status,updated_at,schedule_enabled,schedule_state,"
+                             "schedule_next_at,schedule_identity,schedule_message) VALUES(1,?,?,1,'waiting',?,?,?)",
+                             (status, now, due, identity, "7d 额度耗尽，等待窗口重置"))
+        self.assertIn("查询额度核实", self.guard.snapshot(self.account)["message"])
+        self.guard.consume(self.account, recover_warnings=True)
+        snapshot = self.guard.snapshot(self.account)
+        self.assertFalse(snapshot["blocked"])
+        self.assertEqual(78, snapshot["windows"]["seven_day"]["utilization"])
+        self.assertEqual([], snapshot["exhausted"])
+        self.assertEqual(succeeded_at, snapshot["windows"]["five_hour"]["observed_at"])
+        self.assertEqual("原恢复机会", snapshot["recovery_source"])
+        self.guard.record_control_state(self.account, "run:old:0", {
+            "source": "run:old:0", "status": "quota_wait", "quota_state": {
+                "observed_at": now, "windows": {"seven_day": observation["windows"]["seven_day"]}}})
+        self.assertEqual([], self.guard.snapshot(self.account)["exhausted"])
+        with main.get_db() as conn:
+            self.assertEqual(offset, conn.execute("SELECT byte_offset FROM quota_observation_cursors").fetchone()[0])
+            self.assertLessEqual(conn.execute("SELECT schedule_next_at FROM warmup_projects_agents").fetchone()[0], time.time())
+            self.assertEqual(due, conn.execute("SELECT schedule_next_at FROM projects_agents").fetchone()[0])
+
+    def test_new_manual_usage_rechecks_waiting_quota_plan(self):
+        """原样本缺失时，真实手动用量会提前额度计划复查。"""
+        now = time.time() - 60
+        due = now + 86400
+        self._state(quota_headers(now, seven=86400, rejected=True), now=now)
+        identity = main._quota_identity(self.account)
+        with main.get_db() as conn:
+            conn.execute("INSERT INTO warmup_projects_agents(account_id,status,updated_at,schedule_enabled,schedule_state,"
+                         "schedule_next_at,schedule_identity,schedule_message) VALUES(1,'waiting',?,1,'waiting',?,?,?)",
+                         (now, due, identity, "7d 额度耗尽，等待窗口重置"))
+        self.guard.record_manual_usage(self.account, {"ok": False})
+        with main.get_db() as conn:
+            self.assertEqual(due, conn.execute("SELECT schedule_next_at FROM warmup_projects_agents").fetchone()[0])
+        self.guard.record_manual_usage(self.account, {"ok": True, "seven_day": {"utilization": 78, "resets_at": due}})
+        self.assertFalse(self.guard.snapshot(self.account)["blocked"])
+        with main.get_db() as conn:
+            self.assertLessEqual(conn.execute("SELECT schedule_next_at FROM warmup_projects_agents").fetchone()[0], time.time())
 
     def test_unknown_account_runs_normally_without_usage(self) -> None:
         """首次未知账号允许既有正常运行，返回 None。"""

@@ -1,5 +1,5 @@
 //! 代理管理接口：公开摘要、分页与账号所有权保护。
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use axum::Json;
 use axum::extract::{Path, Query, State};
@@ -47,6 +47,7 @@ pub struct RevisionInput {
 struct References {
     by_connection: HashMap<String, Vec<Value>>,
     previous: HashMap<String, String>,
+    agy_credential_connections: HashSet<String>,
     complete: bool,
 }
 
@@ -54,12 +55,14 @@ async fn references(state: &AppState) -> Result<References, AppError> {
     let mut result = References {
         by_connection: HashMap::new(),
         previous: HashMap::new(),
+        agy_credential_connections: HashSet::new(),
         complete: true,
     };
-    let (accounts, runtime, pending) = tokio::join!(
+    let (accounts, runtime, pending, agy_authorizations) = tokio::join!(
         state.account_svc.list_platform_accounts(),
         runtime_bridge::proxy_references(),
-        state.proxy_svc.store.pending_sync()
+        state.proxy_svc.store.pending_sync(),
+        state.account_svc.pending_agy_authorization_proxies()
     );
     for operation in pending? {
         result.previous.insert(
@@ -85,7 +88,32 @@ async fn references(state: &AppState) -> Result<References, AppError> {
                 "status":account.status, "in_flight":active_counts.get(&account.id).copied().unwrap_or(0)
             }));
     }
-    for (id, raw) in state.oauth_flow_svc.proxy_references() {
+    let mut authorizations: HashMap<_, _> = state
+        .oauth_flow_svc
+        .proxy_references()
+        .into_iter()
+        .collect();
+    match agy_authorizations {
+        Ok(saved) => {
+            for (id, raw) in saved {
+                if let Ok(connection) = ProxyConnection::parse(&raw) {
+                    result
+                        .agy_credential_connections
+                        .insert(connection.fingerprint());
+                }
+                if authorizations
+                    .get(&id)
+                    .is_some_and(|current| current != &raw)
+                {
+                    result.complete = false;
+                } else {
+                    authorizations.insert(id, raw);
+                }
+            }
+        }
+        Err(_) => result.complete = false,
+    }
+    for (id, raw) in authorizations {
         if let Ok(connection) = ProxyConnection::parse(&raw) {
             result.by_connection.entry(connection.fingerprint()).or_default().push(json!({
                 "kind":"authorization", "id":id, "name":"授权登录", "status":"pending", "in_flight":null
@@ -213,6 +241,7 @@ pub async fn list(
                 Ok(References {
                     by_connection: HashMap::new(),
                     previous: HashMap::new(),
+                    agy_credential_connections: HashSet::new(),
                     complete: false,
                 })
             } else {
@@ -283,7 +312,7 @@ mod summary_tests {
     use crate::model::proxy::ProxyConnection;
     use chrono::{DateTime, Duration, Utc};
     use serde_json::json;
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
 
     /// 总览使用完整目录，停用账号仍计入使用，未知引用不显示零。
     #[test]
@@ -293,6 +322,7 @@ mod summary_tests {
         let mut refs = References {
             by_connection: HashMap::new(),
             previous: HashMap::new(),
+            agy_credential_connections: HashSet::new(),
             complete: true,
         };
         refs.by_connection
@@ -340,6 +370,7 @@ mod summary_tests {
         let refs = References {
             by_connection: HashMap::new(),
             previous: HashMap::new(),
+            agy_credential_connections: HashSet::new(),
             complete: false,
         };
         let value = directory_counts(&index, &refs, now);
@@ -391,7 +422,13 @@ pub async fn update(
                 "使用情况暂不可核对，请稍后保存".into(),
             ));
         }
-        users_for(&previous.connection.fingerprint(), &refs)
+        let fingerprint = previous.connection.fingerprint();
+        if refs.agy_credential_connections.contains(&fingerprint) {
+            return Err(AppError::BadRequest(
+                "线路正在用于 AGY 重新授权，请在原操作完成后修改".into(),
+            ));
+        }
+        users_for(&fingerprint, &refs)
             .into_iter()
             .map(serde_json::from_value::<ProxySyncTarget>)
             .collect::<Result<Vec<_>, _>>()

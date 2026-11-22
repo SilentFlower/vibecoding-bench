@@ -8315,8 +8315,9 @@ fn passive_usage_window_rejected(
         if status.eq_ignore_ascii_case("rejected") {
             return true;
         }
-        if status.eq_ignore_ascii_case("allowed") {
-            // 429 属于整条响应，但窗口自身允许时，高位 utilization 可能仍是跨周期残留。
+        if status.eq_ignore_ascii_case("allowed") || status.eq_ignore_ascii_case("allowed_warning")
+        {
+            // 429 属于整条响应；窗口预警只说明达到通知阈值。
             return false;
         }
     }
@@ -10032,6 +10033,23 @@ mod tests {
         assert_eq!(
             extract_rejected_passive_usage_windows(&headers),
             vec!["seven_day_fable".to_string()]
+        );
+    }
+
+    #[test]
+    fn rejected_passive_usage_windows_keep_weekly_warning_available() {
+        let mut headers = reqwest::header::HeaderMap::new();
+        for (name, value) in [
+            ("anthropic-ratelimit-unified-5h-status", "rejected"),
+            ("anthropic-ratelimit-unified-7d-status", "allowed_warning"),
+            ("anthropic-ratelimit-unified-7d-surpassed-threshold", "0.75"),
+            ("anthropic-ratelimit-unified-7d-utilization", "0.78"),
+        ] {
+            headers.insert(name, reqwest::header::HeaderValue::from_static(value));
+        }
+        assert_eq!(
+            extract_rejected_passive_usage_windows(&headers),
+            vec!["five_hour".to_string()]
         );
     }
 

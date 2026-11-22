@@ -76,6 +76,7 @@ fn generate_session_id() -> String {
 struct OAuthSession {
     native: bool,
     account_id: Option<i64>,
+    replace_proxy: bool,
     state: String,
     code_verifier: String,
     scope: String,
@@ -120,6 +121,8 @@ pub struct GenerateAuthUrlRequest {
     pub proxy_url: Option<String>,
     pub proxy_id: Option<String>,
     pub proxy_revision: Option<String>,
+    #[serde(default)]
+    pub replace_proxy: bool,
 }
 
 /// 生成授权 URL 的响应。
@@ -239,7 +242,13 @@ impl OAuthFlowService {
         match req.platform.as_deref().unwrap_or("claude_code") {
             "claude_code" => Ok(self.generate_auth_url(req)),
             "antigravity" => {
-                let result = agy_request("start", &json!({"proxy_url":req.proxy_url.as_deref().unwrap_or(""),"account_id":req.account_id,"generation":generation})).await?;
+                let mut input = json!({"proxy_url":req.proxy_url.as_deref().unwrap_or(""),
+                    "account_id":req.account_id,"generation":generation});
+                if req.replace_proxy {
+                    // 新选线需要原生端保存可供重启对账的线路回执。
+                    input["replace_proxy"] = json!(true);
+                }
+                let result = agy_request("start", &input).await?;
                 let auth_url = result["auth_url"]
                     .as_str()
                     .ok_or_else(|| AppError::ServiceUnavailable("AGY 原生授权链接缺失".into()))?
@@ -256,6 +265,7 @@ impl OAuthFlowService {
                     OAuthSession {
                         native: true,
                         account_id: req.account_id,
+                        replace_proxy: req.replace_proxy,
                         state: String::new(),
                         code_verifier: String::new(),
                         scope: String::new(),
@@ -272,15 +282,19 @@ impl OAuthFlowService {
         }
     }
 
-    /// 读取原生会话绑定的账号。@param id 原会话。@return 冻结的目标账号。
-    pub fn native_target(&self, id: &str) -> Option<i64> {
+    /// 读取原生会话绑定。@param id 原会话。@return 冻结的目标账号及私有线路。
+    pub fn native_target(&self, id: &str) -> Option<(i64, String)> {
         self.store
             .sessions
             .lock()
             .unwrap()
             .get(id)
             .filter(|session| session.native && session.created_at.elapsed() < SESSION_TTL)
-            .and_then(|session| session.account_id)
+            .and_then(|session| {
+                session
+                    .account_id
+                    .map(|account_id| (account_id, session.proxy_url.clone()))
+            })
     }
 
     /// 收尾持久原生会话。@param id 原会话。@return 驱动终态。
@@ -344,6 +358,7 @@ impl OAuthFlowService {
             OAuthSession {
                 native: false,
                 account_id: None,
+                replace_proxy: false,
                 state: state.clone(),
                 code_verifier,
                 scope: scope.to_string(),
@@ -391,6 +406,14 @@ impl OAuthFlowService {
                 &json!({"session_id":session_id,"code":raw_code}),
             )
             .await?;
+            let observed_proxy = result.get("proxy_url").and_then(Value::as_str);
+            if observed_proxy.is_some_and(|proxy| proxy != session.proxy_url)
+                || (session.replace_proxy && observed_proxy.is_none())
+            {
+                return Err(AppError::ServiceUnavailable(
+                    "AGY 原授权线路需要核对".into(),
+                ));
+            }
             let token = &result["document"]["token"];
             let text = |key: &str| {
                 token[key]
@@ -545,6 +568,7 @@ mod directory_tests {
             proxy_url: Some("socks5://user:secret@synthetic.invalid:1080".into()),
             proxy_id: None,
             proxy_revision: None,
+            replace_proxy: false,
         };
         let response = service.generate_auth_url(&request);
         let references = service.proxy_references();

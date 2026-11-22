@@ -521,7 +521,7 @@ quota_observation(headers: dict, status: int, now: float) -> dict
 merge_quota_observation(existing: dict, incoming: dict) -> dict
 quota_decision(state: dict, now: float) -> dict
 QuotaGuard.admit(account: dict, source: str, warmup: bool = False) -> bool
-QuotaGuard.consume(account: dict) -> None
+QuotaGuard.consume(account: dict, *, recover_warnings: bool = False) -> None
 QuotaGuard.record_control_state(account: dict, source: str, payload: dict) -> None
 QuotaGuard.recover() -> None
 QuotaGuard.capture_resume_ready(run_id: str) -> bool
@@ -531,8 +531,9 @@ QuotaGuard.capture_resume_ready(run_id: str) -> bool
 
 - 身份由 bench ID、绑定 ID、profile 的账号/组织 UUID 构成，不使用轮换 AT/RT。run 固化 quota_identity，身份变化不得自动在新身份执行旧工作。来源为 `run:<rid>:<attempt>` 或 `continue:<sid>:<generation>`。
 - sidecar 仅观察当前 OAuth AT 所属的 `api.anthropic.com/v1/messages`。内部白名单 JSONL 保存 source、identity、ts、status、额度头及有限 account_error，不保存 AT/RT 或任意错误正文。dummy key、其它域名及 OAuth 路径不能污染账号额度。
-- 每窗口保存 observed_at、utilization（百分比）、reset_at（UTC 秒）、rejected、exhausted。响应头比例乘 100；秒、毫秒、带时区 RFC3339 均可解析。缺失/非法窗口保留既有事实，按窗口自身时间合并，乱序或同时间允许不能清掉拒绝；跨周期高位残留按真实允许响应归零。
-- 429 的 rejected 优先，allowed 排除该窗口的高位猜测；普通 RPM 429 不形成通用耗尽。仅 seven_day_fable / 7d_oi 耗尽不阻断通用窗口。通用窗口达到 100% 或明确拒绝后阻止后续正式请求；已接受的成功流可以完成。
+- 每窗口保存 observed_at、utilization（百分比）、reset_at（UTC 秒）、rejected、exhausted。429 的明确 rejected 或 allowed_warning 额外保存 upstream_status。响应头比例乘 100。秒、毫秒、带时区 RFC3339 均可解析。缺失或非法窗口保留既有事实。按窗口自身时间合并，明确拒绝优先于同时间允许，跨周期高位残留按真实允许响应归零。
+- 429 的 allowed、allowed_warning 都排除该窗口的阈值或高位猜测。只保留有效的独立用量快照供账号阈值使用。普通 RPM 429 不形成通用耗尽。仅 seven_day_fable / 7d_oi 耗尽不阻断通用窗口。通用窗口达到 100% 或明确拒绝后阻止后续正式请求，已接受的成功流可以完成。
+- 启动时复查仍生效的旧拒绝。已消费 JSONL 中账号、来源、窗口时间、用量及重置一致的明确预警可纠正同次旧推断，并保留游标、其它窗口和原恢复许可。同次旧控制补证不能把已确认预警重新写成耗尽。证据缺失保留原门禁，低用量的历史推断可通过额度查询核实。纠正或新手动读数仅提前同身份的额度等待计划，启动仍核对原执行门禁。
 - 多窗口耗尽取全部 reset 及可信 retry-after 的最晚值。无可信 reset 时保持等待，不猜 now+5h/7d。明确 limit 但窗口未知时保存 unknown 补证；已有真实耗尽窗口不再追加未知阻断。
 - 到期仅为 retry_ready，不写成恢复或 0%。共同门禁先认领一个已有正式执行；其真实允许响应合并后，未再耗尽才放行其它工作。执行失败释放本代认领，不能批量冲上游。
 - quota_wait 是非终态，不计批次完成。自动恢复沿用 run/task/prompt、workspace/session、CLI/effort/权限/模型快照；首次额度判定前固化 execution_model，空串也属于有效快照，不能重新读取全局覆盖。恢复使用原主会话并按本次新增 JSONL 判断完成，排除子代理和复制的旧历史。
@@ -551,6 +552,8 @@ QuotaGuard.capture_resume_ready(run_id: str) -> bool
 | 无首次观察 | 正常任务可以启动，页面显示未知 |
 | 排队后才耗尽 | semaphore 后最终门禁拒绝，不创建 worker |
 | 两窗口耗尽且仅一个到期 | 保持等待 |
+| 429 同时给出 5h rejected 和 7d allowed_warning | 只记录 5h 拒绝，7d 用量继续接受独立阈值判定 |
+| 已消费的原始记录证实旧预警误判 | 原窗口纠正，原计划复查，旧控制回放保持纠正结果 |
 | 明确拒绝但 reset 缺失 | 保留该窗口旧未来 reset，否则无限等待有效证据 |
 | 已接受流携带 100% | 本流可完成，下一条模型请求本地阻断 |
 | 控制已写但 JSONL 故障，随后重启 | 原 reset/封号分类由控制恢复，清旧容器后再调度 |
@@ -563,6 +566,7 @@ QuotaGuard.capture_resume_ready(run_id: str) -> bool
 
 - 正常：原题耗尽，两个窗口都到期后认领原 run，`--resume` 原 session；真实成功响应更新额度后才推进批次后续题。
 - 边界：拒绝头缺少 reset 且没有旧可信时间，页面显示暂无可信恢复时间，后台不补查；其它账号仍正常运行。
+- 边界：5h 用完时上游返回 429，且 7d 的 surpassed-threshold 为 0.75、利用率为 0.78、状态为 allowed_warning。7d 保持 78% 的用量事实和未拒绝状态。
 - 错误用法：把到期缓存直接写成 0%，或者仅禁用前端输入而继续把 WS 二进制帧送给 PTY。
 - 正确处理：到期只认领正常恢复机会；所有输入经过 ContinueManager.send_input 的服务端门禁。
 
@@ -580,6 +584,7 @@ if "model_override" not in task:
 - 直接执行 worker 内嵌 Python，用真实形状的脱敏 synthetic rate_limit/hold/timeout/认证消息证明不会 success；正常完成与恢复基线仍正确。
 - 同 run/session/config、空模型快照、单账号单次恢复认领、再次拒绝、暂停/停止/停用/身份切换、其它账号隔离。
 - JSONL 半行/轮换/游标重启，观察日志故障和控制先到，清理失败、queued 认领后崩溃；旧 worker 与恢复不能重叠。
+- 用同一混合 429 样本检查 Rust 网关和 Python/sidecar。重启覆盖已消费游标、旧控制回放、原计划及新额度查询后原会话接续。
 - continue 实际 WS 文本与二进制门禁、自动恢复、无输入重放、关闭不复活；抓包 run/续聊共同限频。
 - 自动路径 mock usage 和 refresh_usage 为调用即失败；API/观察文件不含凭据明文，协议副本字节一致，旧数据库重复升级后原数据与新列默认值保留。
 

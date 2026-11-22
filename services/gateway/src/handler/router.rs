@@ -2083,6 +2083,17 @@ async fn oauth_generate_auth_url(
     Json(req): Json<crate::service::oauth_flow::GenerateAuthUrlRequest>,
 ) -> Result<Json<crate::service::oauth_flow::GenerateAuthUrlResponse>, AppError> {
     let _guard = state.proxy_svc.mutations.lock().await;
+    let explicit_line = (req.proxy_id.is_some() && req.proxy_revision.is_some())
+        || req.proxy_url.as_deref() == Some("");
+    if req.replace_proxy
+        && (req.platform.as_deref() != Some("antigravity")
+            || req.account_id.is_none()
+            || !explicit_line)
+    {
+        return Err(AppError::BadRequest(
+            "请为原 AGY 账号明确选择授权线路".into(),
+        ));
+    }
     let mut req = resolve_oauth_proxy(&state, req).await?;
     if req.platform.as_deref() == Some("antigravity") {
         if let Some(proxy) = req.proxy_url.as_mut().filter(|value| !value.is_empty()) {
@@ -2092,10 +2103,20 @@ async fn oauth_generate_auth_url(
     let generation = if req.platform.as_deref() == Some("antigravity") {
         if let Some(id) = req.account_id {
             let account = state.account_svc.get_account(id).await?;
-            if !account.is_antigravity()
-                || account.proxy_url != req.proxy_url.as_deref().unwrap_or("")
-            {
-                return Err(AppError::BadRequest("AGY 重授权须保持原账号及代理".into()));
+            if !account.is_antigravity() {
+                return Err(AppError::BadRequest("该账号属于其他平台".into()));
+            }
+            if !req.replace_proxy {
+                if req
+                    .proxy_url
+                    .as_ref()
+                    .is_some_and(|proxy| proxy != &account.proxy_url)
+                {
+                    return Err(AppError::BadRequest(
+                        "账号代理已变化，请重新读取后授权".into(),
+                    ));
+                }
+                req.proxy_url = Some(account.proxy_url);
             }
             let status = state.account_svc.agy_state(id).await?;
             if status["phase"] == "reconcile" {
@@ -2147,7 +2168,9 @@ async fn oauth_generate_setup_token_url(
 ) -> Result<Json<crate::service::oauth_flow::GenerateAuthUrlResponse>, AppError> {
     let _guard = state.proxy_svc.mutations.lock().await;
     let req = resolve_oauth_proxy(&state, req).await?;
-    if req.platform.as_deref().unwrap_or("claude_code") != "claude_code" || req.account_id.is_some()
+    if req.platform.as_deref().unwrap_or("claude_code") != "claude_code"
+        || req.account_id.is_some()
+        || req.replace_proxy
     {
         return Err(AppError::BadRequest(
             "Setup Token 仅适用于 Claude Code".into(),
@@ -2163,11 +2186,11 @@ async fn oauth_exchange_code(
     let _guard = state.proxy_svc.mutations.lock().await;
     let target = state.oauth_flow_svc.native_target(&req.session_id);
     let resp = state.oauth_flow_svc.exchange_code(&req).await?;
-    if let Some(id) = target {
+    if let Some((id, proxy_url)) = target {
         let expiry = chrono::DateTime::from_timestamp(resp.expires_at, 0)
             .ok_or_else(|| AppError::ServiceUnavailable("AGY 授权有效期无效".into()))?;
         state.account_svc.finish_agy_operation(id, &req.session_id, &json!({
-            "email_address":resp.email_address,"capabilities":resp.capabilities,"document":{"token":{"access_token":resp.access_token,
+            "email_address":resp.email_address,"capabilities":resp.capabilities,"proxy_url":proxy_url,"document":{"token":{"access_token":resp.access_token,
             "refresh_token":resp.refresh_token,"expiry":expiry.to_rfc3339()}}})).await?;
     }
     Ok(Json(resp))
@@ -2213,6 +2236,7 @@ async fn agy_credential_recover(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<Json<Value>, AppError> {
+    let _guard = state.proxy_svc.mutations.lock().await;
     Ok(Json(state.account_svc.recover_agy_operation(id).await?))
 }
 

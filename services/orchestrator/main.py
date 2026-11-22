@@ -2908,6 +2908,8 @@ class QuotaGuard:
     :param runner: 既有容器运行器
     """
 
+    _LEGACY_REJECTION_HINT = "。可在任务账号查询额度核实"
+
     def __init__(self, runner: Runner) -> None:
         """
         初始化消费锁与后台停止信号。
@@ -2941,6 +2943,11 @@ class QuotaGuard:
         if state.get("account_error"):
             decision.update(blocked=True, retry_ready=False, resume_at=None, exhausted=[],
                             message=f"{state['account_error']}：账号异常，需重新授权或人工核实")
+        elif decision["blocked"] and any(
+                window.get("rejected") and not window.get("upstream_status")
+                and type(window.get("utilization")) in (int, float) and window["utilization"] < 100
+                for window in (state["windows"][key] for key in decision["exhausted"])):
+            decision["message"] += self._LEGACY_REJECTION_HINT
         return {**state, **decision, "source": state.get("source") or "passive", "identity": identity,
                 "recovery_source": recovery_source, "known": bool(state.get("windows"))}
 
@@ -3331,6 +3338,7 @@ class QuotaGuard:
                                 window["exhausted"] = False
                                 window["rejected"] = False
                                 window["observed_at"] = observed
+                                window.pop("upstream_status", None)
                     recovery = row["recovery_source"] if row and row["identity"] == identity else None
                     decision = quota_decision(state, observed)
                     if (observation.get("allowed") and observed >= float(existing.get('observed_at') or 0)
@@ -3341,15 +3349,90 @@ class QuotaGuard:
                                  "DO UPDATE SET identity=excluded.identity,state_json=excluded.state_json,"
                                  "recovery_source=excluded.recovery_source,updated_at=excluded.updated_at",
                                  (account["id"], identity, json.dumps(state), recovery, time.time()))
+                    if not state.get("account_error") and any(
+                            window.get("upstream_status") == "allowed_warning" and not window.get("rejected")
+                            and existing.get("windows", {}).get(key, {}).get("rejected")
+                            for key, window in state.get("windows", {}).items()):
+                        self._recheck_quota_plans(conn, account, identity, existing)
                     return True
             finally:
                 conn.close()
 
-    def consume(self, account: dict) -> None:
+    def _recheck_quota_plans(self, conn: sqlite3.Connection, account: dict, identity: str, previous: dict) -> None:
+        """提前原本因额度等待的计划，完整准入仍由原调度器核对。"""
+        now = time.time()
+        message = quota_decision(previous, now)["message"]
+        if not message:
+            limits = {"five_hour": account.get("warmup_quota_5h_limit_percent"),
+                      "seven_day": account.get("warmup_quota_7d_limit_percent")}
+            admission = conn.execute("SELECT * FROM warmup_quota_admissions WHERE account_id=? AND identity=?",
+                                     (account["id"], identity)).fetchone()
+            message = self._policy_decision(previous, limits, "warmup",
+                                            admission=dict(admission) if admission else None)["message"]
+        messages = (message, message + self._LEGACY_REJECTION_HINT, "等待被动额度更新或窗口重置")
+        # 认领时仍检查计划状态和账号身份，原地排期保留现有的冷却及恢复许可。
+        for table in ("projects_agents", "warmup_projects_agents"):
+            conn.execute(f"UPDATE {table} SET schedule_next_at=? WHERE account_id=? AND schedule_identity=? "
+                         "AND status='waiting' AND schedule_enabled=1 AND schedule_state='waiting' "
+                         "AND schedule_next_at>? AND schedule_message IN (?,?,?)",
+                         (now, account["id"], identity, now, *messages))
+
+    def _quota_file_observation(self, row: dict, line: bytes) -> dict:
+        """按已登记的来源取真实样本，游标仍可越过无关记录。"""
+        empty = {"windows": {}, "observed_at": 0, "allowed": False}
+        try:
+            event = json.loads(line)
+            if event.get("source") != row["source"] or event.get("identity") != row["identity"]:
+                return empty
+            observed = float(event["ts"])
+            if not 0 < observed <= time.time() + 5:
+                return empty
+            if row["source"].startswith("cli:"):
+                return statusline_quota_observation(event.get("rate_limits"), observed) if event.get("origin") == "cli" else empty
+            observation = quota_observation(event.get("headers") or {}, int(event["status"]), observed)
+            if event.get("origin") == "api":
+                observation["origin"] = "api"
+            if event.get("account_error") == "account_on_hold":
+                observation["account_error"] = "account_on_hold"
+            return observation
+        except (ValueError, TypeError, KeyError, AttributeError):
+            return empty
+
+    def _repair_consumed_warnings(self, account: dict, row: dict, handle, file_identity: str,
+                                  pending: dict) -> None:
+        """在启动时核对仍生效的旧拒绝，修正原始响应明确允许的窗口。"""
+        offset = row["byte_offset"]
+        while pending and handle.tell() < offset:
+            line = handle.readline()
+            if not line or not line.endswith(b"\n") or handle.tell() > offset:
+                break
+            observation = self._quota_file_observation(row, line)
+            corrections = {}
+            for key, window in observation.get("windows", {}).items():
+                previous = pending.get(key)
+                if not previous or any(previous.get(field) != window.get(field)
+                                       for field in ("observed_at", "reset_at", "utilization")):
+                    continue
+                if window.get("upstream_status") == "allowed_warning":
+                    corrections[key] = window
+                elif window.get("upstream_status") == "rejected":
+                    pending.pop(key)
+            if corrections:
+                # 比较当前字节位置，纠错不会倒退游标或重写同次响应的其他窗口。
+                correction = {"windows": corrections, "observed_at": observation["observed_at"],
+                              "origin": observation.get("origin")}
+                if not self._observe(account, row["identity"], correction,
+                                     (row, file_identity, offset)):
+                    break
+                for key in corrections:
+                    pending.pop(key)
+
+    def consume(self, account: dict, *, recover_warnings: bool = False) -> None:
         """
         消费该账号登记的真实响应，半行留待下轮，旧身份样本忽略。
 
         :param account: 当前账号行
+        :param recover_warnings: 启动时复查已消费的原始警告样本
         :return: None
         """
         if self.remote_api:
@@ -3382,6 +3465,15 @@ class QuotaGuard:
                     'WHERE b.account_id=?', (account['id'],)).fetchone() if cluster_service or self.remote_api else None
             finally:
                 conn.close()
+            pending = {}
+            if recover_warnings:
+                now = time.time()
+                pending = {key: window for key, window in self.snapshot(account).get("windows", {}).items()
+                           if key in ("five_hour", "seven_day") and window.get("rejected")
+                           and not window.get("upstream_status") and (window.get("reset_at") or 0) > now
+                           and window.get("utilization") is not None}
+                # 合并后的 API 镜像保留跨节点观察，先读取它可跳过单次执行日志。
+                rows.sort(key=lambda row: not row["source"].startswith("api:"))
             for row in rows:
                 row = dict(row)
                 if row['source'].startswith('api:') and location is not None:
@@ -3396,29 +3488,15 @@ class QuotaGuard:
                     offset = int(row["byte_offset"])
                     if (row["file_identity"] not in (None, file_identity) or offset > stat.st_size):
                         offset = 0
+                    if pending and offset and row["file_identity"] == file_identity and not row["source"].startswith("cli:"):
+                        self._repair_consumed_warnings(account, row, handle, file_identity, pending)
                     handle.seek(offset)
                     while True:
                         line = handle.readline()
                         if not line or not line.endswith(b"\n"):
                             break
                         offset = handle.tell()
-                        observation = {"windows": {}, "observed_at": 0, "allowed": False}
-                        try:
-                            event = json.loads(line)
-                            if event.get("source") == row["source"] and event.get("identity") == identity:
-                                ts = float(event["ts"])
-                                if 0 < ts <= time.time() + 5:
-                                    if row["source"].startswith("cli:"):
-                                        if event.get("origin") == "cli":
-                                            observation = statusline_quota_observation(event.get("rate_limits"), ts)
-                                    else:
-                                        observation = quota_observation(event.get("headers") or {}, int(event["status"]), ts)
-                                    if event.get("origin") == "api":
-                                        observation["origin"] = "api"
-                                    if not row["source"].startswith("cli:") and event.get("account_error") == "account_on_hold":
-                                        observation["account_error"] = "account_on_hold"
-                        except (ValueError, TypeError, KeyError, AttributeError):
-                            pass
+                        observation = self._quota_file_observation(row, line)
                         if not self._observe(account, identity, observation, (row, file_identity, offset)):
                             break
                         row.update(file_identity=file_identity, byte_offset=offset)
@@ -3478,6 +3556,7 @@ class QuotaGuard:
             except (OSError, ValueError, AttributeError):
                 pass
         with self._lock:
+            claimed_windows = {}
             try:
                 state = payload.get("quota_state") or {}
                 if state.get("account_error") in ("account_on_hold", "invalid_grant"):
@@ -3486,11 +3565,19 @@ class QuotaGuard:
                 observed = float(state.get("observed_at") or 0)
                 if isinstance(state.get("windows"), dict) and 0 < observed <= time.time() + 5:
                     self._observe(account, _quota_identity(account), {**state, "allowed": False})
+                    claimed_windows = {key: window for key, window in state["windows"].items()
+                                       if key in ("five_hour", "seven_day", "unknown") and isinstance(window, dict)
+                                       and (window.get("exhausted") or window.get("rejected"))}
             except (ValueError, TypeError, AttributeError):
                 pass
             snapshot = self.snapshot(account)
+            # 已核对的同次预警不应从旧控制文件回退成未知耗尽。
+            corrected_control = bool(claimed_windows) and all(
+                snapshot["windows"].get(key, {}).get("upstream_status") == "allowed_warning"
+                and snapshot["windows"][key].get("observed_at") == (window.get("observed_at") or observed)
+                for key, window in claimed_windows.items())
             if (not snapshot["exhausted"] and not snapshot.get("account_error")
-                    and not warmup_wait):
+                    and not warmup_wait and not corrected_control):
                 self.record_worker_limit(account, "unknown")
             self._publish(account)
 
@@ -3544,6 +3631,7 @@ class QuotaGuard:
                 headers[f"anthropic-ratelimit-unified-{name}-reset"] = window.get("resets_at")
         with self._lock:
             now = time.time()
+            previous = self.snapshot(account) if source == "manual" else {}
             observation = quota_observation(headers, 200, now)
             for window in observation["windows"].values():
                 window["usage_idle"] = False
@@ -3573,7 +3661,15 @@ class QuotaGuard:
                             conn.execute("UPDATE account_quota_states SET state_json=? WHERE account_id=?", (json.dumps(state), account["id"]))
                     finally:
                         conn.close()
-            self._publish(account)
+            state = self._publish(account)
+            if source == "manual" and observation["windows"] and not state.get("account_error"):
+                with _db_lock:
+                    conn = get_db()
+                    try:
+                        with conn:
+                            self._recheck_quota_plans(conn, account, state["identity"], previous)
+                    finally:
+                        conn.close()
             return observation
 
     def start(self) -> None:
@@ -3609,7 +3705,7 @@ class QuotaGuard:
             conn.close()
         by_id = {account["id"]: account for account in accounts}
         for account in accounts:
-            self.consume(account)
+            self.consume(account, recover_warnings=True)
             state = self.snapshot(account)
             if state.get("account_error"):
                 self.record_auth_failure(account, state["account_error"])

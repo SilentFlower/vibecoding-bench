@@ -293,6 +293,37 @@ class WarmupEngineIntegrationTests(unittest.TestCase):
         self.assertFalse(current['schedule']['enabled'])
         self.assertFalse(main._projects_account(1)['warmup_enabled'])
 
+    def test_explicit_quota_refresh_resumes_original_work_through_scheduler(self):
+        """真实额度查询入口唤醒原计划，保留目标和会话。:return: None。"""
+        migrate_warmup_configuration(main.get_db, main._db_lock)
+        self.warmup.start(1)
+        self.assertTrue(self.warmup_pi.entered.wait(1))
+        generation = self.warmup.state(1)['agents'][0]['generation']
+        self.warmup.tool(1, generation, 'claude_start',
+                         {'project_key': 'example', 'objective_id': 'feature'}, 'start')
+        self.warmup.pause(1)
+        self.join(self.warmup)
+        original = self.warmup.state(1)['agents'][0]['work']
+        self.warmup.configure_schedule(1, True, 180)
+        account = main._projects_account(1)
+        observed = time.time() - 60
+        due = observed + 86400
+        self.guard._observe(account, main._quota_identity(account),
+                            main.quota_observation(test_quota.quota_headers(observed, seven=86400, rejected=True),
+                                                   429, observed))
+        waiting = self.warmup.start(1)['agents'][0]
+        self.assertEqual(('waiting', due), (waiting['status'], waiting['schedule']['next_run_at']))
+        self.runner.query_quota.side_effect = None
+        self.runner.query_quota.return_value = {'ok': True, 'five_hour': {'utilization': 0},
+                                                'seven_day': {'utilization': 78, 'resets_at': due}}
+        self.assertTrue(main.query_account_quota(1)['ok'])
+        self.warmup.tick()
+        current = self.warmup.state(1)['agents'][0]
+        self.assertTrue(current['controller_active'])
+        self.assertEqual((original['id'], original['session_id'], original['work_sec']),
+                         tuple(current['work'][key] for key in ('id', 'session_id', 'work_sec')))
+        self.runner.query_quota.assert_called_once_with(account)
+
     def test_apis_share_engine_protocol_and_keep_namespace_specific_state(self):
         """两入口完整复用工程API，严格类型及随机计划保持各自空间。:return: None。"""
         migrate_warmup_configuration(main.get_db, main._db_lock)

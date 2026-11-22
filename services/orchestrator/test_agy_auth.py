@@ -271,16 +271,24 @@ class AgyAuthTests(unittest.TestCase):
         folder = self.manager._folder(identity)
         folder.mkdir(mode=0o700)
         state = dict(kind='authorization', operation_id=identity, created_at=time.time(), phase='authorizing',
-            proxy_url='', container='synthetic', account_id=1, generation=1)
+            proxy_url='socks5h://candidate.example.test:1080', container='synthetic', account_id=1, generation=1)
         atomic_json(folder/'state.json', state)
+        self.assertEqual(self.manager.handle('proxy-references', {'operations': [identity]}),
+                         {'references': [[identity, state['proxy_url']]]})
         self.manager._send = Mock(side_effect=lambda *_: self.token_file(folder, document()))
         result = self.manager.exchange(identity, 'synthetic-code')
+        self.assertEqual(result['proxy_url'], state['proxy_url'])
+        self.manager.verify.assert_called_once_with(document(), state['proxy_url'])
         self.assertEqual(self.manager.exchange(identity, 'synthetic-code'), result)
         self.assertEqual(self.manager._send.call_count, 1)
         with self.assertRaises(ValueError): self.manager.exchange(identity, 'other-code')
         self.manager.cancel(identity)
         with self.assertRaises(ValueError): self.manager.exchange(identity, 'synthetic-code')
-        self.assertEqual(self.manager.recover(identity, 1, 1)['document'], document())
+        recovered = self.manager.recover(identity, 1, 1)
+        self.assertEqual(recovered['document'], document())
+        self.assertEqual(recovered['proxy_url'], state['proxy_url'])
+        with self.assertRaises(ValueError):
+            self.manager.recover(identity, 1, 2)
 
     def test_container_ownership_is_checked_before_stop(self):
         """错误归属容器保持原状态。@return 无。"""

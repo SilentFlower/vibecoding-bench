@@ -64,7 +64,7 @@ def quota_observation(headers: dict, status: int, now: float) -> dict:
             surpassed = exceeded == "true"
         rejected = status == 429 and (
             window_status == "rejected"
-            or (window_status != "allowed" and (
+            or (window_status not in ("allowed", "allowed_warning") and (
                 surpassed or (utilization is not None and utilization >= 1 - 1e-9)
             ))
         )
@@ -75,6 +75,8 @@ def quota_observation(headers: dict, status: int, now: float) -> dict:
         if not rejected and (utilization is None or reset is None):
             continue
         window = {"observed_at": now, "rejected": rejected, "exhausted": rejected}
+        if status == 429 and window_status in ("allowed_warning", "rejected"):
+            window["upstream_status"] = window_status
         if reset is not None:
             window["reset_at"] = reset
             window["resets_at"] = datetime.fromtimestamp(reset, timezone.utc).isoformat()
@@ -117,11 +119,20 @@ def merge_quota_observation(existing: dict, incoming: dict) -> dict:
         window_observed = float(value.get("observed_at") or observed)
         # sidecar 的本地缓存可能包含多个时刻的窗口，不能用另一个窗口的新时间覆盖旧拒绝。
         previous_observed = float(previous.get("observed_at") or 0)
-        if (window_observed < previous_observed
-                or (window_observed == previous_observed and previous.get("rejected")
-                    and not value.get("rejected"))):
+        if window_observed < previous_observed:
             continue
+        if window_observed == previous_observed:
+            # 原始窗口预警可以纠正同一样本的旧推断，明确的上游拒绝仍优先。
+            previous_status = previous.get("upstream_status")
+            incoming_status = value.get("upstream_status")
+            if (previous.get("rejected") and not value.get("rejected")
+                    and (incoming_status != "allowed_warning" or previous_status == "rejected")):
+                continue
+            if previous_status == "allowed_warning" and incoming_status != "rejected":
+                continue
         normalized = {**previous, **value}
+        if "upstream_status" not in value:
+            normalized.pop("upstream_status", None)
         old_reset = quota_timestamp(previous.get("reset_at"))
         new_reset = quota_timestamp(value.get("reset_at"))
         # 成功样本证明进入下一周期；旧/新均为高位时不能把旧周期用量带过去。

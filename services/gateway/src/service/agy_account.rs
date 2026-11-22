@@ -139,7 +139,8 @@ impl AccountService {
         id: i64,
         force: bool,
     ) -> Result<AgyAccessSnapshot, AppError> {
-        self.resolve_agy_access_with_admission(id, force, None).await
+        self.resolve_agy_access_with_admission(id, force, None)
+            .await
     }
 
     /// 读取 AGY 凭据并核对原请求的准入许可。@param id 原账号。@param force 是否请求一次认证恢复。@param admission 原 API 凭据许可。@return AT 快照。
@@ -436,6 +437,7 @@ impl AccountService {
         let (key, owner) = self.acquire_oauth_credential_lock(id).await?;
         let result = async {
             let account = self.store.get_by_id(id).await?;
+            self.require_agy_configuration_open(&account).await?;
             self.store
                 .begin_agy_credentials(&account, operation, "reauth")
                 .await
@@ -446,6 +448,19 @@ impl AccountService {
             self.notify_native_change(id, true);
         }
         result
+    }
+
+    /// 核对重启后仍活动的授权线路。@return 原操作和私有线路，仅用于内部目录引用。
+    pub async fn pending_agy_authorization_proxies(
+        &self,
+    ) -> Result<Vec<(String, String)>, AppError> {
+        let operations = self.store.pending_agy_credential_operations().await?;
+        if operations.is_empty() {
+            return Ok(Vec::new());
+        }
+        let result = agy_request("proxy-references", &json!({"operations": operations})).await?;
+        serde_json::from_value(result["references"].clone())
+            .map_err(|_| AppError::ServiceUnavailable("AGY 授权线路引用暂不可核对".into()))
     }
 
     /// 原生结果写回原账号，保留配置与绑定。@param id 账号。@param operation 原会话。@param result 已核验原生结果。@return 提交结果。

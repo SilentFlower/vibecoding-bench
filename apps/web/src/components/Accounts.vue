@@ -404,6 +404,10 @@ function openAccountDetails(account: Account): void {
 }
 /** 公开代理摘要只显示协议与主机，认证信息仅在配置中编辑。@param value 原始地址。@return 脱敏摘要。 */
 function publicProxy(value: string): string { if (!value) return '直连'; try { const url = new URL(value); return `${url.protocol}//${url.host}`; } catch { return '代理地址待核对'; } }
+const editingProxyLabel = computed(() => {
+  const account = accounts.value.find(item => item.id === editing.value?.id) ?? editing.value;
+  return account?.proxy_name || publicProxy(account?.proxy_url ?? form.value.proxy_url);
+});
 /** 数字草稿保留清空状态，提交边界才转换成后端数字字段。 */
 const numberDrafts = ref<Record<'concurrency' | 'priority' | 'rpm_limit' | 'five_hour_usage_limit_percent' | 'seven_day_usage_limit_percent' | 'upstream_session_pool_size' | 'upstream_session_ttl_minutes', number | string>>({ concurrency: 3, priority: 50, rpm_limit: 0, five_hour_usage_limit_percent: 0, seven_day_usage_limit_percent: 0, upstream_session_pool_size: 3, upstream_session_ttl_minutes: 60 });
 /** 初始化数字编辑草稿。@return 无。 */
@@ -1151,7 +1155,7 @@ const showOAuthFlow = ref(false);
 const oauthPlatform = ref('claude_code');
 const oauthTarget = ref<Account | null>(null);
 const oauthMode = ref<'oauth' | 'setup_token'>('oauth');
-const oauthProxy = ref<ProxyRoute | null>(null);
+const oauthProxy = ref<ProxyRoute | null | undefined>();
 const oauthSessionProxy = ref<ProxyRoute | null>(null);
 const oauthSessionId = ref('');
 const oauthAuthUrl = ref('');
@@ -1192,10 +1196,12 @@ function restartOAuthFlow(): void {
 function openOAuthFlow(target?: Account) {
   invalidateOAuthRequest(); oauthError.value = "";
   cancelOAuthSession();
-  oauthTarget.value = target?.platform === 'antigravity' ? target : null;
+  oauthTarget.value = target?.platform === 'antigravity'
+    ? accounts.value.find(account => account.id === target.id) ?? target
+    : null;
   oauthPlatform.value = oauthTarget.value ? 'antigravity' : 'claude_code';
   oauthMode.value = 'oauth';
-  oauthProxy.value = null; oauthSessionProxy.value = null;
+  oauthProxy.value = oauthTarget.value ? undefined : null; oauthSessionProxy.value = null;
   oauthSessionId.value = '';
   oauthAuthUrl.value = '';
   oauthCode.value = '';
@@ -1212,11 +1218,15 @@ async function generateOAuthUrl(): Promise<void> {
   const current = ++oauthGeneration; const signal = oauthController.signal;
   oauthLoading.value = true; oauthError.value = '';
   try {
-    const proxy = oauthTarget.value ? {proxy_url:oauthTarget.value.proxy_url} : oauthProxy.value ? { proxy_id:oauthProxy.value.id, proxy_revision:oauthProxy.value.revision } : {};
+    const selection = oauthProxy.value;
+    const proxy = selection ? {proxy_id:selection.id, proxy_revision:selection.revision}
+      : oauthTarget.value && selection === null ? {proxy_url:''} : {};
+    const replaceProxy = !!oauthTarget.value && selection !== undefined;
     const platform = oauthPlatform.value;
-    const result = oauthMode.value === 'oauth' ? await api.generateAuthUrl({...proxy, platform, account_id:oauthTarget.value?.id}, signal) : await api.generateSetupTokenUrl(proxy, signal);
+    const result = oauthMode.value === 'oauth' ? await api.generateAuthUrl({...proxy, platform, account_id:oauthTarget.value?.id,
+      ...(replaceProxy ? {replace_proxy:true} : {})}, signal) : await api.generateSetupTokenUrl(proxy, signal);
     if (current !== oauthGeneration || !showOAuthFlow.value) { if (platform === 'antigravity') void api.cancelOAuth(result.session_id, platform).catch(() => {}); return; }
-    oauthSessionProxy.value = oauthProxy.value;
+    oauthSessionProxy.value = selection ?? null;
     oauthSessionId.value = result.session_id; oauthAuthUrl.value = result.auth_url; oauthCode.value = ''; oauthStep.value = 'exchange';
   } catch (cause) { if (current === oauthGeneration && !signal.aborted) oauthError.value = (cause as Error).message || '生成授权链接失败'; }
   finally { if (current === oauthGeneration) oauthLoading.value = false; }
@@ -1522,7 +1532,7 @@ async function copyText(text: string) {
         <div class="account-editor-scroll complete-account-form">
           <section class="account-form-section"><h3>基础配置</h3><div class="account-edit-grid three"><ChoiceSelect :model-value="form.platform" @update:model-value="selectAccountPlatform" label="账号平台" :disabled="!!editing || savingAccount" :options="platformOptions" /><label class="approved-field"><span>备注名（选填）</span><Input v-model="form.name"  /></label><label class="approved-field"><span>邮箱</span><Input v-model="form.email" type="email" :readonly="!!editing && isAgyForm" required /></label></div>
             <div v-if="!isAgyForm" class="forwarding-field"><span class="fui-label">转发方式</span><RadioCardGroup :model-value="form.request_backend" class="forwarding-options" name="request_backend" label="转发方式" :options="[{value:'native293',label:'原生运行时',description:'280 / 293 自动匹配'},{value:'legacy',label:'原有转发',description:'现有转发通道'}]" @update:model-value="value => form.request_backend = value === 'native293' ? 'native293' : 'legacy'" /><p class="form-help">请在账号空闲时切换转发方式。</p></div>
-            <ProxyPicker v-model="proxyChoice" :current-label="editing?.proxy_name || publicProxy(form.proxy_url)" /></section>
+            <ProxyPicker v-model="proxyChoice" :current-label="editingProxyLabel" /></section>
           <section v-if="!isAgyForm" class="account-form-section"><h3>用量与调度</h3><div class="account-edit-grid three"><NumberInput v-model="numberDrafts.concurrency" label="并发上限" :min="1" required /><NumberInput v-model="numberDrafts.rpm_limit" label="RPM 上限" :min="0" required /><NumberInput v-model="numberDrafts.priority" label="调度优先级" :min="1" required /></div><div class="account-edit-grid"><NumberInput v-model="numberDrafts.five_hour_usage_limit_percent" label="5 小时用量上限（%）" :min="0" :max="100" required /><NumberInput v-model="numberDrafts.seven_day_usage_limit_percent" label="7 天用量上限（%）" :min="0" :max="100" required /></div><p class="form-help">RPM 和用量上限填 0 表示不限。达到任一用量上限后停止分配新消息，窗口重置后恢复。未知用量保持可用，单次或并发请求可能越线。</p></section>
           <section v-if="!isAgyForm" class="account-form-section"><h3>请求与模型</h3><div class="account-edit-grid"><ChoiceSelect v-model="form.billing_mode" label="Billing 模式" :options="[{value:'strip',label:'清除（Strip）'},{value:'rewrite',label:'重写（Rewrite）'}]" /><label class="approved-field"><span>允许 1M 上下文的模型</span><Input v-model="form.allow_1m_models"  /></label></div><div class="model-presets"><span>模型预设</span><Button type="button" size="sm" variant="secondary" @click="form.allow_1m_models = 'opus'">仅 Opus</Button><Button type="button" size="sm" variant="secondary" @click="form.allow_1m_models = DEFAULT_ALLOW_1M_MODELS">Opus + Sonnet 5</Button><Button type="button" size="sm" variant="secondary" @click="form.allow_1m_models = ''">全部关闭</Button></div><p class="form-help">模型以逗号分隔，按子串匹配。留空关闭 1M 上下文。Sonnet 5 使用完整名称以区分 Sonnet 4.6。</p>
             <Checkbox v-model="form.allow_fast_mode" class="account-check"><strong>允许客户端 Fast Mode</strong><small>允许后保留客户端申请，可能增加计费和限流风险。</small></Checkbox><Checkbox v-model="form.auto_telemetry" class="account-check"><strong>自动遥测</strong><small>由网关代替客户端发送遥测请求。</small></Checkbox><Checkbox v-if="form.auth_type==='oauth'" v-model="form.auto_poll_usage" class="account-check"><strong>自动轮询用量</strong><small>后台定时拉取 OAuth 账号的用量数据。</small></Checkbox></section>
@@ -1629,7 +1639,8 @@ async function copyText(text: string) {
     <ModalDialog v-model:open="showOAuthFlow" class="account-oauth-dialog approved-oauth-dialog" title="授权登录" :description="oauthStep === 'generate' ? '将账号接入工作空间' : oauthStep === 'exchange' ? '完成浏览器授权后，填写返回的授权码' : '授权成功'" :width="440">
       <form v-if="oauthStep === 'generate'" id="account-oauth-step" class="approved-oauth-body" @submit.prevent="generateOAuthUrl">
         <ChoiceSelect v-model="oauthPlatform" label="授权平台" :options="platformOptions" :disabled="oauthLoading || !!oauthTarget" @update:model-value="oauthMode = 'oauth'" /><ChoiceSelect v-if="oauthPlatform === 'claude_code'" :model-value="oauthMode" @update:model-value="value => { if (value === 'oauth' || value === 'setup_token') oauthMode = value; }" label="授权方式" :disabled="oauthLoading" :options="[{value:'oauth',label:'OAuth'},{value:'setup_token',label:'Setup Token'}]" />
-        <ProxyPicker v-model="oauthProxy" current-label="直连" :disabled="oauthLoading || !!oauthTarget" help="选择本次授权使用的代理，后续账号配置沿用此线路。" />
+        <ProxyPicker v-model="oauthProxy" :current-label="oauthTarget?.proxy_name || publicProxy(oauthTarget?.proxy_url ?? '')"
+          :disabled="oauthLoading" :help="oauthTarget ? '默认使用账号当前线路。重新选线后，授权成功时应用到该账号。' : '选择本次授权使用的代理，后续账号配置沿用此线路。'" />
         <p class="oauth-help">{{ oauthMode === 'oauth' ? '授权后支持账号信息与用量查询。' : 'Setup Token 仅用于推理，有效期 1 年。' }}</p>
         <NoticeStrip v-if="oauthError" tone="danger" class="oauth-error account-strip-text" role="alert">{{ oauthError }}</NoticeStrip>
       </form>

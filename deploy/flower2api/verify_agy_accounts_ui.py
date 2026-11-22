@@ -27,6 +27,9 @@ class PlatformFixture(AccountDesignFixture):
                 'capabilities':{'source':'agy:1.5.9:native','observed_at_ms':int(time.time()*1000),
                     'models':['gemini-synthetic'], 'provider':{'userTier':{'name':'合成分级'}}}}) for i in [1,2]]
         self.accounts.append(dict(copy.deepcopy(self.account_template), id=3, name='CC兼容账号', platform='claude_code'))
+        self.accounts[0].update(proxy_name='当前合成线路', proxy_url='socks5h://original.example.test:1080')
+        self.selected_proxy = dict(id='synthetic-route', revision='synthetic-revision',
+            name='新合成线路', public_url='socks5h://candidate.example.test:1080')
         now = int(time.time() * 1000)
         self.accounts[0]['usage_data']['platform_quota'] = {
             'status': 'ok', 'plan': '演示 Pro', 'checked_at_ms': now,
@@ -49,6 +52,9 @@ class PlatformFixture(AccountDesignFixture):
     async def route(self, route):
         """模拟平台授权和取消，记录准确请求。@param route 请求。@return 无。"""
         path = urlsplit(route.request.url).path
+        if path == '/admin/proxies':
+            return await self.respond(route, {'data': [self.selected_proxy],
+                'total': 1, 'page': 1, 'page_size': 20, 'total_pages': 1})
         if path == '/admin/oauth/generate-auth-url':
             body = route.request.post_data_json
             self.writes.append(dict(path=path, method='POST', body=body))
@@ -63,8 +69,12 @@ class PlatformFixture(AccountDesignFixture):
         if path == '/admin/oauth/exchange-code':
             body = route.request.post_data_json
             self.writes.append(dict(path=path,method='POST',body=body))
-            target = self.oauth_sessions[body['session_id']].get('account_id')
+            session = self.oauth_sessions[body['session_id']]
+            target = session.get('account_id')
             email = f'agy{target}@example.test' if target else 'new-agy@example.test'
+            if target and session.get('proxy_id') == self.selected_proxy['id']:
+                account = next(item for item in self.accounts if item['id'] == target)
+                account.update(proxy_name=self.selected_proxy['name'], proxy_url=self.selected_proxy['public_url'])
             return await self.respond(route, dict(access_token='synthetic-at',refresh_token='synthetic-rt',
                 expires_at=4070908800,expires_in=3600,email_address=email))
         return await super().route(route)
@@ -148,13 +158,25 @@ async def main():
         await dialog.get_by_role('button',name='重新授权',exact=True).click()
         oauth = page.locator('.approved-oauth-dialog')
         await expect(oauth.get_by_role('combobox',name='授权平台')).to_contain_text('Antigravity')
+        picker = oauth.locator('.proxy-picker-trigger')
+        await expect(picker).to_contain_text('当前合成线路')
+        await picker.click()
+        await page.get_by_role('button',name='新合成线路',exact=False).click()
+        await expect(picker).to_contain_text('新合成线路')
         await oauth.get_by_role('button',name='生成授权链接',exact=True).click()
         await expect(oauth.get_by_role('link',name='点击打开授权页面 ↗')).to_be_visible()
-        assert fixture.oauth_sessions['a'*32]['account_id']==1
+        assert fixture.oauth_sessions['a'*32] == {
+            'account_id': 1, 'platform': 'antigravity', 'replace_proxy': True,
+            'proxy_id': fixture.selected_proxy['id'], 'proxy_revision': fixture.selected_proxy['revision'],
+        }
         await oauth.get_by_role('textbox',name='授权码',exact=True).fill('synthetic-code')
         await oauth.get_by_role('button',name='完成授权',exact=True).click()
         await expect(oauth).to_contain_text('已保存到原账号')
         await oauth.get_by_role('button',name='完成',exact=True).click()
+        await expect(dialog.locator('.proxy-picker-trigger')).to_contain_text('新合成线路')
+        await dialog.get_by_role('button',name='重新授权',exact=True).click()
+        await expect(picker).to_contain_text('新合成线路')
+        await page.keyboard.press('Escape')
         await dialog.get_by_role('button',name='取消',exact=True).click()
         fixture.held_generate=asyncio.Event()
         await page.get_by_role('button',name='授权登录',exact=True).click()

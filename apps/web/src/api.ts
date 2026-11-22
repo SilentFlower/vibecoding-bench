@@ -810,7 +810,7 @@ export const api = {
   deleteToken: (id: number) => request<void>('DELETE', `/admin/tokens/${id}`),
   getDashboard: () => request<Dashboard>('GET', '/admin/dashboard'),
 
-  generateAuthUrl: (proxy?: { proxy_id?: string; proxy_revision?: string; proxy_url?: string; platform?:string; account_id?:number }, signal?: AbortSignal) =>
+  generateAuthUrl: (proxy?: { proxy_id?: string; proxy_revision?: string; proxy_url?: string; platform?:string; account_id?:number; replace_proxy?:boolean }, signal?: AbortSignal) =>
     request<OAuthGenerateResult>('POST', '/admin/oauth/generate-auth-url', proxy ?? {}, signal),
   /** 结束原授权进程。@param sessionId 原会话。@param platform 冻结平台。@return 脱敏阶段。 */
   cancelOAuth: (sessionId: string, platform: string) => request<{phase:string}>('POST', `/admin/oauth/${encodeURIComponent(sessionId)}/cancel?platform=${encodeURIComponent(platform)}`),

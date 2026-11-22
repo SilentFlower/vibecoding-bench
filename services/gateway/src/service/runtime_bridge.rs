@@ -328,7 +328,15 @@ fn config() -> Result<(String, String, reqwest::Client), AppError> {
 /// 调用受信管理侧的 AGY 原生适配。@param action 固定操作名。@param input 私有请求。@return 有界原生结果或脱敏错误。
 pub async fn agy_request(action: &str, input: &Value) -> Result<Value, AppError> {
     if ![
-        "start", "exchange", "cancel", "verify", "refresh", "recover", "prepare", "retire",
+        "start",
+        "exchange",
+        "cancel",
+        "verify",
+        "refresh",
+        "recover",
+        "prepare",
+        "retire",
+        "proxy-references",
     ]
     .contains(&action)
     {
@@ -339,7 +347,11 @@ pub async fn agy_request(action: &str, input: &Value) -> Result<Value, AppError>
         .post(format!("{base}/internal/v3/agy-auth/{action}"))
         .bearer_auth(token)
         .json(input)
-        .timeout(Duration::from_secs(90))
+        .timeout(if action == "proxy-references" {
+            STATUS_TIMEOUT
+        } else {
+            Duration::from_secs(90)
+        })
         .send()
         .await
         .map_err(|_| AppError::ServiceUnavailable("AGY 管理结果待核对".into()))?;
@@ -706,7 +718,8 @@ fn browser_path_allowed(method: &Method, path: &str) -> bool {
                 matches!(rest, "check" | "prepare" | "install" | "rollback")
                     || rest.strip_prefix("operations/").is_some_and(|value| {
                         value.split_once('/').is_some_and(|(id, action)| {
-                            Uuid::parse_str(id).is_ok() && matches!(action, "cancel" | "recover" | "retry-account")
+                            Uuid::parse_str(id).is_ok()
+                                && matches!(action, "cancel" | "recover" | "retry-account")
                         })
                     })
             }
@@ -1294,7 +1307,10 @@ mod tests {
         for (method, path) in [
             (Method::GET, "/api/agy-accounts/nodes".to_owned()),
             (Method::GET, "/api/agy-accounts/1/node".to_owned()),
-            (Method::POST, "/api/agy-accounts/1/node-migrations".to_owned()),
+            (
+                Method::POST,
+                "/api/agy-accounts/1/node-migrations".to_owned(),
+            ),
             (Method::GET, agy.clone()),
             (Method::POST, format!("{agy}/cancel")),
             (Method::POST, format!("{agy}/resume")),
