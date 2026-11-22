@@ -20,8 +20,9 @@ use uuid::Uuid;
 use axum::Json;
 use axum::Router;
 use axum::body::{Body, Bytes};
-use axum::extract::{DefaultBodyLimit, State};
+use axum::extract::{DefaultBodyLimit, Request, State};
 use axum::http::{HeaderMap, HeaderValue, Method};
+use axum::middleware::{Next, from_fn_with_state};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use base64::Engine;
@@ -1458,6 +1459,28 @@ fn authenticate(headers: &HeaderMap, config: &SenderConfig) -> Result<(), AppErr
     Ok(())
 }
 
+/// 在读取私有 POST 正文前验证账号证明，handler 仍在提交前重读当前配置。
+/// @param state 发送器状态。@param request 未读取的请求。@param next 下游路由。
+/// @return 已授权的处理结果，或发送前拒绝。
+async fn authenticate_sender_post(
+    State(state): State<SenderState>,
+    request: Request,
+    next: Next,
+) -> Response {
+    let authenticated =
+        read_config(&state.config_path).and_then(|config| authenticate(request.headers(), &config));
+    match authenticated {
+        Ok(()) => next.run(request).await,
+        Err(error) => {
+            let mut response = error.into_response();
+            response
+                .headers_mut()
+                .insert(ERROR_HEADER, HeaderValue::from_static("before-send"));
+            response
+        }
+    }
+}
+
 /// 返回当前 Unix 毫秒，用于私有请求的同一时钟截止。@return UTC 毫秒。
 pub(crate) fn now_ms() -> u64 {
     SystemTime::now()
@@ -1678,6 +1701,8 @@ async fn forward(State(state): State<SenderState>, headers: HeaderMap, body: Byt
             *response.status_mut() = code;
             *response.headers_mut() = response_headers;
             response.headers_mut().remove("transfer-encoding");
+            // 发送状态由本地发送器签发，不能采用上游响应中的同名头。
+            response.headers_mut().remove(ERROR_HEADER);
             Ok::<Response, AppError>(response)
         }
         .await;
@@ -2280,6 +2305,15 @@ pub async fn serve_sender(listener: TcpListener, config_path: String) -> std::io
 
 fn sender_components(config_path: String) -> (Router, Arc<AgyPool>) {
     let agy_pool = Arc::new(AgyPool::default());
+    let state = SenderState {
+        config_path,
+        native_pool: Arc::new(NativePool::default()),
+        agy_pool: agy_pool.clone(),
+        native_transition: Arc::new(RwLock::new(())),
+        active: Arc::new(AtomicU64::new(0)),
+        evidence_error: Arc::new(AtomicBool::new(false)),
+        evidence_lock: Arc::new(Mutex::new(())),
+    };
     let router = Router::new()
         .route("/internal/send", post(forward))
         .route("/internal/agy/prepare", post(agy_prepare))
@@ -2289,7 +2323,6 @@ fn sender_components(config_path: String) -> (Router, Arc<AgyPool>) {
         .route("/internal/agy/tools", post(agy_tools))
         .route("/internal/agy/cancel", post(agy_cancel))
         .route("/internal/agy/capacity", post(agy_capacity))
-        .route("/internal/native/status", get(native_status))
         .route("/internal/native/prepare", post(native_prepare))
         .route("/internal/native/readiness", post(native_readiness))
         .route("/internal/native/idle-policy", post(native_idle_policy))
@@ -2298,17 +2331,11 @@ fn sender_components(config_path: String) -> (Router, Arc<AgyPool>) {
             post(native_prepare_cancel),
         )
         .route("/internal/native/messages", post(native_forward))
+        .route_layer(from_fn_with_state(state.clone(), authenticate_sender_post))
+        .route("/internal/native/status", get(native_status))
         .route("/internal/status", get(status))
         .layer(DefaultBodyLimit::max(128 * 1024 * 1024))
-        .with_state(SenderState {
-            config_path,
-            native_pool: Arc::new(NativePool::default()),
-            agy_pool: agy_pool.clone(),
-            native_transition: Arc::new(RwLock::new(())),
-            active: Arc::new(AtomicU64::new(0)),
-            evidence_error: Arc::new(AtomicBool::new(false)),
-            evidence_lock: Arc::new(Mutex::new(())),
-        });
+        .with_state(state);
     (router, agy_pool)
 }
 

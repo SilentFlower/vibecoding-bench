@@ -55,7 +55,10 @@ src/tlsfp/
 - 响应流日志按网关根request_id、原生job/attempt UUID、worker/PID关联。本层EOF、body_error、静默超时、下游Drop及IPC/运行时错误分别记录，含持续时间、片段/字节及最后收包间隔。错误链最多八层，仅投影reqwest/hyper/io类型标志及OS代码；运行时原错误只保存SHA与受控code。代理隧道仅记录worker/tunnel UUID及密文流量数字，不能据双向复制收口断言首个关闭方。普通日志禁止异常原文、URL、代理凭据及正文。
 - account-sender 启动时初始化 JSON tracing 日志，默认 info，支持 RUST_LOG，关闭 ANSI。原生 error 事件的可选 diagnostics 经 native_error::project 独立有界校验后，记录实际阶段、最多八层白名单 name/code 及截断/循环/读取失败标记；保留原错误 SHA。日志包含 job、worker/PID、account_id、generation。缺省摘要记 unavailable，畸形记 invalid，均保持原业务响应。TS/Rust 目录及实际事件结构由 tests/fixtures/native-error-diagnostics.json 交叉验证；进程退役前记录，保留期沿 Docker 日志轮转。
 - sender 校验现有绑定、代次、deadline、目标及秘密，原生目标仅 POST `/v1/messages` 且无 query。response 继续经过共用用量观察及流许可，取消、EOF、Drop 各按既有一次收口。
+- sender 的私有 POST 在 `Bytes` 或 `Json` 读取正文前校验账号 Bearer。已授权的 handler 在业务提交边界再次读取当前配置并核对环境与代次。前置拒绝使用本地 `x-v3-transport-error: before-send`。
+- `x-v3-transport-error` 是 sender 保留的提交状态头。Legacy 及原生响应均过滤上游同名头，保持实际上游状态、正文和其它公开协议头。
 - 私有`deadline_unix_ms`采用一次墙钟采样：过期拒绝，未来上限允许120秒预算加5秒跨进程时钟偏差，实际剩余预算钳制120秒。legacy发送和原生启动、首响应共用接收时冻结的单调截止；池内不重复按墙钟验期。暖进程在业务投递前复核单调截止，启动耗时不能换取新预算。
+- 原生 worker 的 `request_input` 写 stdin 沿用同一单调截止，消息序列化完成后再次核对。写入超时可能留下部分帧，以 502 提交状态未知收口并退役该进程。
 - 准备仅 checkout/真实 worker_ready/回池，禁止调用 execute、模型或计费。后台协调并行2、待处理账号最多128；启动及5/20/60秒补偿只解析运行绑定。bench 环境就绪在生命周期锁外按环境/代次通知一次；在途新提示合并为一次后续执行。账号更新、凭据提交及交接重新开放门禁后触发准备。
 - 准备执行时重读权威账号，解析 bearer 后核对同一身份；成功前再次核对账号及只读运行绑定。失效、维护、凭据门禁关闭及取消优先收口，已处理取消的迟到完成不能发布 ready。取消按账号/环境/代次/准备 UUID 隔离，保留130秒撤销记录覆盖提前到达与迟到重放；最多16个在途和256条登记，满时明确拒绝。
 - 原生能力检查和热路径复用保持打开的已验证分发体 FD；每轮检查规范路径、dev/inode、大小、mode/uid/gid、纳秒 mtime/ctime，变化后重新完整校验 SHA。新进程启动仍执行固定分发体、精确执行 FD、执行体 SHA 和四项封存核验。
@@ -69,9 +72,10 @@ src/tlsfp/
 | 未知 request_backend、Fast/1M 超出账号权限 | 400，原账号或模型零发送 |
 | 忙时切换后端 | 现有忙门禁拒绝，归属保持 |
 | 缺 V3/二进制/预算、能力或代次不符、平台不支持 | 503 准备失败 |
+| 私有 POST 凭据缺失或错误 | 401，读取正文前拒绝 |
 | 私有期限已过期或剩余超过125秒 | sender在提交前拒绝；原生网关映射为503准备失败，模型零发送 |
 | 固定 293 无法接纳正文版本或参数 | 二进制受控错误，模型零发送 |
-| 提交后断线或状态不明 | 502，保持单次提交语义 |
+| 原生输入写入超时、提交后断线或状态不明 | 502，保持单次提交语义 |
 | 原生上游状态错误（下列可恢复情形除外） | 返回本次状态及响应，管理员空闲时显式切回 legacy |
 | 原生明确429 | 依共用分类透传、有限退避或排除当前账号后重新选号 |
 | 明确签名400且正文可修复、预算尚余 | 同账号追加最多一次修复；获2xx后记录历史摘要，续轮命中则首发前修复 |
@@ -96,6 +100,7 @@ src/tlsfp/
 
 - `account_backend_defaults_validate_and_obey_busy_gate`、`historical_backend_migration_and_account_updates_are_independent`：默认/非法值/忙门禁/两账号和回退。
 - `native_backend_preserves_account_feature_authorization_without_rewriting`：Fast/1M 权限拒绝且正文保持；前端 `npm run build` 及创建/编辑/reset 链路核对。
+- `runtime_transport_test` 覆盖私有 POST 鉴权早于正文、原绑定拒绝、过滤上游保留头和实际状态字节保真。`native_execution_logs_error_event_eof_and_deadline` 核对首响应等待与输入管道阻塞分别受原期限约束，并验证输入超时按提交状态未知处理。
 - `tests/native_signature_fixture.py`经真实Gateway及回环sender覆盖280/293首次400→2xx、续轮单发、同一实际会话跨账号/版本/模型复用、正文与头部会话关联、不同/缺失实际会话独立判断、失败不学习、独立诊断尝试、普通400/业务透传429/提交未知保持单发和预算耗尽；`native_signature_repair`单测覆盖完整思考前缀、不同会话及变更历史隔离、跨模型复用、新建实例重新学习、7天过期及4096项上限。
 - 同一回环夹具用首发屏障模拟在途换票，断言 280/293 各以旧、新凭据依次向同账号发送，正文相同，200 及再次 401 均为两次尝试。覆盖凭据未变、裸 401、其他错误类型、缺上游观察及期限耗尽时单次发送并保留首次关联 ID。
 - `native_real_binary`、`native_real_gateway`：实际附件、独立 TLS/CCH、HTTP/SOCKS、多值白名单、工具/thinking、主子会话、单次发送、取消/代次和诊断来源。跨平台备用实现编译验证明确 503。

@@ -3163,7 +3163,8 @@ fn replace_top_level_string_value(body: &[u8], field: &str, replacement: &[u8]) 
 
 fn replace_all_exact_string_field_values(body: &[u8], field: &str, replacement: &[u8]) -> Vec<u8> {
     let exact_key = format!("\"{}\"", field);
-    let mut ranges = Vec::new();
+    let mut normalized = Vec::with_capacity(body.len());
+    let mut copied = 0usize;
     let mut idx = 0usize;
     while idx < body.len() {
         if body[idx] != b'"' {
@@ -3181,7 +3182,10 @@ fn replace_all_exact_string_field_values(body: &[u8], field: &str, replacement: 
                     let Some(value_end) = scan_json_string_end(body, value_start) else {
                         return body.to_vec();
                     };
-                    ranges.push(value_start..value_end);
+                    // 顺序复制切片，每段原始字节只搬移一次，避免多次替换反复搬移尾部。
+                    normalized.extend_from_slice(&body[copied..value_start]);
+                    normalized.extend_from_slice(replacement);
+                    copied = value_end;
                     idx = value_end;
                     continue;
                 }
@@ -3189,15 +3193,7 @@ fn replace_all_exact_string_field_values(body: &[u8], field: &str, replacement: 
         }
         idx = string_end;
     }
-    if ranges.is_empty() {
-        return body.to_vec();
-    }
-
-    // 从后向前替换可保持前面已记录的字节下标，且不改变其余序列化字节。
-    let mut normalized = body.to_vec();
-    for range in ranges.into_iter().rev() {
-        normalized.splice(range, replacement.iter().copied());
-    }
+    normalized.extend_from_slice(&body[copied..]);
     normalized
 }
 
@@ -14868,6 +14864,27 @@ mod tests {
         assert!(normalized.contains(r#""model":42"#));
         assert!(normalized.contains(r#""\u006dodel":"escaped-key""#));
         assert!(normalized.contains(r#""fallbacks":[{"model":""}]"#));
+    }
+
+    #[test]
+    fn cch_280_and_293_keep_exact_bytes_across_many_model_values() {
+        let input_item = r#"{"model":"nested", "text":"literal \"model\":\"keep\"", "\u006dodel":"keep", "value":{"model":42}}"#;
+        let expected_item = r#"{"model":"", "text":"literal \"model\":\"keep\"", "\u006dodel":"keep", "value":{"model":42}}"#;
+        let item_count = 16_384;
+        let body = format!(
+            r#"{{"model":"root","max_tokens":128000,"tools":[{}],"messages":[]}}"#,
+            vec![input_item; item_count].join(",")
+        );
+        let expected = format!(
+            r#"{{"model":"","tools":[{}],"messages":[]}}"#,
+            vec![expected_item; item_count].join(",")
+        );
+        for version in ["2.1.280", "2.1.293"] {
+            assert_eq!(
+                cch_attestation_input(body.as_bytes(), version),
+                expected.as_bytes()
+            );
+        }
     }
 
     #[test]

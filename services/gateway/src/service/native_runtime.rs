@@ -747,6 +747,7 @@ impl Worker {
         input: Option<&Value>,
         cache_ttl_rewrite: Option<&str>,
         message_cache_policy: Option<&str>,
+        deadline: Instant,
     ) -> Result<(), AppError> {
         let mut frame = json!({"schema_version":2,"worker_id":self.id,"type":kind});
         if let Some(id) = request_id {
@@ -763,9 +764,12 @@ impl Worker {
         }
         let mut bytes = serde_json::to_vec(&frame).map_err(|_| protocol_error())?;
         bytes.push(b'\n');
-        self.stdin
-            .write_all(&bytes)
+        if Instant::now() >= deadline {
+            return Err(protocol_error());
+        }
+        timeout_at(deadline, self.stdin.write_all(&bytes))
             .await
+            .map_err(|_| protocol_error())?
             .map_err(|_| protocol_error())
     }
 
@@ -1331,10 +1335,14 @@ impl Worker {
                 slot.clear();
             }
             if Instant::now() >= deadline { return Err(unavailable()); }
-            self.send("request_input", Some(id), Some(&submission.input),
+            self.send(
+                "request_input", Some(id), Some(&submission.input),
                 self.cache_ttl_rewrite_supported.then_some(cache_ttl.as_str()),
-                self.message_cache_policy_supported.then_some(message_cache))
-                .await?;
+                self.message_cache_policy_supported.then_some(message_cache), deadline,
+            ).await.inspect_err(|_| {
+                // 写入超时可能已交付部分帧，沿提交状态未知的路径退役。
+                if Instant::now() >= deadline { stream_log.reason = "native_input_deadline"; }
+            })?;
             let mut policy = false;
             let mut header_policy = None;
             let mut prepared = false;
@@ -2726,7 +2734,8 @@ impl NativePool {
                 let result = tokio::select! {
                     result = worker.execute(&submission, config.native_capture_dir.as_deref(), &mut reply, &chunks, deadline, received, runtime) => result,
                     _ = chunks.closed() => {
-                        let _ = timeout(Duration::from_millis(200), worker.send("request_cancel", Some(&submission.request.request_id), None, None, None)).await;
+                        let cancel_deadline = Instant::now() + Duration::from_millis(200);
+                        let _ = worker.send("request_cancel", Some(&submission.request.request_id), None, None, None, cancel_deadline).await;
                         Err(protocol_error())
                     }
                 };
@@ -3215,6 +3224,7 @@ mod tests {
             "wrong-request",
             "eof",
             "deadline",
+            "input-deadline",
             "ttl",
             "unsupported-ttl",
             "cache",
@@ -3245,10 +3255,30 @@ mod tests {
             }
             let idle = json!({"schema_version":2,"worker_id":worker_id,"request_id":job_id,"type":"worker_idle"});
             // 直接驱动私有事件读取路径，合成进程只写受控帧，不启动任何模型或原生构造。
-            let mut child = Command::new("python3").args(["-u", "-c",
-                "import sys,time,json; command=json.loads(sys.stdin.readline()); mode=sys.argv[1]; assert mode!='ttl' or command['cache_ttl_rewrite']=='1h'; assert mode!='cache' or command['message_cache_policy']=='sub2api'; time.sleep(2) if mode=='deadline' else None; print(sys.argv[2],flush=True) if mode in ('error','ttl','cache','diagnostic','invalid-diagnostic','wrong-request','rejection') else None; print(sys.argv[3],flush=True) if mode in ('error','ttl','cache','diagnostic','invalid-diagnostic','wrong-request','rejection') else None"])
-                .arg(scenario).arg(frame.to_string()).arg(idle.to_string())
-                .stdin(Stdio::piped()).stdout(Stdio::piped()).kill_on_drop(true).spawn().unwrap();
+            let script = r#"
+import json, sys, time
+mode = sys.argv[1]
+if mode == 'input-deadline':
+    time.sleep(10)
+command = json.loads(sys.stdin.readline())
+assert mode != 'ttl' or command['cache_ttl_rewrite'] == '1h'
+assert mode != 'cache' or command['message_cache_policy'] == 'sub2api'
+if mode == 'deadline':
+    time.sleep(2)
+if mode in ('error', 'ttl', 'cache', 'diagnostic', 'invalid-diagnostic', 'wrong-request', 'rejection'):
+    print(sys.argv[2], flush=True)
+    print(sys.argv[3], flush=True)
+"#;
+            let mut child = Command::new("python3")
+                .args(["-u", "-c", script])
+                .arg(scenario)
+                .arg(frame.to_string())
+                .arg(idle.to_string())
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .kill_on_drop(true)
+                .spawn()
+                .unwrap();
             let root = temp_dir().join(format!("native-log-test-{}", Uuid::new_v4()));
             fs::create_dir(&root).unwrap();
             let pid = child.id().unwrap();
@@ -3295,7 +3325,11 @@ mod tests {
                     preserve_header_casing: false,
                     tls_profile: Default::default(),
                 },
-                input: json!({"request_id":job_id}),
+                input: if scenario == "input-deadline" {
+                    json!({"request_id":job_id, "fixture": "x".repeat(1024 * 1024)})
+                } else {
+                    json!({"request_id":job_id})
+                },
                 bearer: "synthetic-bearer".into(),
                 device_id: String::new(),
                 account_uuid: None,
@@ -3306,14 +3340,19 @@ mod tests {
             let (reply, receive) = oneshot::channel();
             let mut reply = Some(reply);
             let (chunks, _receiver) = mpsc::channel(8);
-            let result = worker
-                .execute(
+            let deadline_ms = match scenario {
+                "deadline" => 30,
+                "input-deadline" => 100,
+                _ => 1000,
+            };
+            let result = timeout(
+                Duration::from_secs(3),
+                worker.execute(
                     &submission,
                     None,
                     &mut reply,
                     &chunks,
-                    Instant::now()
-                        + Duration::from_millis(if scenario == "deadline" { 30 } else { 1000 }),
+                    Instant::now() + Duration::from_millis(deadline_ms),
                     Instant::now(),
                     NativeRuntimeObservation {
                         worker_id,
@@ -3326,8 +3365,10 @@ mod tests {
                         worker_start_ms: None,
                         prepared_ms: 0,
                     },
-                )
-                .await;
+                ),
+            )
+            .await
+            .expect("原生请求应在指定预算内完成");
             if matches!(
                 scenario,
                 "error" | "ttl" | "cache" | "diagnostic" | "invalid-diagnostic" | "rejection"
@@ -3347,6 +3388,9 @@ mod tests {
                 }
             } else {
                 assert!(result.is_err());
+                if scenario == "input-deadline" {
+                    assert!(matches!(result, Err(AppError::BadGateway(_))));
+                }
             }
             worker.retire().await;
         }
@@ -3355,6 +3399,7 @@ mod tests {
             "native_error_event",
             "ipc_eof",
             "native_response_deadline",
+            "native_input_deadline",
             "cache_ttl_capability_missing",
             "message_cache_capability_missing",
         ] {

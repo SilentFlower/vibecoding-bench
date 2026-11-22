@@ -1,6 +1,11 @@
 //! v3 传输保真、长流和取消验证；只使用本地合成服务。
 
+use axum::body::{Body, Bytes};
+use axum::http::{Request, StatusCode};
 use claude_code_gateway::tlsfp::TlsProfileId;
+use futures_util::stream::poll_fn;
+use std::io::Error;
+use std::task::Poll;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
@@ -12,6 +17,7 @@ use reqwest::Client;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::time::timeout;
+use tower::ServiceExt;
 use uuid::Uuid;
 
 /// 按 Content-Length 接收完整原始请求，保留大小写、顺序和 body。
@@ -117,7 +123,7 @@ async fn raw_body_header_order_and_upstream_error_survive_bridge() {
     let raw = tokio::spawn(async move {
         let (mut socket, _) = listener.accept().await.unwrap();
         let raw = request_bytes(&mut socket).await;
-        socket.write_all(b"HTTP/1.1 429 Too Many Requests\r\nContent-Length: 7\r\nX-Test: preserved\r\nConnection: close\r\n\r\nblocked").await.unwrap();
+        socket.write_all(b"HTTP/1.1 429 Too Many Requests\r\nContent-Length: 7\r\nX-Test: preserved\r\nX-V3-Transport-Error: before-send\r\nConnection: close\r\n\r\nblocked").await.unwrap();
         raw
     });
     let (endpoint, mut config, path, handle) = sender(&origin).await;
@@ -230,6 +236,38 @@ async fn sse_is_streamed_and_disconnect_closes_upstream_without_replay() {
         .await
         .unwrap();
     assert_eq!(active["active"], 0);
+    handle.abort();
+    std::fs::remove_file(path).unwrap();
+}
+
+#[tokio::test]
+async fn sender_rejects_unauthorized_post_before_polling_body() {
+    let (_, _, path, handle) = sender("http://127.0.0.1:1").await;
+    let app = sender_router(path.clone());
+    for uri in [
+        "/internal/send",
+        "/internal/native/messages",
+        "/internal/native/prepare",
+        "/internal/agy/generate",
+        "/internal/agy/tools",
+    ] {
+        for bearer in [None, Some("Bearer invalid-binding-proof")] {
+            let body = Body::from_stream(poll_fn(|_| -> Poll<Option<Result<Bytes, Error>>> {
+                panic!("未授权请求的正文被读取");
+            }));
+            let mut request = Request::post(uri).header("content-type", "application/json");
+            if let Some(bearer) = bearer {
+                request = request.header("authorization", bearer);
+            }
+            let response = app
+                .clone()
+                .oneshot(request.body(body).unwrap())
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::UNAUTHORIZED, "{uri}");
+            assert_eq!(response.headers()["x-v3-transport-error"], "before-send");
+        }
+    }
     handle.abort();
     std::fs::remove_file(path).unwrap();
 }
