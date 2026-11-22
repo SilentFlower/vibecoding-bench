@@ -1,0 +1,42 @@
+{
+  "id": "agy-reauth-proxy",
+  "name": "agy-reauth-proxy",
+  "title": "Antigravity 重授权代理选择与凭据交接",
+  "description": "在原账号重授权弹窗选线并随已核验凭据提交，支持同操作恢复。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-22",
+  "completedAt": "2026-11-22",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-22T04:48:41Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-22-reauth-proxy-and-quota-warning",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "completedSteps": [
+      "Antigravity 重授权默认线路、目录选线与直连",
+      "原账号凭据和线路原子提交及重启对账",
+      "浏览器、原生回执和网关隔离验收"
+    ],
+    "partialStep": null,
+    "nextStep": "随同一批版本上线后核对实际账号授权和 11-14 自动计划",
+    "notes": "",
+    "updatedAt": "2026-11-22T04:48:41Z"
+  }
+}
