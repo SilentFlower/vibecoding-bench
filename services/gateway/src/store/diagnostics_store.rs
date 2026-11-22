@@ -747,6 +747,7 @@ mod tests {
             context: None,
             native_rejection: None,
             original_session_id: None,
+            derived_session_id: None,
             last_attempt: None,
             log_mode: None,
             request_id: request_id.clone(),

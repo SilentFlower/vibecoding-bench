@@ -13,6 +13,7 @@ use axum::body::{Body, Bytes};
 use axum::http::StatusCode;
 use axum::response::Response;
 use futures_util::StreamExt;
+use serde::Deserialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -24,13 +25,16 @@ use tokio_stream::wrappers::ReceiverStream;
 use uuid::Uuid;
 
 use crate::error::AppError;
-use crate::service::agy_contract::{AgySubmission, AgyToolCompletion};
-use crate::service::runtime_transport::{SenderConfig, now_ms};
+use crate::service::agy_contract::{
+    AgyOperation, AgySubmission, AgyToolCompletion, AgyWarmPreparation,
+};
+use crate::service::runtime_transport::{SenderConfig, now_ms, read_config};
 
 /// 单账号监督进程池；热配置更换前要求原活动已收口。
 #[derive(Default)]
 pub struct AgyPool {
     controller: Mutex<Option<Arc<Controller>>>,
+    capacity_lock: Mutex<()>,
 }
 
 struct Subscriber {
@@ -51,6 +55,29 @@ struct Controller {
 
 fn unavailable() -> AppError {
     AppError::ServiceUnavailable("AGY账号执行进程暂不可用".into())
+}
+
+fn controller_identity(config: &SenderConfig) -> Result<String, AppError> {
+    let mut native = config.agy.as_ref().ok_or_else(unavailable)?.clone();
+    native.validate()?;
+    // 容量通过受信控制指令单独生效。池身份仍核对实际内核、代理和绑定。
+    native.max_workers = 0;
+    native.memory_mib = 0;
+    let identity = json!({"agy":native,"binding":config.binding,"proxy_url":config.proxy_url});
+    Ok(format!(
+        "{:x}",
+        Sha256::digest(serde_json::to_vec(&identity).map_err(|_| unavailable())?)
+    ))
+}
+
+fn restore_allowed(config_path: &str) -> Result<bool, AppError> {
+    #[derive(Deserialize)]
+    struct RestorePolicy {
+        native_criu_enabled: Option<bool>,
+    }
+    let raw = fs::read(config_path).map_err(|_| unavailable())?;
+    let policy: RestorePolicy = serde_json::from_slice(&raw).map_err(|_| unavailable())?;
+    Ok(policy.native_criu_enabled.unwrap_or(true))
 }
 
 fn requires_reconciliation(root: &Path) -> Result<bool, AppError> {
@@ -110,7 +137,14 @@ impl Controller {
         let request_id = request_id.to_string();
         let terminal = matches!(
             event["type"].as_str(),
-            Some("job_finalized" | "rejected" | "tools_finished" | "control_error")
+            Some(
+                "job_finalized"
+                    | "rejected"
+                    | "tools_finished"
+                    | "control_error"
+                    | "capacity_applied"
+                    | "status"
+            )
         );
         // 活动覆盖异常收口和工具等待，直到监督层确认物理作业已结束。
         if event["type"] == "job_finalized" {
@@ -146,6 +180,29 @@ impl Controller {
             }
         }
         Ok(())
+    }
+
+    async fn query(&self, mut message: Value) -> Result<Value, AppError> {
+        let id = Uuid::new_v4().to_string();
+        message["request_id"] = json!(id);
+        let (sender, mut receiver) = mpsc::channel(1);
+        self.requests.lock().await.insert(
+            id.clone(),
+            Subscriber {
+                sender,
+                api_token_id: 0,
+            },
+        );
+        let result = async {
+            self.send(&message).await?;
+            timeout(Duration::from_secs(2), receiver.recv())
+                .await
+                .map_err(|_| unavailable())?
+                .ok_or_else(unavailable)
+        }
+        .await;
+        self.requests.lock().await.remove(&id);
+        result.map(|(event, _permit)| event)
     }
 
     async fn stop(&self) {
@@ -193,6 +250,18 @@ impl Drop for CancelOnDrop {
 }
 
 impl AgyPool {
+    /// 发送器停止接单后关闭空闲监督器。@return 实际进程退出，活动业务保留原对账保护。
+    pub(super) async fn shutdown_idle(&self) {
+        let state = self.controller.lock().await;
+        let Some(controller) = state.as_ref() else {
+            return;
+        };
+        let idle = controller.active.lock().await.is_empty();
+        if idle {
+            controller.stop().await;
+        }
+    }
+
     /// 请求监督器取消原私有请求。@param request_id 原尝试身份。@param api_token_id 原调用方。@return 取消指令是否已登记。
     pub(crate) async fn cancel(&self, request_id: &str, api_token_id: i64) -> Result<(), AppError> {
         let controller = self.controller.lock().await.clone();
@@ -285,18 +354,12 @@ impl AgyPool {
         result
     }
 
-    async fn controller(&self, config: &SenderConfig) -> Result<Arc<Controller>, AppError> {
-        let native = config.agy.as_ref().ok_or_else(unavailable)?;
-        native.validate()?;
-        let identity = format!(
-            "{:x}",
-            Sha256::digest(
-                serde_json::to_vec(
-                    &json!({"agy":native,"binding":config.binding,"proxy_url":config.proxy_url})
-                )
-                .map_err(|_| unavailable())?
-            )
-        );
+    async fn controller(
+        &self,
+        config: &SenderConfig,
+        config_path: &str,
+    ) -> Result<Arc<Controller>, AppError> {
+        let identity = controller_identity(config)?;
         let mut state = self.controller.lock().await;
         if let Some(controller) = state.as_ref() {
             if controller.identity == identity && !controller.closed.load(Ordering::Acquire) {
@@ -307,6 +370,14 @@ impl AgyPool {
                     "AGY原代次仍有活动，请等待收口".into(),
                 ));
             }
+        }
+        // 等待池锁期间编辑可能已经完成。新进程须使用本代当前容量启动。
+        let config = read_config(config_path)?;
+        if controller_identity(&config)? != identity {
+            return Err(unavailable());
+        }
+        let native = config.agy.as_ref().ok_or_else(unavailable)?;
+        if let Some(controller) = state.as_ref() {
             controller.stop().await;
         }
         let root = PathBuf::from(&native.work_root);
@@ -327,6 +398,7 @@ impl AgyPool {
             &json!({"account_id":config.binding.account_id,"environment_id":config.binding.environment_id,
             "environment_generation":config.binding.generation,"binary_path":native.binary_path,
             "work_root":generation_root.join("state"),"max_workers":native.max_workers,"memory_mib":native.memory_mib,
+            "restore_allowed":restore_allowed(config_path)?,
             "proxy_url":config.proxy_url,"capture_enabled":false,"capture_root":"/flows/api/agy-prepared"}),
         )?;
         let mut child = Command::new("python3")
@@ -414,50 +486,23 @@ impl AgyPool {
         Ok(controller)
     }
 
-    /// 发送独立AGY请求并交付原生私有事件流。@param config 原账号配置。@param submission 已准入信封。@param deadline 原单调截止。@param prepare 是否只准备。@return 私有NDJSON响应。
-    pub async fn submit(
+    /// 发送独立AGY请求并交付原生私有事件流。@param config 原账号配置。@param config_path 私有配置入口。@param submission 已准入信封。@param deadline 原单调截止。@param operation 冻结的操作。@return 私有NDJSON响应。
+    pub(super) async fn submit(
         &self,
         config: &SenderConfig,
+        config_path: &str,
         submission: AgySubmission,
         deadline: Instant,
-        prepare: bool,
+        operation: AgyOperation,
     ) -> Result<Response, AppError> {
         submission.validate(now_ms())?;
-        let controller = timeout_at(deadline, self.controller(config))
-            .await
-            .map_err(|_| unavailable())??;
-        let (sender, receiver) = mpsc::channel(16);
-        let complete = Arc::new(AtomicBool::new(false));
-        let request_id = submission.request.request_id.clone();
-        {
-            let mut requests = controller.requests.lock().await;
-            if requests.contains_key(&request_id)
-                || controller.active.lock().await.contains(&request_id)
-            {
-                return Err(AppError::BadRequest("AGY请求已经登记".into()));
-            }
-            requests.insert(
-                request_id.clone(),
-                Subscriber {
-                    sender,
-                    api_token_id: submission.api_token_id,
-                },
-            );
-            controller.active.lock().await.insert(request_id.clone());
-        }
-        let guard = CancelOnDrop {
-            controller: controller.clone(),
-            request_id: request_id.clone(),
-            api_token_id: submission.api_token_id,
-            complete,
-        };
-        let mut value = json!({"schema_version":1,"type":if prepare {"prepare"} else {"submit"},
-            "request_id":request_id,"account_id":submission.request.account_id,
+        let mut value = json!({"schema_version":1,"type":operation.supervisor_command(),
+            "request_id":submission.request.request_id,"account_id":submission.request.account_id,
             "environment_id":submission.request.environment_id,"environment_generation":submission.request.generation,
             "api_token_id":submission.api_token_id,"credential_snapshot":submission.credential_snapshot,
             "model":submission.model,"native_model":submission.native_model,"body":submission.body,
             "deadline_unix_ms":submission.request.deadline_unix_ms,"capture_enabled":submission.capture_enabled});
-        if submission.system_prompt_policy.enabled {
+        if !submission.system_prompt_policy.is_disabled() {
             value["system_prompt_policy"] = serde_json::to_value(&submission.system_prompt_policy)
                 .map_err(|_| unavailable())?;
         }
@@ -470,6 +515,70 @@ impl AgyPool {
         if submission.disable_safety_filtering {
             value["disable_safety_filtering"] = Value::Bool(true);
         }
+        self.run_job(
+            config,
+            config_path,
+            submission.request.request_id,
+            submission.api_token_id,
+            value,
+            deadline,
+        )
+        .await
+    }
+
+    /// 在同池准备实际空闲进程。@param config 当前配置。@param config_path 私有配置入口。
+    /// @param input 预热归属及 AT 快照。@param deadline 原单调截止。@return 私有终态事件流。
+    pub(super) async fn warm(
+        &self,
+        config: &SenderConfig,
+        config_path: &str,
+        input: AgyWarmPreparation,
+        deadline: Instant,
+    ) -> Result<Response, AppError> {
+        let value = json!({"schema_version":1,"type":"warm","request_id":input.request_id,
+            "account_id":input.account_id,"environment_id":input.environment_id,
+            "environment_generation":input.generation,"credential_snapshot":input.credential_snapshot,
+            "deadline_unix_ms":input.deadline_unix_ms,"capture_enabled":input.capture_enabled});
+        // 零只用于服务作业的撤销归属。业务私有入口要求正调用方 ID。
+        self.run_job(config, config_path, input.request_id, 0, value, deadline)
+            .await
+    }
+
+    async fn run_job(
+        &self,
+        config: &SenderConfig,
+        config_path: &str,
+        request_id: String,
+        api_token_id: i64,
+        value: Value,
+        deadline: Instant,
+    ) -> Result<Response, AppError> {
+        let controller = timeout_at(deadline, self.controller(config, config_path))
+            .await
+            .map_err(|_| unavailable())??;
+        let (sender, receiver) = mpsc::channel(16);
+        {
+            let mut requests = controller.requests.lock().await;
+            if requests.contains_key(&request_id)
+                || controller.active.lock().await.contains(&request_id)
+            {
+                return Err(AppError::BadRequest("AGY请求已经登记".into()));
+            }
+            requests.insert(
+                request_id.clone(),
+                Subscriber {
+                    sender,
+                    api_token_id,
+                },
+            );
+            controller.active.lock().await.insert(request_id.clone());
+        }
+        let guard = CancelOnDrop {
+            controller: controller.clone(),
+            request_id: request_id.clone(),
+            api_token_id,
+            complete: Arc::new(AtomicBool::new(false)),
+        };
         if let Err(error) = controller.send(&value).await {
             controller.requests.lock().await.remove(&request_id);
             return Err(error);
@@ -506,40 +615,52 @@ impl AgyPool {
         }
     }
 
-    /// 查询已有监督器的实际状态，保持休眠环境。@return 只读资源分项或当前状态。
+    /// 按受信配置应用容量，并核对监督器回执。@param config_path 私有配置入口。@param authorize 当前请求的绑定校验。@return 已实际应用的物理上限。
+    pub(super) async fn apply_capacity(
+        &self,
+        config_path: &str,
+        authorize: impl FnOnce(&SenderConfig) -> Result<(), AppError>,
+    ) -> Result<usize, AppError> {
+        let _change = self.capacity_lock.lock().await;
+        let config = read_config(config_path)?;
+        authorize(&config)?;
+        let target = config.agy.as_ref().ok_or_else(unavailable)?.max_workers;
+        let controller = self.controller(&config, config_path).await?;
+        let result = controller
+            .query(
+                json!({"schema_version":1,"type":"capacity","max_workers":target,
+                "restore_allowed":restore_allowed(config_path)?}),
+            )
+            .await?;
+        if result["type"] != "capacity_applied"
+            || result["max_workers"].as_u64() != Some(target as u64)
+        {
+            return Err(AppError::ServiceUnavailable(
+                "AGY发送器暂不支持在线调整，请先升级运行环境".into(),
+            ));
+        }
+        Ok(target)
+    }
+
+    /// 查询已有监督器的实际状态，保持休眠环境。@param config 当前绑定配置。@return 只读资源分项或当前状态。
     pub async fn status(&self, config: &SenderConfig) -> Value {
         let state = self.controller.lock().await;
         let Some(controller) = state.as_ref() else {
             let stale = config.agy.as_ref().is_some_and(|agy| {
                 requires_reconciliation(Path::new(&agy.work_root)).unwrap_or(true)
             });
-            return json!({"state":if stale {"reconcile"} else {"unprepared"},"workers":0,"active":0});
+            return json!({"state":if stale {"reconcile"} else {"unprepared"},
+                "capacity_protocol":1,"workers":0,"allocated_workers":0,"active":0,"idle_workers":0,
+                "max_workers":config.agy.as_ref().map(|agy| agy.max_workers)});
         };
         if controller.closed.load(Ordering::Acquire) {
             return json!({"state":"unknown","active":controller.active.lock().await.len()});
         }
-        let id = Uuid::new_v4().to_string();
-        let (sender, mut receiver) = mpsc::channel(1);
-        controller.requests.lock().await.insert(
-            id.clone(),
-            Subscriber {
-                sender,
-                api_token_id: 0,
-            },
-        );
-        let result = async {
-            controller
-                .send(&json!({"schema_version":1,"type":"status","request_id":id}))
-                .await?;
-            timeout(Duration::from_secs(2), receiver.recv())
-                .await
-                .map_err(|_| unavailable())?
-                .ok_or_else(unavailable)
-        }
-        .await;
-        controller.requests.lock().await.remove(&id);
+        let result = controller
+            .query(json!({"schema_version":1,"type":"status"}))
+            .await;
         let mut status = result
-            .map(|(event, _permit)| event["status"].clone())
+            .map(|event| event["status"].clone())
             .unwrap_or(json!({"state":"unknown"}));
         if let Some(fields) = status.as_object_mut() {
             fields.insert("module_root".into(), json!(controller.module_root));
@@ -598,21 +719,40 @@ mod tests {
             module_root: "synthetic".into(),
             input: Mutex::new(input),
             child: Mutex::new(child),
-            requests: Mutex::new(HashMap::from([(request_id.clone(), Subscriber { sender, api_token_id: 7 })])),
+            requests: Mutex::new(HashMap::from([(
+                request_id.clone(),
+                Subscriber {
+                    sender,
+                    api_token_id: 7,
+                },
+            )])),
             active: Mutex::new(HashSet::from([request_id.clone()])),
             closed: AtomicBool::new(false),
             byte_budget: Arc::new(Semaphore::new(1)),
         });
-        let pool = AgyPool { controller: Mutex::new(Some(controller.clone())) };
+        let pool = AgyPool {
+            controller: Mutex::new(Some(controller.clone())),
+            ..AgyPool::default()
+        };
 
-        assert!(matches!(pool.cancel(&request_id, 8).await, Err(AppError::Unauthorized)));
+        assert!(matches!(
+            pool.cancel(&request_id, 8).await,
+            Err(AppError::Unauthorized)
+        ));
         pool.cancel(&request_id, 7).await.unwrap();
-        let line = timeout(Duration::from_secs(1), read_bounded_line(&mut output)).await.unwrap().unwrap().unwrap();
-        assert_eq!(serde_json::from_slice::<Value>(&line).unwrap(),
-            json!({"schema_version":1,"type":"cancel","request_id":request_id,"api_token_id":7}));
+        let line = timeout(Duration::from_secs(1), read_bounded_line(&mut output))
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            serde_json::from_slice::<Value>(&line).unwrap(),
+            json!({"schema_version":1,"type":"cancel","request_id":request_id,"api_token_id":7})
+        );
         assert_eq!(pool.active().await, 1);
 
-        let finalized = json!({"type":"job_finalized","request_id":request_id,"status":"cancelled"});
+        let finalized =
+            json!({"type":"job_finalized","request_id":request_id,"status":"cancelled"});
         controller.dispatch(finalized.clone(), 128).await.unwrap();
         assert_eq!(pool.active().await, 0);
         assert_eq!(receiver.recv().await.unwrap().0, finalized);

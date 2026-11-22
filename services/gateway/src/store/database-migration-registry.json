@@ -82,6 +82,24 @@
       "predecessor": 8,
       "rollback_mode": "compatible",
       "version": 9
+    },
+    {
+      "checksum": "15e7b4b305348537ca29c68acb06d754f6ad5d1199bd37b6c58b95d4b877aef5",
+      "engine": "sqlite",
+      "id": "gateway.agy-system-reminder.10",
+      "kind": "schema",
+      "predecessor": 9,
+      "rollback_mode": "compatible",
+      "version": 10
+    },
+    {
+      "checksum": "fa7aa12d360fa94a697d5451d9719ba7891191a8d201f8413cec6d745ced9e85",
+      "engine": "sqlite",
+      "id": "gateway.agy-tool-receipts.11",
+      "kind": "schema",
+      "predecessor": 10,
+      "rollback_mode": "compatible",
+      "version": 11
     }
   ]
 }

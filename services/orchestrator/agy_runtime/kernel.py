@@ -17,13 +17,12 @@ import threading
 import time
 import traceback
 import uuid
-from .contract import CAPABILITIES, InputError, MODEL, fields, history_steps, request
+from .contract import CAPABILITIES, InputError, fields, history_steps, request
 from .storage import ROOT, SOURCE_SHA, Output, binary, config, private_dir
 from .stream_controller import DrainBridge, NativeJob, DeliverySpool
 from .layer_reader import LayerReader
 from .tool_broker import Broker
-from .gemini_frames import Frames
-from .models import configure_model
+from .gemini_frames import Frames, RESULT_FINISH_REASONS
 from .capture import save_egress, save_submission
 from .wire_capture import NativeTlsTrace
 from .credentials import read_access_document
@@ -35,18 +34,18 @@ CONTROL_CLOSE_ERRORS={'native_request_failed','native_transport_error','native_c
     'native_process_exited','native_protocol_error'}
 NATIVE_ERRORS=CONTROL_CLOSE_ERRORS|{'cancelled','cancel_timeout','native_stream_incomplete','native_delivery_error',
     'native_start_rejected','tool_protocol_error','native_tool_yield_timeout','native_tool_yield_failed',
-    'ambiguous_parallel_function_calls','unsupported_gemini_candidate_count','invalid_native_gemini_parts',
+    'native_tool_frame_identity','invalid_native_tool_id','unsupported_gemini_candidate_count','invalid_native_gemini_parts',
     'native_safety_endpoint_rejected','native_safety_egress_unobserved'}
 CONTROL_EXCEPTION_TYPES={'AssertionError','AttributeError','IndexError','JSONDecodeError','KeyError',
     'OSError','RuntimeError','TimeoutError','TypeError','ValueError'}
 PROTOCOL_READER_ERRORS={'native_root_identity.unfinished_stream':'native_root_identity.unfinished_stream',
     'native_root_identity.call_reused':'native_root_identity.call_reused',
-    'native_root_identity.additional_call':'native_root_identity.additional_call',
     'native_root_identity.invalid_context':'native_root_identity.invalid_context',
     'native_root_identity.missing_cascade':'native_root_identity.missing_cascade',
     'source_request_identity':'source_request_identity','source_call_identity':'source_call_identity',
     '源事件活动作业归属冲突':'active_job_mismatch'}
 PROTOCOL_OBSERVER_ERRORS={'活动作业缺失':'active_job_missing','活动原生调用数量越界':'active_call_limit',
+    '原生模型调用缺少 goroutine 身份':'route_goroutine_missing','原生模型 goroutine 调用归属冲突':'route_goroutine_conflict',
     'SDK原始帧缺少活动作业':'sdk_job_missing','SDK原始帧存在多个活动模型调用':'sdk_multiple_calls',
     'SDK原始帧缺少模型调用':'sdk_call_missing','SDK原始帧采集长度越界':'sdk_frame_limit',
     'SDK原始帧读取失败':'sdk_frame_unreadable','原生返回缺少调用归属':'receive_call_missing',
@@ -85,12 +84,14 @@ class Scope:
 
     def __init__(self, value, seq, worker):
         """创建请求归属。@param value 已验证请求。@param seq 内核序号。@param worker 工作进程。@return 无返回值。"""
-        self.history_count=len(value['native_steps']) if 'native_steps' in value else len(history_steps(value['messages']));self.value=value;self.seq=seq;self.worker=worker;self.route=f'r-{seq}';self.root=None;self.job=None
-        self.frames=Frames();self.native_tool_calls=None;self.compatibility_error=None;self.tool_wait_ready=threading.Event();self.tool_wait_published=False;self.resume_claimed=False;self.final_status=None;self.yield_tools=threading.Event();self.yield_cancelled=threading.Event();self.yield_started=None;self.yield_rpc=None
+        steps = value['native_steps'] if 'native_steps' in value else history_steps(value['messages'], native_model=value['model'])
+        self.history_count=len(steps);self.value=value;self.seq=seq;self.worker=worker;self.route=f'r-{seq}';self.root=None;self.job=None
+        previous_ids=(call['id'] for content in value.get('gemini_body',{}).get('contents',[])
+            for part in content['parts'] if (call:=part.get('functionCall')) and 'id' in call)
+        self.frames=Frames(previous_ids);self.native_tool_calls=None;self.native_tool_steps=();self.tool_protocol_detail=None;self.compatibility_error=None;self.tool_wait_ready=threading.Event();self.tool_wait_published=False;self.resume_claimed=False;self.final_status=None;self.yield_tools=threading.Event();self.yield_cancelled=threading.Event();self.yield_started=None;self.yield_rpc=None
         self.broker=None;self.cancel=threading.Event();self.cancel_started=None;self.cancel_sent=False;self.finished=threading.Event()
         self.safety_egress=None;self.tls_trace=None
         self.isolated_call_ids=set()
-        self.tool_native_ids=()
 
     def identity(self):
         """返回公开协议身份。@return 身份字段。"""
@@ -201,7 +202,7 @@ class Worker:
         if self.port is None:raise RuntimeError('native_listener_identity_timeout')
         self.ready=True;self.bridge.start_reader()
         self.owner.emit('worker_ready',generation=self.bridge.generation,native_pid=self.bridge.native_pid,observer_pid=self.bridge.proc.pid,
-            source_sha256=SOURCE_SHA,capabilities=CAPABILITIES,runtime_policy={'runtime_env':self.bridge.runtime_env,'rotate_after':self.owner.cfg['rotate_after']})
+            source_sha256=SOURCE_SHA,capabilities=self.owner.capabilities,runtime_policy={'runtime_env':self.bridge.runtime_env,'rotate_after':self.owner.cfg['rotate_after']})
 
     def owns_source(self, event):
         """在调用计数前核对作业与 Cascade。@param event 原生观察。@return 是否属于当前作业。"""
@@ -225,15 +226,12 @@ class Worker:
             raise RuntimeError('native_root_identity.invalid_context')
         if job and call_id==job.call_id:raise RuntimeError('native_root_identity.call_reused')
         if conversation==scope.root:return True
-        if scope.isolated_call_ids and not (scope.tool_wait_published and scope.broker
-                and scope.broker.gemini_results is not None):
-            raise RuntimeError('native_root_identity.additional_call')
         if (scope.value.get('request_format')!='gemini' or not job or job.calls!=1 or job.ends!=1
-                or not job.ended.is_set() or scope.frames.finish_reason!='STOP'):
+                or not job.ended.is_set() or scope.frames.finish_reason not in RESULT_FINISH_REASONS):
             raise RuntimeError('native_root_identity.unfinished_stream')
         if not conversation and not scope.frames.calls:
             raise RuntimeError('native_root_identity.missing_cascade')
-        # 旧轮已接纳结果后，独立调用仍与原根不同。隔离其全部帧，并在原轮收尾后退役进程。
+        # 主调用已确认 EOF。观察器按不同原生调用标记帧，整个独立调用都留在主轨迹之外。
         scope.isolated_call_ids.add(call_id)
         self.owner.emit('foreign_model_observed' if conversation else 'unassigned_model_observed',**scope.identity())
         return False
@@ -367,8 +365,11 @@ class Kernel:
 
     def __init__(self, cfg, state):
         """建立当前账号的独立内核。@param cfg 固定配置。@param state 私有根。@return 无返回值。"""
-        global MODEL
-        MODEL = configure_model(cfg['public_model'], cfg['native_model'])
+        self.fixed_model = (cfg['public_model'], cfg['native_model']) if 'public_model' in cfg else None
+        self.capabilities = CAPABILITIES
+        if self.fixed_model is not None:
+            self.capabilities = {**CAPABILITIES, 'model': self.fixed_model[1],
+                'gemini': {**CAPABILITIES['gemini'], 'model': self.fixed_model[0]}}
         self.cfg=cfg;self.state=state;self.queued=None;self.queued_thread=None;self.lock=threading.RLock();self.active=None;self.closing=False;self.seq=0;self.worker_id=str(uuid.uuid4())
         self.template_enabled=os.environ.get('AGY_CRIU_TEMPLATE')=='1'
         self.sequence_file=state/'request-sequence.json'
@@ -396,7 +397,7 @@ class Kernel:
 
     def accept(self, raw, _queued=False):
         """验证请求或绑定待回填续轮。@param raw JSON 输入。@param _queued 内部已保留的续轮。@return 无。"""
-        value=request(raw)
+        value=request(raw, fixed_model=self.fixed_model)
         if value['history_id']:
             path=self.state/'histories'/(value['history_id']+'.json')
             if path.is_symlink():raise InputError('invalid_history_id')
@@ -404,7 +405,7 @@ class Kernel:
             except OSError as exc:raise InputError('unknown_history_id') from exc
             value['messages']=stored['messages']
             if value['system'] is None:value['system']=stored['system']
-            history_steps(value['messages'])
+            history_steps(value['messages'], native_model=value['model'])
         value['system']=value['system'] if value['system'] is not None else ''
         with self.lock:
             if self.closing:raise InputError('closing')
@@ -439,13 +440,14 @@ class Kernel:
         """完成公开响应并保留原生工具轮直到真实结果到达。@param scope 当前轮次。@return 无。"""
         source=[(c['name'],c.get('args',{})) for c in scope.frames.calls]
         native=[(c['name'],json.loads(c['argumentsJson'])) for c in scope.native_tool_calls]
-        ids=tuple(c['id'] for c in scope.native_tool_calls)
-        known_ids=set(ids)
-        if (source!=native or len(known_ids)!=len(ids)
-                or any(call['id'] in known_ids and call['id']!=identifier
-                       for call,identifier in zip(scope.frames.calls,ids))):
+        ids=tuple(c.get('id') for c in scope.native_tool_calls)
+        if (source!=native or len(scope.native_tool_steps)!=len(source)
+                or len(scope.frames.source_call_ids)!=len(ids)
+                or any(not isinstance(identifier,str) or not identifier
+                       or source_id is not None and source_id!=identifier
+                       for source_id,identifier in zip(scope.frames.source_call_ids,ids))):
+            scope.tool_protocol_detail='planner_identity'
             raise RuntimeError('tool_protocol_error')
-        scope.tool_native_ids=ids
         scope.tool_wait_published=True
         self.emit('completed',**scope.identity(),finish_reason='tool_calls',history_id=None,history_error=None,native_cascade_id=scope.root,native_trajectory_id=scope.broker.trajectory_id,native_model_calls=scope.job.calls,native_empty=False,native_tool_pending=True)
 
@@ -490,7 +492,7 @@ class Kernel:
                 if not isinstance(result.get('result'),str):return None,'unsupported_native_export'
                 messages.append({'role':'tool','tool_call_id':call['id'],'text':result['result']})
             else:return None,'unsupported_native_export'
-        try:history_steps(messages)
+        try:history_steps(messages, native_model=scope.value['model'])
         except InputError:return None,'unsupported_native_export'
         ident=str(uuid.uuid4());path=self.state/'histories'/(ident+'.json')
         path.write_text(json.dumps({'messages':messages,'system':scope.value['system'],'native_cascade':scope.root,'native_trajectory':trajectory['trajectoryId']},ensure_ascii=False))
@@ -503,9 +505,10 @@ class Kernel:
         folder=private_dir(self.state/'requests'/scope.route)
         try:
             if scope.value.get('gemini_body') is not None:(folder/'gemini-input.json').write_text(json.dumps(scope.value['gemini_body'],ensure_ascii=False))
-            steps=copy.deepcopy(scope.value['native_steps']) if 'native_steps' in scope.value else history_steps(scope.value['messages']);cfg=copy.deepcopy(self.base_config)
+            native_model = scope.value['model']
+            steps=copy.deepcopy(scope.value['native_steps']) if 'native_steps' in scope.value else history_steps(scope.value['messages'], native_model=native_model);cfg=copy.deepcopy(self.base_config)
             (folder/'input-mapping.json').write_text(json.dumps({'schema_changes':scope.value.get('schema_changes',[]),'completion':scope.value.get('native_completion',{}),'history_steps':len(steps),'compatibility_notes':scope.value.get('compatibility_notes',[]),'system_prompt_policy':scope.value.get('system_prompt_policy'),'input_view':'decoded_gemini_input','submission_view':'native_cascade_prompt_sections'},ensure_ascii=False))
-            cfg['plannerConfig']['planModel']=MODEL
+            cfg['plannerConfig']['planModel']=native_model
             cfg['plannerConfig']['declarativeMixinConfig']['promptSections']=[{'custom':{'content':scope.value['system']}}]
             if scope.value.get('request_format')=='gemini':cfg['plannerConfig']['retryConfig']['modelOutputRetry']={'maxRetries':0}
             if scope.value.get('native_completion'):cfg['plannerConfig']['completionConfigOverride']=scope.value['native_completion']
@@ -519,12 +522,13 @@ class Kernel:
             if rules:=scope.value.get('safety_egress_rules'):
                 token=read_access_document(worker.bridge.native_home)['token']['access_token']
                 capture=partial(self.capture_egress,scope,token) if self.cfg.get('capture_root') else None
-                scope.safety_egress=SafetyEgress(rules,token,worker.bridge.proxy_url,worker.bridge.ca_file,capture)
+                scope.safety_egress=SafetyEgress(rules,token,worker.bridge.proxy_url,worker.bridge.ca_file,capture,
+                    execution_deadline=scope.value.get('execution_deadline'))
                 switched=worker.call('SetCloudCodeURL',{'url':scope.safety_egress.url},scope)
                 if switched['status']!=200:
                     control_status=switched['status']
                     raise RuntimeError('native_safety_endpoint_rejected')
-            root=worker.call('StartCascade',{'source':'CORTEX_TRAJECTORY_SOURCE_AGENT_API','requestedModel':MODEL},scope)
+            root=worker.call('StartCascade',{'source':'CORTEX_TRAJECTORY_SOURCE_AGENT_API','requestedModel':native_model},scope)
             control_status=root['status']
             if root['status']!=200:raise RuntimeError('native_start_rejected')
             scope.root=root['response']['cascadeId']
@@ -543,9 +547,10 @@ class Kernel:
             phase='submission';control_status=None
             future=RPC(worker,'SendUserCascadeMessage',body,scope)
             while not future.done.wait(.05):
-                if scope.value.get('request_format')=='gemini' and scope.job.ended.is_set() and not scope.frames.terminal:
-                    raise RuntimeError('native_stream_incomplete')
-                if scope.broker and scope.broker.failure:raise RuntimeError('tool_protocol_error')
+                # Receive 先关闭时控制 RPC 可能仍在传回真实错误。监督器的原截止仍约束本次等待。
+                if scope.broker and scope.broker.failure:
+                    scope.tool_protocol_detail='mcp_callback_rejected'
+                    raise RuntimeError('tool_protocol_error')
                 if worker.bridge.reader_error or worker.bridge.errors:raise RuntimeError('native_protocol_error')
                 if (scope.tool_wait_ready.is_set() and not scope.tool_wait_published and not scope.cancel.is_set()
                         and scope.job.calls==scope.job.ends==1 and scope.job.ended.is_set() and not scope.job.native_error
@@ -562,13 +567,13 @@ class Kernel:
                 if scope.cancel_started and time.monotonic()-scope.cancel_started>self.cfg['cancel_timeout']:raise RuntimeError('cancel_timeout')
                 if worker.bridge.proc.poll() is not None:raise RuntimeError('native_process_exited')
             if scope.cancel.is_set():raise RuntimeError('cancelled')
-            if future.error:raise RuntimeError('native_transport_error')
+            if future.error:raise RuntimeError('native_control_timeout' if future.error=='TimeoutError' else 'native_transport_error')
+            if scope.compatibility_error:raise RuntimeError(scope.compatibility_error)
             yielded=scope.yield_tools.is_set()
             if yielded:
                 if scope.yield_rpc is None or not scope.yield_rpc.done.wait(11) or scope.yield_rpc.error or scope.yield_rpc.value['status']!=200:raise RuntimeError('native_tool_yield_failed')
                 scope.yield_cancelled.set();retire=True
             elif future.value['status']!=200:raise RuntimeError('native_request_failed')
-            if scope.compatibility_error:raise RuntimeError(scope.compatibility_error)
             if not scope.job.ended.wait(3):raise RuntimeError('native_stream_incomplete')
             phase='trajectory'
             current=worker.call('GetCascadeTrajectory',{'cascadeId':scope.root},scope)
@@ -578,7 +583,13 @@ class Kernel:
             if worker.bridge.reader_error or worker.bridge.errors:raise RuntimeError('native_protocol_error')
             if scope.job.calls<1 or scope.job.calls!=scope.job.ends or scope.job.calls>scope.value['max_generations'] or scope.job.native_error:raise RuntimeError('native_stream_incomplete')
             if scope.value.get('request_format')=='gemini' and not scope.frames.terminal:raise RuntimeError('native_stream_incomplete')
-            if scope.frames.calls and not scope.tool_wait_published:raise RuntimeError('tool_protocol_error')
+            if scope.frames.calls and not scope.tool_wait_published:
+                scope.tool_protocol_detail=('mcp_callback_rejected' if scope.broker and scope.broker.failure
+                    else 'invalid_native_tool_step' if any(step.get('status')=='CORTEX_STEP_STATUS_INVALID'
+                         and (step.get('metadata') or {}).get('toolCall')
+                         for step in current['response']['trajectory']['steps'][scope.history_count:])
+                    else 'mcp_callback_missing')
+                raise RuntimeError('tool_protocol_error')
             if spool.overflow or spool.failure:raise RuntimeError('native_delivery_error')
             phase='finalize'
             trajectory=current['response']['trajectory'];(folder/'trajectory.json').write_text(json.dumps(trajectory,ensure_ascii=False))
@@ -595,6 +606,8 @@ class Kernel:
                 except RuntimeError:retire=True
             last_planner=next((s['plannerResponse'] for s in reversed(trajectory['steps']) if 'plannerResponse' in s),{})
             finish_reason='tool_calls' if scope.value.get('request_format')=='gemini' and scope.frames.calls else 'generation_limit' if last_planner.get('toolCalls') else 'stop'
+            if finish_reason == 'stop' and scope.frames.finish_reason == 'MAX_TOKENS':
+                finish_reason = 'max_tokens'
             scope.final_status='completed'
             self.emit('tool_turn_finalized' if scope.tool_wait_published else 'completed',**scope.identity(),finish_reason=finish_reason,status='completed',history_id=ident,history_error=history_error,native_cascade_id=scope.root,native_trajectory_id=trajectory['trajectoryId'],native_empty=scope.job.chunks==0,native_model_calls=scope.job.calls,native_tool_pending=False)
         except Exception as exc:
@@ -605,6 +618,17 @@ class Kernel:
             if phase=='submission' and future:
                 control_status=future.response_status
             status=control_status if type(control_status) is int and 100<=control_status<=599 else 'unknown'
+            observed={'native_receive_ended':bool(scope.job and scope.job.ended.is_set()),
+                'native_source_terminal':scope.frames.terminal}
+            if code=='tool_protocol_error' and scope.tool_protocol_detail:
+                observed['tool_protocol_detail']=scope.tool_protocol_detail
+            if type(status) is int:
+                observed['observed_control_http_status']=status
+            if phase=='submission' and future and type(status) is int and status>=400:
+                result=(future.value or {}).get('response')
+                message=result.get('message') if isinstance(result,dict) else None
+                if isinstance(message,str) and 'stream reading error: unexpected EOF' in message:
+                    observed['control_error_detail']='unexpected_eof'
             exception=type(exc).__name__
             if exception not in CONTROL_EXCEPTION_TYPES:exception='other'
             # 旧网关只输出事件类型。固定枚举和状态码进入类型，保留请求关联并避免输出原生错误正文。
@@ -616,11 +640,12 @@ class Kernel:
             except OSError:
                 pass
             if blocker is None:
-                # 已按顺序交付原始 STOP 和用量。控制失败由真实退役收口，原模型结果不重放。
+                # 业务终态有完整源帧证据。控制调用仍缺空闲确认，由原退役路径收口。
                 scope.final_status='completed'
-                self.emit('completed',**scope.identity(),finish_reason='stop',status='completed',
+                finish_reason = 'max_tokens' if scope.frames.finish_reason == 'MAX_TOKENS' else 'stop'
+                self.emit('completed',**scope.identity(),finish_reason=finish_reason,status='completed',
                     native_cascade_id=scope.root,native_model_calls=1,native_empty=False,native_tool_pending=False,
-                    control_error_code=code,control_recovery=recovery)
+                    control_error_code=code,control_recovery=recovery,**observed)
             else:
                 kind='cancelled' if scope.cancel.is_set() else 'error'
                 scope.final_status=kind
@@ -631,8 +656,8 @@ class Kernel:
                     if scope.safety_egress and scope.safety_egress.model_status==429:
                         failure_status['upstream_http_status']=429
                 self.emit('tool_turn_finalized' if scope.tool_wait_published else kind,**scope.identity(),status=kind,code=code,control_recovery=recovery,
-                    native_stream_complete=bool(scope.job and scope.job.ended.is_set()),native_model_calls=scope.job.calls if scope.job else 0,
-                    native_cascade_id=scope.root,native_trajectory_id=scope.broker.trajectory_id if scope.broker else None,**failure_status)
+                    native_stream_complete=observed['native_receive_ended'],native_model_calls=scope.job.calls if scope.job else 0,
+                    native_cascade_id=scope.root,native_trajectory_id=scope.broker.trajectory_id if scope.broker else None,**failure_status,**observed)
         finally:
             try:
                 if scope.broker:scope.broker.close()

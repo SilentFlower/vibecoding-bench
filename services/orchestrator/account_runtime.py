@@ -179,6 +179,18 @@ class RuntimeBusy(ValueError):
     """低优先级作业遇到正式工作时顺延，不能记为认证或任务失败。"""
 
 
+class RuntimeCapacityUnavailable(RuntimeBusy):
+    """当前节点的后台启动名额已用满。"""
+
+
+def active_account_environments(client, deployment: str, node_key: str | None) -> set[str]:
+    """统计所属节点实际占用的账号角色。@param client 节点 Docker。@param deployment 部署。@param node_key 远程节点。@return 活动环境身份。"""
+    running = client.containers.list(filters={"label": ["vibebench.product=v3", f"vibebench.deployment={deployment}"]})
+    return {container.labels.get("vibebench.environment") or container.id for container in running
+        if container.labels.get("vibebench.role") in ("account", "account-network", "account-sender")
+        and container.labels.get('vibebench.cluster-node') == node_key}
+
+
 class AccountRuntime:
     """管理每账号的固定逻辑环境和隔离角色；执行结束保留 HOME 与网络。
 
@@ -2964,17 +2976,12 @@ class AccountRuntime:
                 self.rollout_capacity_reservations.remove(identifier)
 
     def _make_room(self, requested: dict, *, allow_eviction: bool = True) -> None:
-        running = self.client.containers.list(filters={"label": ["vibebench.product=v3",
-            f"vibebench.deployment={self.deployment}"]})
-        running = [container for container in running if container.labels.get("vibebench.role")
-            in ("account", "account-network", "account-sender")
-            and container.labels.get('vibebench.cluster-node') == self.node_key]
-        active_environments = {container.labels.get("vibebench.environment") or container.id for container in running}
+        active_environments = active_account_environments(self.client, self.deployment, self.node_key)
         active_environments.update(self.rollout_capacity_reservations)
         if requested["environment_id"] in active_environments or len(active_environments) < self.limit:
             return
         if not allow_eviction:
-            raise RuntimeBusy("后台预启动跳过：当前没有空余账号环境容量")
+            raise RuntimeCapacityUnavailable("后台预启动跳过：当前没有空余账号环境容量")
         connection = self.database()
         try:
             rows = [dict(row) for row in connection.execute("SELECT * FROM account_environments")]

@@ -5,7 +5,6 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 use tokio::sync::{Mutex as AsyncMutex, Notify, OwnedMutexGuard};
 use tokio::time::{Instant, sleep, timeout, timeout_at};
 use uuid::Uuid;
@@ -15,6 +14,7 @@ use crate::model::account::{Account, UsageQuotaState};
 use crate::model::request_diagnostics::DiagnosticParameters;
 use crate::service::account::DEFAULT_REQUEST_SLOT_UNITS;
 use crate::service::diagnostics;
+use crate::service::request_session::claude_explicit_key;
 pub use crate::store::scheduling_store::send_interval_ms;
 use crate::store::scheduling_store::{SchedulingStore, SendClaim, SessionBinding};
 use crate::store::settings_store::{
@@ -491,14 +491,22 @@ impl V3Scheduler {
         session_id: Option<&str>,
         parameters: &DiagnosticParameters,
     ) -> SchedulingRequest {
+        let key = session_id
+            .filter(|sid| !sid.is_empty())
+            .map(|sid| claude_explicit_key(token_id, sid));
+        self.begin_with_key(key.as_deref(), parameters)
+    }
+
+    /// 从入口解析的匿名会话键建立调度租约。
+    /// @param key 已按平台和令牌隔离的会话键。@param parameters 延迟比较参数。
+    /// @return 与实际请求流同生命周期的租约。
+    pub(super) fn begin_with_key(
+        self: &Arc<Self>,
+        key: Option<&str>,
+        parameters: &DiagnosticParameters,
+    ) -> SchedulingRequest {
         let config = self.config();
-        let key = session_id.filter(|s| !s.is_empty()).map(|sid| {
-            let mut hash = Sha256::new();
-            hash.update(b"cc2api:v3:session\0");
-            hash.update(token_id.to_be_bytes());
-            hash.update(sid.as_bytes());
-            hex::encode(hash.finalize())
-        });
+        let key = key.map(str::to_owned);
         let id = diagnostics::current_request_id().unwrap_or_else(|| Uuid::new_v4().to_string());
         let time = now_ms();
         self.runtime().active.insert(
@@ -514,7 +522,7 @@ impl V3Scheduler {
                 binding: None,
             },
         );
-        let request = SchedulingRequest(Arc::new(RequestLease {
+        SchedulingRequest(Arc::new(RequestLease {
             scheduler: self.clone(),
             id,
             key,
@@ -523,8 +531,7 @@ impl V3Scheduler {
             latency_class: LatencyClass::from(parameters),
             binding: Mutex::new(None),
             attempt_started: Mutex::new(None),
-        }));
-        request
+        }))
     }
 
     /// 启动独立于管理读取的活动续租和有界清理。
@@ -584,6 +591,27 @@ impl V3Scheduler {
             .filter(|b| b.session_key == key && seen.insert(b.revision.clone()))
             .cloned()
             .collect()
+    }
+
+    /// 读取持久绑定，短暂不可用期间仍持有的版本须先在数据库续租。
+    /// @param key 匿名会话键。@return 当前权威绑定或存储错误。
+    pub(super) async fn lookup_binding(
+        &self,
+        key: Option<&str>,
+    ) -> Result<Option<SessionBinding>, AppError> {
+        let Some(key) = key else {
+            return Ok(None);
+        };
+        let binding = self.store.binding(key, now_ms()).await?;
+        if binding.is_some() {
+            return Ok(binding);
+        }
+        for hint in self.live_bindings(key) {
+            if self.store.renew(&hint, now_ms(), true).await? {
+                break;
+            }
+        }
+        self.store.binding(key, now_ms()).await
     }
 
     /// 有界清理闲置绑定，保护仍有请求持有的版本。
@@ -1088,6 +1116,54 @@ impl SchedulingRequest {
         }
     }
 
+    /// 反重力准备成功后认领既有或首次绑定，沿原链路另行处理 RPM。
+    /// @param account_id 已通过资格及发送器准备的账号。@return 绑定成功或冲突。
+    pub(super) async fn claim_binding(&self, account_id: i64) -> Result<(), AppError> {
+        let Some(key) = self.key() else {
+            return Ok(());
+        };
+        let expected = self.expected_binding();
+        let binding = self
+            .0
+            .scheduler
+            .store
+            .claim_binding(account_id, key, expected.as_ref())
+            .await?
+            .ok_or(AppError::SchedulingConflict)?;
+        self.record_binding(account_id, Some(binding));
+        Ok(())
+    }
+
+    fn expected_binding(&self) -> Option<SessionBinding> {
+        self.0
+            .binding
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .clone()
+    }
+
+    fn record_binding(&self, account_id: i64, binding: Option<SessionBinding>) {
+        *self
+            .0
+            .binding
+            .lock()
+            .unwrap_or_else(|error| error.into_inner()) = binding.clone();
+        let Some(key) = self.key() else {
+            return;
+        };
+        let mut runtime = self.0.scheduler.runtime();
+        for state in runtime
+            .active
+            .values_mut()
+            .filter(|state| state.session_key.as_deref() == Some(key))
+        {
+            state.bound = state.account_id == account_id;
+            if state.bound {
+                state.binding = binding.clone();
+            }
+        }
+    }
+
     /// 环境就绪后以 FIFO 获取当前一个发送许可。
     /// @param account 已验证身份的账号快照。
     /// @return 必须持有到真实提交记点的许可，或期限、存储、绑定竞争错误。
@@ -1108,12 +1184,7 @@ impl SchedulingRequest {
             .map_err(|_| limited())?;
         loop {
             self.check_deadline()?;
-            let expected = self
-                .0
-                .binding
-                .lock()
-                .unwrap_or_else(|error| error.into_inner())
-                .clone();
+            let expected = self.expected_binding();
             let claim = timeout_at(
                 self.deadline(),
                 self.0.scheduler.store.claim_current(
@@ -1127,22 +1198,7 @@ impl SchedulingRequest {
             .map_err(|_| limited())??;
             match claim {
                 SendClaim::Acquired(binding) => {
-                    *self
-                        .0
-                        .binding
-                        .lock()
-                        .unwrap_or_else(|error| error.into_inner()) = binding.clone();
-                    let mut runtime = self.0.scheduler.runtime();
-                    for state in runtime
-                        .active
-                        .values_mut()
-                        .filter(|state| state.session_key.as_deref() == self.key())
-                    {
-                        state.bound = self.key().is_some() && state.account_id == account.id;
-                        if state.bound {
-                            state.binding = binding.clone();
-                        }
-                    }
+                    self.record_binding(account.id, binding);
                     return Ok(SendPermit {
                         request: self.clone(),
                         account_id: account.id,

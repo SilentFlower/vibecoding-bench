@@ -11,7 +11,38 @@ pub const AGY_SOURCE_SHA256: &str =
     "39816d49d5ab92229952987225c23ea3fed7580699dcb4a444e0388e0ac1ce43";
 
 /// 公共生成请求共用的原生执行预算。
-pub(super) const AGY_REQUEST_SECONDS: i64 = 120;
+pub(super) const AGY_REQUEST_SECONDS: i64 = 240;
+
+/// 原版在 AT 剩余 310 秒时可离线启动，另预留一次完整原生请求时长。
+pub(super) const AGY_ACCESS_VALIDITY_SECONDS: i64 = 310 + AGY_REQUEST_SECONDS;
+
+/// 账号发送器中区分生成、预热和原版搜索的操作。
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum AgyOperation {
+    Generate,
+    Prepare,
+    Search,
+}
+
+impl AgyOperation {
+    /// 返回绑定环境内的专用路由。@return 固定私有路径。
+    pub(super) fn path(self) -> &'static str {
+        match self {
+            Self::Generate => "/internal/agy/generate",
+            Self::Prepare => "/internal/agy/prepare",
+            Self::Search => "/internal/agy/search",
+        }
+    }
+
+    /// 返回监督器分派的操作名。@return 固定 NDJSON 指令。
+    pub(super) fn supervisor_command(self) -> &'static str {
+        match self {
+            Self::Generate => "submit",
+            Self::Prepare => "prepare",
+            Self::Search => "search",
+        }
+    }
+}
 
 /// 首版固定映射标识，字符表由原生适配的受管理资源持有。
 pub const AGY_SYSTEM_PROMPT_RULE: &str = "new-api-homoglyph-v1";
@@ -23,6 +54,9 @@ pub struct AgySystemPromptPolicy {
     pub schema_version: u8,
     pub enabled: bool,
     pub rule_version: String,
+    /// 普通 Messages 用户段的受信位置。未选择时沿独立系统段。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_reminder_index: Option<usize>,
 }
 
 impl Default for AgySystemPromptPolicy {
@@ -39,12 +73,13 @@ impl AgySystemPromptPolicy {
             schema_version: 1,
             enabled,
             rule_version: AGY_SYSTEM_PROMPT_RULE.into(),
+            user_reminder_index: None,
         }
     }
 
     /// 关闭策略省略私有扩展以保持历史默认发送兼容。@return 是否关闭。
     pub fn is_disabled(&self) -> bool {
-        !self.enabled
+        !self.enabled && self.user_reminder_index.is_none()
     }
 
     /// 拒绝未知规则并保持发送前失败。@return 合同校验结果。
@@ -60,10 +95,15 @@ impl AgySystemPromptPolicy {
         let Some(replaced) = report["replaced_codepoints"].as_u64() else {
             return false;
         };
+        let source = if self.user_reminder_index.is_some() {
+            "cortex_user_reminder"
+        } else {
+            "cortex_custom_system"
+        };
         report["schema_version"].as_u64() == Some(u64::from(self.schema_version))
             && report["enabled"].as_bool() == Some(self.enabled)
             && report["rule_version"].as_str() == Some(self.rule_version.as_str())
-            && report["source"].as_str() == Some("cortex_custom_system")
+            && report["source"].as_str() == Some(source)
             && report["changed"].as_bool() == Some(replaced > 0)
             && (self.enabled || replaced == 0)
             && report["system_codepoints"]
@@ -146,6 +186,27 @@ impl AgyModelId {
     }
 }
 
+/// 运行环境为新工具批次冻结的续轮策略。
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AgyToolContinuationMode {
+    #[default]
+    Claim,
+    History,
+    ClaimWithHistory,
+}
+
+impl AgyToolContinuationMode {
+    /// 给诊断记录提供固定标识。@return 策略标识。
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Claim => "claim",
+            Self::History => "history",
+            Self::ClaimWithHistory => "claim_with_history",
+        }
+    }
+}
+
 /// 同一账号锁内取得的AT-only运行快照；禁止派生Debug。
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -174,6 +235,19 @@ impl AgyAccessSnapshot {
         }
         Ok(())
     }
+}
+
+/// 服务间零模型准备信封，绑定当前环境及 AT 快照。
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct AgyWarmPreparation {
+    pub account_id: i64,
+    pub environment_id: String,
+    pub generation: u64,
+    pub request_id: String,
+    pub deadline_unix_ms: u64,
+    pub credential_snapshot: AgyAccessSnapshot,
+    pub capture_enabled: bool,
 }
 
 /// 网关在同次准入内冻结的Gemini请求，秘密仅传入账号发送器。

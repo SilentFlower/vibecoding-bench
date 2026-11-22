@@ -28,7 +28,8 @@ export interface NodeHostKey { key: string; algorithm: string; sha256: string }
 /** 账号人工归属的唯一公开合同，分配版本用于防止覆盖他人的修改。 */
 export interface AccountNodeAssignment {
   account_id: number; node_id: number; node_key: string; node_name: string;
-  kind: 'local' | 'ssh'; enabled: boolean; revision: number; phase: 'ready' | 'maintenance' | 'reconcile';
+  kind: 'local' | 'ssh'; enabled: boolean; revision: number; phase: 'ready' | 'maintenance' | 'reconcile' | 'retired';
+  migration_ready?: boolean;
 }
 /** 账号列表的只读节点摘要，缓存观察与持久归属分别解释。 */
 export interface AccountNodeSummary {
@@ -57,18 +58,23 @@ export type NodeRegistration = {
   host_key: string;
 } & ({ auth_method?: 'private_key'; private_key: string; password?: never }
   | { auth_method: 'password'; password: string; private_key?: never });
+function accountPath(id: number, agy = false): string {
+  return `/${agy ? 'agy-accounts' : 'accounts'}/${id}`;
+}
 /** 节点接口统一经过同源运行时会话桥。 */
 export const nodeApi = {
   /** 读取账号迁移历史。@param id 任务账号。@param signal 取消读取。@return 公开列表。 */
-  migrations: (id: number, signal?: AbortSignal) => runtimeRequest<{ items: NodeMigration[] }>(`/accounts/${id}/node-migrations`, { signal }),
+  migrations: (id: number, signal?: AbortSignal, agy = false) => runtimeRequest<{ items: NodeMigration[] }>(`${accountPath(id, agy)}/node-migrations`, { signal }),
   /** 读取原操作，未知提交使用同一ID核对。@param id 账号。@param operation 原操作。@param signal 取消。@return 公开状态。 */
-  migration: (id: number, operation: string, signal?: AbortSignal) => runtimeRequest<NodeMigration>(`/accounts/${id}/node-migrations/${operation}`, { signal }),
+  migration: (id: number, operation: string, signal?: AbortSignal, agy = false) => runtimeRequest<NodeMigration>(`${accountPath(id, agy)}/node-migrations/${operation}`, { signal }),
   /** 启动已冻结人工迁移。@param id 账号。@param body 原分配和目标。@return 后台操作状态。 */
-  migrate: (id: number, body: NodeMigrationStart) => runtimeRequest<NodeMigration>(`/accounts/${id}/node-migrations`, { method: 'POST', body }),
+  migrate: (id: number, body: NodeMigrationStart, agy = false) => runtimeRequest<NodeMigration>(`${accountPath(id, agy)}/node-migrations`, { method: 'POST', body }),
   /** 继续或取消原迁移。@param id 账号。@param operation 原操作。@param action 原阶段动作。@return 公开状态。 */
-  migrationAction: (id: number, operation: string, action: 'resume' | 'cancel') => runtimeRequest<NodeMigration>(`/accounts/${id}/node-migrations/${operation}/${action}`, { method: 'POST' }),
+  migrationAction: (id: number, operation: string, action: 'resume' | 'cancel', agy = false) => runtimeRequest<NodeMigration>(`${accountPath(id, agy)}/node-migrations/${operation}/${action}`, { method: 'POST' }),
   /** 读取账号归属。@param id 任务账号。@param signal 页面取消。@return 权威归属。 */
-  assignment: (id: number, signal?: AbortSignal) => runtimeRequest<AccountNodeAssignment>(`/accounts/${id}/node`, { signal }),
+  assignment: (id: number, signal?: AbortSignal, agy = false) => runtimeRequest<AccountNodeAssignment>(`${accountPath(id, agy)}/node`, { signal }),
+  /** 批量读取反重力账号归属。@param signal 页面取消。@return 已登记账号。 */
+  agyAssignments: (signal?: AbortSignal) => runtimeRequest<{ items: AccountNodeAssignment[] }>('/agy-accounts/nodes', { signal }),
   /** 人工选择首次执行节点。@param id 任务账号。@param nodeId 目标。@param revision 原分配版本。@return 持久归属。 */
   assignInitial: (id: number, nodeId: number, revision: number) => runtimeRequest<AccountNodeAssignment>(`/accounts/${id}/node`, { method: 'PUT', body: { node_id: nodeId, revision } }),
   /** 读取公开节点。@param signal 页面生命周期。@return 节点列表。 */

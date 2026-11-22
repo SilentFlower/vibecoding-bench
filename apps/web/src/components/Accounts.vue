@@ -7,7 +7,7 @@ import { useRoute } from 'vue-router';
 import ProxyPicker from './ProxyPicker.vue';
 import ExecutionNodeBadge from './runtime/ExecutionNodeBadge.vue';
 import PlatformBadge from './PlatformBadge.vue';
-import { nodeApi, type AccountNodeSummary } from './runtime/nodeApi';
+import { nodeApi, type AccountNodeAssignment, type AccountNodeSummary } from './runtime/nodeApi';
 import { api, type ProxyRoute, type Account, type OAuthExchangeResult, type UsageWindow, type RuntimeEnvironmentSummary, type OverallWorkStatus } from '../api';
 import AgyAccountUsage from './AgyAccountUsage.vue';
 import UsageWindowStats from './UsageWindowStats.vue';
@@ -78,7 +78,9 @@ const accounts = ref<Account[]>([]);
 const workPending = reactive(new Set<number>());
 const overallStates = reactive(new Map<number, OverallWorkStatus>());
 const accountNodes = ref(new Map<number, AccountNodeSummary>());
-const agyLocalNodeName = ref<string>();
+const agyNodes = ref(new Map<number, AccountNodeAssignment>());
+const agyNodesLoaded = ref(false);
+const agyNodesFailed = ref(false);
 const nodeReadFailed = ref(false);
 const nodeLoaded = ref(false);
 let nodeController: AbortController | undefined;
@@ -94,29 +96,42 @@ async function loadAccountNodes(): Promise<void> {
     if (controller.signal.aborted) return;
     const [bindings, nodes] = await Promise.allSettled([
       api.runtimeAccountNodes(controller.signal),
-      accounts.value.some(account => account.platform === 'antigravity') ? nodeApi.list(controller.signal) : undefined,
+      accounts.value.some(account => account.platform === 'antigravity') ? nodeApi.agyAssignments(controller.signal) : undefined,
     ]);
     if (controller.signal.aborted || generation !== nodeGeneration) return;
-    const local = nodes.status === 'fulfilled' && nodes.value?.items.find(node => node.kind === 'local');
-    if (local) agyLocalNodeName.value = local.name;
+    if (nodes.status === 'fulfilled' && nodes.value) {
+      agyNodes.value = new Map(nodes.value.items.map(node => [node.account_id, node]));
+      agyNodesLoaded.value = true;
+    }
+    agyNodesFailed.value = nodes.status === 'rejected';
     if (bindings.status === 'rejected') throw bindings.reason;
     accountNodes.value = new Map(bindings.value.filter(row => row.cc2api_account_id != null).map(row => [row.cc2api_account_id!, row]));
     nodeReadFailed.value = false;
     nodeLoaded.value = true;
   } catch {
-    if (!controller.signal.aborted && generation === nodeGeneration) nodeReadFailed.value = true;
+    if (!controller.signal.aborted && generation === nodeGeneration) {
+      nodeReadFailed.value = true;
+      if (!agyNodesLoaded.value) agyNodesFailed.value = true;
+    }
   }
 }
 
-/** 反重力 API 归属本机，任务账号沿其已保存的节点绑定。@param account 网关账号。@return 当前节点身份。 */
+/** 从对应账号域读取持久分配。@param account 网关账号。@return 当前节点身份。 */
 function accountNode(account: Account) {
-  if (account.platform === 'antigravity') return { node_key: 'local', node_name: agyLocalNodeName.value, kind: 'local' };
+  if (account.platform === 'antigravity') return agyNodes.value.get(account.id);
   return accountNodes.value.get(account.id)?.node;
 }
 
 /** 归属与缓存观察分别呈现，读取失败保留原身份。@param account 网关账号。@return 观察说明。 */
 function nodeStatus(account: Account): string {
-  if (account.platform === 'antigravity') return '反重力 API 在本机执行';
+  if (account.platform === 'antigravity') {
+    if (agyNodesFailed.value) return '归属待刷新';
+    if (!agyNodesLoaded.value) return '归属读取中';
+    const node = agyNodes.value.get(account.id);
+    if (!node) return '运行环境尚未登记';
+    if (node.phase !== 'ready') return '正在迁移或维护核对';
+    return node.enabled ? '已保存执行归属' : '节点已暂停接单';
+  }
   if (nodeReadFailed.value) return '归属待刷新';
   if (!nodeLoaded.value) return '归属读取中';
   const row = accountNodes.value.get(account.id);
@@ -255,6 +270,7 @@ const savingAccount = ref(false);
 const form = ref({
   platform: 'claude_code',
   agy_system_prompt_homoglyph_enabled: false,
+  agy_system_prompt_as_user_reminder: false,
   agy_gif_frames_enabled: false,
   agy_disable_safety_filtering: false,
   name: '',
@@ -293,6 +309,7 @@ function selectAccountPlatform(value:string): void {
   form.value.auth_type=value==='antigravity'?'oauth':'setup_token';
   form.value.setup_token=''; form.value.access_token=''; form.value.refresh_token=''; form.value.expires_at='';
   form.value.agy_system_prompt_homoglyph_enabled=false;
+  form.value.agy_system_prompt_as_user_reminder=false;
   form.value.agy_gif_frames_enabled=false;
   form.value.agy_disable_safety_filtering=false;
 }
@@ -518,6 +535,7 @@ function openCreate() {
   form.value = {
     platform: 'claude_code',
     agy_system_prompt_homoglyph_enabled: false,
+    agy_system_prompt_as_user_reminder: false,
     agy_gif_frames_enabled: false,
     agy_disable_safety_filtering: false,
     name: '',
@@ -565,6 +583,7 @@ function openEdit(a: Account) {
   form.value = {
     platform: a.platform ?? 'claude_code',
     agy_system_prompt_homoglyph_enabled: a.agy_system_prompt_homoglyph_enabled ?? false,
+    agy_system_prompt_as_user_reminder: a.agy_system_prompt_as_user_reminder ?? false,
     agy_gif_frames_enabled: a.agy_gif_frames_enabled ?? false,
     agy_disable_safety_filtering: a.agy_disable_safety_filtering ?? false,
     name: a.name,
@@ -617,7 +636,7 @@ function usageLimitInput(value: unknown, label: string): number {
   return number;
 }
 
-const agyFormKeys = ['platform','agy_system_prompt_homoglyph_enabled','agy_gif_frames_enabled','agy_disable_safety_filtering','name','email','auth_type','access_token','refresh_token','expires_at','proxy_url','proxy_id','proxy_revision','concurrency','priority','rpm_limit'];
+const agyFormKeys = ['platform','agy_system_prompt_homoglyph_enabled','agy_system_prompt_as_user_reminder','agy_gif_frames_enabled','agy_disable_safety_filtering','name','email','auth_type','access_token','refresh_token','expires_at','proxy_url','proxy_id','proxy_revision','concurrency','priority','rpm_limit'];
 
 /** 保存账号（新建或更新）。@return 保存完成后的空结果。 */
 async function save() {
@@ -663,6 +682,7 @@ async function save() {
       const payload: Record<string, unknown> = {
         platform: form.value.platform,
         agy_system_prompt_homoglyph_enabled: form.value.agy_system_prompt_homoglyph_enabled,
+        agy_system_prompt_as_user_reminder: form.value.agy_system_prompt_as_user_reminder,
         agy_gif_frames_enabled: form.value.agy_gif_frames_enabled,
         agy_disable_safety_filtering: form.value.agy_disable_safety_filtering,
         name: form.value.name,
@@ -1250,6 +1270,7 @@ function applyOAuthResult() {
   form.value = {
     platform: oauthPlatform.value,
     agy_system_prompt_homoglyph_enabled: false,
+    agy_system_prompt_as_user_reminder: false,
     agy_gif_frames_enabled: false,
     agy_disable_safety_filtering: false,
     name: '',
@@ -1510,6 +1531,7 @@ async function copyText(text: string) {
           <section v-if="isAgyForm" class="account-form-section">
             <h3>Antigravity 配置</h3><p class="form-help">账号能力来自最近的原生观测。模型服务等待运行环境接入。</p>
             <Checkbox v-model="form.agy_system_prompt_homoglyph_enabled" class="account-check"><strong>系统提示词同形体转换</strong><small>按当前账号保存，开启后转换系统提示词文本。</small></Checkbox>
+            <Checkbox v-model="form.agy_system_prompt_as_user_reminder" class="account-check"><strong>系统提示词移入用户消息（试验）</strong><small>用于 Messages。与同形体转换同时开启时，先转换原系统提示词，再移入用户消息。</small></Checkbox>
             <Checkbox v-model="form.agy_gif_frames_enabled" class="account-check"><strong>GIF 抽帧兼容</strong><small>开启后每张 GIF 最多抽取 8 帧 PNG。</small></Checkbox>
             <Checkbox v-model="form.agy_disable_safety_filtering" class="account-check"><strong>使用 AGY 原生安全开关</strong><small>启用 disableSafetyFiltering，由 AGY 生成安全字段。客户端逐类阈值在关闭时应用。</small></Checkbox>
             <div class="account-edit-grid three"><NumberInput v-model="numberDrafts.concurrency" label="并发上限" :min="1" required /><NumberInput v-model="numberDrafts.rpm_limit" label="RPM 上限" :min="0" required /><NumberInput v-model="numberDrafts.priority" label="调度优先级" :min="1" required /></div>

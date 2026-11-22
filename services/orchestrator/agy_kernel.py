@@ -9,6 +9,7 @@ import tempfile
 import uuid
 from pathlib import Path
 
+from account_isolation import role_container
 from agy_runtime.storage import SOURCE_SHA, digest
 from runtime_files import atomic_json, directory_fd
 
@@ -174,7 +175,38 @@ def catalog(runtime, row: dict) -> dict:
                 except (ValueError, OSError):
                     continue
                 candidates.append(folder.name)
-    return {'generation': row['generation'], 'kernel': current, 'candidates': candidates}
+    return {'generation': row['generation'], 'kernel': current, 'candidates': candidates,
+        'tool_continuation_supported': supports_tool_continuation(runtime, row, current)}
+
+
+def supports_tool_continuation(runtime, row: dict, kernel: str | None, labels: dict | None = None) -> bool:
+    """核对发送镜像与所选内核的工具收口证据协议。
+
+    @param runtime 当前环境所属运行时。
+    @param row 已核对的环境行。
+    @param kernel 候选摘要，内置内核为空。
+    @param labels 已核对镜像的可选标签。
+    @return 发送器和内核同时支持历史接续时为真。
+    """
+    if labels is None:
+        image = (role_container(runtime, row, 'sender').image if row.get('sender_container_id')
+                 else runtime.client.images.get(runtime.image))
+        config = image.attrs.get('Config') if isinstance(image.attrs, dict) else None
+        labels = (config.get('Labels') or {}) if isinstance(config, dict) else {}
+    if labels.get('vibebench.agy-tool-continuation-protocol') != '1':
+        return False
+    if kernel is None:
+        return True
+    folder = runtime._root(row) / 'runtime/sender' / KERNEL_FOLDER / kernel
+    marker = _receipt(folder)['files'].get('resources/tool-continuation-protocol.json')
+    return marker == hashlib.sha256(b'1\n').hexdigest()
+
+
+def verify_candidate(root: Path, identifier: str) -> None:
+    """在源隔离或目标发布时校验选中候选的实际字节。@param root 环境根。@param identifier 候选摘要。@return 校验通过。"""
+    if not IDENTIFIER.fullmatch(identifier):
+        raise ValueError('AGY 内核制品标识无效')
+    _receipt(root / 'runtime/sender' / KERNEL_FOLDER / identifier, verify=True)
 
 
 def activate(runtime, row: dict, change: dict, running_sender) -> dict:

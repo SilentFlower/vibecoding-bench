@@ -126,7 +126,7 @@ pub fn build_router(
 ) -> Router {
     let proxy_svc = Arc::new(ProxyService::new(settings_store.database_pool()));
     let state = AppState {
-        gemini_svc: Arc::new(GeminiService::default()),
+        gemini_svc: Arc::new(GeminiService::new(settings_store.database_pool())),
         proxy_svc,
         gateway_svc,
         account_svc,
@@ -393,11 +393,12 @@ fn hello_response(include_body: bool) -> Response {
 }
 
 /// 网关透传 fallback：鉴权 + 代理上游
-async fn gateway_fallback(State(state): State<AppState>, req: Request) -> Response {
+async fn gateway_fallback(State(state): State<AppState>, mut req: Request) -> Response {
     let api_token = match authenticate_gateway_token(&state, extract_key(&req)).await {
         Ok(t) => t,
         Err(resp) => return resp,
     };
+    req.extensions_mut().insert(state.gemini_svc.clone());
     state
         .gateway_svc
         .handle_request(req, Some(&api_token))
@@ -615,6 +616,7 @@ async fn list_accounts(
 struct CreateAccountRequest {
     platform: Option<String>,
     agy_system_prompt_homoglyph_enabled: Option<bool>,
+    agy_system_prompt_as_user_reminder: Option<bool>,
     agy_gif_frames_enabled: Option<bool>,
     agy_disable_safety_filtering: Option<bool>,
     cli_identity: Option<CliIdentityImport>,
@@ -776,17 +778,28 @@ async fn runtime_lease_status(
 /// 提供账号配置的唯一来源，避免调度器使用已经漂移的代理。
 /// @param id 绑定账号 ID。
 /// @return 不包含 OAuth 凭据的配置。
+#[derive(Deserialize)]
+struct RuntimeConfigQuery {
+    capacity_operation: Option<String>,
+}
+
 async fn runtime_account_config(
     State(state): State<AppState>,
     Path(id): Path<i64>,
+    Query(query): Query<RuntimeConfigQuery>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let account = state.account_svc.get_account(id).await?;
     if account.is_antigravity() {
-        return Ok(Json(
-            json!({"account_id":account.id,"platform":account.platform,"proxy_url":account.proxy_url,
+        let work = state.account_svc.work_controls.snapshot(id).await?;
+        let mut configuration = json!({"account_id":account.id,"platform":account.platform,"proxy_url":account.proxy_url,
             "auth_type":account.auth_type,"status":account.status,"email":account.email,"concurrency":account.concurrency,
-            "request_backend":"agy159","credential_state":state.account_svc.agy_state(id).await?}),
-        ));
+            "work_enabled":work.work_enabled,"api_accepting":work.api_accepting,
+            "request_backend":"agy159","credential_state":state.account_svc.agy_state(id).await?});
+        if let Some(operation) = query.capacity_operation {
+            configuration["capacity_edit_active"] =
+                json!(state.account_svc.agy_capacity_edit_active(id, &operation));
+        }
+        return Ok(Json(configuration));
     }
     Ok(Json(
         serde_json::json!({"account_id": account.id, "proxy_url": account.proxy_url,
@@ -916,8 +929,18 @@ async fn runtime_lease_update(
         None
     };
     let account = state.account_svc.get_account(id).await?;
+    let agy_migration = account.is_antigravity()
+        && input
+            .owner
+            .strip_prefix("node-migration:")
+            .is_some_and(|operation| {
+                operation.len() == 32
+                    && operation
+                        .bytes()
+                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            });
     if account.is_antigravity()
-        && (!input.owner.starts_with("maintenance:")
+        && (!(input.owner.starts_with("maintenance:") || agy_migration)
             || !matches!(
                 input.operation.as_str(),
                 "prepare" | "claim" | "heartbeat" | "release"
@@ -945,7 +968,14 @@ async fn runtime_lease_update(
         .get_or_create_queue(id, account.concurrency)
         .await;
     if input.operation == "prepare" {
-        queue.runtime_gate.prepare(&input.owner)?;
+        if agy_migration {
+            state
+                .account_svc
+                .prepare_agy_migration(id, &input.owner)
+                .await?;
+        } else {
+            queue.runtime_gate.prepare(&input.owner)?;
+        }
     } else if input.operation == "prepare-cli" {
         queue.runtime_gate.prepare_cli(&input.owner)?;
     } else if input.operation == "prepare-cli-shared" {
@@ -1086,13 +1116,16 @@ async fn update_account_work(
     headers: HeaderMap,
     Json(input): Json<AccountWorkUpdate>,
 ) -> Result<Json<AccountWorkSnapshot>, AppError> {
-    state.account_svc.get_account(id).await?;
+    let account = state.account_svc.get_account(id).await?;
     if input.work_enabled.is_some()
         && std::env::var("V3_RUNTIME_URL").is_ok_and(|value| !value.is_empty())
     {
         require_v3_credential_service(&headers)?;
     }
     let snapshot = state.account_svc.work_controls.update(id, input).await?;
+    if account.is_antigravity() {
+        state.account_svc.notify_native_change(id, true);
+    }
     Ok(Json(snapshot))
 }
 
@@ -1132,6 +1165,11 @@ async fn create_account(
     if platform == "claude_code" && req.agy_system_prompt_homoglyph_enabled == Some(true) {
         return Err(AppError::BadRequest("同形体开关仅适用于 AGY 账号".into()));
     }
+    if platform != "antigravity" && req.agy_system_prompt_as_user_reminder == Some(true) {
+        return Err(AppError::BadRequest(
+            "提示词位置试验仅适用于 AGY 账号".into(),
+        ));
+    }
     if platform == "antigravity"
         && (req.cli_identity.is_some()
             || req.credential_ownership.is_some()
@@ -1161,6 +1199,9 @@ async fn create_account(
         agy_system_prompt_homoglyph_enabled: req
             .agy_system_prompt_homoglyph_enabled
             .unwrap_or(false),
+        agy_system_prompt_as_user_reminder: req
+            .agy_system_prompt_as_user_reminder
+            .unwrap_or_default(),
         agy_gif_frames_enabled: req.agy_gif_frames_enabled.unwrap_or_default(),
         agy_disable_safety_filtering: req.agy_disable_safety_filtering.unwrap_or_default(),
         id: 0,
@@ -1440,12 +1481,17 @@ async fn update_account(
         return Err(AppError::BadRequest("未知账号平台，请核对原记录".into()));
     }
     if existing.is_antigravity() {
-        let runtime_changed = updates
+        let proxy_changed = updates
             .get("proxy_url")
-            .is_some_and(|value| value.as_str() != Some(existing.proxy_url.as_str()))
-            || updates
-                .get("concurrency")
-                .is_some_and(|value| value.as_i64() != Some(existing.concurrency as i64));
+            .is_some_and(|value| value.as_str() != Some(existing.proxy_url.as_str()));
+        let capacity_changed = updates
+            .get("concurrency")
+            .and_then(Value::as_i64)
+            .is_some_and(|value| value != i64::from(existing.concurrency));
+        let credential_edit = ["access_token", "refresh_token", "expires_at"]
+            .iter()
+            .any(|key| updates.get(*key).is_some());
+        let runtime_changed = proxy_changed || (capacity_changed && credential_edit);
         let _runtime_permit = if runtime_changed {
             config_permit(&state, &existing, false).await?
         } else {
@@ -1470,6 +1516,11 @@ async fn update_account(
     }
     if updates.get("agy_disable_safety_filtering").is_some() {
         return Err(AppError::BadRequest("原生安全开关仅适用于 AGY 账号".into()));
+    }
+    if updates.get("agy_system_prompt_as_user_reminder").is_some() {
+        return Err(AppError::BadRequest(
+            "提示词位置试验仅适用于 AGY 账号".into(),
+        ));
     }
     if let Some(value) = updates.get("agy_system_prompt_homoglyph_enabled") {
         if !existing.is_antigravity() {
@@ -2964,7 +3015,7 @@ async fn native_preparation_snapshots(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<serde_json::Value>>, AppError> {
     let snapshots = state.gateway_svc.native_preparation_snapshots();
-    let accounts = state.account_svc.list_accounts().await?;
+    let accounts = state.account_svc.list_platform_accounts().await?;
     Ok(Json(
         accounts
             .into_iter()
@@ -2974,7 +3025,11 @@ async fn native_preparation_snapshots(
                     .find(|item| item["account_id"] == account.id)
                     .cloned()
                     .unwrap_or_else(|| json!({"account_id":account.id,"state":"unprepared"}));
-                value["request_backend"] = json!(account.request_backend);
+                value["request_backend"] = if account.is_antigravity() {
+                    json!("agy159")
+                } else {
+                    json!(account.request_backend)
+                };
                 value
             })
             .collect(),

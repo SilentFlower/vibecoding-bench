@@ -51,6 +51,9 @@ pub struct RequestDiagnostic {
     /// 客户端入站、映射前的完整会话；历史记录保持未知。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub original_session_id: Option<String>,
+    /// 缺少客户端会话时用于选号的匿名派生键。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub derived_session_id: Option<String>,
     pub started_at: String,
     pub finished_at: Option<String>,
     pub status_code: Option<u16>,
@@ -106,6 +109,14 @@ pub(crate) struct NativeRequestObservation {
     pub runtime: Option<NativeRuntimeObservation>,
 }
 
+/// 原生工作进程的实际启动来源。
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NativeStartSource {
+    Exec,
+    CriuRestore,
+}
+
 /// 原生请求实际使用的进程与本地阶段计时，所有耗时来自单调时钟。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -114,6 +125,8 @@ pub struct NativeRuntimeObservation {
     pub worker_pid: u32,
     pub kernel_generation: Option<String>,
     pub warm_hit: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start_source: Option<NativeStartSource>,
     pub preparation_wait_ms: u64,
     pub checkout_ms: u64,
     pub worker_start_ms: Option<u64>,
@@ -341,9 +354,32 @@ pub struct DiagnosticContext {
     pub control_error_code: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub control_recovery: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observed_control_http_status: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub control_error_detail: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub native_receive_ended: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub native_source_terminal: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_continuation_mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_continuation_path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_continuation_reason: Option<String>,
     pub usage: Option<GeminiDiagnosticUsage>,
     pub system_prompt_policy: Option<SystemPromptDiagnostic>,
     pub tool_turn: Option<ToolTurnDiagnostic>,
+    /// 读取原工具续轮响应时关联的 HTTP 根，历史记录默认缺省。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub replay_of_request_id: Option<String>,
+    /// 已进入发送边界的原尝试 ID。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub replay_of_attempt_id: Option<String>,
+    /// 重读时观察到的回填提交状态。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub replay_submission_state: Option<String>,
     pub response_headers_source: Option<String>,
 }
 

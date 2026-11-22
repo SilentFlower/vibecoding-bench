@@ -6,16 +6,20 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use serde_json::{Value, json};
-use tokio::sync::{broadcast, oneshot};
+use tokio::sync::{RwLock, broadcast, oneshot};
 use tokio::task::JoinSet;
 use tokio::time::{Instant, MissedTickBehavior, interval_at, sleep_until, timeout_at};
 use uuid::Uuid;
 
 use crate::error::AppError;
 use crate::model::account::{Account, AccountAuthType, AccountStatus};
+use crate::model::request_diagnostics::RequestLogMode;
 use crate::service::account::AccountService;
+use crate::service::agy_contract::AGY_ACCESS_VALIDITY_SECONDS;
+use crate::service::diagnostics::RequestDiagnosticsConfig;
 use crate::service::native_contract::{NativePreparation, NativeSourceVersion};
-use crate::service::runtime_transport::{now_ms, prepare, prepare_existing};
+use crate::service::runtime_bridge::agy_environment;
+use crate::service::runtime_transport::{REQUEST_BUDGET_MS, now_ms, prepare, prepare_existing};
 use crate::service::system_update;
 use crate::store::settings_store::DEFAULT_NATIVE_IDLE_TIMEOUT_SECS;
 
@@ -31,6 +35,12 @@ struct PreparationFailure {
     wake: bool,
 }
 
+/// 本轮独立冻结的后台准备策略。
+struct PreparationPolicy {
+    native_idle_timeout: u64,
+    agy_capture_enabled: bool,
+}
+
 #[cfg(all(test, unix))]
 #[path = "native_prewarm_tests.rs"]
 mod tests;
@@ -42,13 +52,18 @@ pub(crate) struct NativePrewarmer {
     started: AtomicBool,
     shutdown: Mutex<Option<oneshot::Sender<()>>>,
     idle_timeout_secs: Arc<AtomicU64>,
+    diagnostics: Arc<RwLock<RequestDiagnosticsConfig>>,
 }
 
 impl NativePrewarmer {
     /// 创建尚未启动的准备协调器。
     /// @param accounts 权威账号和凭据所有者。
+    /// @param diagnostics 当前实际生效的业务采集策略。
     /// @return 独立协调器。
-    pub(crate) fn new(accounts: Arc<AccountService>) -> Self {
+    pub(crate) fn new(
+        accounts: Arc<AccountService>,
+        diagnostics: Arc<RwLock<RequestDiagnosticsConfig>>,
+    ) -> Self {
         Self {
             accounts,
             states: Arc::new(Mutex::new(HashMap::new())),
@@ -59,6 +74,7 @@ impl NativePrewarmer {
                     .parse()
                     .expect("默认空闲秒数合法"),
             )),
+            diagnostics,
         }
     }
 
@@ -72,7 +88,7 @@ impl NativePrewarmer {
         self.idle_timeout_secs.load(Ordering::SeqCst)
     }
 
-    /// 在网关装配完成后启动，首次扫描仅触及已运行环境。
+    /// 在网关装配完成后启动，接续运行中的环境及初次登记的 AGY 环境。
     /// @return 无返回值；重复启动沿用现有任务。
     pub(crate) fn start(&self) {
         self.start_with_retries([5, 20, 60]);
@@ -89,18 +105,17 @@ impl NativePrewarmer {
         let accounts = self.accounts.clone();
         let states = self.states.clone();
         let idle_timeout_secs = self.idle_timeout_secs.clone();
+        let diagnostics = self.diagnostics.clone();
         let (stop, mut stopping) = oneshot::channel();
         *self.shutdown.lock().unwrap() = Some(stop);
         tokio::spawn(async move {
             let mut pending = BTreeMap::new();
-            if let Ok(items) = accounts.list_accounts().await {
+            if let Ok(mut items) = accounts.list_platform_accounts().await {
+                items.sort_by_key(|account| (account.priority, account.id));
                 pending.extend(
                     items
                         .into_iter()
-                        .filter(|account| {
-                            account.status == AccountStatus::Active
-                                && account.request_backend == "native293"
-                        })
+                        .filter(is_preparation_candidate)
                         .take(QUEUE_LIMIT)
                         .map(|account| (account.id, false)),
                 );
@@ -141,15 +156,20 @@ impl NativePrewarmer {
                     active.insert(id, Some(cancel));
                     let accounts = accounts.clone();
                     let idle_timeout = idle_timeout_secs.load(Ordering::SeqCst);
+                    let diagnostics = diagnostics.clone();
                     jobs.spawn(async move {
+                        let policy = PreparationPolicy {
+                            native_idle_timeout: idle_timeout,
+                            agy_capture_enabled: diagnostics.read().await.mode
+                                == RequestLogMode::Debug,
+                        };
                         let result = check_one(
                             accounts,
                             id,
                             preparation_id.clone(),
                             cancellation,
-                            true,
                             wake,
-                            Some(idle_timeout),
+                            Some(policy),
                         )
                         .await;
                         (id, preparation_id, wake, result)
@@ -174,12 +194,12 @@ impl NativePrewarmer {
                         }
                     }
                     _ = inspections.tick() => {
-                        if let Ok(mut items) = accounts.list_accounts().await {
+                        if let Ok(mut items) = accounts.list_platform_accounts().await {
                             // 队列有界时轮转扫描起点，避免高 ID 的运行账号一直被前批挤出。
                             items.sort_by_key(|account| (account.id <= scan_after, account.id));
                             for account in items {
                                 if pending.len() >= QUEUE_LIMIT { break; }
-                                if account.status == AccountStatus::Active && account.request_backend == "native293"
+                                if is_preparation_candidate(&account)
                                     && !active.contains_key(&account.id)
                                     && !pending.contains_key(&account.id)
                                     && failures.get(&account.id).is_none_or(|failure| Instant::now() >= failure.next) {
@@ -198,11 +218,12 @@ impl NativePrewarmer {
                     _ = sleep_until(retry_deadline), if retry_index < retries.len() => {
                         retry_index += 1;
                         // 保留首次启动的补偿；维护中断过的真实故障继续遵守原截止。
-                        if let Ok(items) = accounts.list_accounts().await {
+                        if let Ok(mut items) = accounts.list_platform_accounts().await {
+                            items.sort_by_key(|account| (account.priority, account.id));
                             let states = states.lock().unwrap();
                             for account in items {
                                 if pending.len() >= QUEUE_LIMIT { break; }
-                                if account.status == AccountStatus::Active && account.request_backend == "native293"
+                                if is_preparation_candidate(&account)
                                     && !active.contains_key(&account.id)
                                     && failures.get(&account.id).is_none_or(|failure| !failure.maintenance_seen || Instant::now() >= failure.next)
                                     && states.get(&account.id).is_none_or(|state| state["state"] != "ready") {
@@ -228,8 +249,9 @@ impl NativePrewarmer {
                         }
                         Err(broadcast::error::RecvError::Lagged(_)) => {
                             for cancel in active.values_mut().filter_map(Option::take) { let _ = cancel.send(()); }
-                            if let Ok(items) = accounts.list_accounts().await {
-                                for account in items.into_iter().take(QUEUE_LIMIT) {
+                            if let Ok(mut items) = accounts.list_platform_accounts().await {
+                                items.sort_by_key(|account| (account.priority, account.id));
+                                for account in items.into_iter().filter(is_preparation_candidate).take(QUEUE_LIMIT) {
                                     if pending.len() < QUEUE_LIMIT { pending.entry(account.id).or_insert_with(|| failures.get(&account.id).is_some_and(|failure| failure.wake)); }
                                 }
                             }
@@ -239,6 +261,13 @@ impl NativePrewarmer {
                     completed = jobs.join_next(), if !jobs.is_empty() => {
                         if let Some(Ok((id, preparation_id, wake, result))) = completed {
                             let cancelled = matches!(active.remove(&id), Some(None));
+                            if !cancelled && matches!(result, Err(AppError::NotFound)) {
+                                // 账号删除后，清除旧观测及退避，不把已删除账号记成准备失败。
+                                states.lock().unwrap().remove(&id);
+                                failures.remove(&id);
+                                pending.remove(&id);
+                                continue;
+                            }
                             let mut result = if cancelled { json!({"state":"cancelled","reason":"invalidated"}) }
                                 else { result.unwrap_or_else(|_| json!({"state":"failed","reason":"preparation_failed"})) };
                             result["preparation_id"] = json!(preparation_id);
@@ -325,7 +354,6 @@ impl NativePrewarmer {
             Uuid::new_v4().to_string(),
             cancellation,
             false,
-            false,
             None,
         )
         .await;
@@ -346,22 +374,39 @@ impl Drop for NativePrewarmer {
     }
 }
 
+fn is_preparation_candidate(account: &Account) -> bool {
+    (account.is_antigravity() && account.auth_type == AccountAuthType::Oauth)
+        || (account.status == AccountStatus::Active && account.request_backend == "native293")
+}
+
 async fn check_one(
     accounts: Arc<AccountService>,
     id: i64,
     preparation_id: String,
     mut cancellation: oneshot::Receiver<()>,
-    allow_prepare: bool,
     wake: bool,
-    idle_timeout_secs: Option<u64>,
+    policy: Option<PreparationPolicy>,
 ) -> Result<Value, AppError> {
     let mut cutover = system_update::InferenceCutover::subscribe();
     let system_maintenance = || json!({"state":"maintenance","reason":"system_maintenance"});
     let Some(_update_activity) = system_update::background_admission()? else {
         return Ok(system_maintenance());
     };
-    let deadline = Instant::now() + Duration::from_secs(120);
+    let deadline = Instant::now() + Duration::from_millis(REQUEST_BUDGET_MS);
     let account = accounts.get_account(id).await?;
+    if account.is_antigravity() {
+        return check_agy(
+            &accounts,
+            account,
+            &preparation_id,
+            deadline,
+            policy,
+            cancellation,
+            cutover,
+        )
+        .await;
+    }
+    let allow_prepare = policy.is_some();
     if !account.is_claude_code()
         || account.status != AccountStatus::Active
         || account.request_backend != "native293"
@@ -456,9 +501,9 @@ async fn check_one(
         _ = queue.runtime_gate.wait_exclusive() => None,
         _ = activity.closed() => None,
         result = timeout_at(deadline, async {
-            if let Some(seconds) = idle_timeout_secs {
+            if let Some(policy) = policy {
                 // 策略同步是独立管理写入；主动只读inspect从不携带此值。
-                if transport.sync_native_idle_timeout(seconds).await.is_err() {
+                if transport.sync_native_idle_timeout(policy.native_idle_timeout).await.is_err() {
                     tracing::warn!(account_id = id, "原生空闲策略同步失败，将在后续巡检重试");
                 }
             }
@@ -515,6 +560,180 @@ async fn check_one(
             Ok(failure)
         }
     }
+}
+
+/// 将无已验证绑定的控制错误投影为账号级原因。@param error 控制面错误。@return 安全的准备观测。
+fn agy_environment_failure(error: AppError) -> Value {
+    let reason = match error {
+        AppError::ServiceUnavailable(reason) if reason == "orchestrator_upgrade_required" => {
+            "orchestrator_upgrade_required"
+        }
+        _ => "agy_environment_unavailable",
+    };
+    json!({"scope":"account","state":"failed","reason":reason,"checked_at_ms":now_ms()})
+}
+
+async fn check_agy(
+    accounts: &AccountService,
+    account: Account,
+    preparation_id: &str,
+    deadline: Instant,
+    policy: Option<PreparationPolicy>,
+    mut cancellation: oneshot::Receiver<()>,
+    mut cutover: system_update::InferenceCutover,
+) -> Result<Value, AppError> {
+    let id = account.id;
+    let cancelled = || json!({"state":"cancelled","reason":"invalidated"});
+    let system_maintenance = || json!({"state":"maintenance","reason":"system_maintenance"});
+    let maintenance = || json!({"state":"maintenance","reason":"maintenance"});
+    if !std::env::var("V3_RUNTIME_URL").is_ok_and(|value| !value.is_empty()) {
+        return Ok(json!({"state":"sleeping"}));
+    }
+    let work = accounts.work_controls.snapshot(id).await?;
+    let enabled =
+        account.status == AccountStatus::Active && work.work_enabled && work.api_accepting;
+    let credential = accounts.agy_state(id).await?;
+    if account.auth_type != AccountAuthType::Oauth || credential["phase"] != "ready" {
+        return Ok(
+            json!({"scope":"account","state":"unprepared","reason":"credentials_not_ready",
+            "checked_at_ms":now_ms()}),
+        );
+    }
+    let queue = accounts.get_or_create_queue(id, account.concurrency).await;
+    let mut observation;
+    let transport = if policy.is_some() {
+        let preparation = tokio::select! {
+            biased;
+            _ = cutover.cancelled() => return Ok(system_maintenance()),
+            _ = &mut cancellation => return Ok(cancelled()),
+            _ = queue.runtime_gate.wait_exclusive() => return Ok(maintenance()),
+            result = agy_environment(id, enabled && work.admitted_requests == 0, deadline.saturating_duration_since(Instant::now())) => result,
+        };
+        let preparation = match preparation {
+            Ok(preparation) => preparation,
+            Err(error) => return Ok(agy_environment_failure(error)),
+        };
+        observation = json!({"environment_id":preparation.environment_id,"generation":preparation.generation,
+            "state":preparation.state,"reason":preparation.reason,"checked_at_ms":now_ms()});
+        if !enabled {
+            observation["state"] = json!("disabled");
+            observation["reason"] = json!("account_disabled");
+            return Ok(observation);
+        }
+        if work.admitted_requests > 0 {
+            observation["state"] = json!("busy");
+            return Ok(observation);
+        }
+        let Some(transport) = preparation.transport else {
+            return Ok(observation);
+        };
+        transport
+    } else {
+        if !enabled {
+            return Ok(json!({"state":"disabled","reason":"account_disabled"}));
+        }
+        let transport = match prepare_existing(&account).await {
+            Ok(Some(transport)) => transport,
+            Ok(None) => return Ok(json!({"state":"sleeping"})),
+            Err(error) => return Ok(agy_environment_failure(error)),
+        };
+        let location = transport
+            .execution_location()
+            .ok_or_else(|| AppError::ServiceUnavailable("agy_environment_unavailable".into()))?;
+        observation = json!({"environment_id":location.environment_id,"generation":location.generation,
+            "checked_at_ms":now_ms()});
+        transport
+    };
+    let status = match transport.agy_preparation_status().await {
+        Ok(status) => status,
+        Err(_) => {
+            observation["state"] = json!("failed");
+            observation["reason"] = json!("agy_status_failed");
+            return Ok(observation);
+        }
+    };
+    observation["reason"] = Value::Null;
+    if status["active"].as_u64().unwrap_or(0) > 0
+        || status["agy"]["active"].as_u64().unwrap_or(0) > 0
+    {
+        observation["state"] = json!("busy");
+        return Ok(observation);
+    }
+    let capture = policy
+        .as_ref()
+        .is_some_and(|policy| policy.agy_capture_enabled)
+        && status["agy_capture_available"] == true;
+    // 准备只使用业务将继续接受的 AT，换代或采集策略变化时重新按原池键准备。
+    if account.has_valid_oauth_access_token(AGY_ACCESS_VALIDITY_SECONDS)
+        && let Some(pid) = status["agy"]["idle_identity"].as_array().and_then(|idle| {
+            idle.iter()
+                .find(|worker| {
+                    worker["credential_generation"] == credential["generation"]
+                        && (policy.is_none() || worker["capture_enabled"] == capture)
+                })
+                .and_then(|worker| worker["pid"].as_u64())
+                .filter(|pid| *pid > 0)
+        })
+    {
+        observation["state"] = json!("ready");
+        observation["pid"] = json!(pid);
+        return Ok(observation);
+    }
+    if policy.is_none() {
+        observation["state"] = json!("unprepared");
+        return Ok(observation);
+    }
+    if cutover.is_cancelled() {
+        return Ok(system_maintenance());
+    }
+    let activity = accounts.upstream_activity(id).await?;
+    // 复用凭据所有者的事务，AT 刷新中途不通过取消丢弃写回。
+    let snapshot = match accounts
+        .resolve_agy_access_with_admission(id, false, Some(&activity))
+        .await
+    {
+        Ok(snapshot) => snapshot,
+        Err(_) => {
+            observation["state"] = json!("failed");
+            observation["reason"] = json!("agy_credentials_unavailable");
+            return Ok(observation);
+        }
+    };
+    let work = accounts.work_controls.snapshot(id).await?;
+    if !work.work_enabled
+        || !work.api_accepting
+        || accounts.get_account(id).await?.status != AccountStatus::Active
+    {
+        observation["state"] = json!("disabled");
+        observation["reason"] = json!("account_disabled");
+        return Ok(observation);
+    }
+    let current = accounts.agy_state(id).await?;
+    if current["phase"] != "ready" || current["generation"] != snapshot.credential_generation {
+        return Ok(cancelled());
+    }
+    let result = tokio::select! {
+        biased;
+        _ = cutover.cancelled() => return Ok(system_maintenance()),
+        _ = &mut cancellation => return Ok(cancelled()),
+        _ = queue.runtime_gate.wait_exclusive() => return Ok(maintenance()),
+        _ = activity.closed() => return Ok(cancelled()),
+        result = transport.warm_agy(preparation_id, snapshot, deadline, capture) => result,
+    };
+    observation["checked_at_ms"] = json!(now_ms());
+    match result {
+        Ok(Some(pid)) => {
+            observation["state"] = json!("ready");
+            observation["pid"] = json!(pid);
+        }
+        Ok(None) => observation["state"] = json!("busy"),
+        Err(AppError::ServiceUnavailable(reason)) => {
+            observation["state"] = json!("failed");
+            observation["reason"] = json!(reason);
+        }
+        Err(error) => return Err(error),
+    }
+    Ok(observation)
 }
 
 fn matches_identity(account: &Account, preparation: &NativePreparation) -> bool {

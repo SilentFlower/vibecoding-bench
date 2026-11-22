@@ -4,7 +4,7 @@ use serde_json::json;
 use tracing::error;
 
 /// 应用统一错误类型及其 HTTP 响应映射。
-#[derive(Debug, thiserror::Error)]
+#[derive(Clone, Debug, thiserror::Error)]
 pub enum AppError {
     #[error("not found")]
     NotFound,
@@ -30,6 +30,18 @@ pub enum AppError {
     /// 已经接纳回填的原生工具轮未能正常收尾。
     #[error("AGY已接纳回填，但原工具轮收尾失败")]
     AgyToolTurnFailed,
+    /// 续轮已有归属，但原响应无法从网关的短期缓存继续读取。
+    #[error("AGY 工具轮的原响应暂时无法重读，请查询原请求状态")]
+    AgyToolReplayUnavailable,
+    /// 已有提交回执，公开响应的字节已到期回收。
+    #[error("AGY 原工具回填响应已过期，请查询原请求状态")]
+    AgyToolResponseExpired,
+    /// 原工具续轮已经越过安全恢复边界，回包带可核对的 HTTP 根。
+    #[error("AGY_TOOL_CONTINUATION_TERMINAL：{reason}（原请求 {request_id}）")]
+    AgyToolContinuationTerminal {
+        request_id: String,
+        reason: &'static str,
+    },
     /// 本地准入拒绝，携带保守重试提示，保持账号绑定。
     #[error("本地准入容量不足或等待超时")]
     AdmissionLimited { retry_after: u64 },
@@ -75,7 +87,11 @@ impl IntoResponse for AppError {
             }
             AppError::BadGateway(_) | AppError::AgyToolTurnFailed => (StatusCode::BAD_GATEWAY, ""),
             AppError::AgyControl(status) => (*status, ""),
-            AppError::ServiceUnavailable(_) => (StatusCode::SERVICE_UNAVAILABLE, ""),
+            AppError::AgyToolResponseExpired => (StatusCode::GONE, ""),
+            AppError::AgyToolContinuationTerminal { .. } => (StatusCode::BAD_REQUEST, ""),
+            AppError::ServiceUnavailable(_) | AppError::AgyToolReplayUnavailable => {
+                (StatusCode::SERVICE_UNAVAILABLE, "")
+            }
             AppError::PermanentCredential(_) => (StatusCode::SERVICE_UNAVAILABLE, ""),
             AppError::Internal(detail) => {
                 error!("internal error: {}", detail);

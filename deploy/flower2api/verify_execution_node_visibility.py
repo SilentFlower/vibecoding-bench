@@ -20,7 +20,9 @@ class ExecutionNodeFixture(AccountDesignFixture):
         self.accounts[2]['platform'] = 'antigravity'
         self.rows[1]['platform'] = 'antigravity'
         self.node_failed = False
-        self.local_node_failed = False
+        self.agy_node_failed = False
+        self.agy_node = dict(account_id=self.accounts[2]['id'], node_id=3, node_key='c' * 32,
+            node_name='反重力执行节点', kind='ssh', enabled=True, revision=3, phase='ready')
         self.node_reads = 0
         self.task_accounts = []
         for index, name in enumerate(('默认本机', '上海 · 工程执行节点', '历史账号'), 1):
@@ -33,9 +35,8 @@ class ExecutionNodeFixture(AccountDesignFixture):
             account = self.task_accounts[min(index, 2)]
             row.update(gateway_account_id=index + 1, node=account['node'], node_observed=index == 0)
             if index == 1:
-                row.pop('node_observed')
-                row.update(account_id=None, node=dict(node_id=1, node_key='local', node_name='本机执行节点',
-                    kind='local', enabled=True), node_message='反重力 API 在本机执行')
+                row.update(account_id=None, gateway_account_id=self.agy_node['account_id'],
+                    node=self.agy_node, node_observed=True, node_message='已读取 AGY 所属节点的实际环境')
         self.attempts = [dict(attempt_id=f'{index}' * 8 + '-1111-4111-8111-' + f'{index}' * 12,
             ordinal=index, account_id=1, account_name='迁移前请求', account_email='history@example.test',
             profile_selection='native293_cc_prepared', status_code=200, outcome='success', capture_status='disabled',
@@ -53,10 +54,14 @@ class ExecutionNodeFixture(AccountDesignFixture):
     async def route(self, route):
         """截获只读节点和历史请求接口。:param route: 浏览器请求。:return: None。"""
         path = urlsplit(route.request.url).path
+        if path == '/runtime/api/agy-accounts/nodes':
+            return await self.respond(route, {'detail': 'AGY 节点读取故障'} if self.agy_node_failed else {
+                'items': [self.agy_node]}, 503 if self.agy_node_failed else 200)
         if path == '/runtime/api/nodes':
-            return await self.respond(route, {'detail': '本机节点读取故障'} if self.local_node_failed else {
-                'items': [dict(id=1, name='本机执行节点', kind='local', node_key='local', enabled=True)]},
-                503 if self.local_node_failed else 200)
+            return await self.respond(route, {'items': [
+                dict(id=1, name='本机执行节点', kind='local', node_key='local', account_count=1, enabled=True),
+                dict(id=3, name=self.agy_node['node_name'], kind='ssh', node_key=self.agy_node['node_key'],
+                    account_count=1, enabled=True)]})
         if path == '/runtime/api/accounts':
             self.node_reads += 1
             return await self.respond(route, {'detail': '合成节点读取故障'} if self.node_failed else self.task_accounts,
@@ -121,8 +126,8 @@ async def main():
         await expect(cards.first.locator('[data-platform-badge]')).to_have_text('Claude Code')
         agy = cards.nth(2)
         await expect(agy.locator('[data-platform-badge]')).to_have_text('反重力')
-        await expect(agy.locator('[data-execution-node]')).to_have_text('本机执行节点')
-        await node_details(page, agy.locator('[data-execution-node]'), '反重力 API 在本机执行')
+        await expect(agy.locator('[data-execution-node]')).to_have_text('反重力执行节点')
+        await node_details(page, agy.locator('[data-execution-node]'), '已保存执行归属')
         await node_details(page, cards.nth(1).locator('[data-execution-node]'), '最近观测不可达')
         await node_details(page, cards.nth(1).locator('[data-execution-node]'), 'b' * 32)
         for card in await cards.all():
@@ -145,30 +150,31 @@ async def main():
         await snapshot(page, output, 'account-detail')
         await page.keyboard.press('Escape')
         await agy.get_by_role('button', name='详情', exact=True).click()
-        await expect(page.locator('.account-workspace [data-execution-node]').first).to_have_text('本机执行节点')
+        await expect(page.locator('.account-workspace [data-execution-node]').first).to_have_text('反重力执行节点')
         await page.keyboard.press('Escape')
         fixture.node_failed = True
         await page.evaluate("document.dispatchEvent(new Event('visibilitychange'))")
         await node_details(page, cards.nth(1).locator('[data-execution-node]'), '归属待刷新')
         await node_details(page, cards.nth(1).locator('[data-execution-node]'), 'b' * 32)
-        await expect(agy.locator('[data-execution-node]')).to_have_text('本机执行节点')
+        await expect(agy.locator('[data-execution-node]')).to_have_text('反重力执行节点')
         fixture.node_failed = False
-        fixture.local_node_failed = True
-        await page.reload()
-        await expect(agy.locator('[data-execution-node]')).to_have_text('默认本机')
+        fixture.agy_node_failed = True
+        await page.evaluate("document.dispatchEvent(new Event('visibilitychange'))")
+        await node_details(page, agy.locator('[data-execution-node]'), '归属待刷新')
+        await expect(agy.locator('[data-execution-node]')).to_have_text('反重力执行节点')
         await expect(cards.nth(1).locator('[data-execution-node]')).to_have_text('上海 · 工程执行节点')
-        fixture.local_node_failed = False
+        fixture.agy_node_failed = False
         await agy.locator('[data-execution-node]').click()
         await expect(page).to_have_url(BASE + '/nodes')
         await page.goto(BASE + '/environments')
         environments = page.locator('.environment-rich')
         await expect(environments).to_have_count(4)
-        await node_details(page, environments.nth(1).locator('[data-execution-node]'), '反重力 API 在本机执行')
+        await node_details(page, environments.nth(1).locator('[data-execution-node]'), '已读取 AGY 所属节点的实际环境')
         await expect(environments.nth(1).locator('.fui-entity-card-head [data-platform-badge]')).to_have_text('反重力')
-        await expect(environments.nth(1).locator('.fui-entity-card-head [data-execution-node]')).to_have_text('本机执行节点')
+        await expect(environments.nth(1).locator('.fui-entity-card-head [data-execution-node]')).to_have_text('反重力执行节点')
         await snapshot(page, output, 'environments')
         await environments.nth(1).get_by_role('button', name='环境详情', exact=True).click()
-        await node_details(page, page.locator('.runtime-environment-dialog [data-execution-node]'), '反重力 API 在本机执行')
+        await node_details(page, page.locator('.runtime-environment-dialog [data-execution-node]'), '已读取 AGY 所属节点的实际环境')
         await expect(page.locator('.runtime-environment-dialog')).to_be_visible()
         await snapshot(page, output, 'environment-detail')
         await page.get_by_role('button', name='关闭环境详情', exact=True).click()

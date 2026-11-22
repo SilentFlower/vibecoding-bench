@@ -331,7 +331,21 @@ impl AccountService {
     /// 核对长期归属及维护门禁并登记上游活动。
     /// @param id 账号。@return 必须持有到发送结束的许可。
     pub async fn upstream_activity(&self, id: i64) -> Result<CredentialActivity, AppError> {
-        let permit = self.credential_gate(id).enter()?;
+        self.upstream_activity_with_admission(id, None).await
+    }
+
+    /// 核对 AGY 已接纳活动的原账号与当前门禁。
+    /// @param id 账号。@param admission 本次 API 已持有的凭据许可。@return 当前凭据操作许可。
+    pub(super) async fn upstream_activity_with_admission(
+        &self,
+        id: i64,
+        admission: Option<&CredentialActivity>,
+    ) -> Result<CredentialActivity, AppError> {
+        let gate = self.credential_gate(id);
+        if admission.is_some_and(|admission| !Arc::ptr_eq(&gate, &admission.gate)) {
+            return Err(unavailable());
+        }
+        let permit = gate.enter()?;
         if self
             .store
             .credential_ownership(id)
@@ -344,10 +358,20 @@ impl AccountService {
         let queue = self.get_or_create_queue(id, account.concurrency).await;
         let snapshot = queue.runtime_gate.snapshot();
         if snapshot["lease"].as_object().is_some_and(|lease| {
-            lease
+            let exclusive = lease
                 .get("exclusive")
                 .and_then(Value::as_bool)
-                .unwrap_or(true)
+                .unwrap_or(true);
+            // 工具回填会再次读取 AT。迁移排空只允许仍持有原 API 许可的请求经过此处。
+            let original_agy = admission.is_some()
+                && account.is_antigravity()
+                && snapshot["active"].as_i64().is_some_and(|active| active > 0)
+                && lease.get("phase").and_then(Value::as_str) == Some("draining")
+                && lease
+                    .get("owner")
+                    .and_then(Value::as_str)
+                    .is_some_and(|owner| owner.starts_with("node-migration:"));
+            exclusive && !original_agy
         }) {
             return Err(unavailable());
         }

@@ -60,14 +60,17 @@ def binary(state, source):
 def config(path):
     """读取受管理端发布的私有OAuth启动配置。@param path 私有配置。@return 已核验的冻结配置。"""
     from .credentials import read_private, read_access_document
+    from .models import valid_model_mapping
     value = read_private(Path(path))
     allowed = {'home','public_model','native_model','binary_path','proxy_url','rotate_after',
         'startup_timeout','retire_timeout','cancel_timeout','runtime_env','capture_enabled','capture_root','account_id','credential_generation'}
     if set(value) - allowed:
         raise ValueError('AGY启动配置字段无效')
-    for name in ['home','public_model','binary_path']:
+    for name in ['home','binary_path']:
         if not isinstance(value.get(name),str) or not value[name]:
             raise ValueError('AGY启动配置缺少必要字段')
+    if {'public_model', 'native_model'} & value.keys() and not valid_model_mapping(value.get('public_model'), value.get('native_model')):
+        raise ValueError('AGY启动配置的固定模型映射无效')
     for name in ['account_id','credential_generation']:
         if type(value.get(name)) is not int or value[name]<1:
             raise ValueError('AGY启动归属无效')

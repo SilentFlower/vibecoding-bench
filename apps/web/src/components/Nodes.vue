@@ -85,18 +85,13 @@ async function loadAgyAccounts(): Promise<void> {
     if (alive && !controller.signal.aborted) agyError.value = '反重力账号归属读取失败，请刷新列表';
   }
 }
-/** 使用同一份正式账号列表更新归属选择和节点计数。@return 无。 */
+/** 刷新节点与正式账号选项。@return 无。 */
 function refresh(): void {
   void load();
   void loadAgyAccounts();
 }
-/** 汇总本机反重力账号和已有任务账号归属。@param node 节点。@return 归属数量或待核对占位。 */
-function accountCount(node: ExecutionNode): number | string {
-  if (node.kind !== 'local') return node.account_count;
-  return agyAccounts.value === null ? '—' : node.account_count + agyAccounts.value.length;
-}
-const totalAccounts = computed(() => agyAccounts.value === null ? '—'
-  : rows.value.reduce((total, node) => total + node.account_count, agyAccounts.value.length));
+/** 节点的 account_count 已由后端计入反重力账号归属，直接求和，避免前端重复累加。 */
+const totalAccounts = computed(() => rows.value.reduce((total, node) => total + node.account_count, 0));
 type Attention = 'connection' | 'component' | 'removal';
 /** 待处理原因的单独说明与计数说明，顺序即说明行顺序。 */
 const attentionLabels: Record<Attention, [string, string]> = {
@@ -301,7 +296,7 @@ onUnmounted(() => { alive = false; loadGeneration++; if (refreshTimer) clearTime
           <div><dt>CPU</dt><dd :class="{ 'is-empty': node.observation?.host_cpus == null }">{{ node.observation?.host_cpus != null ? `${node.observation.host_cpus} 核` : '未采集' }}</dd></div>
           <div><dt>可用内存</dt><dd :class="{ 'is-empty': node.observation?.memory?.MemAvailable == null }">{{ bytes(node.observation?.memory?.MemAvailable) }}</dd></div>
           <div><dt>可用磁盘</dt><dd :class="{ 'is-empty': node.observation?.disk_available_bytes == null }">{{ bytes(node.observation?.disk_available_bytes) }}</dd></div>
-          <div><dt>归属账号</dt><dd>{{ accountCount(node) }}</dd></div>
+          <div><dt>归属账号</dt><dd>{{ node.account_count }}</dd></div>
         </dl>
         <EntityBlock class="node-meta">
           <div><span>最近检查</span><time>{{ node.observation && node.observation.observed_at > 0 ? new Date(node.observation.observed_at * 1000).toLocaleString('zh-CN') : '尚未检查' }}</time></div>

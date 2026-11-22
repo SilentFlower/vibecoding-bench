@@ -17,11 +17,11 @@ from unittest.mock import patch
 from types import SimpleNamespace
 
 from agy_runtime import gemini_contract
-from agy_runtime.contract import InputError
+from agy_runtime.contract import InputError, request
 from agy_runtime.credentials import TOKEN_PATH, publish_access_document, read_access_document, read_private
 from agy_runtime.criu import read_failure
 from agy_runtime.gemini_frames import Frames
-from agy_runtime.models import configure_model, decode_catalog, decode_media_support, decode_png_support
+from agy_runtime.models import decode_catalog, decode_media_support, decode_png_support
 from agy_runtime.native_bridge import NativeBridge
 from agy_runtime.process_memory import cgroup_memory
 from agy_runtime.safety_egress import MODEL_PATH, SafetyEgress, _Request
@@ -42,7 +42,7 @@ class AgyRuntimeTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
-        configure_model('gemini-synthetic', 'MODEL_PLACEHOLDER_M36')
+        self.fixed_model = ('gemini-synthetic', 'MODEL_PLACEHOLDER_M36')
 
     def snapshot(self):
         """创建同代AT-only管理快照。@return 合成快照。"""
@@ -51,9 +51,11 @@ class AgyRuntimeTests(unittest.TestCase):
             'email': 'synthetic@example.test'}
 
     def test_isolated_calls_do_not_change_completed_tool_stream(self):
-        """待回填时隔离后续调用，同会话的第二次启动仍计入原作业。@return 无。"""
-        for conversation, isolation in [('other','foreign_model_observed'), ('','unassigned_model_observed')]:
-            with self.subTest(conversation=conversation):
+        """主轮 EOF 后隔离交错的独立调用，同会话的第二次启动仍计入原作业。@return 无。"""
+        cases = [('STOP', 'other', 'foreign_model_observed'), ('STOP', '', 'unassigned_model_observed'),
+            ('MAX_TOKENS', 'other', 'foreign_model_observed')]
+        for finish_reason, conversation, isolation in cases:
+            with self.subTest(finish_reason=finish_reason, conversation=conversation):
                 bridge=Bridge.__new__(Bridge)
                 worker=Worker.__new__(Worker)
                 recorded=[]
@@ -72,40 +74,56 @@ class AgyRuntimeTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError,'native_root_identity.unfinished_stream'):
                     bridge._emit(extra)
                 call={'name':'fixture','args':{'x':1}}
-                frame=json.dumps({'candidates':[{'content':{'parts':[{'functionCall':call}]},'finishReason':'STOP'}]}).encode()
+                frame=json.dumps({'candidates':[{'content':{'parts':[{'functionCall':call}]},'finishReason':finish_reason}]}).encode()
                 bridge._emit({**owned,'event':'gemini_response','data_base64':base64.b64encode(frame).decode()})
                 with self.assertRaisesRegex(RuntimeError,'source_call_identity'):
                     bridge._emit({**extra,'event':'model_end','native_error_present':None})
                 bridge._emit({**owned,'event':'model_end','native_error_present':None})
+                another={**extra,'call_id':'r-1.3'}
                 bridge._emit(extra)
+                bridge._emit(another)
                 bridge._emit({**extra,'event':'gemini_response','data_base64':'外部帧禁止解析'})
+                bridge._emit({**another,'event':'gemini_response','data_base64':'外部帧禁止解析'})
                 bridge._emit({**extra,'event':'model_end','native_error_present':None})
-                self.assertEqual(recorded,['model_start','gemini_response','model_end',isolation])
+                bridge._emit({**another,'event':'model_end','native_error_present':None})
+                self.assertEqual(recorded,['model_start','gemini_response','model_end',isolation,isolation])
                 self.assertEqual((scope.job.calls,scope.job.ends),(1,1))
                 self.assertEqual(scope.frames.calls[0]['name'],call['name'])
                 self.assertTrue(scope.frames.calls[0]['id'].startswith('call_'))
                 self.assertTrue(scope.job.ended.is_set())
                 with self.assertRaisesRegex(RuntimeError,'native_root_identity.call_reused'):
                     bridge._emit({**owned,'call_id':extra['call_id']})
-                another={**extra,'call_id':'r-1.3'}
-                with self.assertRaisesRegex(RuntimeError,'native_root_identity.additional_call'):
-                    bridge._emit(another)
-                scope.tool_wait_published=True
-                scope.broker.gemini_results={'synthetic-native':{'value':1}}
-                bridge._emit(another)
-                bridge._emit({**another,'event':'model_end','native_error_present':None})
-                self.assertEqual((scope.job.calls,scope.job.ends),(1,1))
+                with self.assertRaisesRegex(RuntimeError,'source_call_identity'):
+                    bridge._emit({**another,'event':'gemini_response','call_id':'r-1.unknown'})
                 bridge._emit({**owned,'call_id':'r-1.4'})
                 self.assertEqual(scope.job.calls,2)
 
     def test_model_result_survives_only_post_stream_control_failure(self):
         """通过真实执行入口区分已结束的结果、断流、工具和取消。@return 无。"""
         usage={'promptTokenCount':12,'candidatesTokenCount':2,'totalTokenCount':14}
+        text = [{'text': '合成模型结果'}]
+        thinking = [{'text': '合成思考', 'thought': True}]
+        media = [{'inlineData': {'mimeType': 'image/png', 'data': 'aW1hZ2U='}}]
+        thinking_usage = {'promptTokenCount': 12, 'totalTokenCount': 42, 'thoughtsTokenCount': 30}
+        max_tokens_cases = {
+            'max_tokens_rpc_200': (text, usage, 'kept'),
+            'max_tokens_text': (text, usage, 'kept'),
+            'max_tokens_thinking': (thinking, {**thinking_usage, 'candidatesTokenCount': 0}, 'kept'),
+            'max_tokens_without_candidates': (thinking, thinking_usage, 'kept'),
+            'max_tokens_media': (media, usage, 'kept'),
+            'max_tokens_missing_output': ([], usage, 'missing_text'),
+            'max_tokens_invalid_candidates': (thinking, {**thinking_usage, 'candidatesTokenCount': None}, 'missing_usage'),
+            'max_tokens_invalid_thoughts': (thinking, {**thinking_usage, 'thoughtsTokenCount': True}, 'missing_usage'),
+        }
         cases=[('rpc_503','completed'),('rpc_400','error'),('not_idle','completed'),('late_observer_error','completed'),
             ('missing_stop','error'),('missing_usage','error'),('pending_tool','error'),('unregistered_tool','error'),
-            ('early_observer_error','error'),('second_model_call','error'),('cancelled','cancelled')]
+            ('early_observer_error','error'),('second_model_call','error'),('cancelled','cancelled'),
+            ('late_eof_clean','error'),('late_eof_truncated','error')]
+        cases.extend((mode, 'completed' if reason == 'kept' else 'error')
+            for mode, (_, _, reason) in max_tokens_cases.items())
         for mode,expected in cases:
             with self.subTest(mode=mode):
+                max_tokens_case = max_tokens_cases.get(mode)
                 kernel=Kernel.__new__(Kernel)
                 kernel.state=self.root/mode;kernel.state.mkdir()
                 kernel.cfg={'capture_enabled':False,'rotate_after':None}
@@ -118,21 +136,27 @@ class AgyRuntimeTests(unittest.TestCase):
                 worker.retire=lambda reason:retirements.append(reason)
                 def control(method, body, scope):
                     """投影真实控制入口的合成结果。@param method 控制方法。@param body 输入。@param scope 作业。@return 控制回应。"""
-                    if method=='StartCascade':return {'status':200,'response':{'cascadeId':'owned'}}
+                    if method=='StartCascade':
+                        self.assertEqual(body['requestedModel'], self.fixed_model[1])
+                        return {'status':200,'response':{'cascadeId':'owned'}}
                     self.assertEqual(method,'GetCascadeTrajectory')
                     state='CASCADE_RUN_STATUS_RUNNING' if mode=='not_idle' else 'CASCADE_RUN_STATUS_IDLE'
-                    return {'status':200,'response':{'status':state}}
+                    return {'status':200,'response':{'status':state,'trajectory':{'trajectoryId':'fixture','steps':[]}}}
                 worker.call=control
                 bridge=Bridge.__new__(Bridge);bridge.worker=worker;bridge.run_folder=kernel.state
                 bridge.events=io.StringIO();bridge.errors=[];bridge.source_events=0;bridge.reader_error=None
+                bridge.proc=SimpleNamespace(poll=lambda:None)
                 bridge.generation='synthetic-generation';bridge.capture_tls=False;worker.bridge=bridge
                 value={'request_id':'synthetic','request_format':'gemini','native_steps':[],
-                    'prompt':'fixture','system':'','max_generations':1,'tools':[]}
+                    'prompt':'fixture','system':'','model':self.fixed_model[1],'max_generations':1,'tools':[]}
+                if max_tokens_case:
+                    value['native_completion'] = {'maxTokens': 30}
                 scope=Scope(value,1,worker);kernel.worker=worker;kernel.active=scope
 
                 def submit(worker, method, body, scope):
                     """交付原始帧后注入控制异常。@param worker 进程。@param method 方法。@param body 提交。@param scope 作业。@return 异步结果。"""
                     self.assertEqual(method,'SendUserCascadeMessage');submissions.append(body['cascadeId'])
+                    self.assertEqual(body['cascadeConfig']['plannerConfig']['planModel'], self.fixed_model[1])
                     event={'request_id':scope.route,'call_id':'r-1.1','ns':1,
                         'native_context':{'ConversationID':'owned'}}
                     bridge._emit({**event,'event':'model_start'})
@@ -141,7 +165,12 @@ class AgyRuntimeTests(unittest.TestCase):
                     if mode in ('pending_tool','unregistered_tool'):
                         candidate['content']['parts'].append({'functionCall':{'name':'fixture'}})
                     frame={'candidates':[candidate]}
+                    if mode.startswith('late_eof_'):frame={}
                     if mode!='missing_usage':frame['usageMetadata']=usage
+                    if max_tokens_case:
+                        self.assertEqual(body['cascadeConfig']['plannerConfig']['completionConfigOverride']['maxTokens'], 30)
+                        candidate.update(finishReason='MAX_TOKENS', content={'parts': max_tokens_case[0]})
+                        frame['usageMetadata'] = max_tokens_case[1]
                     encoded=base64.b64encode(json.dumps(frame).encode()).decode()
                     bridge._emit({**event,'event':'gemini_response','data_base64':encoded})
                     if mode=='early_observer_error':bridge._emit({'event':'observer_error','ns':2})
@@ -150,13 +179,34 @@ class AgyRuntimeTests(unittest.TestCase):
                     if mode=='second_model_call':bridge._emit({**event,'event':'model_start','call_id':'r-1.2'})
                     if mode=='cancelled':scope.cancel.set()
                     done=threading.Event();done.set()
-                    status={'not_idle':200,'late_observer_error':200,'unregistered_tool':200,'rpc_400':400}.get(mode,503)
+                    status={'not_idle':200,'late_observer_error':200,'unregistered_tool':200,'rpc_400':400,
+                        'late_eof_clean':200,'late_eof_truncated':500}.get(mode,503)
+                    if max_tokens_case:
+                        status = 200 if mode == 'max_tokens_rpc_200' else 500
+                    if mode.startswith('late_eof_'):
+                        pending=SimpleNamespace(error=None,value=None,response_status=None)
+                        def wait(_timeout):
+                            """先交付接收通道关闭，再暴露下一拍到达的控制响应。@param _timeout 等待时间。@return 控制响应是否已到。"""
+                            if done.is_set():
+                                done.clear()
+                                return False
+                            pending.response_status=status
+                            pending.value={'status':status,'response':{'message':'stream reading error: unexpected EOF'} if status==500 else {}}
+                            return True
+                        pending.done=SimpleNamespace(wait=wait)
+                        return pending
                     return SimpleNamespace(done=done,error=None,value={'status':status},response_status=status)
 
                 with patch('agy_runtime.kernel.RPC',side_effect=submit):kernel.execute(scope)
                 terminal=[(kind,fields) for kind,fields in events if kind in ('completed','error','cancelled')]
-                self.assertEqual([kind for kind,_ in terminal],[expected])
+                self.assertEqual([kind for kind,_ in terminal],[expected],terminal)
                 self.assertEqual(submissions,['owned'])
+                if mode == 'max_tokens_rpc_200':
+                    self.assertEqual(terminal[0][1]['finish_reason'], 'max_tokens')
+                    self.assertEqual(retirements, [])
+                    self.assertEqual(events[-1][0], 'idle')
+                    self.assertEqual(events[-1][1]['next_generation'], bridge.generation)
+                    continue
                 self.assertEqual(retirements,['request_error'])
                 self.assertEqual(events[-1][0],'idle')
                 self.assertIsNone(events[-1][1]['next_generation'])
@@ -164,7 +214,24 @@ class AgyRuntimeTests(unittest.TestCase):
                 reasons={'rpc_503':'kept','rpc_400':'missing_stop','not_idle':'kept','late_observer_error':'kept',
                     'missing_stop':'missing_stop','missing_usage':'missing_usage','pending_tool':'tool_pending',
                     'unregistered_tool':'ineligible_error',
-                    'early_observer_error':'observer_before_eof','second_model_call':'model_call_count','cancelled':'ineligible_error'}
+                    'early_observer_error':'observer_before_eof','second_model_call':'model_call_count','cancelled':'ineligible_error',
+                    'late_eof_clean':'ineligible_error','late_eof_truncated':'missing_stop'}
+                if max_tokens_case:
+                    reasons[mode] = max_tokens_case[2]
+                    fields = terminal[0][1]
+                    self.assertEqual(fields['observed_control_http_status'], 500)
+                    self.assertTrue(fields['native_receive_ended'])
+                    self.assertTrue(fields['native_source_terminal'])
+                    if expected == 'completed':
+                        self.assertEqual(fields['finish_reason'], 'max_tokens')
+                        delivered = [json.loads(base64.b64decode(event['data']['data_base64']))
+                            for kind, event in events if kind == 'gemini_response']
+                        self.assertEqual(len(delivered), 1)
+                        self.assertEqual(delivered[0]['usageMetadata'], max_tokens_case[1])
+                        self.assertEqual(delivered[0]['candidates'][0]['finishReason'], 'MAX_TOKENS')
+                        self.assertEqual(delivered[0]['candidates'][0]['content']['parts'], max_tokens_case[0])
+                    else:
+                        self.assertEqual(fields['control_http_status'], 500)
                 self.assertEqual(len(diagnostic),1)
                 self.assertEqual(diagnostic[0].rsplit('.',1)[-1],reasons[mode])
                 self.assertEqual(terminal[0][1]['control_recovery'],reasons[mode])
@@ -178,9 +245,19 @@ class AgyRuntimeTests(unittest.TestCase):
                 if mode=='unregistered_tool':
                     self.assertEqual(terminal[0][1]['code'],'tool_protocol_error')
                     self.assertNotIn('control_http_status',terminal[0][1])
+                if mode.startswith('late_eof_'):
+                    fields=terminal[0][1]
+                    self.assertTrue(fields['native_receive_ended'])
+                    self.assertFalse(fields['native_source_terminal'])
+                    if mode=='late_eof_clean':
+                        self.assertEqual(fields['observed_control_http_status'],200)
+                        self.assertEqual(fields['code'],'native_stream_incomplete')
+                    else:
+                        self.assertEqual(fields['control_http_status'],500)
+                        self.assertEqual(fields['control_error_detail'],'unexpected_eof')
                 if expected=='completed':
-                    expected_code={'rpc_503':'native_request_failed','not_idle':'native_not_idle',
-                        'late_observer_error':'native_protocol_error'}[mode]
+                    expected_code={'not_idle':'native_not_idle',
+                        'late_observer_error':'native_protocol_error'}.get(mode, 'native_request_failed')
                     self.assertEqual(terminal[0][1]['control_error_code'],expected_code)
                     self.assertFalse(terminal[0][1]['native_tool_pending'])
                     self.assertNotIn('control_http_status',terminal[0][1])
@@ -203,15 +280,15 @@ class AgyRuntimeTests(unittest.TestCase):
         """确认显式文本输出沿用默认行为，图片和音频仍保留字段级错误。@return 无。"""
         raw = {'schema_version': 1, 'type': 'gemini_request', 'request_id': 'modalities',
                'model': 'gemini-synthetic', 'body': {'contents': [{'parts': [{'text': '合成请求'}]}]}}
-        expected = gemini_contract.decode_request(raw)['native_completion']
+        expected = gemini_contract.decode_request(raw, fixed_model=self.fixed_model)['native_completion']
         for modalities in ([], ['TEXT']):
             raw['body']['generationConfig'] = {'responseModalities': modalities}
-            self.assertEqual(gemini_contract.decode_request(raw)['native_completion'], expected)
+            self.assertEqual(gemini_contract.decode_request(raw, fixed_model=self.fixed_model)['native_completion'], expected)
         for modalities in (None, 'TEXT', ['IMAGE'], ['TEXT', 'AUDIO']):
             raw['body']['generationConfig'] = {'responseModalities': modalities}
             with self.subTest(modalities=modalities), self.assertRaisesRegex(
                     InputError, 'unsupported_gemini_output_modality:/body/generationConfig/responseModalities'):
-                gemini_contract.decode_request(raw)
+                gemini_contract.decode_request(raw, fixed_model=self.fixed_model)
 
     def test_gemini_normalizes_nested_array_items_and_string_const(self):
         """从 Gemini 两类工具声明保留已知类型，并记录真实缺项与常量改写位置。@return 无。"""
@@ -226,7 +303,7 @@ class AgyRuntimeTests(unittest.TestCase):
                 'tools': [{'functionDeclarations': [{'name': 'tool_' + key, key: schema}
                     for key in ('parameters', 'parametersJsonSchema')]}]}}
         original = copy.deepcopy(raw)
-        decoded = gemini_contract.decode_request(raw)
+        decoded = gemini_contract.decode_request(raw, fixed_model=self.fixed_model)
         for tool in decoded['tools']:
             query = tool['input_schema']['properties']['query']['properties']
             self.assertEqual(query['where']['items']['items'], {'anyOf': [{}]})
@@ -338,13 +415,15 @@ class AgyRuntimeTests(unittest.TestCase):
                     'native_model':'MODEL_PLACEHOLDER_M36','capture_enabled':False}
                 supervisor=Supervisor.__new__(Supervisor)
                 supervisor.condition=threading.Condition();supervisor.closed=False
+                supervisor.search_slots=0
                 supervisor.restore_enabled=False
                 supervisor.config={'max_workers':1 if mode=='capacity' else 3,'proxy_url':'synthetic'}
                 supervisor.credential_generation=value['credential_snapshot']['credential_generation']
                 key=supervisor.worker_key(value)
-                original=SimpleNamespace(key=key,busy=True,closed=False,prewarming=False)
+                original=SimpleNamespace(key=key,busy=True,closed=False,prewarming=False,parked=False)
                 supervisor.workers=[original]
-                spare=SimpleNamespace(key=key,busy=True,closed=False,process=None)
+                spare=SimpleNamespace(key=key,busy=True,closed=False,parked=False,start_source='exec',
+                    credential_expires_at=value['credential_snapshot']['expires_at'],process=None)
                 entered=threading.Event();release=threading.Event();checked_out=[]
                 until=time.monotonic()+5
 
@@ -354,9 +433,11 @@ class AgyRuntimeTests(unittest.TestCase):
                     if mode=='stale':supervisor.credential_generation+=1
                     if mode=='ready':
                         entered.set();release.wait(3)
+                        spare.process=SimpleNamespace(poll=lambda: None)
 
                 spare.start=start
                 spare.close=lambda: setattr(spare,'closed',True)
+                spare.running=lambda: spare.process is not None and not spare.closed
                 with patch('agy_runtime.supervisor.Worker',return_value=spare) as factory:
                     if mode=='ready':
                         warming=threading.Thread(target=supervisor.prewarm_replacement,args=(original,value,until),daemon=True)
@@ -387,6 +468,7 @@ class AgyRuntimeTests(unittest.TestCase):
             'native_model':'MODEL_PLACEHOLDER_M36'}
         supervisor=Supervisor.__new__(Supervisor)
         supervisor.condition=threading.Condition();supervisor.closed=False
+        supervisor.search_slots=0
         supervisor.config={'max_workers':1,'proxy_url':'synthetic'}
         supervisor.credential_generation=snapshot['credential_generation']
         supervisor.workers=[];supervisor.template_failure=None
@@ -414,20 +496,25 @@ class AgyRuntimeTests(unittest.TestCase):
             supervisor.record_template_attempt(template,False)
         self.assertIsNone(supervisor.template_failure)
 
-    def test_reaper_keeps_one_recent_idle_worker_per_identity(self):
-        """同身份保留一个较新热进程，工具轮和其他模型各自保留。@return 无。"""
+    def test_reaper_keeps_busy_workers_and_extra_workers_before_idle_deadline(self):
+        """回收超期额外进程，保留未过空闲期限的进程及活动工具轮。@return 无。"""
         supervisor = Supervisor.__new__(Supervisor)
         supervisor.condition = threading.Condition()
         supervisor.closed = False
+        supervisor.search_slots = 0
+        supervisor.credential_generation = 1
+        supervisor.config = {'max_workers': 4}
+        supervisor.restore_allowed = True
         released = threading.Event()
         now = time.monotonic()
 
         def worker(key, age, busy=False):
             """构造活进程或占用中的原工具进程。@param key 复用键。@param age 空闲时长。@param busy 是否独占。@return 测试进程。"""
-            return SimpleNamespace(key=key, last_used=now-age, busy=busy, process=SimpleNamespace(poll=lambda: None),
-                close=released.set)
+            return SimpleNamespace(key=(1, key), last_used=now-age, busy=busy, parked=False,
+                credential_expires_at=4070908800000, process=SimpleNamespace(poll=lambda: None),
+                close=released.set, running=lambda: True)
 
-        old, current, tool, other = worker('same', 2), worker('same', 1), worker('same', 0, True), worker('other', 3)
+        old, current, tool, other = worker('same', 121), worker('same', 1), worker('same', 300, True), worker('other', 3)
         supervisor.workers = [old, current, tool, other]
         thread = threading.Thread(target=supervisor.reap_idle, daemon=True)
         thread.start()
@@ -443,18 +530,19 @@ class AgyRuntimeTests(unittest.TestCase):
             thread.join(2)
 
     def test_kernel_completion_reaches_real_tool_broker_once(self):
-        """两个同名工具反序回填时仍交给各自原生调用，错误和重复 ID 拒绝。@return 无。"""
+        """原生 ID 重复时按原步骤各完成一次反序混合回填。@return 无。"""
         body={'contents':[{'role':'user','parts':[{'text':'合成问题'}]}]}
         call={'id':'synthetic-call','name':'synthetic_tool','args':{'x':1}}
         frames=Frames()
         parts=[{'functionCall':call,'thoughtSignature':'synthetic-signature'},
-            {'functionCall':{'name':'synthetic_tool','args':{'x':2}}}]
+            {'functionCall':{'id':'synthetic-call','name':'synthetic_tool','args':{'x':2}}}]
         source={'candidates':[{'content':{'parts':parts},'finishReason':'STOP'}]}
         projected=frames.project({'data_base64':base64.b64encode(json.dumps(source).encode()).decode()})
         public_parts=[json.loads(base64.b64decode(frame['data_base64']))['candidates'][0]['content']['parts'][0]
             for frame in projected]
         self.assertEqual(public_parts[0],parts[0])
         self.assertTrue(public_parts[1]['functionCall']['id'].startswith('call_'))
+        self.assertEqual(frames.source_call_ids,['synthetic-call','synthetic-call'])
         incoming=copy.deepcopy(body)
         incoming['contents']+=[{'role':'model','parts':public_parts},
             {'role':'user','parts':[
@@ -466,24 +554,60 @@ class AgyRuntimeTests(unittest.TestCase):
         service.lock=threading.RLock();service.cfg={'capture_enabled':False};service.worker_id='synthetic-worker'
         emitted=[];service.output=SimpleNamespace(emit=emitted.append)
         scope=SimpleNamespace(tool_wait_published=True,resume_claimed=False,cancel=threading.Event(),
-            tool_native_ids=('synthetic-native-call-1','synthetic-native-call-2'),
+            native_tool_steps=(3,4),
             value={'gemini_body':body,'request_id':identity['request_id'],'tools':[]},frames=frames,identity=lambda:identity)
         scope.broker=Broker(service,scope,self.root)
         self.addCleanup(scope.broker.close)
-        scope.broker.pending['synthetic-native-call-2']={'result':None}
-        scope.broker.pending['synthetic-native-call-1']={'result':None}
+        scope.broker.pending[4]={'result':None}
+        scope.broker.pending[3]={'result':None}
         service.active=scope
         value={'schema_version':1,'type':'finish_tool_turn',**identity,'body':incoming}
         wrong=copy.deepcopy(value);wrong['body']['contents'][-1]['parts'][0]['functionResponse']['id']='other'
         with self.assertRaises(InputError):service.finish_tool_turn(wrong)
-        ambiguous=copy.deepcopy(value);ambiguous['body']['contents'][-1]['parts'][0]['functionResponse'].pop('id')
-        with self.assertRaises(InputError):service.finish_tool_turn(ambiguous)
+        duplicate = copy.deepcopy(value)
+        duplicate['body']['contents'][-1]['parts'][0]['functionResponse']['id'] = call['id']
+        with self.assertRaises(InputError):service.finish_tool_turn(duplicate)
         self.assertFalse(scope.resume_claimed)
-        service.finish_tool_turn(value)
-        self.assertEqual(scope.broker.pending['synthetic-native-call-1']['result']['structuredContent'],{'result':9})
-        self.assertEqual(scope.broker.pending['synthetic-native-call-2']['result']['structuredContent'],{'result':10})
+        mixed = copy.deepcopy(value)
+        mixed['body']['contents'][-1]['parts'][0]['functionResponse'].pop('id')
+        service.finish_tool_turn(mixed)
+        self.assertEqual(scope.broker.pending[3]['result']['structuredContent'],{'result':9})
+        self.assertEqual(scope.broker.pending[4]['result']['structuredContent'],{'result':10})
         self.assertEqual(emitted[-1]['type'],'tool_continuation_accepted')
-        with self.assertRaises(InputError):service.finish_tool_turn(value)
+        with self.assertRaises(InputError):service.finish_tool_turn(mixed)
+
+    def test_tool_frames_distinguish_source_repetition_from_equal_parts(self):
+        """同一观察身份重投时只消费一次，下一源帧仍有独立原生步骤。@return 无。"""
+        def event(epoch, identifier):
+            value={'response':{'candidates':[{'content':{'parts':[
+                {'functionCall':{'name':'Read','id':identifier,'args':{}}}]}}]}}
+            block=b'data: '+json.dumps(value).encode()+b'\n\n'
+            return {'call_id':'r-1.1','source':'codeassist_scanner_block','raw_epoch':epoch,
+                'data_base64':base64.b64encode(block).decode()}
+        frames=Frames()
+        self.assertEqual(len(frames.project(event(1,'same'))),1)
+        self.assertEqual(frames.project(event(1,'same')),[])
+        self.assertEqual(len(frames.project(event(2,'same'))),1)
+        self.assertEqual(frames.source_call_ids,['same','same'])
+        self.assertEqual(len(frames.call_ids),2)
+        with self.assertRaisesRegex(RuntimeError,'native_tool_frame_identity'):
+            frames.project(event(2,'changed'))
+        with self.assertRaisesRegex(RuntimeError,'invalid_native_tool_id'):
+            frames.project(event(3,17))
+
+    def test_legacy_web_search_query_respects_explicit_schema(self):
+        """兼容线上空查询声明并保留闭合或自定义属性。@return 无。"""
+        for schema, expected in [
+                ({},{'query':{'type':'string'}}),
+                ({'type':'OBJECT','properties':{}},{'query':{'type':'string'}}),
+                ({'type':'object','properties':{},'additionalProperties':False},{}),
+                ({'type':'object','properties':{'term':{'type':'string'}}},{'term':{'type':'string'}})]:
+            definition={'name':'web_search','parameters':schema}
+            body={'tools':[{'functionDeclarations':[definition]}]}
+            before=copy.deepcopy(body)
+            normalized=gemini_contract.definitions(body,[])[0]['input_schema']
+            self.assertEqual(normalized.get('properties',{}),expected)
+            self.assertEqual(body,before)
 
     def test_access_only_document_is_private_and_cannot_overwrite_a_generation(self):
         """业务发布只保存AT，原代次和权威RT保持隔离。@return 无。"""
@@ -526,7 +650,7 @@ class AgyRuntimeTests(unittest.TestCase):
             'generationConfig': {'temperature': 0.2, 'topP': 0.8, 'maxOutputTokens': 128}}
         original = copy.deepcopy(body)
         result = gemini_contract.decode_request({'schema_version': 1, 'type': 'gemini_request',
-            'request_id': 'synthetic-request', 'model': 'gemini-synthetic', 'body': body})
+            'request_id': 'synthetic-request', 'model': 'gemini-synthetic', 'body': body}, fixed_model=self.fixed_model)
         self.assertEqual(body, original)
         self.assertEqual(result['native_completion'], {'maxTokens': 128})
         self.assertEqual({item['field'] for item in result['compatibility_notes']},
@@ -537,13 +661,44 @@ class AgyRuntimeTests(unittest.TestCase):
         mapping = decode_catalog({'response': json.dumps({'models': {
             'claude-synthetic': {'model': 'MODEL_PLACEHOLDER_M320'},
             'gemini-synthetic': {'model': 'MODEL_PLACEHOLDER_M36'}}})})
-        configure_model('claude-synthetic', mapping['claude-synthetic'])
         value = gemini_contract.decode_request({'schema_version': 1, 'type': 'gemini_request',
-            'request_id': 'claude-request', 'model': 'claude-synthetic',
+            'request_id': 'claude-request', 'model': 'claude-synthetic', 'native_model': mapping['claude-synthetic'],
             'body': {'contents': [{'parts': [{'text': '合成输入'}]}]}})
         self.assertEqual(value['model'], 'MODEL_PLACEHOLDER_M320')
         with self.assertRaises(ValueError):
             decode_catalog({'response': {'models': {'claude-unknown': {}}}})
+
+    def test_fixed_model_history_reference_roundtrip(self):
+        """独立内核以固定映射保存并读回旧协议的历史引用。@return 无。"""
+        (self.root / 'histories').mkdir()
+        kernel = Kernel.__new__(Kernel)
+        kernel.state = self.root
+        kernel.fixed_model = self.fixed_model
+        kernel.sequence_file = self.root / 'request-sequence.json'
+        kernel.cfg = {}
+        kernel.lock = threading.RLock()
+        kernel.closing = False
+        kernel.queued = None
+        kernel.active = None
+        kernel.seq = 1
+        kernel.worker = SimpleNamespace(template=None, bridge=SimpleNamespace(generation='synthetic'))
+        kernel.emit = lambda *args, **kwargs: None
+        raw = {'schema_version': 1, 'type': 'request', 'request_id': 'fixed-history',
+            'prompt': '第二问', 'system': '合成系统提示', 'history': [{'role': 'user', 'text': '第一问'}]}
+        first = Scope(request(raw, fixed_model=self.fixed_model), 1, kernel.worker)
+        ident, error = kernel.export_history(first, {'trajectoryId': 'fixture', 'steps': [
+            {'userInput': {'userResponse': '第一问'}},
+            {'plannerResponse': {'response': '第一答'}},
+        ]})
+        self.assertIsNone(error)
+        followup = {'schema_version': 1, 'type': 'request', 'request_id': 'fixed-next',
+            'prompt': '第二问', 'history_id': ident}
+        with patch('agy_runtime.kernel.threading.Thread'):
+            kernel.accept(followup)
+        self.assertEqual(kernel.active.value['model'], self.fixed_model[1])
+        self.assertEqual(kernel.active.value['system'], raw['system'])
+        self.assertEqual(kernel.active.history_count, 2)
+        self.assertEqual(kernel.active.value['messages'][-1], {'role': 'assistant', 'text': '第一答'})
 
     def test_png_directory_uses_verified_model_and_known_flags(self):
         """目录只为已核对的模型报告明确能力。@return 无。"""
@@ -580,10 +735,10 @@ class AgyRuntimeTests(unittest.TestCase):
         user = {'role': 'user', 'parts': [media]}
         raw = {'schema_version': 1, 'type': 'gemini_request', 'request_id': 'gif-trial', 'model': 'gemini-synthetic',
                'body': {'contents': [user, user]}}
-        output = gemini_contract.decode_request(raw)['native_steps']
+        output = gemini_contract.decode_request(raw, fixed_model=self.fixed_model)['native_steps']
         self.assertEqual(output[0]['userInput']['media'][0]['inlineData'], media['inlineData']['data'])
         raw['gif_frames'] = True
-        output = gemini_contract.decode_request(raw)['native_steps']
+        output = gemini_contract.decode_request(raw, fixed_model=self.fixed_model)['native_steps']
         for step in output:
             images = step['userInput']['media']
             self.assertEqual([image['mimeType'] for image in images], ['image/png'] * 8)
@@ -592,7 +747,7 @@ class AgyRuntimeTests(unittest.TestCase):
                     self.assertEqual(frame.convert('RGB').getpixel((0, 0)), original.getpixel((0, 0)))
         raw['body']['contents'] = [user] * 17
         with self.assertRaisesRegex(InputError, 'gif_conversion_limit'):
-            gemini_contract.decode_request(raw)
+            gemini_contract.decode_request(raw, fixed_model=self.fixed_model)
 
     def test_legacy_letter_ids_require_prior_history_evidence(self):
         """已观测旧式编号可恢复，普通纯字母名称单独出现时仍拒绝。@return 无。"""
@@ -600,10 +755,10 @@ class AgyRuntimeTests(unittest.TestCase):
         ids = ['V7rd5Z9q', 'QvKrmPax', 'call_' + 'a1f0' * 8]
         replies = [{'role': 'user', 'parts': [{'functionResponse': {'name': alias, 'response': {}}}]} for alias in ids]
         turns = [turn for reply in replies for turn in (call, reply)]
-        steps = gemini_contract.native_history(turns)
+        steps = gemini_contract.native_history(turns, native_model=self.fixed_model[1])
         self.assertEqual([step['metadata']['toolCall']['id'] for step in steps if 'generic' in step], ids)
         with self.assertRaisesRegex(InputError, 'ambiguous_or_unknown_function_response'):
-            gemini_contract.native_history(turns[2:4])
+            gemini_contract.native_history(turns[2:4], native_model=self.fixed_model[1])
 
     def test_legacy_tool_history_reconstructs_unambiguous_calls_and_keeps_input(self):
         """旧格式按相邻单轮恢复，多个或冲突的历史给出拒绝。@return 无。"""
@@ -611,7 +766,7 @@ class AgyRuntimeTests(unittest.TestCase):
         reply = {'functionResponse': {'name': 'call_123', 'response': {'success': True}}}
         contents = [{'role': 'model', 'parts': [call]}, {'role': 'user', 'parts': [reply]}]
         original = copy.deepcopy(contents)
-        steps = gemini_contract.native_history(contents)
+        steps = gemini_contract.native_history(contents, native_model=self.fixed_model[1])
         self.assertEqual(contents, original)
         original_call = steps[0]['plannerResponse']['toolCalls'][0]
         self.assertEqual(original_call['id'], 'call_123')
@@ -620,9 +775,38 @@ class AgyRuntimeTests(unittest.TestCase):
         for invalid in (contents * 2, [{**contents[0], 'parts': [call, call]}, contents[1]],
                 [contents[0], {'role': 'user', 'parts': [{'text': '间隔'}]}, contents[1]]):
             with self.assertRaisesRegex(InputError, 'function_response'):
-                gemini_contract.native_history(invalid)
+                gemini_contract.native_history(invalid, native_model=self.fixed_model[1])
         with self.assertRaisesRegex(InputError, 'ambiguous_or_unknown_function_response'):
-            gemini_contract.native_history(contents, ['call_123'])
+            gemini_contract.native_history(contents, ['call_123'], native_model=self.fixed_model[1])
+
+    def test_mixed_tool_history_pairs_results_across_user_contents(self):
+        """历史和实时回填按工具名补齐，并保留稍后收到的显式 ID。@return 无。"""
+        names = ('synthetic_lookup', 'synthetic_tool', 'synthetic_tool', 'synthetic_tool')
+        calls = [{'name': name, 'id': f'call-{index}', 'args': {'index': index}}
+            for index, name in enumerate(names)]
+        previous = {'contents': [{'role': 'user', 'parts': [{'text': '合成问题'}]}]}
+        expected = [{'value': index} for index in range(len(calls))]
+        for sequence, with_id in (((1, 2, 3, 0), False), ((2, 1, 3, 0), True)):
+            with self.subTest(with_id=with_id):
+                model_parts = [{'functionCall': {'name': call['name'], 'args': copy.deepcopy(call['args'])}}
+                    for call in calls]
+                replies = [{'functionResponse': {'name': names[index], 'response': copy.deepcopy(expected[index])}}
+                    for index in sequence]
+                if with_id:
+                    model_parts[1]['functionCall']['id'] = calls[1]['id']
+                    replies[1]['functionResponse']['id'] = calls[1]['id']
+                model = {'role': 'model', 'parts': model_parts}
+                contents = [*previous['contents'], model, {'role': 'user', 'parts': replies}]
+                original = copy.deepcopy(contents)
+                self.assertEqual(gemini_contract.continuation_results(previous, calls, {'contents': contents}), expected)
+                history = [*contents[:-1], {'role': 'user', 'parts': replies[:1]},
+                    {'role': 'user', 'parts': replies[1:]}]
+                steps = gemini_contract.native_history(history, native_model=self.fixed_model[1])
+                generic = [step['generic'] for step in steps if 'generic' in step]
+                self.assertEqual([step['args']['index'] for step in generic], ['0', '1', '2', '3'])
+                self.assertEqual([step['result']['resultValue'] for step in generic],
+                    [gemini_contract.native_value(value) for value in expected])
+                self.assertEqual(contents, original)
 
     def test_split_frames_preserve_parts_signature_extensions_and_single_usage(self):
         """兼容投影保留所有Part，并只在最后一帧发布终态与用量。@return 无。"""
@@ -652,7 +836,7 @@ class AgyRuntimeTests(unittest.TestCase):
                     }}]},
                 ]
                 original = copy.deepcopy(turns)
-                plan, reply = gemini_contract.native_history(turns)
+                plan, reply = gemini_contract.native_history(turns, native_model=self.fixed_model[1])
                 planner = plan['plannerResponse']
                 self.assertEqual(planner['thinkingSignature'], '+/8=')
                 self.assertEqual(planner['toolCalls'][0]['thinkingSignature'], '+/8=')
@@ -701,6 +885,13 @@ class AgyRuntimeTests(unittest.TestCase):
                 'response': {'value': '合成结果'}}}]}]
         self.assertEqual(gemini_contract.continuation_results(previous, [call], incoming),
             [{'value': '合成结果'}])
+        continuation = copy.deepcopy(incoming)
+        continuation['contents'].append({'role':'user','parts':[{'text':'收到结果后继续'}]})
+        self.assertEqual(gemini_contract.continuation_results(previous, [call], continuation),
+            [{'value':'合成结果'}])
+        steps = gemini_contract.native_history(continuation['contents'], native_model=self.fixed_model[1])
+        self.assertEqual(steps[-2]['type'], 'CORTEX_STEP_TYPE_GENERIC')
+        self.assertEqual(steps[-1]['userInput']['userResponse'], '收到结果后继续')
         incoming['contents'][-1]['parts'][0]['functionResponse']['name'] = 'old-result-name'
         self.assertEqual(gemini_contract.continuation_results(previous, [call], incoming),
             [{'value': '合成结果'}])
@@ -727,7 +918,7 @@ class AgyRuntimeTests(unittest.TestCase):
             for value in values]}
         incoming = {'contents': [*previous['contents'], model, results]}
         self.assertEqual(gemini_contract.continuation_results(previous, calls, incoming), values)
-        generic = [step for step in gemini_contract.native_history(incoming['contents']) if 'generic' in step]
+        generic = [step for step in gemini_contract.native_history(incoming['contents'], native_model=self.fixed_model[1]) if 'generic' in step]
         self.assertEqual([step['generic']['args']['path'] for step in generic], ['0.txt', '1.txt'])
         self.assertEqual([step['generic']['result']['resultValue'] for step in generic],
             [gemini_contract.native_value(value) for value in values])

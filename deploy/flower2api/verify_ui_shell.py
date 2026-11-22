@@ -101,6 +101,10 @@ class ShellFixture(DashboardUpdateFixture):
             return await self.respond(route, dict(items=[], total=0, page=1, page_size=20, observed_at_ms=int(time.time() * 1000)))
         if path == '/runtime/api/nodes':
             return await self.respond(route, {'items': [dict(id=1, name='本机执行节点', kind='local', node_key='local', enabled=True)]})
+        if path == '/runtime/api/agy-accounts/nodes':
+            # 主线 v1.27 起账号页按此接口读取反重力账号归属；夹具中的反重力账号都归属本机节点。
+            return await self.respond(route, {'items': [dict(account_id=account['id'], node_id=1, node_key='local', node_name='本机执行节点',
+                kind='local', enabled=True, revision=1, phase='ready') for account in self.accounts if account.get('platform') == 'antigravity']})
         if path == '/admin/dashboard' and 'wrong-password' in (route.request.headers.get('authorization') or ''):
             return await self.respond(route, {'error': '合成鉴权失败'}, 401)
         return await super().route(route)

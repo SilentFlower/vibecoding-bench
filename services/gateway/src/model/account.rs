@@ -175,6 +175,9 @@ pub struct Account {
     /// AGY 账号的系统文本同形体策略，缺省关闭。
     #[serde(default)]
     pub agy_system_prompt_homoglyph_enabled: bool,
+    /// AGY Messages 提示词位置试验，缺省关闭。
+    #[serde(default)]
+    pub agy_system_prompt_as_user_reminder: bool,
     /// AGY 账号的 GIF 抽帧策略，缺省关闭。
     #[serde(default)]
     pub agy_gif_frames_enabled: bool,

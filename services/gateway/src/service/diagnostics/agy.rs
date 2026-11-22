@@ -12,7 +12,9 @@ use crate::model::request_diagnostics::{
     DiagnosticTokens, ExecutionLocation, GeminiDiagnosticUsage, NativeRuntimeObservation,
     SystemPromptDiagnostic, ToolTurnDiagnostic,
 };
-use crate::service::agy_contract::{AGY_SOURCE_SHA256, AgyModelId, AgySystemPromptPolicy};
+use crate::service::agy_contract::{
+    AGY_SOURCE_SHA256, AgyModelId, AgySystemPromptPolicy, AgyToolContinuationMode,
+};
 use crate::service::v3_scheduling::SchedulingRequest;
 
 /// 持有一次真实AGY提交的观察归属，HTTP结束后仅补工具收口。
@@ -204,6 +206,32 @@ impl AgyAttemptTrace {
         if let Some(calls) = native["native_model_calls"].as_u64() {
             context.native_model_calls = Some(calls);
         }
+        if let Some(status) = native["observed_control_http_status"]
+            .as_u64()
+            .filter(|status| (100..=599).contains(status))
+        {
+            context.observed_control_http_status = Some(status as u16);
+        }
+        if native["control_error_detail"] == "unexpected_eof" {
+            context.control_error_detail = Some("unexpected_eof".into());
+        }
+        if let Some(detail) = native["tool_protocol_detail"].as_str().filter(|detail| {
+            matches!(
+                *detail,
+                "planner_identity"
+                    | "mcp_callback_rejected"
+                    | "invalid_native_tool_step"
+                    | "mcp_callback_missing"
+            )
+        }) {
+            context.control_error_detail = Some(detail.into());
+        }
+        if let Some(ended) = native["native_receive_ended"].as_bool() {
+            context.native_receive_ended = Some(ended);
+        }
+        if let Some(terminal) = native["native_source_terminal"].as_bool() {
+            context.native_source_terminal = Some(terminal);
+        }
         let control_code = match native["type"].as_str() {
             Some("completed") => native["control_error_code"].as_str(),
             Some("error" | "cancelled" | "tool_turn_finalized") => native["code"].as_str(),
@@ -227,6 +255,8 @@ impl AgyAttemptTrace {
                     | "native_tool_yield_timeout"
                     | "native_tool_yield_failed"
                     | "ambiguous_parallel_function_calls"
+                    | "native_tool_frame_identity"
+                    | "invalid_native_tool_id"
                     | "unsupported_gemini_candidate_count"
                     | "invalid_native_gemini_parts"
                     | "native_safety_endpoint_rejected"
@@ -266,7 +296,7 @@ impl AgyAttemptTrace {
                 enabled: self.policy.enabled,
                 rule_version: self.policy.rule_version.clone(),
                 rule_sha256: report["rule_sha256"].as_str().map(str::to_owned),
-                source: Some("cortex_custom_system".into()),
+                source: report["source"].as_str().map(str::to_owned),
                 changed: report["changed"].as_bool(),
                 replaced_codepoints: report["replaced_codepoints"].as_u64(),
                 system_codepoints: report["system_codepoints"].as_u64(),
@@ -386,6 +416,23 @@ impl AgyAttemptTrace {
             call_hashes: vec![],
         });
         self.publish();
+    }
+
+    /// 保存本次续轮路径，后续工具批次使用自己的策略。
+    /// @param mode 配置策略。@param history 本次使用历史。@param reason 固定切换原因。@return 无返回值。
+    pub(crate) fn continuation_path(
+        &mut self,
+        mode: AgyToolContinuationMode,
+        history: bool,
+        reason: Option<&'static str>,
+    ) {
+        let context = self.record.context.as_mut().expect("AGY固定上下文");
+        if context.tool_continuation_path.is_none() {
+            context.tool_continuation_mode = Some(mode.as_str().into());
+            context.tool_continuation_path = Some(if history { "history" } else { "claim" }.into());
+            context.tool_continuation_reason = reason.map(str::to_owned);
+            self.publish();
+        }
     }
 
     /// 记录本次采集状态。@param status 受控采集结果。@return 无。
@@ -732,6 +779,37 @@ mod tests {
         )
         .unwrap();
         (observer, store, trace)
+    }
+
+    /// 保存 AGY 真实恢复观测，兼容版本较旧的执行记录。@return 无。
+    #[tokio::test]
+    async fn keeps_verified_runtime_start_source() {
+        for source in [None, Some("criu_restore"), Some("unverified")] {
+            let (mut observer, store, _) = fixture().await;
+            let worker = Uuid::new_v4().to_string();
+            let generation = Uuid::new_v4().to_string();
+            let mut event = json!({
+                "type": "request_prepared", "worker_id": worker, "generation": generation,
+                "runtime": {"worker_id": worker, "worker_pid": 12, "kernel_generation": generation,
+                    "warm_hit": false, "preparation_wait_ms": 2, "checkout_ms": 310,
+                    "worker_start_ms": 300, "prepared_ms": 330}
+            });
+            if let Some(source) = source {
+                event["runtime"]["start_source"] = json!(source);
+            }
+            observer.native(&event, &json!({}));
+            observer.finish("success", None);
+            store.flush().await.unwrap();
+            let detail = store.detail(&observer.record.request_id).await.unwrap();
+            let runtime = serde_json::to_value(&detail.attempts[0].runtime).unwrap();
+            if source == Some("unverified") {
+                assert!(runtime.is_null());
+            } else {
+                assert_eq!(runtime["worker_pid"], 12);
+                assert_eq!(runtime["checkout_ms"], 310);
+                assert_eq!(runtime["start_source"].as_str(), source);
+            }
+        }
     }
 
     /// 重复累计帧保留真实零值，异常扩展保持缺口并拒绝字符串。@return 无。

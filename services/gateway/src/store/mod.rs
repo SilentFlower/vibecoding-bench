@@ -3,6 +3,8 @@ pub mod account_store;
 pub mod account_work_schema;
 pub mod agy_media_schema;
 pub mod agy_safety_schema;
+pub mod agy_system_reminder_schema;
+pub mod agy_tool_receipts_schema;
 pub mod cache;
 pub mod database_migrations;
 pub mod database_schema;

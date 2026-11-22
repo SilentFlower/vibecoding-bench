@@ -121,7 +121,7 @@ class DatabaseMigrationTests(unittest.TestCase):
                 "VALUES('cluster-environment','cluster-old',7,'{}')")
         markers = [tuple(row) for row in self.database.execute('SELECT * FROM system_schema_migrations ORDER BY version')]
         assignments = [tuple(row) for row in self.database.execute('SELECT * FROM account_node_assignments')]
-        self.assertEqual(5, apply_migrations(self.database)['current_version'])
+        self.assertEqual(5, apply_migrations(self.database, target=5)['current_version'])
         with self.database:
             self.database.execute("INSERT INTO account_environments(environment_id,name,fingerprint_json) "
                 "VALUES('agy-environment','agy:7','{}')")
@@ -133,7 +133,9 @@ class DatabaseMigrationTests(unittest.TestCase):
         self.assertEqual('compatible_newer', apply_migrations(self.database, registry=previous)['state'])
         self.database.execute("UPDATE accounts SET timezone='Europe/Paris' WHERE id=7")
         self.database.commit()
-        apply_migrations(self.database)
+        self.assertEqual(6, apply_migrations(self.database)['current_version'])
+        self.assertEqual([(7, 1, 1, 'ready')], [tuple(row) for row in self.database.execute(
+            'SELECT account_id,node_id,revision,phase FROM agy_node_assignments')])
         self.assertEqual('Europe/Paris', self.database.execute('SELECT timezone FROM accounts WHERE id=7').fetchone()[0])
         self.assertIsNone(self.database.execute("SELECT account_id FROM account_environments WHERE environment_id='agy-environment'").fetchone()[0])
 

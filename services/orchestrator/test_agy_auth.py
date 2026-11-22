@@ -12,6 +12,8 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 from urllib.parse import urlencode
 
+from requests.exceptions import ReadTimeout
+
 from agy_auth import AgyAuthManager, TOKEN_PATH, authorization_url, native_document, stage_auth_asset
 from runtime_files import atomic_json
 
@@ -80,6 +82,25 @@ class AgyAuthTests(unittest.TestCase):
         windows = snapshot['groups']['items'][0]['windows']
         self.assertEqual(0, windows[0]['remaining_fraction'])
         self.assertIsNone(windows[1]['remaining_fraction'])
+
+    def test_identity_only_verification_uses_at_without_model_catalog(self):
+        """续期收尾只核验来源身份，避免再等待目录。@return 无。"""
+        driver = Mock()
+        driver.exec_run.return_value = SimpleNamespace(exit_code=0, output=json.dumps({
+            'GetUserStatus': {'userStatus': {'email': 'synthetic@example.test'}}}))
+
+        def launch(folder, state, *, interactive, document):
+            self.assertNotIn('refresh_token', document['token'])
+            logs = folder / 'home/.gemini/antigravity-cli/log'
+            logs.mkdir(parents=True)
+            (logs / 'synthetic.log').write_text('Language server listening on random port at 12345 for HTTP')
+            return driver
+
+        with patch.object(self.manager, '_launch', side_effect=launch):
+            result = AgyAuthManager.verify(self.manager, document(), '', identity_only=True)
+        self.assertEqual(result, {'email_address': 'synthetic@example.test'})
+        driver.exec_run.assert_called_once()
+        self.assertEqual(driver.exec_run.call_args.args[0][-1], 'GetUserStatus')
 
     def test_pkce_url_rejects_origin_callback_duplicates_and_fragment(self):
         """只接纳固定 Google PKCE 合同。@return 无。"""
@@ -151,21 +172,98 @@ class AgyAuthTests(unittest.TestCase):
             with self.assertRaises(ValueError): self.manager.recover(identity, account, generation)
         self.assertEqual(self.manager._launch.call_count, 1)
 
-    def test_refresh_omitted_rt_keeps_original_and_uncertainty_does_not_replay(self):
-        """省略RT沿用原操作；断连后只允许对账。@return 无。"""
+    def test_refresh_wait_timeout_completes_with_saved_token(self):
+        """等待超时后核验已落盘的新 AT，省略 RT 时保留原值。@return 无。"""
         identity = 'b'*32
         updated = document()
         del updated['token']['refresh_token']
         updated['token']['access_token'] = 'synthetic-at2'
         def launch(folder, state, **kwargs):
             self.token_file(folder, updated)
-            return SimpleNamespace(wait=Mock(side_effect=TimeoutError))
+            return SimpleNamespace(wait=Mock(side_effect=ReadTimeout))
+
+        def verify(candidate, proxy_url, *, identity_only):
+            self.manager._stop.assert_called_once()
+            self.assertEqual(candidate['token']['access_token'], 'synthetic-at2')
+            self.assertTrue(identity_only)
+            return {'email_address': 'synthetic@example.test'}
+
+        self.manager.verify.side_effect = verify
         self.manager._launch = Mock(side_effect=launch)
-        with self.assertRaises(ValueError): self.manager.refresh(identity, 1, 1, document(), '')
-        with self.assertRaises(ValueError): self.manager.refresh(identity, 1, 1, document(), '')
-        recovered = self.manager.recover(identity, 1, 1)
-        self.assertEqual(recovered['document']['token']['refresh_token'], 'synthetic-rt1')
-        self.assertEqual(self.manager._launch.call_count, 1)
+        result = self.manager.refresh(identity, 1, 1, document(), '')
+        self.assertEqual(result['document']['token']['refresh_token'], 'synthetic-rt1')
+        self.assertNotIn('capabilities', result)
+        self.assertEqual(self.manager.refresh(identity, 1, 1, document(), ''), result)
+        self.assertEqual(self.manager.recover(identity, 1, 1), result)
+        self.manager._launch.assert_called_once()
+        self.manager.verify.assert_called_once()
+
+    def test_refresh_nonzero_native_exit_recovers_rotated_rt(self):
+        """原生命令异常退出后，保留同操作已经保存的新 RT。@return 无。"""
+        updated = document('synthetic-rt2')
+        updated['token']['access_token'] = 'synthetic-at2'
+
+        def launch(folder, state, **kwargs):
+            self.token_file(folder, updated)
+            return SimpleNamespace(wait=lambda timeout: {'StatusCode': 1})
+
+        self.manager._launch = Mock(side_effect=launch)
+        result = self.manager.refresh('b'*32, 1, 1, document(), '')
+        self.assertEqual(result['document'], updated)
+        self.manager.verify.assert_called_once_with(updated, '', identity_only=True)
+
+    def test_refresh_without_valid_output_stays_in_reconcile(self):
+        """临时副本仍处于强制到期状态时保留原操作。@return 无。"""
+        identity = 'b'*32
+
+        def launch(folder, state, **kwargs):
+            self.token_file(folder, kwargs['document'])
+            return SimpleNamespace(wait=Mock(side_effect=ReadTimeout))
+
+        self.manager._launch = Mock(side_effect=launch)
+        for _ in range(2):
+            with self.assertRaisesRegex(ValueError, '待对账'):
+                self.manager.refresh(identity, 1, 1, document(), '')
+        self.assertEqual(self.manager._read(self.manager._folder(identity) / 'state.json')['phase'], 'reconcile')
+        self.manager.verify.assert_not_called()
+        self.manager._launch.assert_called_once()
+
+    def test_refresh_without_verified_identity_keeps_saved_credential_for_recovery(self):
+        """身份核验失败时保留同操作的新凭据，供后续对账。@return 无。"""
+        identity = 'b'*32
+        updated = document('synthetic-rt2')
+        updated['token']['access_token'] = 'synthetic-at2'
+
+        def launch(folder, state, **kwargs):
+            self.token_file(folder, updated)
+            return SimpleNamespace(wait=Mock(side_effect=ReadTimeout))
+
+        self.manager._launch = Mock(side_effect=launch)
+        self.manager.verify.side_effect = ValueError('synthetic-unverified-identity')
+        with self.assertRaisesRegex(ValueError, '待对账'):
+            self.manager.refresh(identity, 1, 1, document(), '')
+        folder = self.manager._folder(identity)
+        self.assertEqual(self.manager._read(folder / 'state.json')['phase'], 'reconcile')
+        self.assertFalse((folder / 'result.json').exists())
+        self.manager.verify.side_effect = None
+        self.assertEqual(self.manager.recover(identity, 1, 1)['document'], updated)
+        self.manager._launch.assert_called_once()
+
+    def test_refresh_without_writer_shutdown_stays_in_reconcile(self):
+        """原容器收口失败时不得核验或发布其凭据。@return 无。"""
+        identity = 'b'*32
+
+        def launch(folder, state, **kwargs):
+            self.token_file(folder, document('synthetic-rt2'))
+            return SimpleNamespace(wait=lambda timeout: {'StatusCode': 0})
+
+        self.manager._launch = Mock(side_effect=launch)
+        self.manager._stop.side_effect = ValueError('synthetic-stop-unconfirmed')
+        with self.assertRaises(ValueError):
+            self.manager.refresh(identity, 1, 1, document(), '')
+        self.assertEqual(self.manager._read(self.manager._folder(identity) / 'state.json')['phase'], 'reconcile')
+        self.manager.verify.assert_not_called()
+        self.assertFalse((self.manager._folder(identity) / 'result.json').exists())
 
     def test_code_submission_is_once_and_wrong_replay_is_rejected(self):
         """重复码复用回执，其他码和取消后的回包隔离。@return 无。"""

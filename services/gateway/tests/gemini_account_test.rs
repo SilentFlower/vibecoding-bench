@@ -51,7 +51,7 @@ async fn fixture() -> (AppState, AnyPool, std::path::PathBuf) {
         Arc::new(UsageStore::new(pool.clone())),
     ));
     let state = AppState {
-        gemini_svc: Arc::new(GeminiService::default()),
+        gemini_svc: Arc::new(GeminiService::new(pool.clone())),
         gateway_svc: gateway,
         account_svc: accounts,
         token_tester: Arc::new(TokenTester::new()),

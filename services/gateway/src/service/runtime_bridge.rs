@@ -10,6 +10,7 @@ use axum::{Json, Router};
 use futures_util::{SinkExt, StreamExt};
 use reqwest::redirect::Policy;
 use reqwest::{Client, Error as ReqwestError};
+use serde::Deserialize;
 use serde_json::{Value, json};
 use std::sync::LazyLock;
 use std::time::Duration;
@@ -23,12 +24,81 @@ use crate::error::AppError;
 use crate::handler::router::AppState;
 use crate::model::proxy::ProxySyncTarget;
 use crate::service::runtime_lease::RuntimeLease;
+use crate::service::runtime_transport::{PreparedTransport, TransportBinding};
 use crate::store::proxy_store::ProxyRecord;
 
 mod task_proxy;
 
 const SESSION_TIMEOUT: Duration = Duration::from_secs(5);
 const STATUS_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// 编排器确认的环境登记和后台绑定结果。
+#[derive(Deserialize)]
+pub(super) struct AgyEnvironmentPreparation {
+    pub environment_id: String,
+    pub generation: u64,
+    pub state: String,
+    pub reason: Option<String>,
+    #[serde(skip)]
+    pub transport: Option<PreparedTransport>,
+}
+
+/// 读取当前权威账号的默认环境。@param account_id 网关账号。@param prepare 是否申请后台运行绑定。
+/// @param budget 剩余控制预算。@return 环境登记回执、当前绑定或者受控等待状态。
+pub(super) async fn agy_environment(
+    account_id: i64,
+    prepare: bool,
+    budget: Duration,
+) -> Result<AgyEnvironmentPreparation, AppError> {
+    #[derive(Deserialize)]
+    struct Reply {
+        #[serde(flatten)]
+        preparation: AgyEnvironmentPreparation,
+        binding: Option<TransportBinding>,
+    }
+
+    let (base, token, client) = config()?;
+    let failed = || AppError::ServiceUnavailable("agy_environment_unavailable".into());
+    let response = client
+        .post(format!("{base}/internal/v3/agy-environments/{account_id}"))
+        .query(&[("prepare", prepare)])
+        .bearer_auth(&token)
+        .timeout(if prepare {
+            budget
+        } else {
+            budget.min(SESSION_TIMEOUT)
+        })
+        .send()
+        .await
+        .map_err(|_| failed())?;
+    if response.status() == reqwest::StatusCode::NOT_FOUND {
+        return Err(AppError::ServiceUnavailable(
+            "orchestrator_upgrade_required".into(),
+        ));
+    }
+    let Reply {
+        mut preparation,
+        binding,
+    } = response
+        .error_for_status()
+        .map_err(|_| failed())?
+        .json()
+        .await
+        .map_err(|_| failed())?;
+    if preparation.state == "bound" {
+        let binding = binding.ok_or_else(failed)?;
+        if !prepare
+            || binding.environment_id != preparation.environment_id
+            || binding.generation != preparation.generation
+        {
+            return Err(failed());
+        }
+        preparation.transport = Some(PreparedTransport::for_agy_preparation(
+            account_id, binding, client, &token,
+        )?);
+    }
+    Ok(preparation)
+}
 
 /// 核对维护前已经登记的 CLI 作业，拒绝旧 owner 的迟到重放。
 /// @param account_id 原账号。
@@ -87,11 +157,12 @@ static MANAGEMENT_CLIENT: LazyLock<Result<Client, ReqwestError>> = LazyLock::new
 
 static AGY_INGRESS_WRITERS: Semaphore = Semaphore::const_new(2);
 
-/// 独立发布已脱敏入口，缺口仅记录诊断。@param account_id 已确认账号。@param attempt_id 实际尝试。@param generation 原环境代次。@param ingress 有界脱敏预览。@return 无。
+/// 独立发布已脱敏入口，缺口仅记录诊断。@param account_id 已确认账号。@param attempt_id 实际尝试。@param generation 原环境代次。@param remote 采集是否经过节点。@param ingress 有界脱敏预览。@return 无。
 pub(crate) fn publish_agy_ingress(
     account_id: i64,
     attempt_id: &str,
     generation: u64,
+    remote: bool,
     ingress: Value,
 ) {
     let Ok(permit) = AGY_INGRESS_WRITERS.try_acquire() else {
@@ -106,7 +177,11 @@ pub(crate) fn publish_agy_ingress(
         let result = client
             .post(path)
             .bearer_auth(token)
-            .timeout(Duration::from_millis(250))
+            .timeout(if remote {
+                SESSION_TIMEOUT
+            } else {
+                Duration::from_millis(250)
+            })
             .json(&json!({"environment_generation":generation,"ingress":ingress}))
             .send()
             .await;
@@ -136,6 +211,55 @@ pub async fn quiesce(account_id: i64, lease: &RuntimeLease) -> Result<(), AppErr
         ));
     }
     Ok(())
+}
+
+/// 在所属编排器准备或收口并发变更。@param account_id 网关账号。@param operation_id 固定操作。@param before 原上限。@param target 新上限。@param phase 准备或收口。@return 同操作的生效回执。
+pub(super) async fn agy_capacity(
+    account_id: i64,
+    operation_id: &str,
+    before: i32,
+    target: i32,
+    phase: &str,
+) -> Result<(), AppError> {
+    let (base, token, client) = config()?;
+    let pending =
+        || AppError::ServiceUnavailable("反重力并发调整结果待核对，请重新读取账号".into());
+    let mut response = client
+        .post(format!("{base}/internal/v3/agy-capacity/{account_id}"))
+        .bearer_auth(token)
+        .json(&json!({"operation_id":operation_id,"before":before,"target":target,"phase":phase}))
+        .timeout(Duration::from_secs(20))
+        .send()
+        .await
+        .map_err(|_| pending())?;
+    let status = response.status();
+    if status == reqwest::StatusCode::NOT_FOUND {
+        return Err(AppError::BadRequest(
+            "反重力运行环境暂不支持在线调整，请先升级".into(),
+        ));
+    }
+    let mut body = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(|_| pending())? {
+        if body.len() + chunk.len() > 4096 {
+            return Err(pending());
+        }
+        body.extend_from_slice(&chunk);
+    }
+    let value: Value = serde_json::from_slice(&body).map_err(|_| pending())?;
+    if status.is_success()
+        && value["ok"] == true
+        && value["operation_id"].as_str() == Some(operation_id)
+    {
+        return Ok(());
+    }
+    let detail = match value["detail"].as_str() {
+        Some("capacity_unsupported") => "反重力发送器暂不支持在线调整，请先升级运行环境",
+        Some("capacity_memory") => "反重力账号内存预算不足，请先调整资源配置",
+        Some("capacity_busy") => "反重力环境的现有资源暂无法安全划拨，请稍后重试",
+        Some("capacity_changed") => "反重力账号配置或环境代次已变化，请重读后重试",
+        _ => return Err(pending()),
+    };
+    Err(AppError::BadRequest(detail.into()))
 }
 
 /// 只读聚合任务账号及登录草稿的代理引用。
@@ -481,11 +605,18 @@ fn browser_path_allowed(method: &Method, path: &str) -> bool {
                 && matches!(*method, Method::GET | Method::PUT)
         });
     }
-    if let Some(account) = api_path.strip_prefix("accounts/") {
+    if api_path == "agy-accounts/nodes" {
+        return *method == Method::GET;
+    }
+    let agy = api_path.starts_with("agy-accounts/");
+    if let Some(account) = api_path
+        .strip_prefix("accounts/")
+        .or_else(|| api_path.strip_prefix("agy-accounts/"))
+    {
         let mut parts = account.split('/');
         let id = parts.next().unwrap_or_default();
         let resource = parts.next();
-        if resource == Some("work-control") {
+        if resource == Some("work-control") && !agy {
             return parts.next().is_none()
                 && id.bytes().all(|value| value.is_ascii_digit())
                 && id.parse::<i64>().is_ok_and(|value| value > 0)
@@ -499,7 +630,8 @@ fn browser_path_allowed(method: &Method, path: &str) -> bool {
                 return false;
             }
             if resource == Some("node") {
-                return parts.next().is_none() && matches!(*method, Method::GET | Method::PUT);
+                return parts.next().is_none()
+                    && (*method == Method::GET || !agy && *method == Method::PUT);
             }
             let Some(operation) = parts.next() else {
                 return matches!(*method, Method::GET | Method::POST);
@@ -516,6 +648,9 @@ fn browser_path_allowed(method: &Method, path: &str) -> bool {
                 Some("resume" | "cancel") => *method == Method::POST && parts.next().is_none(),
                 _ => false,
             };
+        }
+        if agy {
+            return false;
         }
     }
     if api_path == "nodes" {
@@ -547,12 +682,15 @@ fn browser_path_allowed(method: &Method, path: &str) -> bool {
         .filter(|(_, operation)| {
             matches!(
                 operation.split('/').next(),
-                Some("content-capture" | "agy-kernel")
+                Some("content-capture" | "agy-kernel" | "agy-tool-continuation")
             )
         })
     {
         return matches!(*method, Method::GET | Method::POST)
-            && matches!(operation, "content-capture" | "agy-kernel")
+            && matches!(
+                operation,
+                "content-capture" | "agy-kernel" | "agy-tool-continuation"
+            )
             && environment.len() == 32
             && environment.bytes().all(|value| value.is_ascii_hexdigit());
     }
@@ -606,10 +744,14 @@ fn browser_path_allowed(method: &Method, path: &str) -> bool {
 /// @param path 不含查询字符串的管理路径。
 /// @return 普通状态读取的期限，其它请求沿用既有生命周期。
 fn status_timeout(method: &Method, path: &str) -> Option<Duration> {
-    let account_node_status = path.strip_prefix("/api/accounts/").is_some_and(|value| {
-        matches!(value.split('/').nth(1), Some("node" | "node-migrations"))
-            && browser_path_allowed(method, path)
-    });
+    let account_node_status = path == "/api/agy-accounts/nodes"
+        || path
+            .strip_prefix("/api/accounts/")
+            .or_else(|| path.strip_prefix("/api/agy-accounts/"))
+            .is_some_and(|value| {
+                matches!(value.split('/').nth(1), Some("node" | "node-migrations"))
+                    && browser_path_allowed(method, path)
+            });
     let account_work_status = path.ends_with("/work-control") && browser_path_allowed(method, path);
     if *method == Method::GET
         && (path.starts_with("/api/system-updates/") || account_node_status || account_work_status)
@@ -1148,6 +1290,25 @@ mod tests {
         ] {
             assert!(!browser_path_allowed(&method, &invalid), "{invalid}");
         }
+        let agy = format!("/api/agy-accounts/1/node-migrations/{operation}");
+        for (method, path) in [
+            (Method::GET, "/api/agy-accounts/nodes".to_owned()),
+            (Method::GET, "/api/agy-accounts/1/node".to_owned()),
+            (Method::POST, "/api/agy-accounts/1/node-migrations".to_owned()),
+            (Method::GET, agy.clone()),
+            (Method::POST, format!("{agy}/cancel")),
+            (Method::POST, format!("{agy}/resume")),
+        ] {
+            assert!(browser_path_allowed(&method, &path), "{path}");
+        }
+        for (method, path) in [
+            (Method::PUT, "/api/agy-accounts/1/node".to_owned()),
+            (Method::GET, "/api/agy-accounts/1/work-control".to_owned()),
+            (Method::GET, "/api/agy-accounts/0/node".to_owned()),
+            (Method::POST, format!("{agy}/cancel/extra")),
+        ] {
+            assert!(!browser_path_allowed(&method, &path), "{path}");
+        }
     }
 
     /// 新界面依赖的精确资源仅允许只读，不扩展为任意目录访问。
@@ -1180,10 +1341,10 @@ mod tests {
         }
     }
 
-    /// 环境采集和反重力内核只开放精确的读写入口。
+    /// 环境采集、反重力内核和续轮策略只开放精确的读写入口。
     #[test]
     fn environment_controls_are_scoped_to_one_environment() {
-        for action in ["content-capture", "agy-kernel"] {
+        for action in ["content-capture", "agy-kernel", "agy-tool-continuation"] {
             let path = format!("/api/environments/{}/{action}", "a".repeat(32));
             assert!(browser_path_allowed(&Method::GET, &path));
             assert!(browser_path_allowed(&Method::POST, &path));

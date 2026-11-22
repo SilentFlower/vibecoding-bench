@@ -1,14 +1,15 @@
 """解析 Gemini 工具与调用方持有的历史，构造独立 Cortex 输入。"""
 import copy
 import json
+import math
 import re
 from collections import Counter
-from .contract import InputError, MODEL, decode_gemini_bytes, text, tools
+from .contract import InputError, decode_gemini_bytes, text, tools
 from .tool_schema import normalize
 from .input_media import gif_budget, media_part
-from .system_prompt import decode_policy, default_policy, transform_system
+from .models import valid_model_mapping
+from .system_prompt import default_policy, prepare_system
 
-GEMINI_MODEL=None
 BYPASS_SIGNATURE='context_engineering_is_the_way_to_go'
 SAFETY_CATEGORIES={'HARM_CATEGORY_HARASSMENT','HARM_CATEGORY_HATE_SPEECH','HARM_CATEGORY_SEXUALLY_EXPLICIT','HARM_CATEGORY_DANGEROUS_CONTENT'}
 LEGACY_TOOL_ID = re.compile(r'call_[0-9]+')
@@ -44,6 +45,13 @@ def definitions(body, changes):
             if schema=={}:
                 schema={'type':'object','properties':{}}
                 changes.append({'path':location+'/parameters','action':'empty_function_parameters_as_object'})
+            if (value.get('name')=='web_search' and isinstance(schema,dict)
+                    and set(schema)<={'type','properties','additionalProperties','description'}
+                    and str(schema.get('type','object')).lower()=='object'
+                    and schema.get('properties',{})=={} and schema.get('additionalProperties',True) is True):
+                # AGY 在 MCP 调用前拒绝未声明的 query。仅补全可接纳任意属性的旧版声明。
+                schema={**schema,'type':'object','properties':{'query':{'type':'string'}}}
+                changes.append({'path':location+'/parameters/properties/query','action':'legacy_web_search_query'})
             result.append({'name':value.get('name'),'description':value.get('description',''),'input_schema':normalize(schema,location+'/parameters',changes)})
     return tools(result)
 
@@ -117,33 +125,49 @@ def _legacy_tool_history(contents, tool_names):
     return normalized
 
 
-def _matching_call(calls, value, position):
-    name = value.get('name')
-    if not isinstance(name, str) or not name:
+def _ordered_tool_results(calls, values):
+    """按原调用顺序配对一轮结果。@param calls 实际调用。@param values 客户端结果。@return 排好序的结果或空。"""
+    if len(values) != len(calls):
         return None
-    identifier = value.get('id')
-    named = [call for call in calls if call['name'] == name]
-    if 'id' in value and (not isinstance(identifier, str) or not identifier):
-        return None
-    if identifier is None and not named and any(call.get('id') == name for call in calls):
-        identifier = name
-    if identifier is not None:
-        matches = [call for call in (named or calls) if call.get('id') == identifier]
-    else:
-        matches = named
-    if len(matches) == 1:
-        return matches[0]
-    # 只在中转省略同名调用的 ID 时使用原顺序。整轮仍须全部匹配且每项只消费一次。
-    if identifier is None and len(named) > 1 and position < len(calls) and calls[position]['name'] == name:
-        return calls[position]
-    return None
+    results = [None] * len(calls)
+    deferred = []
+    # 先保留可由 ID 核对的位置，再处理可能早于它到达的无 ID 结果。
+    for value in values:
+        if not isinstance(value, dict):
+            return None
+        name, result = value.get('name'), value.get('response')
+        if not isinstance(name, str) or not name or not isinstance(result, dict):
+            return None
+        has_name = any(call['name'] == name for call in calls)
+        if 'id' in value:
+            identifier = value['id']
+            if not isinstance(identifier, str) or not identifier:
+                return None
+        elif has_name:
+            deferred.append((name, result))
+            continue
+        else:
+            identifier = name
+        matches = [index for index, call in enumerate(calls)
+            if (not has_name or call['name'] == name) and call.get('id') == identifier]
+        if len(matches) != 1 or results[matches[0]] is not None:
+            return None
+        results[matches[0]] = result
+    # 不同工具的完成次序可变化，同名组内用原顺序补齐尚未认领的位置。
+    for name, result in deferred:
+        index = next((index for index, call in enumerate(calls)
+            if results[index] is None and call['name'] == name), None)
+        if index is None:
+            return None
+        results[index] = result
+    return results
 
 
-def native_history(contents, tool_names=(), gif=None):
-    """将多 Part 和完整函数结果映射为原生步骤。@param contents Gemini 内容。@param tool_names 已声明工具名称。@param gif 可选 GIF 转换预算。@return 原生步骤。"""
+def native_history(contents, tool_names=(), gif=None, *, native_model):
+    """映射多 Part 和完整函数结果。@param contents Gemini 内容。@param tool_names 工具名。@param gif GIF 预算。@param native_model 本轮执行ID。@return 原生步骤。"""
     if not isinstance(contents,list) or not contents:raise InputError('invalid_gemini_contents')
     contents = _legacy_tool_history(contents, tool_names)
-    steps=[];pending=[];used=set();tool_steps={}
+    steps=[];pending=[];used=set();tool_results=[]
     for i,content in enumerate(contents):
         path='/body/contents/'+str(i);checked_fields(content,{'role','parts'},path)
         role=content.get('role','user');parts=content.get('parts')
@@ -175,17 +199,23 @@ def native_history(contents, tool_names=(), gif=None):
                 value=part['functionResponse'];checked_fields(value,{'name','response','id'},location+'/functionResponse')
                 text(value.get('name'));result=value.get('response')
                 if not isinstance(result,dict):raise InputError('invalid_function_response:'+location)
-                # 保留本轮完整名称集合，避免第二个结果借其他工具名认领剩余调用。
-                call = _matching_call(planner['toolCalls'], value, len(tool_steps)) if pending else None
-                if call is None or call not in pending:raise InputError('ambiguous_or_unknown_function_response:'+location)
-                pending.remove(call)
+                if not pending or len(tool_results) == len(pending):
+                    raise InputError('ambiguous_or_unknown_function_response:'+location)
+                tool_results.append(value)
+        if pending and len(tool_results) == len(pending):
+            # 一个历史工具轮可跨多条用户内容，收齐才能保留较晚出现的显式 ID。
+            ordered = _ordered_tool_results(pending, tool_results)
+            if ordered is None:
+                raise InputError('ambiguous_or_unknown_function_response:'+path)
+            for call, result in zip(pending, ordered):
                 # 结果使用原生 ResultValue，避免把 Gemini 对象再次包成 output 文本。
-                args=json.loads(call['argumentsJson']);native_args={k:v if isinstance(v,str) else encode(v) for k,v in args.items()}
-                tool_steps[call['id']]={'type':'CORTEX_STEP_TYPE_GENERIC','status':'CORTEX_STEP_STATUS_DONE','metadata':{'toolCall':copy.deepcopy(call)},'generic':{'args':native_args,'result':{'resultValue':native_value(result)}}}
-        if tool_steps and not pending:
-            # 原生轨迹按 planner 的调用顺序导入，客户端仍可反序提交结果。
-            steps.extend(tool_steps[call['id']] for call in planner['toolCalls'])
-            tool_steps.clear()
+                args = json.loads(call['argumentsJson'])
+                native_args = {key: value if isinstance(value, str) else encode(value) for key, value in args.items()}
+                steps.append({'type': 'CORTEX_STEP_TYPE_GENERIC', 'status': 'CORTEX_STEP_STATUS_DONE',
+                    'metadata': {'toolCall': copy.deepcopy(call)},
+                    'generic': {'args': native_args, 'result': {'resultValue': native_value(result)}}})
+            pending = []
+            tool_results.clear()
         if role=='model':
             if pending:raise InputError('missing_function_response:'+path)
             planner={'response':'\n'.join(response),'modifiedResponse':'\n'.join(response),'stopReason':'STOP_REASON_STOP_PATTERN'}
@@ -194,8 +224,10 @@ def native_history(contents, tool_names=(), gif=None):
                 native={};call_signature(thinking_signature,native)
                 if 'thinkingSignature' in native:planner['thinkingSignature']=native['thinkingSignature']
                 elif 'thoughtSignature' in native:planner['signature']=native['thoughtSignature']
-            if calls:planner['toolCalls']=calls;pending=copy.deepcopy(calls)
-            steps.append({'type':'CORTEX_STEP_TYPE_PLANNER_RESPONSE','status':'CORTEX_STEP_STATUS_DONE','metadata':{'source':'CORTEX_STEP_SOURCE_MODEL','generatorModel':MODEL},'plannerResponse':planner})
+            if calls:
+                planner['toolCalls'] = calls
+                pending = calls
+            steps.append({'type':'CORTEX_STEP_TYPE_PLANNER_RESPONSE','status':'CORTEX_STEP_STATUS_DONE','metadata':{'source':'CORTEX_STEP_SOURCE_MODEL','generatorModel':native_model},'plannerResponse':planner})
         elif response or media:
             if pending:raise InputError('missing_function_response:'+path)
             user_input = {'userResponse':'\n'.join(response)}
@@ -206,13 +238,23 @@ def native_history(contents, tool_names=(), gif=None):
     return steps
 
 
-def decode_request(raw):
-    """校验 Gemini 业务正文并给出原生执行参数。@param raw 控制信封。@return 内部请求。"""
-    checked_fields(raw,{'schema_version','type','request_id','model','body','system_prompt_policy','gif_frames','disable_safety_filtering','full_egress'},'')
+def decode_request(raw, *, fixed_model: tuple[str, str | int] | None = None):
+    """校验 Gemini 业务输入。@param raw 私有信封。@param fixed_model 独立内核的固定映射。@return 本轮原生执行参数。"""
+    checked_fields(raw,{'schema_version','type','request_id','model','native_model','body','system_prompt_policy','gif_frames','disable_safety_filtering','full_egress','execution_deadline'},'')
     if type(raw.get('schema_version')) is not int or raw['schema_version']!=1 or raw.get('type')!='gemini_request':raise InputError('invalid_schema')
     ident=text(raw.get('request_id'))
     if not ident or len(ident)>128:raise InputError('invalid_request_id')
-    if raw.get('model')!=GEMINI_MODEL:raise InputError('unsupported_gemini_model')
+    execution_deadline=raw.get('execution_deadline')
+    if execution_deadline is not None and (type(execution_deadline) not in (float,int) or not math.isfinite(execution_deadline)
+            or execution_deadline<=0):raise InputError('invalid_request_deadline')
+    if fixed_model is None:
+        native_model = raw.get('native_model')
+        if not valid_model_mapping(raw.get('model'), native_model):
+            raise InputError('invalid_model_mapping')
+    else:
+        public_model, native_model = fixed_model
+        if raw.get('model') != public_model or 'native_model' in raw:
+            raise InputError('unsupported_gemini_model')
     body=raw.get('body');checked_fields(body,{'contents','systemInstruction','generationConfig','tools','safetySettings','toolConfig'},'/body')
     enabled=raw.get('gif_frames',False)
     if type(enabled) is not bool:raise InputError('invalid_media_policy')
@@ -221,12 +263,17 @@ def decode_request(raw):
     full_egress=raw.get('full_egress',False)
     if type(full_egress) is not bool:raise InputError('invalid_capture_policy')
     changes=[];notices=[];declared=definitions(body,changes)
-    steps=native_history(body.get('contents'), (tool['name'] for tool in declared), gif_budget(body,enabled));system=[]
+    system=[]
     if 'systemInstruction' in body:
         value=body['systemInstruction'];checked_fields(value,{'role','parts'},'/body/systemInstruction')
         if value.get('role','user') not in ['user','system']:raise InputError('unsupported_system_role')
         if not isinstance(value.get('parts'),list) or not value['parts']:raise InputError('invalid_system_parts')
         for part in value['parts']:checked_fields(part,{'text'},'/body/systemInstruction/parts');system.append(text(part.get('text')))
+    policy = raw.get('system_prompt_policy', default_policy())
+    submitted, contents, report = prepare_system('\n'.join(system), body.get('contents'), policy)
+    steps = native_history(
+        contents, (tool['name'] for tool in declared), gif_budget(body, enabled), native_model=native_model,
+    )
     completion={}
     if 'generationConfig' in body:
         value=body['generationConfig'];checked_fields(value,{'maxOutputTokens','temperature','topP','responseModalities'},'/body/generationConfig')
@@ -271,34 +318,32 @@ def decode_request(raw):
         # 现有 new-api 会丢弃历史函数 ID；请求单工具生成可避免同名并发结果错配。
         completion['disableParallelToolCalls']=True
         notices.append({'field':'parallel_tool_calls','policy':'native_disable_requested;ordered_same_name_results','reason':'new-api removes function IDs'})
-    policy=decode_policy(raw.get('system_prompt_policy',default_policy()))
-    submitted,report=transform_system('\n'.join(system),policy)
-    return {'request_id':ident,'prompt':'','messages':[],'history_id':None,'system':submitted,'system_prompt_policy':report,'model':MODEL,'tools':declared,'max_generations':1,
+    return {'request_id':ident,'prompt':'','messages':[],'history_id':None,'system':submitted,'system_prompt_policy':report,'model':native_model,'tools':declared,'max_generations':1,
         'request_format':'gemini','gemini_body':copy.deepcopy(body),'native_completion':completion,'native_steps':steps,'schema_changes':changes,'compatibility_notes':notices,
-        'safety_egress_rules':safety_egress_rules,'full_egress':full_egress}
+        'safety_egress_rules':safety_egress_rules,'full_egress':full_egress,'execution_deadline':execution_deadline}
 def continuation_results(previous, calls, incoming):
     """把续轮结果绑定到本 worker 唯一待回填工具轮。@param previous 原始入站正文。@param calls 实际模型调用。@param incoming 新正文。@return 按原调用顺序排列的真实结果。"""
     original=previous['contents'];contents=incoming['contents'];count=len(original)
-    if len(contents)!=count+2 or contents[:count]!=original:raise InputError('gemini_pending_history_mismatch')
-    model,user=contents[count:]
-    if model.get('role')!='model' or user.get('role','user')!='user':raise InputError('gemini_pending_turn_mismatch')
+    if len(contents)<count+2 or contents[:count]!=original:raise InputError('gemini_pending_history_mismatch')
+    model,*users=contents[count:]
+    if model.get('role')!='model' or any(user.get('role','user')!='user' for user in users):
+        raise InputError('gemini_pending_turn_mismatch')
     expected=[{'name':c['name'],'args':c.get('args',{})} for c in calls]
     observed=[{'name':p['functionCall']['name'],'args':p['functionCall'].get('args',{})} for p in model['parts'] if 'functionCall' in p]
     if expected!=observed:raise InputError('gemini_pending_call_mismatch')
     for part, call in zip([p['functionCall'] for p in model['parts'] if 'functionCall' in p], calls):
         if 'id' in part and part['id'] != call.get('id'):raise InputError('gemini_pending_call_mismatch')
     # 拒绝坏图后才能领取原工具轮，避免输入修正时发现结果已被消费。
-    for index, part in enumerate(user['parts']):
-        if isinstance(part, dict):
-            media_part(part, f'/body/contents/{count + 1}/parts/{index}', 'user')
-    values=[p['functionResponse'] for p in user['parts'] if 'functionResponse' in p]
-    indices={id(call):index for index,call in enumerate(calls)}
-    results = {}
-    for position, value in enumerate(values):
-        call = _matching_call(calls, value, position)
-        index = indices.get(id(call))
-        if index is None or index in results or not isinstance(value.get('response'), dict):
-            raise InputError('gemini_pending_results_mismatch')
-        results[index] = copy.deepcopy(value['response'])
-    if len(results)!=len(calls):raise InputError('gemini_pending_results_mismatch')
-    return [results[index] for index in range(len(calls))]
+    values=[];seen_text=False
+    for user_index,user in enumerate(users,count+1):
+        for index, part in enumerate(user['parts']):
+            if not isinstance(part,dict):raise InputError('gemini_pending_turn_mismatch')
+            media_part(part, f'/body/contents/{user_index}/parts/{index}', 'user')
+            if 'functionResponse' in part:
+                if seen_text:raise InputError('gemini_pending_results_mismatch')
+                values.append(part['functionResponse'])
+            seen_text |= 'text' in part
+    ordered = _ordered_tool_results(calls, values)
+    if ordered is None:
+        raise InputError('gemini_pending_results_mismatch')
+    return copy.deepcopy(ordered)

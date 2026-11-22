@@ -1064,6 +1064,7 @@ mod tests {
             agy_system_prompt_homoglyph_enabled: false,
             agy_gif_frames_enabled: false,
             agy_disable_safety_filtering: false,
+            agy_system_prompt_as_user_reminder: false,
             id: 0,
             name: "Prime 测试账号".into(),
             email: email.into(),

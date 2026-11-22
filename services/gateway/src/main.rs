@@ -178,7 +178,6 @@ async fn main() {
         .reload_native_idle_timeout()
         .await
         .expect("原生空闲配置加载失败");
-    gateway_svc.start_native_prewarm();
     gateway_svc
         .reload_system_role_models()
         .await
@@ -297,7 +296,7 @@ async fn main() {
 
     let app = handler::router::build_router(
         &cfg,
-        gateway_svc,
+        gateway_svc.clone(),
         account_svc,
         token_tester,
         token_store,
@@ -315,5 +314,7 @@ async fn main() {
     }
 
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
+    // AGY 登记读取本网关配置，启动巡检前先完成设置加载并绑定监听端口。
+    gateway_svc.start_native_prewarm();
     axum::serve(listener, app).await.unwrap();
 }

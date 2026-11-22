@@ -1,0 +1,42 @@
+{
+  "id": "agy-node-migration",
+  "name": "agy-node-migration",
+  "title": "反重力账号支持节点迁移",
+  "description": "让已有运行环境的反重力账号可以在节点管理中选择目标节点并迁移。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-20",
+  "completedAt": "2026-11-20",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-20T16:38:54Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-20-agy-runtime-followups",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-20T16:38:54+00:00",
+    "completedSteps": [
+      "反重力账号双向节点迁移和持久归属",
+      "真实发送器验证排空、取消、恢复、工具回填和并发热更新",
+      "节点换批预检和兼容性回归"
+    ],
+    "partialStep": null,
+    "nextStep": "发布窗口在具备 CRIU 恢复权限的宿主核对迁移后首轮实际恢复启动",
+    "notes": "隔离宿主 CRIU 预检返回 RESTORE_PRIVILEGE_UNAVAILABLE，实际恢复按发布窗口验证。远程活跃账号迁回本机并收口原迁移后可执行更新或回退。"
+  }
+}

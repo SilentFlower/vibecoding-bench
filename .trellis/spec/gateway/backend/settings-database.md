@@ -24,6 +24,40 @@
 
 SQLite 固定维护入口为 `claude-code-gateway database-migrations plan|apply|verify --operation-id <UUID> --target-version <N>`。迁移台账、签名证据、两库恢复及错误合同统一见[平台自动迁移规范](../../platform/deploy/platform-online-update.md#scenario-自动数据库迁移与原操作恢复)。
 
+## Scenario: Gateway SQLite 连接路径与外键
+
+### 1. Scope / Trigger
+
+适用于 Gateway 数据库连接池初始化和依赖 SQLite 级联删除的存储入口。
+
+### 2. Signatures
+
+- `init_db(driver: &str, dsn: &str) -> Result<AnyPool, sqlx::Error>` 为 async。Gateway 启动和 SQLite 离线迁移共用 `sqlite_connection_options` 解析 `DATABASE_DSN`。启动与 apply 共用 `connect_sqlite`。
+
+### 3. Contracts
+
+- SQLite 分支在每条物理连接建好后、交给业务前执行 `PRAGMA foreign_keys=ON`，覆盖首次、扩容和替换连接。已有库和新建库共用回调。
+- `DATABASE_DSN` 接受裸文件路径和 SQLx SQLite URI。启动与 apply 的默认模式为 `rwc`，显式模式由 URI 提供。创建父目录以 SQLx 解码后的 SQLite 文件路径为准。
+- 离线 plan 和 verify 强制 `mode=ro`。离线维护在打开连接前检查解析出的文件路径并拒绝符号链接。
+- WAL 按 SQLite 文件设置。PostgreSQL 走原 DSN 连接路径。
+
+### 4. Validation & Error Matrix
+
+- SQLite 建连及回调成功时交付连接。回调执行失败按 SQLx 建连错误处理，出错连接不交给业务。
+- 删除账号或代理时，由对应 SQLite 外键清理关联子行。
+- 无效 SQLite DSN 返回配置或建连错误。离线只读查询遇目标文件缺失即失败。指向符号链接的离线请求返回「数据库维护路径无效」。
+
+### 5. Scenarios and Examples
+
+- 多条连接在并发删除时各自执行外键约束。被替换连接的后继连接也执行约束。
+- 在池上执行一次外键 PRAGMA 只处理该次查询借到的连接。连接级设置放在 `after_connect`。
+- `sqlite:/data/nested%20name/gateway.sqlite` 以 `/data/nested name` 为父目录。用原始 URI 建目录会在当前工作目录留下字面量路径。
+
+### 6. Tests Required
+
+- `sqlite_pool_enforces_foreign_keys_during_concurrent_deletes` 检查池中每条连接及替换连接的外键状态，在真实迁移后的库中并发删除账号与代理。断言其子行清空，其它实体的子行保留。
+- `sqlite_pool_creates_the_decoded_dsn_path` 检查带前缀及编码的实际落盘路径。`sqlite_migrations_resolve_dsn_before_opening_the_file` 运行真实离线 CLI，覆盖缺库只读失败、apply 创建及 verify、带前缀的符号链接拒绝。
+
 ## Settings Key 契约
 
 新增 setting 必须同步：
@@ -271,7 +305,7 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - `/admin/settings` 的 `request_diagnostics_log_mode` 为字符串，默认 `info`；GET 返回实际生效缓存，PUT 在全部写入前校验 `info|debug`。迁移只补缺键，保留显式 debug。
 
 - `RequestDiagnostic`、`AttemptDiagnostic` 管理投影可选字段 `account_name:Option<String>`、`account_email:Option<String>`；None 在响应中省略。
-- `RequestDiagnostic.original_session_id:Option<String>`：原始入站会话，serde default 兼容旧记录，None 在响应中省略；`diagnostics::original_session(&HeaderMap, &Value) -> ()` 在请求作用域冻结一次。
+- `RequestDiagnostic.original_session_id: Option<String>` 和 `derived_session_id: Option<String>` 分别保存客户端原值和网关实际内容派生键。`diagnostics::claude_request_session(&RequestSession, &Value)` 及 `diagnostics::record_request_session(Option<&str>, Option<&str>)` 在根请求作用域冻结值。两字段均以 serde default 读取旧记录，响应省略 None。
 
 ### 3. Contracts
 
@@ -280,11 +314,12 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - 在网关 Token 鉴权后的精确 `/v1/messages` 及AGY Gemini生成入口建立根请求 UUID；每次真实提交建立独立尝试 UUID。多平台扩展遵循本文的AGY请求记录合同。`count_tokens`、模型目录、Hello、后台遥测不混入此请求尝试链。
 - 下游新增 `X-CC2API-Request-Id` 根 UUID；保留已有 `X-Request-Id`，缺失时补根 UUID。根 UUID、最终响应 ID、上游 `request-id/x-request-id` 可用于列表反查；标准 UUID 和 `req_` 字母数字 ID 保留，其它头值先 SHA256。诊断 ID 不增加到发往上游的业务 headers/body。
 - 尝试记录实际冻结画像 key/选择方式、最终模型/max_tokens/thinking 类型与预算/effort/stream/工具数量、匿名 session/thread、响应模型与消息、stop_reason、六类 token、partial、状态、耗时、重试原因和受控错误阶段/类型。未知字段保留 `null`；累计 usage 使用每字段最大值，5m/1h 缓存写明细不重复加入总量。
-- 根记录包含起止时间、下游状态、最终选中账号、结果、尝试数和可选的 `original_session_id`。根状态与尝试实际上游状态分开；中间认证或签名错误不得覆盖后续尝试结果。首字节字段 `ttft_ms` 测量响应头到达耗时，不解释为首个模型文本 token。
+- 根记录包含起止时间、下游状态、最终选中账号、结果、尝试数和可选的会话字段。根状态与尝试实际上游状态分开；中间认证或签名错误不得覆盖后续尝试结果。首字节字段 `ttft_ms` 测量响应头到达耗时，不解释为首个模型文本 token。
 - 本地拒绝、模拟和缓存命中有根记录，但无虚构的上游尝试。EOF、末帧、读取错误和 Drop 只终结一次；HTTP 200 内的错误事件与成功区分，缺用量或采样失败标记 `incomplete/partial`。发送错误不伪造上游 HTTP 状态或断言未提交。
 - 本地 503 的 `error_stage` 由实际失败边界写入：选号为 `account_selection`，凭据解析为 `credentials`，V3 环境/传输绑定准备为 `runtime_prepare`，原生能力检查及原生准备拒绝为 `native_prepare`。`RequestTraceGuard::error` 保留已记录阶段；通用 `AppError::ServiceUnavailable` 缺少边界信息时回退 `gateway`，不能仅凭错误类型归为选号失败。诊断标记不改变响应、准入超时或重试行为。
 - 尝试中的 session/thread/响应消息仅存带账号及标识类型域的 SHA256 前 128 位；线程前驱和响应消息使用同一消息域。只观察既有池解析结果，不能额外 resolve 或刷新 TTL；上游 session 摘要以实际最终 body 为准。
-- 根字段 `original_session_id` 是管理员关联客户端日志的明确明文例外：在入站正文解码后、会话封禁与正文策略前冻结一次，正文通过既有 JSON-string/legacy 提取器优先解析；缺省时读取原始 HeaderMap 中唯一的 `X-Claude-Code-Session-Id`。仅保存非空白、无控制字符、UTF-8 不超过 256 字节的完整值，不 trim 或截断；正文提取值异常时保持未知，不用头值替代。info/debug 均保存，重试、换号和上游映射不改写该值。无客户端会话时保持未知，SDK 生成会话不充当原始值。新增字段以 serde default 兼容旧 JSON，沿用根记录 summary_json、管理鉴权与七天保留期，不新增业务转发头或表结构。
+- `original_session_id` 是管理员关联客户端日志的明文例外。Claude 在入站正文解码后、会话封禁与正文策略前冻结，依次尝试既有 JSON-string/legacy 提取器、`X-Claude-Code-Session-Id`，V3 路径再接受 `X-Session-Id`。反重力 Gemini 读取 `X-Session-Id`。只保存非空白、无控制字符、UTF-8 最多 256 字节的完整值，不 trim 或截断。正文提取值异常时沿原路由并保持诊断原值未知。
+- 缺少原值且有内容派生键时，在 `derived_session_id` 保存实际调度使用的 64 位小写十六进制摘要。已核验的反重力工具接续和重读在缺少原值时沿用原工具轮派生值。本地无有效键和历史缺字段记录保留空值。info/debug 均记录，重试、换号和上游映射不改写已冻结值。两字段沿用根记录 `summary_json`、管理鉴权与七天保留期。
 - 除上述原始会话字段外，默认诊断摘要不持久化正文、工具参数、完整 headers、凭据、Cookie、邮箱、设备 ID、账号 UUID、完整 session 或任意 error.message。按账号显式开启的私有组装快照遵循[CC 组装后私有采集](#scenario-cc-组装后私有采集)。响应模型、参数枚举及错误类型执行白名单；非标准关联头只保存散列。
 - 有界异步队列容量 1024，热路径不等待数据库；每个摘要上限 16 KiB。响应观察按完整 JSON／单行／单事件各限 1 MiB，压缩 SSE 增量解码，不限制整流累计长度；编码层数、窗口及失败边界见[有界响应观察](#scenario-messages-响应的有界事件观察)。`health.dropped_records` 统计丢弃写入事件，`write_failures` 统计写入/清理失败，`observation_failures` 统计采样/解码/解析失败尝试；均为进程内计数，重启清零，日志只输出固定文案、计数及内部 UUID。
 - 模式在入口冻结，独立于诊断存储可用性；排队/在途切换沿原模式。info 在完整内容克隆与写入前关闭私有采集，429/非流式专项全文日志也受同次模式门控；上游错误普通日志只保留长度。debug 继续受账号采集资格和原专项开关限制。设置读取失败保留已生效缓存，首次装配沿 info。
@@ -300,7 +335,8 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 | 模拟、缓存、本地拒绝 | 根结果明确，未发送时尝试数为零 |
 | 选号 / 凭据 / 环境绑定 / 原生准备失败，均返回本地 503 | 分别记录 `account_selection` / `credentials` / `runtime_prepare` / `native_prepare`，保留原 HTTP 响应；无边界的通用 503 为 `gateway` |
 | 原始会话映射、重试、换号 / info 或 debug | 根 original_session_id 保持入站完整值 / 两种模式均记录 |
-| 原始会话缺失、空白、控制字符、超过 256 字节 / 重复会话头且正文缺省 / 旧 JSON 缺字段 | 原始值未知，沿原业务处理 / 原始值未知 / 兼容读取 None |
+| 显式会话缺失或会话头无效，且有稳定输入／无有效派生键／旧 JSON 缺字段 | 保存实际派生键／会话字段可空／兼容读取 None |
+| 已核验的反重力工具接续或重读，缺少客户端值 | 记录原工具轮派生键，保留原工具账号归属 |
 | 账号改名 / 删除 / 旧记录缺展示字段 | 查询当前名称邮箱 / LEFT JOIN 保留诊断及 ID，资料为空 / 兼容读取 |
 | 流内错误、读取异常、取消 | 保留部分 token，受控终态，响应原始字节继续透传 |
 | 损坏压缩、采样超限、非法 JSON | `partial=true`，受控错误类型与观察失败计数，不阻断业务 |
@@ -317,6 +353,7 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - 边界：账号已选中，内部 `/internal/v3/transport/:id` 返回 503，根结果为 `local_rejected/runtime_prepare` 且尝试数为零。错误用法是将所有 `ServiceUnavailable` 归为 `account_selection`；正确处理是在失败出口记录阶段，并由终结保护保留该阶段。
 - 边界：两个真实 session 借用同一上游成员时，真实散列不同、上游散列相同；目标过期后可观察新目标，诊断不能延长旧目标 TTL。
 - 正常：客户端发送原始 session A，上游池映射成 B；根 original_session_id 保存 A，尝试保留 A/B 的账号域散列。错误用法：以 sender 生成的 B 填充原始字段。正确处理：入站解码后冻结 A，所有后续映射只补充原有尝试摘要。
+- 正常：普通 API 缺少客户端值，网关以派生键 K 绑定账号。列表和详情均下发 `derived_session_id=K`，页面可复制同一完整值。原始字段跟随客户端提供的值，摘要分别保存。
 - 错误用法：HTTP 200 且没有完整 usage 就填零并标成功，或把缓存/中间重试写入原费用表。正确处理：未知值为 `null`，结果与完整性分开判定，费用保持原语义。
 - PostgreSQL 可空正整数示例：`.bind(request.account_id.unwrap_or(0))` 配合 `NULLIF($7,0)`；不能直接复用先绑定 `None::<i64>`、再绑定实值的 Any 缓存语句，也不能把未知账号持久化为真实 0。
 - 正常：info 请求排队后切换 debug，该次仍保存 info 摘要且完整内容零落盘；后续请求采用 debug。错误用法是发送时重读模式或用当前设置填补历史模式。正确处理是入口冻结并读取各记录的可选字段。
@@ -330,6 +367,7 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - `diagnostics_preserve_bytes_and_correlate_anonymous_sessions`：最终参数、stop_reason、null token、匿名标识、头值保留/散列反查及合成秘密不泄露。
 - `diagnostics_local_503_preserves_failure_stage_and_uses_generic_fallback`：四类明确阶段及无阶段的通用 503，经响应消费和实际持久化后保留正确阶段、503 状态和 `local_rejected`；响应正文保持原样，摘要不包含任意错误文本且尝试数为零。
 - `original_session_diagnostics_freeze_ingress_and_validate_boundaries`、`original_session_diagnostics_survive_local_policy_rejection`：正文/单头来源、重复头、两种日志模式、本地响应和正文拒绝、冻结一次、UTF-8 256 字节边界、控制字符、列表与详情一致；存储合同追加重开连接保留原始值、换号保持原值及旧 JSON 缺字段断言。
+- `v3_messages_routes_and_records_derived_sessions`、`verify_agy_gemini.py` 覆盖派生调度键与根摘要同值、工具回填继承和显式值优先。`verify_management_ui.py::verify_request_metadata` 核对列表与详情的原始值、派生标记、旧记录空态和完整复制。
 - `diagnostics_record_stream_errors_and_cancellation_once`、`diagnostics_report_observation_failures_without_changing_bytes`、`diagnostics_cover_early_cancellation_and_unavailable_storage`：流内错误、读取失败、取消、超限/解码/解析、数据库故障与响应保真。
 - `diagnostics_overload_and_write_failures_are_observable` 与 `diagnostics_routes_require_admin_and_expose_committed_requests`：队列立即返回、健康计数、管理员鉴权、分页错误和详情查询。
 - Gateway 现有真实 HTTP 回归：`gateway_usage_records_real_responses_once_without_telemetry` 验证 JSON/SSE/gzip/取消、缓存/count_tokens 与费用次数；签名重试、OAuth 恢复、setup 换号及 `gateway_hello_probe_reuses_resolved_upstream_session` 核对独立尝试、实际画像和会话归属。
@@ -581,6 +619,7 @@ let observed = capture.observation(complete);
 - `RequestDiagnostic.context`与`AttemptDiagnostic.context`为可缺省的`DiagnosticContext`。根冻结`platform/entry_protocol/requested_model`；尝试记录`kernel/kernel_version/source_sha256/submitted_model/response_model_version`、凭据/环境/worker代次及原生会话。
 - `GET /admin/request-diagnostics`追加`platform/entry_protocol/kernel_version/requested_model/actual_model`；与原account_id、时间、结果及关联ID组合。`platform=claude_code|antigravity|history_unknown`，协议为`anthropic_messages|gemini|history_unknown`；模型及版本为最多128字节的安全标识。
 - `gateway.request-records.6`由`request_records_schema.rs`定义：根表追加可空TEXT列`platform/entry_protocol/requested_model`，尝试表追加`platform/kernel_version/actual_model`及对应查询索引。步骤1—5保持原摘要，发布精确源码映射同步。
+- `RequestDiagnostic.context.replay_of_request_id`为可缺省字符串，关联已受理工具续轮的 HTTP 根 UUID。
 - `AgyAttemptTrace::tool_finalized(status)`只更新工具结果；`finalized(status)`仅由已核对的`job_finalized`调用，限定更新`control_state/control_observed_at`。
 - 管理采集沿`GET /admin/request-diagnostics/:request_id/captures/:attempt_id`。受信内部读取为`GET /internal/v3/native-captures/:account_id/:attempt_id?platform=antigravity`；独立入站发布为`POST /internal/v3/agy-ingress/:account_id/:attempt_id`，正文精确包含`environment_generation:StrictInt`与`ingress:dict`。
 
@@ -589,6 +628,7 @@ let observed = capture.observation(complete);
 - 每个已鉴权生成HTTP建立一根；HTTP根UUID与实际提交attempt UUID独立。在真实私有发送边界计尝试；准备拒绝为零，传输未知保持未知。认证恢复沿一根创建独立尝试，标记oauth_recovery并保留每代凭据和同HTTP策略。
 - 平台按实际入口冻结。AGY调用Claude模型仍为antigravity/AGY1.5.9。历史context缺失保持未知，不用当前账号平台、策略或版本回填。五类新增筛选在SQL中执行；history_unknown覆盖缺失事实。counts只移除结果维度，保留其余条件及服务端分页。
 - 工具下一HTTP从已验证ToolTurn取得前驱根与attempt。工具状态与物理控制终态分别观察；工具已完成后控制仍可未知或失败。提前原生error/cancelled只终结所观测的模型尝试。仅实际job_finalized登记控制收口；重复回执保持首次状态和时刻。限定补写保持原HTTP结果、起止时间和尝试数。
+- 工具回填重读保留自身 HTTP 根和状态，记录原账号及 `replay_of_request_id`。成功重读标记 `cache_hit`，已发 SSE 响应头后读到错误终态标记 `incomplete`。重读根的尝试数为 0，源用量归原发送。响应帧在网关内存随原截止回收，诊断不保存额外的响应副本。
 - 源用量来自Gemini usageMetadata，输入/输出/缓存读取/思考/总量分别保留，累计字段取最大值。缺省为未知，真实零保持零。原始用量最多32字段、每数组32项及4096字节，字符串扩展被移除；缺失必要计数、畸形或截断标记不完整。源模型版本使用安全标识。私有响应头耗时标记agy_account_sender来源；首次有效输出另计。
 - 摘要仅存显式元数据、受控状态及账号域工具散列；正文和工具参数留在权限控制的内容视图。模式在HTTP入口冻结，debug与账号目录共同决定采集；同HTTP恢复复用原策略。诊断队列及采集故障只形成缺口，保持原业务提交、重试、字节及许可语义。
 - 快照来源分别为gateway_http_ingress/http_logical_bytes、decoded_gemini_input和cortex_submission/native_cascade_prompt_sections。原始HTTP长度/摘要在脱敏前计算；显示副本脱敏重复秘密。入口保留既有captured_at_ms；入站旁路缺失显示unavailable。最终TLS线字节沿未采集状态，不以Cortex提交替代。
@@ -603,6 +643,7 @@ let observed = capture.observation(complete);
 | AGY调用Claude / 401恢复 | 平台保持AGY / 同根独立尝试与凭据代次 |
 | 工具完成后退役失败 / 原生取消先于idle | 工具结果独立 / 实际作业回执前控制未知 |
 | 重复物理回执 / 工具晚补写 | 保留首次控制状态及时刻 / 原HTTP时间和结果保持 |
+| 重读原工具续轮 / SSE 尾帧失败 | 关联原根、零次额外尝试 / HTTP 状态保留并记录 `incomplete` |
 | 缺失context / 缺失用量 / 真实0 | 历史未记录 / 未观测及partial / 显示0 |
 | 非法筛选 / 非法代次或附加字段 | 管理查询400 / 内部DTO422或旧代次409 |
 | 匿名 / 错请求或账号 / 链接或越界 | 鉴权拒绝 / 归属拒绝 / 受控采集失败 |
@@ -613,11 +654,13 @@ let observed = capture.observation(complete);
 
 - 正常：管理员以platform=antigravity和requested_model查询一次401恢复，查看同根两次凭据代次、源用量及冻结策略，再按原attempt读取独立阶段。
 - 边界：工具HTTP已成功，tool_turn_finalized表示工具完成；排空期间control_state保持未知，实际job_finalized=error后仅控制显示失败，原HTTP结果和耗时保持。
+- 例：回填请求 A 产出下一轮工具调用，重复 HTTP B 在原截止内得到同一响应。查询 B 的 `context.replay_of_request_id` 可定位 A 的实际尝试。
 - 错误用法：工具完成时写入物理completed，或把每帧累计token求和。正确处理：分离工具和job回执，源计数取最大值并保留未知。
 
 ### 6. Tests Required
 
 - Rust诊断/存储覆盖双库组合筛选、全量计数、历史未知、真实0、重复源用量、限定晚补写及并行凭据CAS。顺序测试覆盖工具完成后控制失败、取消先于回执、重复回执及HTTP起止保持。
 - test_agy_capture及test_agy_capture_api覆盖三种来源、重复秘密、入站时间、共享预算、过期清理、活跃保护、链接/硬链接、嵌套白名单、服务鉴权和环境代次。
+- `verify_agy_native_loopback.py --parallel-tools` 核对并发重读、响应后重读的 SQLite 原根关联及零尝试，并确认原根记录一次接续模型尝试。
 - verify_agy_gemini.py核对真实HTTP/SQLite与合成发送器；verify_agy_native_loopback.py --homoglyph独立核对固定原版、本地TLS/MCP、真实尝试及入站旁路；--capture-off验证关闭路径。真实外部模型预算为0。
 - verify_agy_request_records.py --image <固定测试镜像> --baseline <旧网关副本>验证5→6、重复迁移、旧程序读写及真实UI/API/SQLite；verify_management_ui.py保持CC旧视图、迟到回包与移动端回归。窄屏截图先等待弹窗实际宽度并断言左右边界。

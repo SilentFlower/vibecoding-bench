@@ -10,15 +10,19 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tokio::sync::RwLock;
+use tokio::net::TcpListener;
+#[cfg(unix)]
+use tokio::signal::unix::{SignalKind, signal};
+use tokio::sync::{OwnedRwLockReadGuard, RwLock};
 use tokio::time::{Instant, timeout, timeout_at};
 use uuid::Uuid;
 
 use axum::Json;
 use axum::Router;
 use axum::body::{Body, Bytes};
-use axum::extract::{DefaultBodyLimit, State};
+use axum::extract::{DefaultBodyLimit, Request, State};
 use axum::http::{HeaderMap, HeaderValue, Method};
+use axum::middleware::{Next, from_fn_with_state};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use base64::Engine;
@@ -36,8 +40,9 @@ use crate::error::AppError;
 use crate::model::account::Account;
 use crate::model::request_diagnostics::{ExecutionLocation, RequestLogMode};
 use crate::service::agy_contract::{
-    AgyAccessSnapshot, AgyModelId, AgySenderConfig, AgySubmission, AgySystemPromptPolicy,
-    AgyToolCompletion,
+    AGY_REQUEST_SECONDS, AgyAccessSnapshot, AgyModelId, AgyOperation, AgySenderConfig,
+    AgySubmission, AgySystemPromptPolicy, AgyToolCompletion, AgyToolContinuationMode,
+    AgyWarmPreparation,
 };
 use crate::service::agy_runtime::AgyPool;
 use crate::service::gemini::agy_input_rejection;
@@ -57,6 +62,13 @@ const AGY_TOOL_FINALIZATION_FAILED: &str = "x-flower2api-agy-finalization-failed
 
 const META_HEADER: &str = "x-v3-request";
 const ERROR_HEADER: &str = "x-v3-transport-error";
+/// 核对可信 sender 在原生提交前的显式拒绝。@param response 绑定的私有响应。@return 未进入发送边界。
+pub(super) fn agy_rejected_before_send(response: &reqwest::Response) -> bool {
+    response
+        .headers()
+        .get(ERROR_HEADER)
+        .is_some_and(|value| value == "before-send")
+}
 const NODE_RELAY_PREFIX: &str = "/cluster-transports/v2/";
 /// 私有请求最多持有的单调执行预算。
 pub(crate) const REQUEST_BUDGET_MS: u64 = 120_000;
@@ -73,6 +85,19 @@ pub struct TransportBinding {
     pub secret: String,
     #[serde(default)]
     pub release_id: String,
+}
+
+/// 管理面返回的业务绑定，续轮策略在单次派发内冻结。
+#[derive(Deserialize)]
+struct RuntimeBinding {
+    #[serde(flatten)]
+    binding: TransportBinding,
+    #[serde(default)]
+    agy_tool_continuation_mode: AgyToolContinuationMode,
+    #[serde(default)]
+    agy_tool_continuation_protocol: u32,
+    #[serde(default)]
+    agy_generation_seconds: u64,
 }
 
 /// 请求元信息与原始 body 分开传输，避免重新序列化改变协议字节。
@@ -257,9 +282,129 @@ async fn send_with_client(
 pub struct PreparedTransport {
     account_id: i64,
     route: PreparedRoute,
+    tool_continuation_mode: AgyToolContinuationMode,
+    long_agy_generation: bool,
 }
 
 impl PreparedTransport {
+    /// 读取发送器和已选内核共同支持的生成预算。@return 原生生成时长。
+    pub(super) fn agy_generation_budget(&self) -> Duration {
+        Duration::from_millis(if self.long_agy_generation {
+            AGY_REQUEST_SECONDS as u64 * 1000
+        } else {
+            REQUEST_BUDGET_MS
+        })
+    }
+
+    /// 核对编排器授予的 AGY 后台绑定。@param account_id 权威账号。
+    /// @param binding 已运行或首次获准启动的环境。@param client 内部管理客户端。
+    /// @param secret 私有转接认证。@return 只用于当前已确认环境的发送通道。
+    pub(super) fn for_agy_preparation(
+        account_id: i64,
+        binding: TransportBinding,
+        client: Client,
+        secret: &str,
+    ) -> Result<Self, AppError> {
+        validate_binding(
+            &binding,
+            account_id,
+            &std::env::var("V3_DEPLOYMENT_ID").unwrap_or_default(),
+            &configured_account_release(),
+        )?;
+        let client = binding_client(client, &binding, secret)?;
+        Ok(Self {
+            account_id,
+            route: PreparedRoute::V3 { client, binding },
+            tool_continuation_mode: AgyToolContinuationMode::Claim,
+            long_agy_generation: false,
+        })
+    }
+
+    /// 只读核对绑定和实际池。@return 当前环境的发送器状态。
+    pub(super) async fn agy_preparation_status(&self) -> Result<Value, AppError> {
+        let unavailable = || AppError::ServiceUnavailable("agy_status_failed".into());
+        let PreparedRoute::V3 { client, binding } = &self.route else {
+            return Err(unavailable());
+        };
+        let status: Value = client
+            .get(format!("{}/internal/status", binding.endpoint))
+            .bearer_auth(&binding.secret)
+            .timeout(Duration::from_secs(10))
+            .send()
+            .await
+            .and_then(reqwest::Response::error_for_status)
+            .map_err(|_| unavailable())?
+            .json()
+            .await
+            .map_err(|_| unavailable())?;
+        if status["environment_id"].as_str() != Some(binding.environment_id.as_str())
+            || status["generation"].as_u64() != Some(binding.generation)
+            || !status["agy"].is_object()
+        {
+            return Err(unavailable());
+        }
+        Ok(status)
+    }
+
+    /// 请求同一绑定的零模型热准备。@param request_id 本次控制请求。
+    /// @param snapshot 同代 AT。@param deadline 原单调截止。@param capture_enabled 当前采集模式。
+    /// @return 已完成真实握手的 PID，业务占用时为空。
+    pub(super) async fn warm_agy(
+        &self,
+        request_id: &str,
+        snapshot: AgyAccessSnapshot,
+        deadline: Instant,
+        capture_enabled: bool,
+    ) -> Result<Option<u64>, AppError> {
+        let failed = || AppError::ServiceUnavailable("agy_warm_failed".into());
+        let PreparedRoute::V3 { client, binding } = &self.route else {
+            return Err(failed());
+        };
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Err(failed());
+        }
+        let input = AgyWarmPreparation {
+            account_id: self.account_id,
+            environment_id: binding.environment_id.clone(),
+            generation: binding.generation,
+            request_id: request_id.into(),
+            deadline_unix_ms: now_ms().saturating_add(remaining.as_millis() as u64),
+            credential_snapshot: snapshot,
+            capture_enabled,
+        };
+        let mut response = client
+            .post(format!("{}/internal/agy/warm", binding.endpoint))
+            .bearer_auth(&binding.secret)
+            .json(&input)
+            .timeout(remaining)
+            .send()
+            .await
+            .map_err(|_| failed())?;
+        if response.status() == StatusCode::NOT_FOUND {
+            return Err(AppError::ServiceUnavailable(
+                "sender_upgrade_required".into(),
+            ));
+        }
+        if !response.status().is_success() {
+            return Err(failed());
+        }
+        // 准备协议只返回带归属的握手及终态两条短事件。
+        let mut body = Vec::new();
+        while let Some(chunk) = response.chunk().await.map_err(|_| failed())? {
+            if body.len() + chunk.len() > 4096 {
+                return Err(failed());
+            }
+            body.extend_from_slice(&chunk);
+        }
+        read_agy_warm_receipt(&body, &input).ok_or_else(failed)
+    }
+
+    /// 读取管理面本次派发选择。@return 冻结的工具续轮策略。
+    pub(crate) fn tool_continuation_mode(&self) -> AgyToolContinuationMode {
+        self.tool_continuation_mode
+    }
+
     /// 向原发送器登记取消，原事件流负责接收实际收口。@param request_id 原尝试。@param api_token_id 原调用方。@param deadline 截止。@return 取消已登记。
     pub(crate) async fn cancel_agy(
         &self,
@@ -306,6 +451,7 @@ impl PreparedTransport {
             return Err(AppError::ServiceUnavailable("原AGY环境不可用".into()));
         };
         let id = Uuid::new_v4().to_string();
+        let deadline = deadline.min(Instant::now() + Duration::from_millis(REQUEST_BUDGET_MS));
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
             return Err(AppError::BadRequest("原工具轮已到期".into()));
@@ -351,12 +497,16 @@ impl PreparedTransport {
                 }
             }
             if response.status() == StatusCode::BAD_GATEWAY
-                && response.headers().contains_key(AGY_TOOL_FINALIZATION_FAILED)
+                && response
+                    .headers()
+                    .contains_key(AGY_TOOL_FINALIZATION_FAILED)
             {
                 return Err(AppError::AgyToolTurnFailed);
             }
             if response.status().is_server_error() {
-                return Err(AppError::ServiceUnavailable("AGY原工具轮状态暂时不可用".into()));
+                return Err(AppError::ServiceUnavailable(
+                    "AGY原工具轮状态暂时不可用".into(),
+                ));
             }
             return Err(AppError::BadRequest("AGY原工具轮拒绝回填".into()));
         }
@@ -372,8 +522,8 @@ impl PreparedTransport {
         }
         Ok(())
     }
-    /// 在既有受信绑定中提交AGY请求。@param request_id 公共请求身份。@param api_token_id 调用方。@param snapshot AT-only快照。@param model 公开模型。@param native_model 观测枚举。@param body Gemini正文。@param system_prompt_policy 本HTTP冻结的账号策略。@param deadline 原单调截止。@param capture 采集策略。@param full_egress 保存完整脱敏出站正文。@param gif_frames 冻结的 GIF 策略。@param disable_safety_filtering 冻结的原生安全策略。@return 持续到原生作业收口的私有事件流。
-    pub async fn send_agy(
+    /// 在既有受信绑定中提交AGY请求。@param request_id 公共请求身份。@param api_token_id 调用方。@param snapshot AT-only快照。@param model 公开模型。@param native_model 观测枚举。@param body 操作正文。@param system_prompt_policy 本HTTP冻结的账号策略。@param deadline 原单调截止。@param capture 采集策略。@param full_egress 保存完整脱敏出站正文。@param gif_frames 冻结的 GIF 策略。@param disable_safety_filtering 冻结的原生安全策略。@param operation 目标操作。@return 持续到原生作业收口的私有事件流。
+    pub(super) async fn send_agy(
         &self,
         request_id: &str,
         api_token_id: i64,
@@ -387,15 +537,22 @@ impl PreparedTransport {
         full_egress: bool,
         gif_frames: bool,
         disable_safety_filtering: bool,
+        operation: AgyOperation,
     ) -> Result<reqwest::Response, AppError> {
         let PreparedRoute::V3 { client, binding } = &self.route else {
             return Err(AppError::ServiceUnavailable(
                 "AGY需要受管账号运行环境".into(),
             ));
         };
+        let budget = if operation == AgyOperation::Generate {
+            self.agy_generation_budget()
+        } else {
+            Duration::from_millis(REQUEST_BUDGET_MS)
+        };
+        let deadline = deadline.min(Instant::now() + budget);
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
-            return Err(AppError::ServiceUnavailable("AGY请求已到截止时间".into()));
+            return Err(AppError::AdmissionLimited { retry_after: 1 });
         }
         let submission = AgySubmission {
             request: PreparedRequest {
@@ -423,7 +580,7 @@ impl PreparedTransport {
             disable_safety_filtering,
         };
         let mut request = client
-            .post(format!("{}/internal/agy/generate", binding.endpoint))
+            .post(format!("{}{}", binding.endpoint, operation.path()))
             .bearer_auth(&binding.secret)
             .json(&submission);
         if full_egress {
@@ -466,6 +623,8 @@ pub async fn prepare(
         return Ok(PreparedTransport {
             account_id: account.id,
             route: PreparedRoute::Direct(account.proxy_url.clone()),
+            tool_continuation_mode: AgyToolContinuationMode::Claim,
+            long_agy_generation: false,
         });
     }
     let secret = std::env::var("V3_INTERNAL_TOKEN").map_err(|_| {
@@ -546,6 +705,8 @@ pub(crate) async fn prepare_existing(
     Ok(Some(PreparedTransport {
         account_id: account.id,
         route: PreparedRoute::V3 { client, binding },
+        tool_continuation_mode: AgyToolContinuationMode::Claim,
+        long_agy_generation: false,
     }))
 }
 
@@ -595,15 +756,29 @@ async fn prepare_from_runtime(
             .unwrap_or("account environment not ready");
         return Err(AppError::ServiceUnavailable(reason.into()));
     }
-    let binding: TransportBinding = response
+    let RuntimeBinding {
+        binding,
+        agy_tool_continuation_mode,
+        agy_tool_continuation_protocol,
+        agy_generation_seconds,
+    } = response
         .json()
         .await
         .map_err(|_| AppError::ServiceUnavailable("invalid runtime binding".into()))?;
     validate_binding(&binding, account.id, deployment, release)?;
+    if agy_tool_continuation_mode != AgyToolContinuationMode::Claim
+        && agy_tool_continuation_protocol != 1
+    {
+        return Err(AppError::ServiceUnavailable(
+            "当前 AGY 发送器或请求内核暂不支持所选续轮模式".into(),
+        ));
+    }
     let client = binding_client(client, &binding, secret)?;
     Ok(PreparedTransport {
         account_id: account.id,
         route: PreparedRoute::V3 { client, binding },
+        tool_continuation_mode: agy_tool_continuation_mode,
+        long_agy_generation: agy_generation_seconds == AGY_REQUEST_SECONDS as u64,
     })
 }
 
@@ -1038,7 +1213,11 @@ fn configured_account_release() -> String {
 }
 
 #[cfg(unix)]
-fn authorized_previous_release(binding: &TransportBinding, deployment: &str, release: &str) -> bool {
+fn authorized_previous_release(
+    binding: &TransportBinding,
+    deployment: &str,
+    release: &str,
+) -> bool {
     let Ok(directory) = std::env::var("V3_UPDATE_GATE_DIR") else {
         return false;
     };
@@ -1060,7 +1239,9 @@ fn authorized_previous_release(binding: &TransportBinding, deployment: &str, rel
         return false;
     }
     let path = Path::new(&directory).join(format!("account-rollout-{control}.json"));
-    let Ok(record) = crate::service::system_update::read_update_record::<Value>(&path, 8 * 1024 * 1024) else {
+    let Ok(record) =
+        crate::service::system_update::read_update_record::<Value>(&path, 8 * 1024 * 1024)
+    else {
         return false;
     };
     rollout_matches(&record, binding, deployment, &control, release)
@@ -1087,7 +1268,11 @@ fn rollout_matches(
 }
 
 #[cfg(not(unix))]
-fn authorized_previous_release(_binding: &TransportBinding, _deployment: &str, _release: &str) -> bool {
+fn authorized_previous_release(
+    _binding: &TransportBinding,
+    _deployment: &str,
+    _release: &str,
+) -> bool {
     false
 }
 
@@ -1234,7 +1419,8 @@ impl Drop for ActiveRequest {
     }
 }
 
-fn read_config(path: &str) -> Result<SenderConfig, AppError> {
+/// 读取账号角色当前冻结的私有发送配置。@param path 私有路径。@return 已校验配置。
+pub(super) fn read_config(path: &str) -> Result<SenderConfig, AppError> {
     let bytes = std::fs::read(path)
         .map_err(|_| AppError::ServiceUnavailable("sender configuration unavailable".into()))?;
     let mut config: SenderConfig = serde_json::from_slice(&bytes)
@@ -1273,6 +1459,28 @@ fn authenticate(headers: &HeaderMap, config: &SenderConfig) -> Result<(), AppErr
     Ok(())
 }
 
+/// 在读取私有 POST 正文前验证账号证明，handler 仍在提交前重读当前配置。
+/// @param state 发送器状态。@param request 未读取的请求。@param next 下游路由。
+/// @return 已授权的处理结果，或发送前拒绝。
+async fn authenticate_sender_post(
+    State(state): State<SenderState>,
+    request: Request,
+    next: Next,
+) -> Response {
+    let authenticated =
+        read_config(&state.config_path).and_then(|config| authenticate(request.headers(), &config));
+    match authenticated {
+        Ok(()) => next.run(request).await,
+        Err(error) => {
+            let mut response = error.into_response();
+            response
+                .headers_mut()
+                .insert(ERROR_HEADER, HeaderValue::from_static("before-send"));
+            response
+        }
+    }
+}
+
 /// 返回当前 Unix 毫秒，用于私有请求的同一时钟截止。@return UTC 毫秒。
 pub(crate) fn now_ms() -> u64 {
     SystemTime::now()
@@ -1298,6 +1506,15 @@ fn validate_request_at(
     config: &SenderConfig,
     wall_now_ms: u64,
 ) -> Result<Duration, AppError> {
+    validate_request_budget(prepared, config, wall_now_ms, REQUEST_BUDGET_MS)
+}
+
+fn validate_request_budget(
+    prepared: &PreparedRequest,
+    config: &SenderConfig,
+    wall_now_ms: u64,
+    budget_ms: u64,
+) -> Result<Duration, AppError> {
     let url = reqwest::Url::parse(&prepared.target_url)
         .map_err(|_| AppError::BadRequest("invalid upstream URL".into()))?;
     let allowed = reqwest::Url::parse(&config.allowed_origin)
@@ -1310,13 +1527,7 @@ fn validate_request_at(
             .iter()
             .any(|prefix| url.path().starts_with(prefix))
     };
-    if Uuid::parse_str(&prepared.request_id).is_err()
-        || prepared.deadline_unix_ms <= wall_now_ms
-        || prepared.deadline_unix_ms > wall_now_ms.saturating_add(REQUEST_BUDGET_MS + CLOCK_SKEW_MS)
-        || prepared.account_id != config.binding.account_id
-        || prepared.environment_id != config.binding.environment_id
-        || prepared.generation != config.binding.generation
-        || url.origin() != allowed.origin()
+    if url.origin() != allowed.origin()
         || !url.username().is_empty()
         || url.password().is_some()
         || url.fragment().is_some()
@@ -1326,13 +1537,74 @@ fn validate_request_at(
             "runtime request binding or target mismatch".into(),
         ));
     }
+    request_budget(
+        &config.binding,
+        prepared.account_id,
+        &prepared.environment_id,
+        prepared.generation,
+        &prepared.request_id,
+        prepared.deadline_unix_ms,
+        wall_now_ms,
+        budget_ms,
+    )
+}
+
+fn request_budget(
+    binding: &TransportBinding,
+    account_id: i64,
+    environment_id: &str,
+    generation: u64,
+    request_id: &str,
+    deadline_ms: u64,
+    wall_now_ms: u64,
+    budget_ms: u64,
+) -> Result<Duration, AppError> {
+    if Uuid::parse_str(request_id).is_err()
+        || deadline_ms <= wall_now_ms
+        || deadline_ms > wall_now_ms.saturating_add(budget_ms + CLOCK_SKEW_MS)
+        || account_id != binding.account_id
+        || environment_id != binding.environment_id
+        || generation != binding.generation
+    {
+        return Err(AppError::BadRequest(
+            "runtime request binding or target mismatch".into(),
+        ));
+    }
     // 跨进程的墙钟可能回拨；偏差只用于接纳，实际等待仍钳制为原预算。
     Ok(Duration::from_millis(
-        prepared
-            .deadline_unix_ms
-            .saturating_sub(wall_now_ms)
-            .min(REQUEST_BUDGET_MS),
+        (deadline_ms - wall_now_ms).min(budget_ms),
     ))
+}
+
+fn read_agy_warm_receipt(body: &[u8], input: &AgyWarmPreparation) -> Option<Option<u64>> {
+    let mut events = body.strip_suffix(b"\n")?.split(|byte| *byte == b'\n');
+    let mut owned = || {
+        let event: Value = serde_json::from_slice(events.next()?).ok()?;
+        (event["protocol"] == "agy-account-supervisor"
+            && event["schema_version"] == 1
+            && event["account_id"] == input.account_id
+            && event["environment_id"] == input.environment_id
+            && event["environment_generation"] == input.generation
+            && event["request_id"] == input.request_id)
+            .then_some(event)
+    };
+    let prepared = owned()?;
+    let finalized = owned()?;
+    if events.next().is_some()
+        || prepared["type"] != "prepared"
+        || finalized["type"] != "job_finalized"
+        || finalized["status"] != "prepared"
+    {
+        return None;
+    }
+    match prepared["preparation_state"].as_str()? {
+        "ready" => prepared["native_pid"]
+            .as_u64()
+            .filter(|pid| *pid > 0)
+            .map(Some),
+        "busy" if prepared["native_pid"].is_null() => Some(None),
+        _ => None,
+    }
 }
 
 async fn status(
@@ -1345,6 +1617,7 @@ async fn status(
         serde_json::json!({"active": state.active.load(Ordering::SeqCst).max(state.agy_pool.active().await),
         "environment_id": config.binding.environment_id, "generation": config.binding.generation,
         "evidence_ok": !state.evidence_error.load(Ordering::SeqCst),
+        "agy_capture_available": config.agy.is_some() && config.native_capture_dir.is_some(),
         "agy":if config.agy.is_some() {Some(state.agy_pool.status(&config).await)} else {None}}),
     ))
 }
@@ -1428,6 +1701,8 @@ async fn forward(State(state): State<SenderState>, headers: HeaderMap, body: Byt
             *response.status_mut() = code;
             *response.headers_mut() = response_headers;
             response.headers_mut().remove("transfer-encoding");
+            // 发送状态由本地发送器签发，不能采用上游响应中的同名头。
+            response.headers_mut().remove(ERROR_HEADER);
             Ok::<Response, AppError>(response)
         }
         .await;
@@ -1647,12 +1922,12 @@ async fn native_prepare_cancel(
     Ok(Json(serde_json::json!({"cancelled":true})))
 }
 
-/// 沿现有账号鉴权和环境准入分派AGY私有请求。@param state 发送器。@param headers 服务证明。@param submission 冻结信封。@param prepare 是否仅准备。@return 原生私有事件流。
+/// 沿现有账号鉴权和环境准入分派AGY私有请求。@param state 发送器。@param headers 服务证明。@param submission 冻结信封。@param operation 目标操作。@return 原生私有事件流。
 async fn agy_operation(
     state: SenderState,
     headers: HeaderMap,
     mut submission: AgySubmission,
-    prepare: bool,
+    operation: AgyOperation,
 ) -> Response {
     let mut started = false;
     let result = async {
@@ -1664,7 +1939,14 @@ async fn agy_operation(
                 "该账号环境未配置AGY内核".into(),
             ));
         }
-        let deadline = validate_request(&submission.request, &config)?;
+        let budget_ms = if operation == AgyOperation::Generate {
+            AGY_REQUEST_SECONDS as u64 * 1000
+        } else {
+            REQUEST_BUDGET_MS
+        };
+        let now = Instant::now();
+        let deadline =
+            now + validate_request_budget(&submission.request, &config, now_ms(), budget_ms)?;
         submission.validate(now_ms())?;
         let target = reqwest::Url::parse(&submission.request.target_url)
             .map_err(|_| AppError::BadRequest("AGY目标无效".into()))?;
@@ -1676,9 +1958,10 @@ async fn agy_operation(
         }
         state.active.fetch_add(1, Ordering::SeqCst);
         let guard = ActiveRequest(state.active.clone());
-        submission.capture_enabled =
-            submission.capture_enabled && config.native_capture_dir.is_some();
-        submission.full_egress = !prepare
+        submission.capture_enabled = submission.capture_enabled
+            && operation != AgyOperation::Search
+            && config.native_capture_dir.is_some();
+        submission.full_egress = operation == AgyOperation::Generate
             && submission.capture_enabled
             && headers
                 .get("x-v3-agy-egress-body")
@@ -1686,19 +1969,9 @@ async fn agy_operation(
         started = true;
         let response = state
             .agy_pool
-            .submit(&config, submission, deadline, prepare)
+            .submit(&config, &state.config_path, submission, deadline, operation)
             .await?;
-        let (parts, body) = response.into_parts();
-        let stream = unfold(
-            (body.into_data_stream(), guard, transition),
-            |(mut stream, guard, transition)| async move {
-                stream
-                    .next()
-                    .await
-                    .map(|item| (item, (stream, guard, transition)))
-            },
-        );
-        Ok::<Response, AppError>(Response::from_parts(parts, Body::from_stream(stream)))
+        Ok::<Response, AppError>(hold_agy_stream(response, guard, transition))
     }
     .await;
     result.unwrap_or_else(|error| {
@@ -1713,13 +1986,72 @@ async fn agy_operation(
     })
 }
 
+fn hold_agy_stream(
+    response: Response,
+    guard: ActiveRequest,
+    transition: OwnedRwLockReadGuard<()>,
+) -> Response {
+    let (parts, body) = response.into_parts();
+    let stream = unfold(
+        (body.into_data_stream(), guard, transition),
+        |(mut stream, guard, transition)| async move {
+            stream
+                .next()
+                .await
+                .map(|item| (item, (stream, guard, transition)))
+        },
+    );
+    Response::from_parts(parts, Body::from_stream(stream))
+}
+
+/// 按私有环境身份准备可复用进程。@param state 发送器。
+/// @param headers 服务证明。@param input 冻结环境及凭据。@return 私有握手及终态事件。
+async fn agy_warm(
+    State(state): State<SenderState>,
+    headers: HeaderMap,
+    Json(mut input): Json<AgyWarmPreparation>,
+) -> Result<Response, AppError> {
+    let transition = state.native_transition.clone().read_owned().await;
+    let config = read_config(&state.config_path)?;
+    authenticate(&headers, &config)?;
+    if config.agy.is_none() {
+        return Err(AppError::ServiceUnavailable(
+            "该账号环境未配置AGY内核".into(),
+        ));
+    }
+    let monotonic_now = Instant::now();
+    let wall_now_ms = now_ms();
+    let budget = request_budget(
+        &config.binding,
+        input.account_id,
+        &input.environment_id,
+        input.generation,
+        &input.request_id,
+        input.deadline_unix_ms,
+        wall_now_ms,
+        REQUEST_BUDGET_MS,
+    )?;
+    input.credential_snapshot.validate(wall_now_ms)?;
+    if input.credential_snapshot.account_id != input.account_id {
+        return Err(AppError::BadRequest("AGY准备凭据归属不匹配".into()));
+    }
+    input.capture_enabled &= config.native_capture_dir.is_some();
+    state.active.fetch_add(1, Ordering::SeqCst);
+    let guard = ActiveRequest(state.active.clone());
+    let response = state
+        .agy_pool
+        .warm(&config, &state.config_path, input, monotonic_now + budget)
+        .await?;
+    Ok(hold_agy_stream(response, guard, transition))
+}
+
 /// 只准备AGY进程，模型提交为零。@param state 发送器。@param headers 服务证明。@param submission 准备身份。@return 准备事件流。
 async fn agy_prepare(
     State(state): State<SenderState>,
     headers: HeaderMap,
     Json(submission): Json<AgySubmission>,
 ) -> Response {
-    agy_operation(state, headers, submission, true).await
+    agy_operation(state, headers, submission, AgyOperation::Prepare).await
 }
 
 /// 验证原环境并完成工具回填，独立于新凭据发布。@param state 发送器。@param headers 受信证明。@param input 原工具归属。@return 真实收口回执。
@@ -1773,7 +2105,17 @@ async fn agy_generate(
     headers: HeaderMap,
     Json(submission): Json<AgySubmission>,
 ) -> Response {
-    agy_operation(state, headers, submission, false).await
+    agy_operation(state, headers, submission, AgyOperation::Generate).await
+}
+
+/// 执行同代账号的原版搜索。@param state 发送器。@param headers 服务证明。
+/// @param submission 查询和账号归属。@return 搜索收口事件流。
+async fn agy_search(
+    State(state): State<SenderState>,
+    headers: HeaderMap,
+    Json(submission): Json<AgySubmission>,
+) -> Response {
+    agy_operation(state, headers, submission, AgyOperation::Search).await
 }
 
 #[derive(Deserialize, Serialize)]
@@ -1808,6 +2150,42 @@ async fn agy_cancel(
         .cancel(&input.request_id, input.api_token_id)
         .await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// 受信配置生效时核对当前环境与期望的上限。
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AgyCapacityControl {
+    account_id: i64,
+    environment_id: String,
+    generation: u64,
+    max_workers: usize,
+}
+
+/// 将当前文件的容量应用到此发送器的原监督器。@param state 发送器。@param headers 服务证明。@param input 已冻结的归属与上限。@return 实际生效回执。
+async fn agy_capacity(
+    State(state): State<SenderState>,
+    headers: HeaderMap,
+    Json(input): Json<AgyCapacityControl>,
+) -> Result<Json<Value>, AppError> {
+    let max_workers = state
+        .agy_pool
+        .apply_capacity(&state.config_path, |config| {
+            authenticate(&headers, config)?;
+            if input.account_id != config.binding.account_id
+                || input.environment_id != config.binding.environment_id
+                || input.generation != config.binding.generation
+                || config.agy.as_ref().map(|agy| agy.max_workers) != Some(input.max_workers)
+            {
+                return Err(AppError::BadRequest("AGY容量配置或发送器代次已变化".into()));
+            }
+            Ok(())
+        })
+        .await?;
+    Ok(Json(
+        json!({"account_id":input.account_id,"environment_id":input.environment_id,
+        "generation":input.generation,"max_workers":max_workers}),
+    ))
 }
 
 async fn native_forward(
@@ -1898,14 +2276,53 @@ async fn native_forward(
 ///
 /// @param config_path root 所有的账号配置文件路径。
 /// @return 包含发送与活动状态接口的 Router。
+/// 组装独立账号发送器路由。@param config_path 私有绑定文件。@return 发送器路由。
 pub fn sender_router(config_path: String) -> Router {
-    Router::new()
+    sender_components(config_path).0
+}
+
+/// 提供账号发送服务，正常停止时让原监督器写入真实退出回执。
+/// @param listener 已绑定的账号内部端口。@param config_path 私有绑定文件。
+/// @return HTTP 服务的退出结果。
+pub async fn serve_sender(listener: TcpListener, config_path: String) -> std::io::Result<()> {
+    let (router, agy_pool) = sender_components(config_path);
+    #[cfg(unix)]
+    let mut terminate = signal(SignalKind::terminate())?;
+    let result = axum::serve(listener, router)
+        .with_graceful_shutdown(async move {
+            #[cfg(unix)]
+            tokio::select! {
+                _ = terminate.recv() => {}
+                _ = tokio::signal::ctrl_c() => {}
+            }
+            #[cfg(not(unix))]
+            let _ = tokio::signal::ctrl_c().await;
+        })
+        .await;
+    agy_pool.shutdown_idle().await;
+    result
+}
+
+fn sender_components(config_path: String) -> (Router, Arc<AgyPool>) {
+    let agy_pool = Arc::new(AgyPool::default());
+    let state = SenderState {
+        config_path,
+        native_pool: Arc::new(NativePool::default()),
+        agy_pool: agy_pool.clone(),
+        native_transition: Arc::new(RwLock::new(())),
+        active: Arc::new(AtomicU64::new(0)),
+        evidence_error: Arc::new(AtomicBool::new(false)),
+        evidence_lock: Arc::new(Mutex::new(())),
+    };
+    let router = Router::new()
         .route("/internal/send", post(forward))
         .route("/internal/agy/prepare", post(agy_prepare))
+        .route("/internal/agy/warm", post(agy_warm))
         .route("/internal/agy/generate", post(agy_generate))
+        .route("/internal/agy/search", post(agy_search))
         .route("/internal/agy/tools", post(agy_tools))
         .route("/internal/agy/cancel", post(agy_cancel))
-        .route("/internal/native/status", get(native_status))
+        .route("/internal/agy/capacity", post(agy_capacity))
         .route("/internal/native/prepare", post(native_prepare))
         .route("/internal/native/readiness", post(native_readiness))
         .route("/internal/native/idle-policy", post(native_idle_policy))
@@ -1914,17 +2331,12 @@ pub fn sender_router(config_path: String) -> Router {
             post(native_prepare_cancel),
         )
         .route("/internal/native/messages", post(native_forward))
+        .route_layer(from_fn_with_state(state.clone(), authenticate_sender_post))
+        .route("/internal/native/status", get(native_status))
         .route("/internal/status", get(status))
         .layer(DefaultBodyLimit::max(128 * 1024 * 1024))
-        .with_state(SenderState {
-            config_path,
-            native_pool: Arc::new(NativePool::default()),
-            agy_pool: Arc::new(AgyPool::default()),
-            native_transition: Arc::new(RwLock::new(())),
-            active: Arc::new(AtomicU64::new(0)),
-            evidence_error: Arc::new(AtomicBool::new(false)),
-            evidence_lock: Arc::new(Mutex::new(())),
-        })
+        .with_state(state);
+    (router, agy_pool)
 }
 
 #[cfg(test)]
@@ -2097,6 +2509,8 @@ mod tests {
         );
         let server = tokio::spawn(axum::serve(listener, router).into_future());
         let transport = PreparedTransport {
+            tool_continuation_mode: AgyToolContinuationMode::Claim,
+            long_agy_generation: false,
             account_id: 7,
             route: PreparedRoute::V3 {
                 client: Client::new(),
@@ -2158,6 +2572,8 @@ mod tests {
             axum::serve(listener, sender_router(path.to_string_lossy().into_owned())).into_future(),
         );
         let transport = PreparedTransport {
+            tool_continuation_mode: AgyToolContinuationMode::Claim,
+            long_agy_generation: false,
             account_id: 7,
             route: PreparedRoute::V3 {
                 client: Client::new(),
@@ -2190,6 +2606,8 @@ mod tests {
             axum::serve(listener, Router::new()).await.unwrap();
         });
         let transport = PreparedTransport {
+            tool_continuation_mode: AgyToolContinuationMode::Claim,
+            long_agy_generation: false,
             account_id: 7,
             route: PreparedRoute::V3 {
                 client: Client::new(),
@@ -2390,6 +2808,8 @@ mod tests {
             release_id: "synthetic-release".into(),
         };
         let mut transport = PreparedTransport {
+            tool_continuation_mode: AgyToolContinuationMode::Claim,
+            long_agy_generation: false,
             account_id: 7,
             route: PreparedRoute::V3 {
                 client: Client::new(),
@@ -2419,6 +2839,8 @@ mod tests {
         assert_eq!(frozen.generation, 5);
         assert!(
             PreparedTransport {
+                tool_continuation_mode: AgyToolContinuationMode::Claim,
+                long_agy_generation: false,
                 account_id: 7,
                 route: PreparedRoute::Direct(String::new())
             }
@@ -2480,7 +2902,9 @@ mod tests {
             rollout_matches(&record, binding, "isolated", "ci-2-1", "ci-2-1")
         };
         assert!(matches(&binding));
-        assert!(!rollout_matches(&record, &binding, "isolated", "ci-3-1", "ci-2-1"));
+        assert!(!rollout_matches(
+            &record, &binding, "isolated", "ci-3-1", "ci-2-1"
+        ));
         binding.generation = 3;
         assert!(!matches(&binding));
         binding.generation = 2;
@@ -2781,6 +3205,27 @@ mod tests {
         assert_eq!(
             validate_request_at(&prepared, &config, issued + 119_000).unwrap(),
             Duration::from_secs(1)
+        );
+        let agy_budget_ms = AGY_REQUEST_SECONDS as u64 * 1000;
+        prepared.deadline_unix_ms = issued + agy_budget_ms;
+        assert!(validate_request_at(&prepared, &config, issued).is_err());
+        assert_eq!(
+            validate_request_budget(&prepared, &config, issued - CLOCK_SKEW_MS, agy_budget_ms)
+                .unwrap(),
+            Duration::from_secs(240)
+        );
+        assert!(
+            validate_request_budget(
+                &prepared,
+                &config,
+                issued - CLOCK_SKEW_MS - 1,
+                agy_budget_ms
+            )
+            .is_err()
+        );
+        assert!(
+            validate_request_budget(&prepared, &config, issued + agy_budget_ms, agy_budget_ms)
+                .is_err()
         );
         prepared.deadline_unix_ms = now_ms() + 30_000;
         prepared.generation = 1;

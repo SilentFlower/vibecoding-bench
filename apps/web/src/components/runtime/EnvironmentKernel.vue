@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { Button } from '../ui/button';
 import { ChoiceSelect, type ChoiceOption } from '../ui/controls';
-import { runtimeRequest, type AgyKernelCatalog, type RuntimeEnvironment } from './runtimeApi';
+import { agyToolContinuationLabels, runtimeRequest, type AgyKernelCatalog, type AgyToolContinuationPolicy, type RuntimeEnvironment } from './runtimeApi';
 
 /** 读取内核的实际运行状态，并按同一环境代次切换已登记的反重力候选。 */
 const props = defineProps<{ environment: RuntimeEnvironment }>();
@@ -21,6 +21,55 @@ const kernelOptions = computed<ChoiceOption[]>(() => {
   const pending = observed.kernel && !observed.candidates.includes(observed.kernel) ? [{ value: observed.kernel, label: `${observed.kernel.slice(0, 12)}（待核对）` }] : [];
   return [{ value: '', label: '平台内置' }, ...pending, ...observed.candidates.map(item => ({ value: item, label: item.slice(0, 12) }))];
 });
+const toolPolicyPath = computed(() => `/environments/${props.environment.environment_id}/agy-tool-continuation`);
+const toolPolicy = ref<AgyToolContinuationPolicy>();
+const toolMode = ref('claim');
+const toolError = ref('');
+const toolLoading = ref(false);
+const toolSaving = ref(false);
+let toolRequest = 0;
+const toolOptions = computed<ChoiceOption[]>(() => Object.entries(agyToolContinuationLabels).map(([value, label]) => ({
+  value, label, disabled: value !== 'claim' && !toolPolicy.value?.supported,
+})));
+
+/** 读取当前环境的续轮策略，按请求序号忽略迟到响应。@return 已读取的界面状态。 */
+async function loadToolPolicy() {
+  if (props.environment.platform !== 'antigravity' || toolSaving.value) return;
+  const request = ++toolRequest;
+  toolLoading.value = true;
+  toolError.value = '';
+  try {
+    const value = await runtimeRequest<AgyToolContinuationPolicy>(toolPolicyPath.value);
+    if (request !== toolRequest) return;
+    toolPolicy.value = value;
+    toolMode.value = value.mode;
+  } catch (cause) {
+    if (request === toolRequest) toolError.value = (cause as Error).message;
+  } finally {
+    if (request === toolRequest) toolLoading.value = false;
+  }
+}
+
+/** 用实际读取的代次和策略版本保存。@return 按服务端回执更新的状态。 */
+async function saveToolPolicy() {
+  const observed = toolPolicy.value;
+  if (!observed || toolLoading.value || toolSaving.value || toolMode.value === observed.mode) return;
+  const request = ++toolRequest;
+  toolSaving.value = true;
+  toolError.value = '';
+  try {
+    const value = await runtimeRequest<AgyToolContinuationPolicy>(toolPolicyPath.value, {
+      method: 'POST', body: { expected_generation: observed.generation, expected_revision: observed.revision, mode: toolMode.value },
+    });
+    if (request !== toolRequest) return;
+    toolPolicy.value = value;
+    toolMode.value = value.mode;
+  } catch (cause) {
+    if (request === toolRequest) toolError.value = (cause as Error).message;
+  } finally {
+    if (request === toolRequest) toolSaving.value = false;
+  }
+}
 
 /** 加载宿主机已为当前环境准备的候选。@return 完成后的界面状态。 */
 async function loadKernels() {
@@ -50,6 +99,7 @@ async function applyKernel() {
     });
     target.value = catalog.value.kernel ?? '';
     emit('refresh');
+    void loadToolPolicy();
   } catch (cause) {
     error.value = (cause as Error).message;
   } finally {
@@ -60,6 +110,13 @@ async function applyKernel() {
 
 onMounted(loadKernels);
 watch(() => props.environment.generation, loadKernels);
+watch([() => props.environment.environment_id, () => props.environment.generation], () => {
+  toolRequest += 1;
+  toolPolicy.value = undefined;
+  toolSaving.value = false;
+  toolLoading.value = false;
+  void loadToolPolicy();
+}, { immediate: true });
 const versions = ['2.1.280', '2.1.293'] as const;
 const states: Record<string, string> = {
   ready: '暖进程就绪', busy: '暖进程使用中', preparing: '准备中', unprepared: '等待按需准备',
@@ -91,6 +148,15 @@ const kernels = computed(() => versions.map(version => ({
       <p v-if="error" role="alert" class="runtime-error">{{ error }}</p>
       <p v-else-if="catalog && catalog.kernel !== loaded && (catalog.kernel || loaded !== undefined)">下一条请求将载入所选内核。</p>
       <p v-else-if="catalog && !catalog.candidates.length">在宿主机准备候选包后刷新。</p>
+      <div class="workspace-inline-actions">
+        <ChoiceSelect v-model="toolMode" class="environment-kernel-select" :options="toolOptions" label="工具续轮模式" :disabled="toolLoading || toolSaving || !toolPolicy" />
+        <Button variant="outline" :disabled="toolLoading || toolSaving || !toolPolicy || toolMode === toolPolicy.mode || (!toolPolicy.supported && toolMode !== 'claim')"
+          @click="saveToolPolicy">{{ toolSaving ? '正在保存' : '保存模式' }}</Button>
+        <Button v-if="toolError" variant="outline" :disabled="toolLoading || toolSaving" @click="loadToolPolicy">刷新模式</Button>
+      </div>
+      <p v-if="toolError" role="alert" class="runtime-error">{{ toolError }}</p>
+      <p v-else-if="toolPolicy && !toolPolicy.supported">当前发送器或请求内核暂不支持历史续轮。</p>
+      <p v-else-if="toolPolicy">保存后对新派发的请求生效。</p>
       <details class="runtime-technical"><summary>固定原版身份</summary><code>{{ environment.agy_runtime?.source_sha256 || '未提供' }}</code></details>
     </template>
     <template v-else>

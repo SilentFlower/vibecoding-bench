@@ -34,16 +34,19 @@ class EnvironmentFence(BaseModel):
     generation: StrictInt = Field(ge=0)
 
 
-def fence_environment(runtime, row: dict, request: EnvironmentFence) -> dict:
+def fence_environment(runtime, row: dict, request: EnvironmentFence, *, agy: bool = False) -> dict:
     """在中央排空门禁及环境锁内停止原角色，持久拒绝旧源唤醒。
 
     :param runtime: 原节点的实际AccountRuntime。
     :param row: 原节点实际环境行。
     :param request: 中央按原分配冻结的身份。
+    :param agy: 源是已经核对的独立 AGY 网关环境。
     :return: 包含真实停止容器的隔离回执，未知或活动状态抛错保留现场。
     """
     if (request.node_key != (getattr(runtime, 'node_key', None) or 'local')
-            or row['environment_id'] != request.environment_id or row['account_id'] != request.account_id
+            or row['environment_id'] != request.environment_id
+            or row['gateway_account_id' if agy else 'account_id'] != request.account_id
+            or agy and (row['account_id'] is not None or row['platform'] != 'antigravity')
             or row['generation'] != request.generation):
         raise ValueError('源隔离环境身份或代次不一致')
     root = runtime._root(row)
@@ -74,8 +77,9 @@ def fence_environment(runtime, row: dict, request: EnvironmentFence) -> dict:
     if (pending_owner_transition(root) or runtime.environment_jobs(row['environment_id']) or any(item.exists() or item.is_symlink() for item in pending)
             or runtime._execution_records(row) or runtime.reviews.serial_state(row) or pending_upgrade(root)):
         raise RuntimeBusy('源节点仍有执行、登录、凭据交接或内核维护记录，请先收口')
-    runtime.reviews.check_orphans(row)
-    if row.get('container_id'):
+    if not agy:
+        runtime.reviews.check_orphans(row)
+    if row.get('container_id') and not agy:
         try:
             cli = runtime._container(row)
         except NotFound:
@@ -95,7 +99,11 @@ def fence_environment(runtime, row: dict, request: EnvironmentFence) -> dict:
     atomic_json(path, {**identity, 'phase': 'fencing'})
     if ownership is not None:
         atomic_json(root / 'runtime/node-assignment.json', {**ownership, 'phase': 'fencing', 'operation_id': request.operation_id})
-    runtime._stop_environment(row)
+    if agy:
+        from agy_environment import stop_environment
+        stop_environment(runtime, row, remove=False)
+    else:
+        runtime._stop_environment(row)
     expected = runtime._labels(row)
     expected.pop('vibebench.role')
     stopped = []
@@ -117,16 +125,19 @@ def fence_environment(runtime, row: dict, request: EnvironmentFence) -> dict:
     return result
 
 
-def restore_fenced_source(runtime, row: dict, request: EnvironmentFence) -> dict:
+def restore_fenced_source(runtime, row: dict, request: EnvironmentFence, *, agy: bool = False) -> dict:
     """按原隔离收据撤销提交前迁移，旧操作保留取消墓碑。
 
     :param runtime: 原节点运行时，中央已持有排他维护许可。
     :param row: 原实际环境，恢复阶段保持停止。
     :param request: 原迁移冻结范围。
+    :param agy: 源是已经核对的独立 AGY 网关环境。
     :return: 无执行唤醒的源恢复收据。
     """
     if (request.node_key != (getattr(runtime, 'node_key', None) or 'local')
-            or row['account_id'] != request.account_id or row['environment_id'] != request.environment_id
+            or row['gateway_account_id' if agy else 'account_id'] != request.account_id
+            or agy and (row['account_id'] is not None or row['platform'] != 'antigravity')
+            or row['environment_id'] != request.environment_id
             or row['generation'] != request.generation):
         raise ValueError('源恢复身份或代次不一致')
     root = runtime._root(row)
@@ -136,14 +147,15 @@ def restore_fenced_source(runtime, row: dict, request: EnvironmentFence) -> dict
     except FileNotFoundError:
         previous = None
     identity = {'protocol': 1, **request.model_dump()}
-    if previous is None or isinstance(previous, dict) and previous.get('phase') == 'fencing':
-        previous = fence_environment(runtime, row, request)
+    if previous is None or isinstance(previous, dict) and (previous.get('phase') == 'fencing'
+            or agy and previous.get('phase') == 'cancelled' and previous.get('operation_id') != request.operation_id):
+        previous = fence_environment(runtime, row, request, agy=agy)
     if (not isinstance(previous, dict) or any(previous.get(key) != value for key, value in identity.items())
             or previous.get('phase') not in ('fenced', 'cancelled')):
         raise ValueError('源恢复缺少原操作的已停止隔离收据')
     if previous['phase'] == 'fenced':
         # 重复核对真实停止，取消不能把过期租约或旧磁盘收据当作当前进程已停止。
-        fence_environment(runtime, row, request)
+        fence_environment(runtime, row, request, agy=agy)
     if request.node_key != 'local':
         ownership_path = root / 'runtime/node-assignment.json'
         ownership = _read_json(ownership_path)

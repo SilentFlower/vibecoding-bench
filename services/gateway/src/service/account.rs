@@ -22,6 +22,7 @@ use crate::model::account::{
 use crate::model::credential_ownership::CredentialOwnershipInput;
 use crate::service::account_work::{AccountWorkAdmission, AccountWorkControls};
 use crate::service::rewriter::ClientType;
+use crate::service::runtime_bridge::agy_environment;
 use crate::service::runtime_lease::RuntimeGate;
 use crate::service::v3_scheduling::{
     PhaseCounts, SchedulingAccountSummary, SchedulingCandidate, SchedulingConfig,
@@ -608,6 +609,7 @@ pub struct AccountService {
     pub work_controls: AccountWorkControls,
     native_changes: broadcast::Sender<(i64, bool, bool)>,
     credential_gates: Mutex<HashMap<i64, Arc<CredentialGate>>>,
+    agy_capacity_edits: Mutex<HashMap<i64, String>>,
     scheduler: Option<Arc<V3Scheduler>>,
     v3_settings_lock: AsyncMutex<()>,
     store: Arc<AccountStore>,
@@ -752,6 +754,7 @@ impl AccountService {
             cache,
             oauth_token_url,
             credential_gates: Mutex::new(HashMap::new()),
+            agy_capacity_edits: Mutex::new(HashMap::new()),
             scheduler: None,
             v3_settings_lock: AsyncMutex::new(()),
             selection_scheduler: Arc::new(V3Scheduler::new(Arc::new(SchedulingStore::new(
@@ -824,7 +827,18 @@ impl AccountService {
     pub async fn create_account(&self, a: &mut Account) -> Result<(), AppError> {
         if a.is_antigravity() {
             self.verify_agy_account(a).await?;
-            return self.store.create(a).await;
+            self.store.create(a).await?;
+            if std::env::var("V3_RUNTIME_URL").is_ok_and(|value| !value.is_empty()) {
+                // 账号已经提交，编排器暂时不可用时由后续巡检补登记。
+                if agy_environment(a.id, false, Duration::from_secs(5))
+                    .await
+                    .is_err()
+                {
+                    warn!(account_id = a.id, "AGY运行环境待后台补登记");
+                }
+                self.notify_native_change(a.id, false);
+            }
+            return Ok(());
         }
         if !a.is_claude_code() {
             return Err(AppError::BadRequest("未知账号平台".into()));
@@ -1100,6 +1114,7 @@ impl AccountService {
         if account.is_antigravity() {
             let (key, owner) = self.acquire_oauth_credential_lock(id).await?;
             let result = async {
+                self.require_agy_configuration_open(&account).await?;
                 if self.store.agy_credential_state(id).await?.phase != "ready" {
                     return Err(AppError::BadRequest("请先结束或核对原凭据操作".into()));
                 }
@@ -1107,6 +1122,9 @@ impl AccountService {
             }
             .await;
             self.cache.release_lock(&key, &owner).await;
+            if result.is_ok() {
+                self.notify_native_change(id, true);
+            }
             return result;
         }
         if let Some(scheduler) = &self.scheduler {
@@ -1663,22 +1681,7 @@ impl AccountService {
             .as_ref()
             .ok_or_else(|| AppError::ServiceUnavailable("v3 调度未装配".into()))?;
         request.check_deadline()?;
-        let binding = match request.key() {
-            Some(key) => {
-                let mut binding = scheduler.store.binding(key, now_ms()).await?;
-                if binding.is_none() {
-                    // 活动流在短暂存储故障后仍可能持有旧期限；先 CAS 续租，不能用内存猜权威绑定。
-                    for hint in scheduler.live_bindings(key) {
-                        if scheduler.store.renew(&hint, now_ms(), true).await? {
-                            break;
-                        }
-                    }
-                    binding = scheduler.store.binding(key, now_ms()).await?;
-                }
-                binding
-            }
-            None => None,
-        };
+        let binding = scheduler.lookup_binding(request.key()).await?;
         if let Some(bound) = &binding {
             if (allowed_ids.is_empty() || allowed_ids.contains(&bound.account_id))
                 && self
@@ -3694,6 +3697,7 @@ mod tests {
             agy_system_prompt_homoglyph_enabled: false,
             agy_gif_frames_enabled: false,
             agy_disable_safety_filtering: false,
+            agy_system_prompt_as_user_reminder: false,
             id: 1,
             name: "测试账号".into(),
             email: "user@example.com".into(),
@@ -3746,6 +3750,7 @@ mod tests {
             agy_system_prompt_homoglyph_enabled: false,
             agy_gif_frames_enabled: false,
             agy_disable_safety_filtering: false,
+            agy_system_prompt_as_user_reminder: false,
             id: 0,
             name: "测试账号".into(),
             email: email.into(),
@@ -4710,6 +4715,63 @@ mod tests {
             credentials: None,
         };
         (store, settings, service, account, input)
+    }
+
+    /// AGY 排空时原请求可以继续读取凭据，新活动和其他账号许可继续受限。
+    #[tokio::test]
+    async fn agy_migration_only_continues_the_original_admission() {
+        let (store, _, service) = setup_account_service_with_settings().await;
+        let mut account = test_account_with_usage(json!({}));
+        account.id = 0;
+        account.email = "migration-agy@example.invalid".into();
+        account.platform = "antigravity".into();
+        store.create(&mut account).await.unwrap();
+        let mut other = test_account_with_usage(json!({}));
+        other.id = 0;
+        other.email = "migration-other@example.invalid".into();
+        store.create(&mut other).await.unwrap();
+        let foreign = service.upstream_activity(other.id).await.unwrap();
+        let original = service.upstream_activity(account.id).await.unwrap();
+        let queue = service.get_or_create_queue(account.id, account.concurrency).await;
+        let slot = queue
+            .acquire(Duration::from_secs(1), DEFAULT_REQUEST_SLOT_UNITS)
+            .await
+            .unwrap();
+        let owner = format!("node-migration:{}", Uuid::new_v4().simple());
+        let lease = queue.runtime_gate.prepare(&owner).unwrap();
+        assert!(service.upstream_activity(account.id).await.is_err());
+        assert!(service
+            .upstream_activity_with_admission(account.id, Some(&foreign))
+            .await
+            .is_err());
+        assert!(service
+            .upstream_activity_with_admission(account.id, Some(&original))
+            .await
+            .is_ok());
+        drop(slot);
+        assert!(service
+            .upstream_activity_with_admission(account.id, Some(&original))
+            .await
+            .is_err());
+        queue
+            .runtime_gate
+            .update(&owner, &lease.generation, "release")
+            .unwrap();
+
+        let slot = queue
+            .acquire(Duration::from_secs(1), DEFAULT_REQUEST_SLOT_UNITS)
+            .await
+            .unwrap();
+        let maintenance = queue.runtime_gate.prepare("maintenance:fixture").unwrap();
+        assert!(service
+            .upstream_activity_with_admission(account.id, Some(&original))
+            .await
+            .is_err());
+        drop(slot);
+        queue
+            .runtime_gate
+            .update(&maintenance.owner, &maintenance.generation, "release")
+            .unwrap();
     }
 
     #[tokio::test]

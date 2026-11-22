@@ -1540,6 +1540,8 @@ oauth-2025-04-20,interleaved-thinking-2025-05-14,redact-thinking-2026-02-12,thin
 
 CCH 使用 `0x4D659218E32A3268`：在最终序列化字节上将唯一受管理根级 system billing 的 CCH 替为占位值、删除顶层 max_tokens、清空全层级精确字符串 model 值，保留 fallback，再取 xxhash64 低 20 bits。禁止 JSON 往返重排。初始后缀仍以 salt `59cf53e54c78`、首条 user 的最后一个 text block、UTF-16 code units `[4,7,20]` 与版本计算 SHA256 前三位；缺失索引按既有 `0` 规则，孤立代理项按既有替换字符语义处理。续轮使用当前入站 billing 后缀；审计通过 previous_message_id 对应前一 SSE message_start.id 逐链检查，同 run/model 不构成唯一会话键，也不新增全局后缀缓存。 CCH 原始 JSON 字符串中的目标偏移必须单次扫描映射，不能为每个同名示例重复解析完整前缀；转义边界无法安全映射时失败开放并保留原字节。
 
+280／293 的全层级 `model` 字符串值清空采用一次扫描与顺序复制。其扫描和搬移开销随原始字节数线性增长。`cch_280_and_293_keep_exact_bytes_across_many_model_values` 核对大输入的归一化字节，包括嵌套的精确键、转义键、文本内部示例、非字符串字段及空白。
+
 **后台端点**
 
 以下为本轮已观察的精确分支；其它路径不得按 293 版本号套用旧版后台端点分类。

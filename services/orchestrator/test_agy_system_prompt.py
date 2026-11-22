@@ -5,16 +5,17 @@ import unittest
 
 from agy_runtime.contract import InputError
 from agy_runtime.gemini_contract import decode_request
-from agy_runtime.models import configure_model
-from agy_runtime.system_prompt import RULE_VERSION, decode_policy, default_policy, transform_system
+from agy_runtime.system_prompt import (
+    POLICY_SOURCE, REMINDER_SYSTEM_INSTRUCTION, RULE_VERSION, USER_REMINDER_SOURCE,
+    decode_policy, default_policy, transform_system,
+)
 
 
 class AgySystemPromptTests(unittest.TestCase):
     """覆盖原生提交前的独立系统段与固定映射合同。"""
 
     def setUp(self):
-        """冻结合成模型。@return 无。"""
-        configure_model('gemini-synthetic', 'MODEL_PLACEHOLDER_M36')
+        """准备合成账号策略。@return 无。"""
         self.enabled = {**default_policy(), 'enabled': True}
 
     def test_reference_golden_vectors_and_idempotence(self):
@@ -50,7 +51,7 @@ class AgySystemPromptTests(unittest.TestCase):
                 {'role': 'user', 'parts': [{'functionResponse': {'id': 'ABC-id', 'name': 'ABC_tool', 'response': {'ABC': 'ABC system'}}}]}]}
         original = copy.deepcopy(body)
         raw = {'schema_version': 1, 'type': 'gemini_request', 'request_id': 'synthetic',
-            'model': 'gemini-synthetic', 'body': body}
+            'model': 'gemini-synthetic', 'native_model': 'MODEL_PLACEHOLDER_M36', 'body': body}
         before = decode_request(raw)
         after = decode_request({**raw, 'system_prompt_policy': self.enabled})
         self.assertEqual(body, original)
@@ -65,17 +66,69 @@ class AgySystemPromptTests(unittest.TestCase):
         self.assertNotIn('ABC system', report)
         self.assertNotIn('ABC-id', report)
 
+    def test_reminder_and_homoglyph_policies_compose_before_native_history(self):
+        """核对四种组合、原始历史、工具和回执来源。@return 无。"""
+        body = {
+            'systemInstruction': {'parts': [{'text': 'ABC system'}, {'text': '中文 {x: 3}'}]},
+            'contents': [
+                {'role': 'user', 'parts': [{'text': 'ABC user'}, {'text': '<system-reminder>ABC</system-reminder>'}]},
+                {'role': 'model', 'parts': [
+                    {'functionCall': {'id': 'sample', 'name': 'lookup', 'args': {'x': 'ABC'}}, 'thoughtSignature': 'c2ln'},
+                ]},
+                {'role': 'user', 'parts': [
+                    {'functionResponse': {'id': 'sample', 'name': 'lookup', 'response': {'value': 'ABC'}}},
+                ]},
+            ],
+        }
+        original = copy.deepcopy(body)
+        raw = {'schema_version': 1, 'type': 'gemini_request', 'request_id': 'synthetic',
+            'model': 'gemini-synthetic', 'native_model': 'MODEL_PLACEHOLDER_M36', 'body': body}
+        original_steps = decode_request(raw)['native_steps']
+        expected = ('ABC system\n中文 {x: 3}', 'ΑΒС ѕуѕtеm\n中文 {х: 3}')
+        expected_instruction = (
+            "Use the provided context to answer the user's request. "
+            "When working on multi-step tasks or calling tools, briefly share your progress and explain what you are doing and why. "
+            "For strict-format requests such as JSON-only output, or auxiliary tasks such as compaction, summaries, titles, and classification, "
+            "return only the requested output."
+        )
+        self.assertEqual(REMINDER_SYSTEM_INSTRUCTION, expected_instruction)
+        for glyphs in (False, True):
+            for reminder in (False, True):
+                with self.subTest(glyphs=glyphs, reminder=reminder):
+                    policy = {**default_policy(), 'enabled': glyphs}
+                    if reminder:
+                        policy['user_reminder_index'] = 0
+                    decoded = decode_request({**raw, 'system_prompt_policy': policy})
+                    self.assertEqual(body, original)
+                    self.assertEqual(decoded['gemini_body'], original)
+                    self.assertEqual(decoded['native_steps'][1:], original_steps[1:])
+                    self.assertEqual(decoded['system'], expected_instruction if reminder else expected[glyphs])
+                    user = decoded['native_steps'][0]['userInput']['userResponse']
+                    original_user = original_steps[0]['userInput']['userResponse']
+                    self.assertEqual(user, original_user + (
+                        f'\n<system-reminder>\n{expected[glyphs]}\n</system-reminder>' if reminder else ''
+                    ))
+                    report = decoded['system_prompt_policy']
+                    self.assertEqual(report['source'], USER_REMINDER_SOURCE if reminder else POLICY_SOURCE)
+                    self.assertEqual(report['changed'], glyphs)
+                    self.assertNotIn('user_reminder_index', report)
+
+        for index in (1, 2, 3):
+            with self.subTest(index=index), self.assertRaisesRegex(InputError, 'invalid_system_reminder_target'):
+                decode_request({**raw, 'system_prompt_policy': {**default_policy(), 'user_reminder_index': index}})
+
     def test_malformed_or_unknown_policy_never_becomes_truthy_configuration(self):
         """未知规则及畸形布尔显式拒绝，缺省仅由调用边界解释。@return 无。"""
         for value in [None, True, {}, {**self.enabled, 'enabled': 'false'}, {**self.enabled, 'schema_version': True},
-                {**self.enabled, 'rule_version': 'unknown'}, {**self.enabled, 'source': 'public'}]:
+                {**self.enabled, 'rule_version': 'unknown'}, {**self.enabled, 'source': 'public'},
+                {**self.enabled, 'user_reminder_index': True}, {**self.enabled, 'user_reminder_index': -1}]:
             with self.subTest(value=value), self.assertRaises(InputError):
                 decode_policy(value)
 
     def test_public_body_cannot_override_account_policy(self):
         """用户载荷不能把内部策略字段作为公开开关。@return 无。"""
         raw = {'schema_version': 1, 'type': 'gemini_request', 'request_id': 'synthetic',
-            'model': 'gemini-synthetic', 'body': {'contents': [{'parts': [{'text': 'ABC'}]}],
+            'model': 'gemini-synthetic', 'native_model': 'MODEL_PLACEHOLDER_M36', 'body': {'contents': [{'parts': [{'text': 'ABC'}]}],
                 'system_prompt_policy': self.enabled}}
         with self.assertRaises(InputError):
             decode_request(raw)

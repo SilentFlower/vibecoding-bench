@@ -1,27 +1,39 @@
 //! 在既有账号服务中按平台适配原生凭据，CC 调用保持原路径。
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap, hash_map::Entry};
+use std::sync::Mutex;
 
 use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
 use super::{
-    AccountService, DEFAULT_REQUEST_SLOT_UNITS, OAUTH_LOCK_TTL, OAUTH_WAIT_ATTEMPTS,
-    OAUTH_WAIT_RETRY, build_oauth_credential_snapshot, validate_account_usage_limits,
+    AccountService, CredentialActivity, DEFAULT_REQUEST_SLOT_UNITS, OAUTH_LOCK_TTL,
+    OAUTH_WAIT_ATTEMPTS, OAUTH_WAIT_RETRY, build_oauth_credential_snapshot,
+    validate_account_usage_limits,
 };
 use crate::error::AppError;
 use crate::model::account::{Account, AccountAuthType, AccountStatus};
 use crate::model::api_token::ApiToken;
 use crate::model::proxy::ProxyConnection;
 use crate::model::request_diagnostics::DiagnosticParameters;
-use crate::service::agy_contract::{AGY_REQUEST_SECONDS, AgyAccessSnapshot, AgyModelId};
-use crate::service::runtime_bridge::agy_request;
+use crate::service::agy_contract::{AGY_ACCESS_VALIDITY_SECONDS, AgyAccessSnapshot, AgyModelId};
+use crate::service::runtime_bridge::{agy_capacity, agy_request};
 use crate::service::v3_scheduling::{SchedulingCandidate, SchedulingRequest};
 use tokio::time::sleep;
 
-// AGY 1.5.9 离线启动实测在剩余 299 秒时要求登录，310 秒时可就绪。
-// 预留原请求预算，避免无刷新令牌的业务进程在准备或执行时触及该窗口。
-const AGY_ACCESS_VALIDITY_SECONDS: i64 = 310 + AGY_REQUEST_SECONDS;
+/// 在网关提交期间持有本账号操作，丢失调用方或进程重启后可按已保存值收口。
+struct AgyCapacityEdit<'a> {
+    edits: &'a Mutex<HashMap<i64, String>>,
+    account_id: i64,
+    operation_id: String,
+}
+
+impl Drop for AgyCapacityEdit<'_> {
+    fn drop(&mut self) {
+        let mut edits = self.edits.lock().unwrap_or_else(|error| error.into_inner());
+        edits.remove(&self.account_id);
+    }
+}
 
 /// 将权威账号转换为原生私有输入。@param account 原账号。@return 严格原生凭据对象。
 pub(super) fn native_document(account: &Account) -> Result<Value, AppError> {
@@ -121,13 +133,23 @@ fn verify_retirement(
 }
 
 impl AccountService {
-    /// 在原刷新锁内读取同代AT与代次，业务侧仅取得AT。@param id 原账号。@param force 是否请求一次认证恢复。@return AT-only快照。
+    /// 在原刷新锁内读取同代 AT 与代次。@param id 原账号。@param force 是否请求一次认证恢复。@return AT 快照。
     pub async fn resolve_agy_access(
         &self,
         id: i64,
         force: bool,
     ) -> Result<AgyAccessSnapshot, AppError> {
-        let _activity = self.upstream_activity(id).await?;
+        self.resolve_agy_access_with_admission(id, force, None).await
+    }
+
+    /// 读取 AGY 凭据并核对原请求的准入许可。@param id 原账号。@param force 是否请求一次认证恢复。@param admission 原 API 凭据许可。@return AT 快照。
+    pub(crate) async fn resolve_agy_access_with_admission(
+        &self,
+        id: i64,
+        force: bool,
+        admission: Option<&CredentialActivity>,
+    ) -> Result<AgyAccessSnapshot, AppError> {
+        let _activity = self.upstream_activity_with_admission(id, admission).await?;
         let initial = self.store.agy_credential_state(id).await?;
         let key = format!("oauth:refresh:account:{id}");
         let owner = Uuid::new_v4().to_string();
@@ -267,16 +289,15 @@ impl AccountService {
         Ok(result)
     }
 
-    /// 为反重力实际选定的模型冻结同类延迟分组。@param token_id 调用方。@param model 实际公开档位。@param streaming 是否流式。@return 请求调度租约。
+    /// 为反重力实际选定的模型冻结同类延迟分组。@param session_key 匿名会话。@param model 实际公开档位。@param streaming 是否流式。@return 请求调度租约。
     pub(crate) fn begin_agy_scheduling(
         &self,
-        token_id: i64,
+        session_key: Option<&str>,
         model: &str,
         streaming: bool,
     ) -> SchedulingRequest {
-        self.selection_scheduler.begin_with_parameters(
-            token_id,
-            None,
+        self.selection_scheduler.begin_with_key(
+            session_key,
             &DiagnosticParameters {
                 model: Some(model.into()),
                 stream: Some(streaming),
@@ -285,25 +306,40 @@ impl AccountService {
         )
     }
 
-    /// 先选仍可接单的模型档位，再沿共享的优先级、容量和智能评分择号。@param token_id 调用方。@param models 已排序模型名。@param accounts 已通过模型和权限校验的候选。@param streaming 是否流式。@return 实际档位、账号和调度租约。
+    /// 在可接单的模型档位内优先使用原绑定，再按优先级、容量和智能评分择号。
+    /// @param session_key 匿名会话。@param models 已排序模型名。@param accounts 已通过模型和权限校验的候选。
+    /// @param streaming 是否流式。@return 实际档位、账号和调度租约。
     pub(crate) async fn select_agy_smart(
         &self,
-        token_id: i64,
+        session_key: Option<&str>,
         models: &[String],
         accounts: Vec<(usize, Account)>,
         streaming: bool,
     ) -> Result<(usize, Account, SchedulingRequest), AppError> {
+        let binding = self.selection_scheduler.lookup_binding(session_key).await?;
         let mut tier = None;
         let mut candidates = Vec::new();
         for (index, account) in accounts {
             if tier.is_some_and(|first| first != index) {
                 break;
             }
+            let bound = binding
+                .as_ref()
+                .is_some_and(|bound| bound.account_id == account.id);
             let control = self.work_controls.snapshot(account.id).await?;
-            if !control.api_accepting
-                || !control.work_enabled
-                || self.get_account_rpm_status(&account).await?.saturated
-            {
+            if !control.api_accepting || !control.work_enabled {
+                if bound {
+                    return Err(AppError::ServiceUnavailable("原会话账号暂停接单".into()));
+                }
+                continue;
+            }
+            if bound {
+                // 既有会话在绑定账号等并发和 RPM，临时负载不应造成换号。
+                let request = self.begin_agy_scheduling(session_key, &models[index], streaming);
+                request.selected(&account, binding);
+                return Ok((index, account, request));
+            }
+            if self.get_account_rpm_status(&account).await?.saturated {
                 continue;
             }
             tier = Some(index);
@@ -319,11 +355,11 @@ impl AccountService {
         }
         let index =
             tier.ok_or_else(|| AppError::ServiceUnavailable("没有支持该模型的AGY账号".into()))?;
-        let request = self.begin_agy_scheduling(token_id, &models[index], streaming);
+        let request = self.begin_agy_scheduling(session_key, &models[index], streaming);
         let account =
             self.selection_scheduler
                 .choose(candidates, &request, DEFAULT_REQUEST_SLOT_UNITS)?;
-        request.selected(&account, None);
+        request.selected(&account, binding);
         Ok((index, account, request))
     }
 
@@ -406,6 +442,9 @@ impl AccountService {
         }
         .await;
         self.cache.release_lock(&key, &owner).await;
+        if result.is_ok() {
+            self.notify_native_change(id, true);
+        }
         result
     }
 
@@ -436,6 +475,9 @@ impl AccountService {
         }
         .await;
         self.cache.release_lock(&key, &owner).await;
+        if outcome.is_ok() {
+            self.notify_native_change(id, true);
+        }
         outcome
     }
 
@@ -447,6 +489,7 @@ impl AccountService {
             } else {
                 self.store.reconcile_agy_credentials(id, operation).await?;
             }
+            self.notify_native_change(id, true);
         }
         Ok(())
     }
@@ -462,6 +505,7 @@ impl AccountService {
                 let result = agy_request("retire", &json!({"operation_id":operation,"account_id":id,"generation":state.generation})).await?;
                 verify_retirement(id, &operation, state.generation, &result)?;
                 self.store.retire_agy_credentials(id, &operation, state.generation).await?;
+                self.notify_native_change(id, true);
             }
             self.agy_state(id).await
         }.await;
@@ -488,6 +532,7 @@ impl AccountService {
             self.store
                 .retire_agy_credentials(id, &operation, state.generation)
                 .await?;
+            self.notify_native_change(id, true);
         } else {
             self.finish_agy_operation(id, &operation, &result).await?;
         }
@@ -572,15 +617,69 @@ impl AccountService {
     /// 按提交差异修改 AGY 账号，当前凭据在锁内重读。@param id 账号。@param updates 已解析代理的字段差异。@return 当前账号。
     pub async fn update_agy_fields(&self, id: i64, updates: &Value) -> Result<Account, AppError> {
         let (key, owner) = self.acquire_oauth_credential_lock(id).await?;
-        let result = self.update_agy_fields_locked(id, updates).await;
+        let mut preparation_changed = false;
+        let result = self
+            .update_agy_fields_locked(id, updates, &mut preparation_changed)
+            .await;
+        self.cache.release_lock(&key, &owner).await;
+        if preparation_changed {
+            self.notify_native_change(id, true);
+        }
+        result
+    }
+
+    /// 在与账号配置相同的锁内关闭新准入。@param id 网关账号。@param migration 原迁移。@return 持久门禁已登记。
+    pub(crate) async fn prepare_agy_migration(
+        &self,
+        id: i64,
+        migration: &str,
+    ) -> Result<(), AppError> {
+        let (key, owner) = self.acquire_oauth_credential_lock(id).await?;
+        let result = async {
+            let account = self.store.get_by_id(id).await?;
+            if !account.is_antigravity()
+                || self.store.agy_credential_state(id).await?.phase != "ready"
+            {
+                return Err(AppError::BadRequest("原反重力账号凭据需要核对".into()));
+            }
+            self.get_or_create_queue(id, account.concurrency)
+                .await
+                .runtime_gate
+                .prepare(migration)?;
+            Ok(())
+        }
+        .await;
         self.cache.release_lock(&key, &owner).await;
         result
     }
 
+    /// 核对原账号可安全保存配置。@param account 正式账号。@return 当前迁移没有持有门禁。
+    pub(super) async fn require_agy_configuration_open(
+        &self,
+        account: &Account,
+    ) -> Result<(), AppError> {
+        let snapshot = self
+            .get_or_create_queue(account.id, account.concurrency)
+            .await
+            .runtime_gate
+            .snapshot();
+        if snapshot["lease"]["owner"]
+            .as_str()
+            .is_some_and(|owner| owner.starts_with("node-migration:"))
+        {
+            return Err(AppError::BadRequest(
+                "反重力账号正在迁移，请在原操作收口后保存配置".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// 保存账号差异。@param id 账号。@param updates 配置差异。@param preparation_changed 是否已写入影响准备的状态。@return 当前账号。
     async fn update_agy_fields_locked(
         &self,
         id: i64,
         updates: &Value,
+        preparation_changed: &mut bool,
     ) -> Result<Account, AppError> {
         let current = self.store.get_by_id(id).await?;
         let fields = updates
@@ -600,12 +699,14 @@ impl AccountService {
             "priority",
             "rpm_limit",
             "agy_system_prompt_homoglyph_enabled",
+            "agy_system_prompt_as_user_reminder",
             "agy_gif_frames_enabled",
             "agy_disable_safety_filtering",
         ];
         if !current.is_antigravity() || fields.keys().any(|key| !allowed.contains(&key.as_str())) {
             return Err(AppError::BadRequest("该字段不属于 AGY 账号配置".into()));
         }
+        self.require_agy_configuration_open(&current).await?;
         if fields
             .get("platform")
             .is_some_and(|value| value.as_str() != Some("antigravity"))
@@ -641,9 +742,10 @@ impl AccountService {
         if state.phase != "ready" {
             return Err(AppError::ServiceUnavailable("AGY 原凭据操作待核对".into()));
         }
-        let credentials_changed = ["access_token", "refresh_token", "expires_at", "proxy_url"]
+        let credentials_changed = ["access_token", "refresh_token", "expires_at"]
             .iter()
-            .any(|key| fields.contains_key(*key));
+            .any(|key| fields.contains_key(*key))
+            || current.proxy_url != candidate.proxy_url;
         let options: Vec<&str> = fields
             .keys()
             .map(String::as_str)
@@ -669,6 +771,8 @@ impl AccountService {
                 .store
                 .begin_agy_credentials(&current, &operation, "reauth")
                 .await?;
+            // 即便随后进入对账，已提交的凭据阶段也使旧准备失效。
+            *preparation_changed = true;
             let prepared = agy_request(
                 "prepare",
                 &json!({"operation_id":operation,"account_id":id,
@@ -697,13 +801,100 @@ impl AccountService {
                 self.store.reconcile_agy_credentials(id, &operation).await?;
                 return Err(error);
             }
+        } else if candidate.concurrency != current.concurrency {
+            self.update_agy_capacity(&current, &candidate, &options)
+                .await?;
         } else {
+            if fields.contains_key("concurrency")
+                && !std::env::var("V3_RUNTIME_URL")
+                    .unwrap_or_default()
+                    .is_empty()
+            {
+                agy_capacity(
+                    id,
+                    &Uuid::new_v4().simple().to_string(),
+                    current.concurrency,
+                    current.concurrency,
+                    "reconcile",
+                )
+                .await?;
+            }
             self.store.update_options(&candidate, &options).await?;
         }
         if fields.contains_key("status") {
+            let status_changed = current.status != candidate.status;
             self.store.update_status(id, candidate.status).await?;
+            *preparation_changed |= status_changed;
         }
         self.store.get_by_id(id).await
+    }
+
+    /// 判断编排侧的原操作是否仍有网关持有者。@param id 账号 ID。@param operation_id 冻结操作。@return 是否仍在提交。
+    pub(crate) fn agy_capacity_edit_active(&self, id: i64, operation_id: &str) -> bool {
+        self.agy_capacity_edits
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .get(&id)
+            .is_some_and(|operation| operation == operation_id)
+    }
+
+    async fn update_agy_capacity(
+        &self,
+        current: &Account,
+        candidate: &Account,
+        fields: &[&str],
+    ) -> Result<(), AppError> {
+        if std::env::var("V3_RUNTIME_URL")
+            .unwrap_or_default()
+            .is_empty()
+        {
+            return self.update_account_options(candidate, fields).await;
+        }
+        let operation_id = Uuid::new_v4().simple().to_string();
+        {
+            let mut edits = self
+                .agy_capacity_edits
+                .lock()
+                .unwrap_or_else(|error| error.into_inner());
+            match edits.entry(current.id) {
+                Entry::Vacant(entry) => {
+                    entry.insert(operation_id.clone());
+                }
+                Entry::Occupied(_) => {
+                    return Err(AppError::BadRequest(
+                        "反重力并发调整仍在进行，请稍后重读".into(),
+                    ));
+                }
+            }
+        }
+        let edit = AgyCapacityEdit {
+            edits: &self.agy_capacity_edits,
+            account_id: current.id,
+            operation_id,
+        };
+        let prepare = agy_capacity(
+            current.id,
+            &edit.operation_id,
+            current.concurrency,
+            candidate.concurrency,
+            "prepare",
+        )
+        .await;
+        // 扩容先确认实际容量。缩容先保存网关上限，再收回发送器容量。
+        let saved = match prepare {
+            Ok(()) => self.update_account_options(candidate, fields).await,
+            Err(error) => Err(error),
+        };
+        let settled = agy_capacity(
+            current.id,
+            &edit.operation_id,
+            current.concurrency,
+            candidate.concurrency,
+            "settle",
+        )
+        .await;
+        saved?;
+        settled
     }
 
     /// 在已持有的账号刷新锁内解析 AGY 凭据。@param account 当前账号。@param validity 最小有效期。@param force 是否强制刷新。@return 最终权威快照。

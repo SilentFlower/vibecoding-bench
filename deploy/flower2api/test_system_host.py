@@ -172,6 +172,26 @@ class HostNetworkNamesTests(unittest.TestCase):
                     host.capture(current)
                 metadata.assert_not_called()
 
+    def test_remote_agy_ownership_stops_platform_capture_and_cutover(self) -> None:
+        """普通和快速更新沿原快照退出，保留原节点执行组件。@return 无。"""
+        host = HostDeployment({'state_root': '/unused', 'data_root': '/unused-data',
+            'env_file': '/unused-env', 'deployment': 'test'})
+        controls = {'gateway': {'Image': 'trusted-image'}}
+        current = {'selection': {'control': {'config_digest': 'trusted-image'}}}
+        message = 'AGY 账号 #7 仍归属远程节点，请迁回本机后更新或回退平台'
+        snapshot = {'agy_update_blockers': [message], 'environments': []}
+        with patch.object(host, 'values'), patch.object(host, 'controls', return_value=controls), \
+                patch.object(host, 'verify_images', return_value={'control': {'Id': 'trusted-image'}}), \
+                patch('system_update_host._container_image_matches', return_value=True), \
+                patch.object(host, 'metadata') as metadata, patch.object(host, '_runtime_snapshot', return_value=snapshot), \
+                patch.object(host, 'request') as request:
+            with self.assertRaisesRegex(ValueError, '迁回本机后更新或回退平台'):
+                host.capture(current)
+            with self.assertRaisesRegex(ValueError, '迁回本机后更新或回退平台'):
+                host.drained({'rolling_accounts': True})
+            metadata.assert_not_called()
+            request.assert_not_called()
+
     def test_environment_retry_only_replays_pre_action_quiescence_conflicts(self) -> None:
         """仅两种前置排空冲突可沿原请求重试，代次冲突与提交未知直接上抛。@return None。"""
         host = HostDeployment({'state_root': '/unused', 'data_root': '/unused-data',

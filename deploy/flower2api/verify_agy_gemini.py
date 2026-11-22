@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError
@@ -31,9 +32,14 @@ class Fixture(BaseHTTPRequestHandler):
     waiting=threading.Event()
     tool_finished=threading.Event()
     tool_drained=threading.Event()
+    tool_completions=[]
     refreshes=0
     cancelled=threading.Event()
     policy_failed=False
+    reminder_failed=False
+    binding_gate = None
+    binding_prepared = threading.Event()
+    binding_candidates = []
 
     def log_message(self,*args):
         """避免把查询密钥和私有正文打印到测试日志。@param args HTTP日志参数。@return 无。"""
@@ -42,6 +48,12 @@ class Fixture(BaseHTTPRequestHandler):
         """返回唯一合成账号的受信运行绑定。@return 无。"""
         require(self.path in ['/internal/v3/transport/1','/internal/v3/transport/2'],'请求偏离合成运行时')
         account=int(self.path.rsplit('/',1)[1]);environment=ENVIRONMENT if account==1 else 'b'*32
+        gate = Fixture.binding_gate
+        if gate is not None:
+            Fixture.binding_candidates.append(account)
+            Fixture.binding_prepared.set()
+            gate.wait(timeout=5)
+            Fixture.binding_gate = None
         host='flower2api-'+hashlib.sha256(b'synthetic').hexdigest()[:12]+'-'+environment
         value={'account_id':account,'environment_id':environment,'generation':1,'endpoint':f'http://{host}:8091',
             'secret':SECRET,'release_id':'synthetic-release'}
@@ -50,6 +62,12 @@ class Fixture(BaseHTTPRequestHandler):
 
     def do_POST(self):
         """按真实私有信封输出源帧、HTTP终态和物理收口。@return 无。"""
+        if self.path.partition('?')[0] in ('/internal/v3/agy-environments/1', '/internal/v3/agy-environments/2'):
+            require(self.headers.get('Authorization') == 'Bearer ' + SECRET, '环境登记证明错误')
+            self.send_response(404)
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+            return
         if self.path=='/internal/v3/agy-auth/refresh':
             require(self.headers.get('Authorization')=='Bearer '+SECRET,'管理证明错误')
             value=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
@@ -63,6 +81,7 @@ class Fixture(BaseHTTPRequestHandler):
             value=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
             require('credential_snapshot' not in value,'工具收口意外发布凭据')
             require(any(item['request']['request_id']==value['previous_request_id'] and item['api_token_id']==value['api_token_id'] for item in Fixture.calls),'工具控制归属错误')
+            Fixture.tool_completions.append(value['previous_request_id'])
             Fixture.tool_finished.set();require(Fixture.tool_drained.wait(5),'原工具物理收口失败')
             self.send_response(200);self.send_header('content-type','application/json');self.end_headers()
             self.wfile.write(json.dumps({'finished':True,'request_id':value['request']['request_id'],'previous_request_id':value['previous_request_id']}).encode())
@@ -88,8 +107,10 @@ class Fixture(BaseHTTPRequestHandler):
         self.send_response(200);self.send_header('content-type','application/x-ndjson');self.end_headers()
         mode=contents[0]['parts'][0].get('text','')
         policy=value.get('system_prompt_policy',{'schema_version':1,'enabled':False,'rule_version':'new-api-homoglyph-v1'})
-        report={**policy,'source':'cortex_custom_system','rule_sha256':'c'*64,'changed':False,
+        prompt_source = 'cortex_user_reminder' if 'user_reminder_index' in policy else 'cortex_custom_system'
+        report={**policy,'source':prompt_source,'rule_sha256':'c'*64,'changed':False,
             'replaced_codepoints':0,'system_codepoints':len('\n'.join(part.get('text','') for part in body.get('systemInstruction',{}).get('parts',[])))}
+        report.pop('user_reminder_index', None)
         if mode=='policy-wrong-receipt':report['rule_version']='unknown'
         native('request_accepted',parameter_policy=[{'field':'generationConfig.temperature','policy':'native_default'}],
             **({} if mode=='policy-no-receipt' else {'system_prompt_policy':report}))
@@ -97,6 +118,8 @@ class Fixture(BaseHTTPRequestHandler):
             emit('job_finalized',status='error');return
         control_cases = {'control-400': 400, 'control-502': 502, 'control-200': 200,
             'control-legacy': None, 'control-after-frame': 400}
+        if results and mode.startswith('replay-control-'):
+            mode = mode.removeprefix('replay-')
         if mode in control_cases:
             after_frame = mode == 'control-after-frame'
             if after_frame:
@@ -112,6 +135,11 @@ class Fixture(BaseHTTPRequestHandler):
             Fixture.policy_failed=True
             with sqlite3.connect('/state/gateway.sqlite') as database:
                 database.execute('UPDATE accounts SET agy_system_prompt_homoglyph_enabled=0 WHERE id=1')
+        reminder_auth = mode == 'reminder-auth-recover' and not Fixture.reminder_failed
+        if reminder_auth:
+            Fixture.reminder_failed = True
+            with sqlite3.connect('/state/gateway.sqlite') as database:
+                database.execute('UPDATE accounts SET agy_system_prompt_as_user_reminder=0 WHERE id=1')
         if mode=='cancel-stream':
             frame={'candidates':[{'content':{'role':'model','parts':[{'text':'合成首帧'}]}}]}
             native('gemini_response',data={'data_base64':base64.b64encode(json.dumps(frame).encode()).decode()})
@@ -122,7 +150,7 @@ class Fixture(BaseHTTPRequestHandler):
             except OSError:
                 Fixture.cancelled.set()
             return
-        auth_error=policy_auth or mode=='auth-always' or mode=='auth-recover' and value['credential_snapshot']['credential_generation']==2 or mode=='auth-after-frame'
+        auth_error=policy_auth or reminder_auth or mode=='auth-always' or mode=='auth-recover' and value['credential_snapshot']['credential_generation']==2 or mode=='auth-after-frame'
         if auth_error or mode=='capacity-error':
             if mode=='auth-after-frame':
                 frame={'candidates':[{'content':{'role':'model','parts':[{'text':'已经交付的合成片段'}]}}]}
@@ -145,6 +173,84 @@ class Fixture(BaseHTTPRequestHandler):
         if tools:Fixture.tool_drained.set()
 
 
+def verify_session_affinity(database, request, base, body):
+    """验证双账号真实发送与持久会话一致。@param database 隔离 SQLite。@param request HTTP 夹具。@param base 生成入口。@param body 请求模板。@return 无。"""
+    def send(payload, key='synthetic-both-key', session_id=None, streaming=False):
+        request_ids = []
+        action = 'streamGenerateContent?alt=sse' if streaming else 'generateContent'
+        status, _ = request(base + action, payload, key=key, session_id=session_id, request_ids=request_ids)
+        require(status == 200, '会话测试请求失败：' + str(status))
+        until = time.monotonic() + 5
+        while time.monotonic() < until:
+            row = database.execute('SELECT summary_json FROM request_diagnostics WHERE request_id=? AND finished_at IS NOT NULL', (request_ids[0],)).fetchone()
+            if row:
+                return json.loads(row[0])
+            time.sleep(.02)
+        raise ValueError('会话测试请求缺少持久诊断')
+
+    with database:
+        database.execute('UPDATE accounts SET priority=id')
+    opening = copy.deepcopy(body)
+    opening['contents'][0]['parts'][0]['text'] = '合成粘性会话开场'
+    continued = copy.deepcopy(opening)
+    continued['contents'].extend([{'role':'model','parts':[{'text':'合成回复'}]},
+        {'role':'user','parts':[{'text':'合成粘性会话下一轮'}]}])
+    first = send(opening)
+    key = first.get('derived_session_id')
+    require(first['account_id'] == 1 and key and len(key) == 64 and 'original_session_id' not in first,
+        '首轮没有记录派生会话或没有提交到优先账号')
+    with database:
+        database.execute('UPDATE accounts SET priority=0 WHERE id=2')
+    next_turn = send(continued, streaming=True)
+    require(next_turn['account_id'] == 1 and next_turn.get('derived_session_id') == key,
+        '切换流式或账号优先级后有效粘性失效')
+    other = send(opening, key='synthetic-two-key')
+    require(other['account_id'] == 2 and other.get('derived_session_id') != key, '不同 API Token 共用派生键')
+
+    require(request('/admin/accounts/1/work-control', {'api_accepting':False}, admin=True, method='PUT')[0] == 200,
+        '合成账号暂停接单失败')
+    try:
+        before = len(Fixture.calls)
+        require(request(base+'generateContent', continued, key='synthetic-both-key')[0] == 503
+            and len(Fixture.calls) == before, '原账号暂停后错误切号')
+        require(database.execute('SELECT account_id FROM gateway_session_bindings WHERE session_key=?', (key,)).fetchone() == (1,),
+            '暂停接单改写会话账号')
+    finally:
+        require(request('/admin/accounts/1/work-control', {'api_accepting':True}, admin=True, method='PUT')[0] == 200,
+            '合成账号恢复接单失败')
+    with database:
+        database.execute('UPDATE gateway_session_bindings SET expires_at_ms=0 WHERE session_key=?', (key,))
+    expired = send(continued)
+    require(expired['account_id'] == 2 and expired.get('derived_session_id') == key, '过期后未重新绑定')
+
+    explicit = 'synthetic-agy-session-header'
+    explicit_first = send(opening, session_id=explicit)
+    with database:
+        database.execute('UPDATE accounts SET priority=0 WHERE id=1')
+        database.execute('UPDATE accounts SET priority=1 WHERE id=2')
+    explicit_next = send(continued, session_id=explicit)
+    for root in (explicit_first, explicit_next):
+        require(root['account_id'] == 2 and root.get('original_session_id') == explicit and 'derived_session_id' not in root,
+            '显式会话头的优先级、显示或账号归属错误')
+
+    with database:
+        database.execute('UPDATE accounts SET priority=0')
+    simultaneous = copy.deepcopy(opening)
+    simultaneous['contents'][0]['parts'][0]['text'] = '合成并发首轮'
+    Fixture.binding_candidates.clear()
+    Fixture.binding_prepared.clear()
+    Fixture.binding_gate = threading.Barrier(2)
+    before = len(Fixture.calls)
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        one = workers.submit(request, base+'generateContent', simultaneous, key='synthetic-both-key')
+        require(Fixture.binding_prepared.wait(5), '并发首轮没有进入发送准备')
+        two = workers.submit(request, base+'generateContent', simultaneous, key='synthetic-both-key')
+        require(all(call.result()[0] == 200 for call in (one, two)), '绑定竞争后请求未恢复')
+    require(set(Fixture.binding_candidates) == {1, 2}, '并发测试需要两个不同的初选账号')
+    sent = Fixture.calls[before:]
+    require(len(sent) == 2 and len({call['request']['account_id'] for call in sent}) == 1, '并发首轮提交到了多个账号')
+
+
 def inside() -> dict:
     """在隔离容器执行真实HTTP、数据库及工具许可场景。@return 测试摘要。"""
     for port in (8765,8091):
@@ -152,12 +258,17 @@ def inside() -> dict:
         threading.Thread(target=server.serve_forever,daemon=True).start()
     output=open('/state/gateway.log','wb')
     child=subprocess.Popen(['/opt/gateway'],stdout=output,stderr=subprocess.STDOUT)
-    def request(path,body=None,key='synthetic-key',admin=False):
+    def request(path,body=None,key='synthetic-key',admin=False,*,method=None,session_id=None,request_ids=None):
         headers={'x-api-key':'synthetic-admin' if admin else key}
+        if path == '/v1/messages':
+            headers['user-agent'] = 'python-httpx/0.28.1'
         if body is not None:headers['content-type']='application/json'
-        value=Request('http://127.0.0.1:5674'+path,data=json.dumps(body).encode() if body is not None else None,headers=headers)
+        if session_id is not None:headers['x-session-id']=session_id
+        value=Request('http://127.0.0.1:5674'+path,data=json.dumps(body).encode() if body is not None else None,headers=headers,method=method)
         try:
-            with urlopen(value,timeout=8) as response:return response.status,response.read()
+            with urlopen(value,timeout=8) as response:
+                if request_ids is not None:request_ids.append(response.headers['x-cc2api-request-id'])
+                return response.status,response.read()
         except HTTPError as error:return error.code,error.read()
     try:
         until=time.monotonic()+30
@@ -258,7 +369,24 @@ def inside() -> dict:
         require(status==200 and json.loads(raw)['candidates'][0]['content']['parts'][0]['text']=='合成回复','concurrency=1续轮失败')
         require(Fixture.calls[-1]['model']=='gemini-4-neon-low','续轮改变了已绑定的型号')
         require(Fixture.tool_finished.is_set(),'真实工具回填未完成')
-        require(request(tool_base,continuation)[0]==400,'重复工具结果被接纳')
+        require(request(tool_base,continuation)==(status,raw) and len(Fixture.calls)==previous+1,
+            '重复工具结果未返回原响应或再次提交模型')
+        require(len(Fixture.tool_completions)==1,'原生工具结果重复回填')
+        for mode,operation,expected in [('control-502','generateContent',502),
+                ('control-after-frame','streamGenerateContent?alt=sse',200)]:
+            Fixture.tool_finished.clear()
+            Fixture.tool_drained.clear()
+            failed=copy.deepcopy(tool)
+            failed['contents'][0]['parts'][0]['text']='replay-'+mode
+            status,raw=request(tool_base,failed)
+            require(status==200,'错误终态用例缺少原工具轮')
+            failed['contents']+=[json.loads(raw)['candidates'][0]['content'], continuation['contents'][-1]]
+            before,before_tools=len(Fixture.calls),len(Fixture.tool_completions)
+            path=tool_base.rsplit(':',1)[0]+':'+operation
+            first=request(path,failed)
+            require(first[0]==expected and b'AGY' in first[1],'接续错误未返回实际原生终态')
+            require(request(path,failed)==first and len(Fixture.calls)==before+1
+                and len(Fixture.tool_completions)==before_tools+1,'失败续轮重试改变终态或重复发送')
         for mode,expected,attempts,refreshes in [('auth-recover',200,2,1),('capacity-error',429,1,0),('auth-always',503,2,1),('auth-after-frame',200,1,0)]:
             current=copy.deepcopy(body);current['contents'][0]['parts'][0]['text']=mode
             before=len(Fixture.calls);before_refresh=Fixture.refreshes
@@ -333,6 +461,37 @@ def inside() -> dict:
         require(len(Fixture.calls)==before+2 and all(value['system_prompt_policy']['enabled'] for value in Fixture.calls[before:]),'认证恢复重新读取了变化后的开关')
         require(database.execute('SELECT agy_system_prompt_homoglyph_enabled FROM accounts WHERE id=1').fetchone()[0]==0,'并发开关变化未进入真实存储')
         require(request(base+'generateContent',candidate)[0]==200 and 'system_prompt_policy' not in Fixture.calls[-1],'后续HTTP没有读取关闭策略')
+        with database:
+            database.execute('UPDATE accounts SET agy_system_prompt_as_user_reminder=1 WHERE id=1')
+        messages = {
+            'model': 'gemini-synthetic',
+            'max_tokens': 128,
+            'system': 'A synthetic application instruction.',
+            'messages': [{'role': 'user', 'content': 'reminder-role-fixture'}],
+        }
+        for key, account in [('synthetic-key', 1), ('synthetic-two-key', 2)]:
+            require(request('/v1/messages', messages, key=key)[0] == 200, '两账号 Messages 对照请求失败')
+            sent = Fixture.calls[-1]
+            require(sent['request']['account_id'] == account, 'Messages 实际出站账号不符')
+            sent_body = sent['body']
+            if account == 1:
+                require(sent['system_prompt_policy']['user_reminder_index'] == 0, '启用账号缺少用户提醒位置')
+            else:
+                require('system_prompt_policy' not in sent, '关闭账号采用了其它账号的试验设置')
+            require(sent_body['systemInstruction']['parts'] == [{'text': messages['system']}]
+                and len(sent_body['contents'][0]['parts']) == 1, '私有信封未保留原始历史')
+        before, refreshes = len(Fixture.calls), Fixture.refreshes
+        messages['messages'][0]['content'] = 'reminder-auth-recover'
+        require(request('/v1/messages', messages)[0] == 200, '试验模式的认证恢复失败')
+        attempts = Fixture.calls[before:]
+        require(len(attempts) == 2 and Fixture.refreshes == refreshes + 1
+            and attempts[0]['body'] == attempts[1]['body']
+            and attempts[0]['system_prompt_policy'] == attempts[1]['system_prompt_policy']
+            and attempts[1]['system_prompt_policy']['user_reminder_index'] == 0, '认证恢复改变了本次 HTTP 的用户提醒')
+        messages['messages'][0]['content'] = 'reminder-role-fixture'
+        require(request('/v1/messages', messages)[0] == 200
+            and 'system_prompt_policy' not in Fixture.calls[-1],
+            '后续 HTTP 未读取认证恢复期间保存的关闭值')
         with database:database.execute('UPDATE accounts SET agy_system_prompt_homoglyph_enabled=1 WHERE id=1')
         for mode in ['policy-no-receipt','policy-wrong-receipt']:
             current=copy.deepcopy(candidate);current['contents'][0]['parts'][0]['text']=mode
@@ -350,6 +509,7 @@ def inside() -> dict:
             database.execute("UPDATE accounts SET oauth_expires_at=strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '+650 seconds') WHERE id=1")
         require(request(base+'generateContent',body)[0]==200 and Fixture.refreshes==refreshes+1,
             '有效期充足的凭据被重复刷新')
+        verify_session_affinity(database, request, base, body)
         # 从真实持久摘要按私有attempt关联，避免用当前账号资料替代历史事实。
         until=time.monotonic()+10
         while time.monotonic()<until:
@@ -358,12 +518,15 @@ def inside() -> dict:
             time.sleep(.02)
         require(len(attempts)==len(Fixture.calls),'真实发送和持久尝试计数不一致')
         by_id={value['request']['request_id']:value for value in Fixture.calls}
+        message_roots = set()
         for attempt in attempts:
             source=by_id[attempt['attempt_id']];context=attempt.get('context',{})
+            mode = source['body']['contents'][0]['parts'][0].get('text')
+            if mode in ('reminder-role-fixture', 'reminder-auth-recover'):
+                message_roots.add(attempt['request_id'])
             require(context.get('platform')=='antigravity' and context.get('entry_protocol')=='gemini','持久平台或协议被模型名覆盖')
             require(context.get('credential_generation')==source['credential_snapshot']['credential_generation'],'尝试凭据代次漂移')
             require(attempt['account_id']==source['request']['account_id'],'持久尝试跨账号')
-            mode = source['body']['contents'][0]['parts'][0].get('text')
             if mode in ('control-400', 'control-502', 'control-after-frame'):
                 require(attempt['status_code'] == (502 if mode == 'control-502' else 400)
                     and attempt['error_stage'] == 'native_control', '请求记录遗漏控制状态或阶段')
@@ -373,6 +536,15 @@ def inside() -> dict:
         recovered=[a for a in attempts if a.get('retry_reason')=='oauth_recovery']
         require(len(recovered)>=3,'401恢复尝试原因缺失')
         roots={row[0]:json.loads(row[1]) for row in database.execute('SELECT request_id,summary_json FROM request_diagnostics')}
+        require(len(message_roots) == 4 and all(
+            roots[root].get('context', {}).get('entry_protocol') == 'anthropic_messages'
+            for root in message_roots), 'Messages 原始 HTTP 协议记录错误')
+        replayed = [root for root in roots.values() if root.get('context', {}).get('replay_of_request_id')]
+        require(bool(replayed), '工具重放根记录缺失')
+        for root in replayed:
+            original = roots[root['context']['replay_of_request_id']]
+            require(root.get('derived_session_id') and root['derived_session_id'] == original.get('derived_session_id'),
+                '工具重放诊断丢失已验证的会话归属')
         for attempt in recovered:
             same=[a for a in attempts if a['request_id']==attempt['request_id']]
             require(len(same)==2 and roots[attempt['request_id']]['attempt_count']==2,'401恢复未保留同根两尝试')
@@ -380,11 +552,13 @@ def inside() -> dict:
         database.close()
         return {'passed':True,'evidence':'real_http_sqlite_synthetic_sender','network':'none','real_model_submissions':0,
             'synthetic_submissions':len(Fixture.calls),'checks':['真实Gemini目录与令牌','按档位匹配目录、保留精确型号与令牌范围','非流式源usage','SSE','函数签名和结果','错调用方和ID拒绝',
-                '待对账期间旧工具独立收口和新模型拒绝','concurrency=1原许可接续','新AT代次','重复结果拒绝','禁用令牌',
+                '待对账期间旧工具独立收口和新模型拒绝','concurrency=1原许可接续','新AT代次','重复回填复用原响应','禁用令牌',
                 '明确401仅恢复一次','容量错误零恢复','SSE首帧后零重放','SSE断连关闭原发送和释放许可',
                 '原生控制状态在HTTP、SSE尾帧及诊断中一致',
                 '两账号策略隔离','认证恢复冻结策略','后续HTTP采用新开关','缺失和错误策略回执拒绝','原始入站视图保持',
-                '真实SQLite尝试计数和凭据代次','401同根两尝试及恢复原因','AGY调用Claude平台保持']}
+                'Messages 提示词位置按账号隔离并冻结到同一 HTTP 的认证恢复',
+                '真实SQLite尝试计数和凭据代次','401同根两尝试及恢复原因','AGY调用Claude平台保持',
+                '双账号会话绑定、并发首轮、显式头、Token隔离、暂停和过期','工具重放保留派生会话']}
     finally:
         child.terminate()
         try:child.wait(timeout=5)

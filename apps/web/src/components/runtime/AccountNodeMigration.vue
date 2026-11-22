@@ -2,9 +2,9 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { Button } from '../ui/button';
 import { ConfirmationDialog } from '../ui/feedback';
-import { nodeApi, type AccountNodeAssignment, type ExecutionNode, type NodeMigration, type NodeMigrationStart, type NodeTaskAccount } from './nodeApi';
+import { nodeApi, type AccountNodeAssignment, type ExecutionNode, type NodeMigration, type NodeMigrationStart } from './nodeApi';
 
-const props = defineProps<{ assignment: AccountNodeAssignment; account?: NodeTaskAccount; target?: ExecutionNode }>();
+const props = defineProps<{ assignment: AccountNodeAssignment; accountName: string; version?: string; agy: boolean; target?: ExecutionNode }>();
 const emit = defineEmits<{ changed: []; busy: [value: boolean] }>();
 const history = ref<NodeMigration[]>([]), loaded = ref(false), reading = ref(false), sending = ref(false);
 const error = ref(''), failed = ref(false);
@@ -14,7 +14,9 @@ const latest = computed(() => history.value[0]);
 const failureStages: Record<string, string> = { preflight: '检查目标节点并同步运行组件', draining: '等待原工作完成', fence: '隔离源环境', export: '导出资料', transfer: '传输资料', 'verify-import': '核验目标资料', 'prepare-import': '准备目标环境', commit: '保存新归属', 'activate-import': '激活目标环境', 'revoke-import': '撤销目标副本', 'restore-source': '恢复源环境', context: '核对原操作' };
 const unfinished = computed(() => !!latest.value && !['completed', 'cancelled'].includes(latest.value.phase));
 const canStart = computed(() => loaded.value && !unfinished.value && props.assignment.phase === 'ready'
-  && !!props.account?.effective_claude_code_version && !!props.target?.enabled
+  && !!props.version && !!props.target?.enabled
+  && (!props.agy || props.assignment.migration_ready === true
+    && (props.target.kind === 'local' || props.target.preparation?.state === 'prepared'))
   && props.target.id !== props.assignment.node_id);
 let alive = true, generation = 0, timer: ReturnType<typeof setTimeout> | undefined, controller: AbortController | undefined;
 
@@ -26,7 +28,7 @@ async function refresh(): Promise<void> {
   controller = new AbortController(); reading.value = true;
   const previous = latest.value;
   try {
-    const value = await nodeApi.migrations(props.assignment.account_id, controller.signal);
+    const value = await nodeApi.migrations(props.assignment.account_id, controller.signal, props.agy);
     if (!alive || current !== generation) return;
     history.value = value.items; loaded.value = true; error.value = '';
     if (previous && !['completed', 'cancelled'].includes(previous.phase) && latest.value
@@ -43,11 +45,11 @@ async function refresh(): Promise<void> {
 
 /** 冻结当前账号、版本和目标，确认窗口只展示该快照。@return 无。 */
 function openStart(): void {
-  if (!canStart.value || !props.account || !props.target) return;
+  if (!canStart.value || !props.version || !props.target) return;
   const operation = Array.from(crypto.getRandomValues(new Uint8Array(16)), value => value.toString(16).padStart(2, '0')).join('');
-  frozen.value = { action: 'start', accountId: props.assignment.account_id, accountName: props.account.name,
+  frozen.value = { action: 'start', accountId: props.assignment.account_id, accountName: props.accountName,
     targetName: props.target.name, operation, body: { operation_id: operation, node_id: props.target.id,
-      revision: props.assignment.revision, version: props.account.effective_claude_code_version! } };
+      revision: props.assignment.revision, version: props.version } };
   failed.value = false; error.value = ''; emit('busy', true);
 }
 
@@ -55,7 +57,7 @@ function openStart(): void {
 function openCancel(): void {
   const value = latest.value;
   if (!value?.can_cancel) return;
-  frozen.value = { action: 'cancel', accountId: value.account_id, accountName: props.account?.name ?? '',
+  frozen.value = { action: 'cancel', accountId: value.account_id, accountName: props.accountName,
     targetName: value.target.name, operation: value.operation_id };
   failed.value = false; error.value = ''; emit('busy', true);
 }
@@ -75,10 +77,10 @@ async function submit(resume = false): Promise<void> {
   if (timer) clearTimeout(timer);
   generation++; controller?.abort(); reading.value = false;
   try {
-    const result = failed.value && confirmation ? await nodeApi.migration(accountId, operation)
-      : resume ? await nodeApi.migrationAction(accountId, operation, 'resume')
-      : confirmation?.action === 'cancel' ? await nodeApi.migrationAction(accountId, operation, 'cancel')
-      : await nodeApi.migrate(accountId, confirmation!.body!);
+    const result = failed.value && confirmation ? await nodeApi.migration(accountId, operation, undefined, props.agy)
+      : resume ? await nodeApi.migrationAction(accountId, operation, 'resume', props.agy)
+      : confirmation?.action === 'cancel' ? await nodeApi.migrationAction(accountId, operation, 'cancel', props.agy)
+      : await nodeApi.migrate(accountId, confirmation!.body!, props.agy);
     if (!alive) return;
     history.value = [result, ...history.value.filter(row => row.operation_id !== result.operation_id)];
     frozen.value = null; failed.value = false; emit('changed');
@@ -95,8 +97,9 @@ onUnmounted(() => { alive = false; generation++; controller?.abort(); if (timer)
 
 <template>
   <section class="node-migration">
-    <div class="migration-heading"><div><h3>迁移已有环境</h3><p>先自动准备目标节点，再排空源环境并迁移 HOME、身份与工程资料。</p></div><Button variant="outline" :disabled="!canStart || sending || !!frozen" @click="openStart">迁移到所选节点</Button></div>
-    <p v-if="!account?.effective_claude_code_version">账号 CLI 版本待核对。</p>
+    <div class="migration-heading"><div><h3>迁移已有环境</h3><p>{{ agy ? '核验目标节点后暂停新接单，等待原请求及工具回填结束。' : '先自动准备目标节点，再排空源环境并迁移 HOME、身份与工程资料。' }}</p></div><Button variant="outline" :disabled="!canStart || sending || !!frozen" @click="openStart">迁移到所选节点</Button></div>
+    <p v-if="agy && !assignment.migration_ready && !unfinished">AGY 运行环境待核对。</p>
+    <p v-if="!agy && !version">账号 CLI 版本待核对。</p>
     <div v-if="latest" class="migration-status" aria-live="polite">
       <strong>{{ latest.source.name }} → {{ latest.target.name }}</strong>
       <p>{{ latest.message }}<span v-if="latest.running"> · 后台处理中</span><span v-else-if="latest.cancelling && unfinished"> · 取消操作待继续</span></p>

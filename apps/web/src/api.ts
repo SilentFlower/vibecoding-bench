@@ -75,6 +75,7 @@ export interface Account {
   id: number
   platform?: string
   agy_system_prompt_homoglyph_enabled?: boolean
+  agy_system_prompt_as_user_reminder?: boolean
   agy_gif_frames_enabled?: boolean
   agy_disable_safety_filtering?: boolean
   credential_state?: {generation:number; phase:string; operation_id?:string | null}
@@ -507,6 +508,7 @@ export interface DiagnosticRequest {
   context?: DiagnosticContext | null
   native_rejection?: { reason: string | null; capture_id: string; capture_status: string } | null
   original_session_id?: string | null
+  derived_session_id?: string | null
   account_name?: string | null
   account_email?: string | null
   log_mode?: 'info' | 'debug' | null
@@ -528,6 +530,7 @@ export interface NativeRuntimeObservation {
   worker_pid: number
   kernel_generation: string | null
   warm_hit: boolean
+  start_source?: 'exec' | 'criu_restore'
   preparation_wait_ms: number
   checkout_ms: number
   worker_start_ms: number | null
@@ -593,6 +596,13 @@ export interface DiagnosticContext {
   control_observed_at?: string | null
   control_error_code?: string | null
   control_recovery?: string | null
+  observed_control_http_status?: number | null
+  control_error_detail?: string | null
+  native_receive_ended?: boolean | null
+  native_source_terminal?: boolean | null
+  tool_continuation_mode?: string | null
+  tool_continuation_path?: string | null
+  tool_continuation_reason?: string | null
   input_rejection_reason?: string | null
   input_rejection_field?: string | null
   response_headers_source?: string | null

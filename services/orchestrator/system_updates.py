@@ -27,6 +27,7 @@ from system_update_contract import MANIFEST_LIMIT, safe_read, strict_json, valid
 from system_update_gate import UPDATE_GATE
 from system_update_rollout import read_rollout
 from cluster_migration_maintenance import paused_migration_lease
+from cluster_store import ClusterStore
 
 
 _PLATFORM_VERSION_FILE = Path(__file__).with_name('platform-version.json')
@@ -240,9 +241,18 @@ def runtime_snapshot(runtime, central_only: bool = False, control_only: bool = F
     if runtime is None:
         return {**gate, 'ready': False, 'environments': [], 'blockers': ['账号运行时未初始化']}
     connection = runtime.database()
+    remote_agy = {}
+    agy_update_blockers = []
     try:
         rows = [dict(row) for row in connection.execute('SELECT * FROM account_environments ORDER BY environment_id')]
         accounts = {row['id']: dict(row) for row in connection.execute('SELECT * FROM accounts')}
+        if ClusterStore.has_agy_nodes(connection):
+            remote_agy = {row['environment_id']: row for row in connection.execute(
+                'SELECT p.environment_id,b.phase,b.account_id FROM agy_node_assignments b '
+                'JOIN platform_api_environments p ON p.gateway_account_id=b.account_id '
+                "JOIN cluster_nodes n ON n.id=b.node_id WHERE n.kind='ssh'")}
+            if connection.execute("SELECT 1 FROM agy_node_migrations WHERE phase NOT IN ('completed','cancelled')").fetchone():
+                agy_update_blockers.append('请先完成或取消原 AGY 节点迁移，再更新平台')
     finally:
         connection.close()
     blockers = ['管理端仍有在途活动'] if gate['active'] else []
@@ -258,6 +268,16 @@ def runtime_snapshot(runtime, central_only: bool = False, control_only: bool = F
     for row in rows:
         reasons = []
         item = {key: row.get(key) for key in ('environment_id', 'generation', 'state', 'name', 'account_id')}
+        if assigned := remote_agy.get(row['environment_id']):
+            archived = (assigned['phase'] == 'retired' and row['state'] == 'stopped'
+                and not any(row[column] for column in ROLE_COLUMNS.values()))
+            if not archived:
+                # 快速控制切换也会改变归属读取和节点版本门禁，必须保留正在使用的原组件。
+                reasons = [f"AGY 账号 #{assigned['account_id']} 仍归属远程节点，请迁回本机后更新或回退平台"]
+                agy_update_blockers.extend(reasons)
+            environments.append({**item, 'platform': 'antigravity', 'gateway_account_id': assigned['account_id'],
+                'node_kind': 'ssh', 'roles': {}, 'origin': None, 'blockers': reasons})
+            continue
         if row['account_id'] is None and row['environment_id'] in removed_drafts:
             # 节点清理回执已证明原草稿的远端资料与组件收口，中央行继续保存历史引用。
             environments.append({**item, 'node_kind': 'ssh', 'roles': {}, 'origin': None, 'blockers': []})
@@ -365,8 +385,10 @@ def runtime_snapshot(runtime, central_only: bool = False, control_only: bool = F
     nodes = [row for row in node_rows if row['kind'] == 'ssh' and not row.get('removal')
         and ((row.get('preparation') or {}).get('release') or (row.get('preparation') or {}).get('current_release'))]
     scope = 'control' if control_only else 'central' if central_only else 'full'
+    blockers = agy_update_blockers + blockers
     return {**gate, 'scope': scope, 'ready': gate['phase'] == 'blocked' and not blockers,
-        'environments': environments, 'nodes': nodes, 'node_removals': node_removals, 'blockers': blockers[:256]}
+        'environments': environments, 'nodes': nodes, 'node_removals': node_removals, 'blockers': blockers[:256],
+        'agy_update_blockers': agy_update_blockers[:3]}
 
 
 def environment_sources(runtime, *, observe_remote: bool = True) -> list[dict]:

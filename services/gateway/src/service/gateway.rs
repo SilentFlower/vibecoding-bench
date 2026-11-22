@@ -3,7 +3,7 @@ use axum::Error as AxumError;
 use axum::body::Body;
 use axum::extract::Request;
 use axum::http::{
-    HeaderMap, HeaderValue, StatusCode,
+    HeaderMap, HeaderValue, Method, StatusCode,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE, TRANSFER_ENCODING},
     response::Parts,
 };
@@ -46,6 +46,7 @@ use crate::service::account::{
 use crate::service::diagnostics::{
     self, CURRENT_TRACE, RequestDiagnosticsConfig, RequestTraceGuard, TraceContext,
 };
+use crate::service::gemini::{self, GeminiService, MessagesIngress};
 use crate::service::native_contract::NativeSourceVersion;
 use crate::service::native_contract::validate_idle_timeout;
 use crate::service::native_error::{REJECTION_CAPTURE_HEADER, REJECTION_HEADER, rejection_reason};
@@ -61,6 +62,7 @@ use self::native_signature_repair::{
 use crate::service::request_body_codec::{
     REQUEST_BODY_LIMIT, RequestBodyCodecError, RequestBodyEncoding,
 };
+use crate::service::request_session::{RequestSession, SESSION_HEADER};
 use crate::service::rewriter::{
     CacheControlTtlRewrite, ClaudeCodeContextSanitizerConfig, ClientType, DisabledThinkingRewrite,
     EnvPassthrough, MessageCacheControlRewrite, Rewriter, StatefulCacheCompletion,
@@ -643,7 +645,7 @@ pub struct GatewayService {
     disabled_thinking_rewrite: RwLock<DisabledThinkingRewrite>,
     assistant_prefill_intercept_config: RwLock<AssistantPrefillInterceptConfig>,
     rate_limit_request_log_config: RwLock<RateLimitRequestLogConfig>,
-    request_diagnostics_config: RwLock<RequestDiagnosticsConfig>,
+    request_diagnostics_config: Arc<RwLock<RequestDiagnosticsConfig>>,
     non_stream_probe_cache_config: RwLock<NonStreamProbeCacheConfig>,
     non_stream_probe_cache: RwLock<HashMap<String, CachedProbeResponse>>,
     stream_stability_config: RwLock<StreamStabilityConfig>,
@@ -697,10 +699,14 @@ impl GatewayService {
         cache: Arc<dyn CacheStore>,
         usage_store: Arc<UsageStore>,
     ) -> Self {
+        let request_diagnostics_config = Arc::new(RwLock::default());
         Self {
             native_signature_repairs: NativeSignatureRepairs::default(),
             session_policy_block_svc: Arc::new(SessionPolicyBlockService::new(&settings_store)),
-            native_prewarmer: NativePrewarmer::new(account_svc.clone()),
+            native_prewarmer: NativePrewarmer::new(
+                account_svc.clone(),
+                request_diagnostics_config.clone(),
+            ),
             account_svc,
             rewriter,
             telemetry_svc,
@@ -742,7 +748,7 @@ impl GatewayService {
                 default_assistant_prefill_intercept_config(),
             ),
             rate_limit_request_log_config: RwLock::new(default_rate_limit_request_log_config()),
-            request_diagnostics_config: RwLock::default(),
+            request_diagnostics_config,
             non_stream_probe_cache_config: RwLock::new(default_non_stream_probe_cache_config()),
             non_stream_probe_cache: RwLock::new(HashMap::new()),
             stream_stability_config: RwLock::new(default_stream_stability_config()),
@@ -1759,7 +1765,10 @@ impl GatewayService {
             .as_ref()
             .filter(|_| req.uri().path() == "/v1/messages")
         else {
-            return match self.handle_request_inner(req, api_token).await {
+            return match self
+                .handle_request_inner(req, api_token, full_rejected_ingress)
+                .await
+            {
                 Ok(resp) => resp,
                 Err(e) => {
                     if self.account_svc.scheduler().is_some() {
@@ -1778,7 +1787,10 @@ impl GatewayService {
         );
         let guard = RequestTraceGuard::new(trace.clone());
         let response = match CURRENT_TRACE
-            .scope(trace, self.handle_request_inner(req, api_token))
+            .scope(
+                trace,
+                self.handle_request_inner(req, api_token, full_rejected_ingress),
+            )
             .await
         {
             Ok(resp) => resp,
@@ -2077,15 +2089,18 @@ impl GatewayService {
         &self,
         req: Request,
         api_token: Option<&ApiToken>,
+        full_egress: bool,
     ) -> Result<Response, AppError> {
         let req_start = std::time::Instant::now();
         let method = req.method().clone();
         let path = req.uri().path().to_string();
         let query = req.uri().query().unwrap_or("").to_string();
+        let gemini = req.extensions().get::<Arc<GeminiService>>().cloned();
+        let cutover: Option<InferenceCutover> = req.extensions().get().cloned();
 
-        let native_header_map = req.headers().clone();
+        let mut native_header_map = req.headers().clone();
         // 提取 header
-        let headers = extract_headers(req.headers());
+        let mut headers = extract_headers(req.headers());
         let ua = headers
             .get("User-Agent")
             .or_else(|| headers.get("user-agent"))
@@ -2157,7 +2172,57 @@ impl GatewayService {
             serde_json::from_slice(&body_bytes).unwrap_or(serde_json::json!({}))
         };
 
-        diagnostics::original_session(&native_header_map, &body_map);
+        let agy = gemini.zip(api_token).filter(|_| {
+            method == Method::POST
+                && path == "/v1/messages"
+                && body_map["model"]
+                    .as_str()
+                    .is_some_and(|model| model.starts_with("gemini-"))
+        });
+        if let Some((service, token)) = agy {
+            let session = RequestSession::agy_messages(token.id, &native_header_map, &body_map);
+            diagnostics::request_context(
+                "antigravity",
+                "anthropic_messages",
+                body_map["model"].as_str(),
+            );
+            diagnostics::record_request_session(session.original(), session.derived());
+            if let Some(response) = self
+                .session_policy_block_svc
+                .begin(token.id, &body_map)
+                .await?
+            {
+                return Ok(response);
+            }
+            return Ok(gemini::generate_messages(
+                service,
+                self.account_svc.clone(),
+                token.clone(),
+                MessagesIngress {
+                    request: body_map,
+                    raw: body_bytes,
+                    headers: native_header_map,
+                    session,
+                    started: req_start.into(),
+                    cutover,
+                    full_egress,
+                },
+            )
+            .await);
+        }
+
+        let scheduler = self
+            .account_svc
+            .scheduler()
+            .filter(|_| path == "/v1/messages");
+        let session = (path == "/v1/messages").then(|| {
+            let token_id = scheduler.map(|_| api_token.map_or(0, |token| token.id));
+            let session = RequestSession::claude(token_id, &native_header_map, &body_map);
+            diagnostics::claude_request_session(&session, &body_map);
+            native_header_map.remove(SESSION_HEADER);
+            headers.remove(SESSION_HEADER);
+            session
+        });
 
         if path == "/v1/messages" {
             if let Some(response) = self
@@ -2250,18 +2315,12 @@ impl GatewayService {
         let session_hash =
             crate::service::account::generate_session_hash(&ua, &body_map, client_type);
 
-        let scheduling_request = self
-            .account_svc
-            .scheduler()
-            .filter(|_| path == "/v1/messages")
-            .map(|scheduler| {
-                let explicit_sid = extract_session_id_from_body(&body_map);
-                scheduler.begin_with_parameters(
-                    api_token.map(|t| t.id).unwrap_or(0),
-                    explicit_sid.as_deref(),
-                    &DiagnosticParameters::from_request(&body_map),
-                )
-            });
+        let scheduling_request = scheduler.zip(session.as_ref()).map(|(scheduler, session)| {
+            scheduler.begin_with_key(
+                session.key(),
+                &DiagnosticParameters::from_request(&body_map),
+            )
+        });
 
         // 根据令牌限制构建账号过滤条件
         let (allowed_ids, blocked_ids) = if let Some(t) = api_token {
@@ -4938,19 +4997,31 @@ fn count_tokens_app_error_response(err: AppError) -> Response {
         error @ AppError::AgyControl(status) => {
             anthropic_error_response(status, "upstream_error", &error.to_string())
         }
-        error @ AppError::AgyToolTurnFailed => {
-            anthropic_error_response(StatusCode::BAD_GATEWAY, "upstream_error", &error.to_string())
+        error @ AppError::AgyToolTurnFailed => anthropic_error_response(
+            StatusCode::BAD_GATEWAY,
+            "upstream_error",
+            &error.to_string(),
+        ),
+        error @ AppError::AgyToolResponseExpired => {
+            anthropic_error_response(StatusCode::GONE, "api_error", &error.to_string())
         }
+        error @ AppError::AgyToolContinuationTerminal { .. } => anthropic_error_response(
+            StatusCode::BAD_REQUEST,
+            "invalid_request_error",
+            &error.to_string(),
+        ),
         AppError::BadGateway(_) => anthropic_error_response(
             StatusCode::BAD_GATEWAY,
             "upstream_error",
             "Upstream request failed",
         ),
-        AppError::ServiceUnavailable(_) => anthropic_error_response(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "api_error",
-            "Service temporarily unavailable",
-        ),
+        AppError::ServiceUnavailable(_) | AppError::AgyToolReplayUnavailable => {
+            anthropic_error_response(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "api_error",
+                "Service temporarily unavailable",
+            )
+        }
         AppError::PermanentCredential(_) => anthropic_error_response(
             StatusCode::SERVICE_UNAVAILABLE,
             "api_error",
@@ -9675,6 +9746,7 @@ mod tests {
             agy_system_prompt_homoglyph_enabled: false,
             agy_gif_frames_enabled: false,
             agy_disable_safety_filtering: false,
+            agy_system_prompt_as_user_reminder: false,
             id: 42,
             name: "测试账号".into(),
             email: "user@example.com".into(),
@@ -23612,6 +23684,155 @@ data: {"type":"message_delta","delta":{"stop_reason":"max_tokens"},"usage":{"out
                 .active_request_count(),
             0
         );
+    }
+
+    /// 同一无 ID 会话跨轮命中原账号，旧显式绑定可由两个合法会话头继续访问。
+    #[tokio::test]
+    async fn v3_messages_routes_and_records_derived_sessions() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let app = Router::new().route(
+            "/v1/messages",
+            post(|headers: HeaderMap| async move {
+                assert!(!headers.contains_key("x-session-id"));
+                axum::Json(json!({
+                    "id":"msg_fixture", "type":"message", "role":"assistant",
+                    "model":"claude-opus-4-8", "content":[{"type":"text","text":"reply"}],
+                    "stop_reason":"end_turn", "usage":{"input_tokens":3,"output_tokens":1}
+                }))
+            }),
+        );
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let (service, _) = test_gateway_service_with_scheduling(
+            Arc::new(MemoryStore::new()),
+            base,
+            String::new(),
+            true,
+        )
+        .await;
+        let mut first =
+            create_gateway_account(&service, "affinity-first@example.invalid", 2, 0).await;
+        let mut second =
+            create_gateway_account(&service, "affinity-second@example.invalid", 2, 0).await;
+        first.priority = 1;
+        second.priority = 2;
+        service
+            .account_svc
+            .update_account_options(&first, &["priority"])
+            .await
+            .unwrap();
+        service
+            .account_svc
+            .update_account_options(&second, &["priority"])
+            .await
+            .unwrap();
+        let token = ApiToken {
+            id: 91,
+            name: "合成会话令牌".into(),
+            token: "synthetic-session-token".into(),
+            allowed_accounts: format!("{},{}", first.id, second.id),
+            blocked_accounts: String::new(),
+            status: ApiTokenStatus::Active,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        let other_token = ApiToken {
+            id: 92,
+            ..token.clone()
+        };
+        let scheduler = service.account_svc.scheduler().unwrap();
+        let sid = "known-client-session";
+        let seed = scheduler.begin(token.id, Some(sid));
+        seed.selected(&first, None);
+        drop(seed.admit(&first).await.unwrap());
+        drop(seed);
+
+        let opening = json!({"model":"claude-opus-4-8", "max_tokens":16,
+            "messages":[{"role":"user","content":"first synthetic request"}]});
+        let mut continued = opening.clone();
+        continued["messages"].as_array_mut().unwrap().extend([
+            json!({"role":"assistant", "content":"reply"}),
+            json!({"role":"user", "content":"next synthetic request"}),
+        ]);
+        let cases = [
+            (&token, &opening, None, first.id),
+            (&token, &continued, None, first.id),
+            (&other_token, &continued, None, second.id),
+            (
+                &token,
+                &opening,
+                Some(("x-claude-code-session-id", sid)),
+                first.id,
+            ),
+            (&token, &continued, Some(("x-session-id", sid)), first.id),
+        ];
+        let diagnostics = service.diagnostics_store().unwrap();
+        let mut first_key = None;
+        for (index, (token, content, session_header, account_id)) in cases.into_iter().enumerate() {
+            if index == 1 {
+                // 下一轮优先级已经倒转，真实发送仍须跟随持久绑定。
+                second.priority = 0;
+                service
+                    .account_svc
+                    .update_account_options(&second, &["priority"])
+                    .await
+                    .unwrap();
+            }
+            let mut request = Request::builder()
+                .method("POST")
+                .uri("/v1/messages")
+                .header("content-type", "application/json")
+                .header(
+                    "user-agent",
+                    if index == 0 {
+                        "AI-Hub-Monitor/1.0"
+                    } else {
+                        "python-httpx/0.28"
+                    },
+                );
+            if let Some((name, value)) = session_header {
+                request = request.header(name, value);
+            }
+            let response = service
+                .handle_request(
+                    request.body(Body::from(content.to_string())).unwrap(),
+                    Some(token),
+                )
+                .await;
+            assert_eq!(response.status(), StatusCode::OK);
+            let root = response.headers()["x-cc2api-request-id"]
+                .to_str()
+                .unwrap()
+                .to_owned();
+            body::to_bytes(response.into_body(), 65536).await.unwrap();
+            diagnostics.flush().await.unwrap();
+            let detail = diagnostics.detail(&root).await.unwrap();
+            assert_eq!(detail.attempts.len(), 1);
+            assert_eq!(detail.attempts[0].account_id, account_id);
+            if session_header.is_some() {
+                assert_eq!(detail.request.original_session_id.as_deref(), Some(sid));
+                assert!(detail.request.derived_session_id.is_none());
+            } else {
+                let key = detail.request.derived_session_id.unwrap();
+                assert_eq!(key.len(), 64);
+                assert_eq!(
+                    scheduler
+                        .store
+                        .binding(&key, now_ms())
+                        .await
+                        .unwrap()
+                        .unwrap()
+                        .account_id,
+                    account_id
+                );
+                match index {
+                    0 => first_key = Some(key),
+                    1 => assert_eq!(first_key.as_deref(), Some(key.as_str())),
+                    _ => assert_ne!(first_key.as_deref(), Some(key.as_str())),
+                }
+            }
+        }
+        server.abort();
     }
 
     /// 已有 SSE 观察器识别到 200 内错误时只反馈一次失败，不奖励快速错误的延迟。

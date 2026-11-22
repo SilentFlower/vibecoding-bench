@@ -82,6 +82,47 @@ async fn authentication_binding_and_snapshot_fail_before_native_preparation() {
     fs::remove_dir_all(root).unwrap();
 }
 
+/// 容量应用只接收服务鉴权和磁盘当前配置。@return 无。
+#[tokio::test]
+async fn capacity_requires_authenticated_current_layout() {
+    let (path, root, _) = fixture();
+    let router = sender_router(path.to_string_lossy().into_owned());
+    for (secret, generation, max_workers, status) in [
+        ("missing", 2, 1, StatusCode::UNAUTHORIZED),
+        (
+            "synthetic-service-secret-at-least-32-bytes",
+            1,
+            1,
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            "synthetic-service-secret-at-least-32-bytes",
+            2,
+            2,
+            StatusCode::BAD_REQUEST,
+        ),
+    ] {
+        let input = json!({"account_id":17,"environment_id":"synthetic-env","generation":generation,
+            "max_workers":max_workers});
+        let response = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/internal/agy/capacity")
+                    .header("authorization", format!("Bearer {secret}"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(input.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), status);
+    }
+    assert!(!root.join("native").exists());
+    fs::remove_dir_all(root).unwrap();
+}
+
 /// AGY配置拒绝普通透传，避免跨平台绕过原生业务。@return 无。
 #[tokio::test]
 async fn agy_configuration_cannot_use_legacy_transport() {

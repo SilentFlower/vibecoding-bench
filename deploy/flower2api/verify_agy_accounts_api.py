@@ -25,6 +25,7 @@ def main():
     counts = {'refresh':0,'proxy_refresh':0,'observation':0}
     fail_reply = threading.Event()
     fail_before_start = threading.Event()
+    verify_identity_only = threading.Event()
 
     def native(email, access, refresh='synthetic-rt1'):
         """生成合成原生回执。@param email 已核验身份。@param access AT。@param refresh RT。@return 私有结果。"""
@@ -43,10 +44,19 @@ def main():
         def do_POST(self):
             """处理受信白名单操作。@return 无。"""
             assert self.headers['Authorization']=='Bearer '+SECRET
+            path = self.path.partition('?')[0]
+            if path.startswith('/internal/v3/agy-environments/'):
+                self.send_response(404)
+                self.send_header('Content-Length', '0')
+                self.end_headers()
+                return
             body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
-            action = self.path.rsplit('/',1)[-1]
+            action = path.rsplit('/',1)[-1]
             status = 200
-            if action=='verify':
+            if path.startswith('/internal/v3/quiesce/'):
+                assert body['owner'].startswith('gateway-config:') and body['generation']
+                result = {'ok': True}
+            elif action=='verify':
                 email = tokens[body['document']['token']['access_token']]
                 result = native(email, body['document']['token']['access_token'])
             elif action=='start':
@@ -70,6 +80,8 @@ def main():
                 time.sleep(.3)
                 result = native(tokens[body['document']['token']['access_token']], 'synthetic-refreshed-'+str(counts['refresh']),
                     'synthetic-rotated-'+str(counts['refresh']))
+                if verify_identity_only.is_set():
+                    result.pop('capabilities')
                 receipts[body['operation_id']] = result
                 if fail_reply.is_set(): status=503
             elif action=='prepare':
@@ -154,12 +166,32 @@ def main():
             assert request('GET','/admin/accounts')['total']==1
             assert request('GET','/admin/accounts?platform=all')['total']==2
             assert request('GET','/admin/accounts?platform=antigravity&page=2&page_size=1')['data']==[]
+            reminder = 'agy_system_prompt_as_user_reminder'
+            assert created[reminder] is False and cc[reminder] is False
+            request('POST', '/admin/accounts', {
+                'email': 'fixture-cc@example.test', 'setup_token': 'synthetic-cc', reminder: True,
+            }, 400)
+            request('PUT', f"/admin/accounts/{cc['id']}", {reminder: True}, 400)
+            request('PUT', f'/admin/accounts/{account}', {reminder: 'true'}, 400)
+            assert request('PUT', f'/admin/accounts/{account}', {reminder: True})[reminder] is True
+            native('experiment@example.test', 'synthetic-experiment-at')
+            experiment = request('POST', '/admin/accounts', {
+                'platform': 'antigravity', 'email': 'experiment@example.test', 'auth_type': 'oauth',
+                'access_token': 'synthetic-experiment-at', 'refresh_token': 'synthetic-rt1',
+                'expires_at': 4070908800000, reminder: True,
+            }, 201)
+            assert experiment[reminder] is True
+            request('PUT', f"/admin/accounts/{experiment['id']}", {reminder: False})
+            listed = request('GET', '/admin/accounts?platform=antigravity')['data']
+            assert {row['id']: row[reminder] for row in listed} == {account: True, experiment['id']: False}
             request('PUT',f'/admin/accounts/{account}',{'platform':'claude_code'},400)
             request('PUT',f'/admin/accounts/{account}',{'proxy_url':'invalid-proxy'},400)
             request('POST','/admin/oauth/generate-auth-url',{'platform':'antigravity','proxy_url':'invalid-proxy'},400)
             request('POST','/admin/accounts',{'platform':'unknown','email':'unknown@example.test'},400)
             request('POST','/admin/oauth/generate-setup-token-url',{'platform':'antigravity'},400)
-            request('GET',f'/admin/runtime/accounts/{account}/config',expected=400)
+            runtime = request('GET', f'/admin/runtime/accounts/{account}/config')
+            assert runtime['account_id'] == account and runtime['platform'] == 'antigravity'
+            assert 'access_token' not in runtime and 'refresh_token' not in runtime
             request('PUT',f'/admin/accounts/{account}',{'agy_system_prompt_homoglyph_enabled':True})
             assert request('GET',f'/admin/accounts/{account}')['agy_system_prompt_homoglyph_enabled']
             path=f'/admin/accounts/{account}/oauth-credentials/resolve'
@@ -191,6 +223,7 @@ def main():
             exchanged=request('POST','/admin/oauth/exchange-code',{'session_id':generated['session_id'],'code':'synthetic-code'})
             current=request('GET',f'/admin/accounts/{account}')
             assert current['agy_system_prompt_homoglyph_enabled'] and current['id']==account
+            assert current[reminder] is True
             assert current['usage_data']['capabilities']==exchanged['capabilities']
             assert current['usage_data']['capabilities']!=created['usage_data']['capabilities'] and current['usage_fetched_at']
             wrong=request('POST','/admin/oauth/generate-auth-url',{'platform':'antigravity','account_id':account})
@@ -234,9 +267,29 @@ def main():
             assert saved['proxy_url']=='http://new-proxy.example.test:8080' and saved['refresh_token']=='synthetic-proxy-rt'
             assert saved['usage_data']['capabilities']==receipts[next(reversed(receipts))]['capabilities'] and saved['usage_fetched_at']
             assert request('GET',f'/admin/accounts/{account}/agy-credentials')['phase']=='ready'
+            # 只核验身份的续期与丢失回执恢复都保留已有额度、能力和采集时刻。
+            with sqlite3.connect(folder/'gateway.sqlite') as database:
+                database.execute("UPDATE accounts SET usage_fetched_at='2001-01-01T00:00:00Z' WHERE id=?", (account,))
+            prior_usage = request('GET', f'/admin/accounts/{account}')
+            state_path = f'/admin/accounts/{account}/agy-credentials'
+            generation = request('GET', state_path)['generation']
+            fail_reply.clear()
+            verify_identity_only.set()
+            request('POST', path, {'force_refresh': True})
+            assert request('GET', state_path)['generation'] == generation + 1
+            fail_reply.set()
+            request('POST', path, {'force_refresh': True}, 503)
+            assert request('GET', state_path)['phase'] == 'reconcile'
+            request('POST', state_path + '/recover', {})
+            state = request('GET', state_path)
+            assert (state['phase'], state['generation']) == ('ready', generation + 2)
+            recovered = request('GET', f'/admin/accounts/{account}')
+            assert counts['refresh'] == 4 and recovered['refresh_token'] == 'synthetic-rotated-4'
+            assert recovered['usage_data'] == prior_usage['usage_data']
+            assert recovered['usage_fetched_at'] == prior_usage['usage_fetched_at']
             print(json.dumps({'passed':True,'evidence':'gateway_http_sqlite_synthetic_native',
                 'capabilities_persisted':True,'missing_operation_recovered':True,'missing_operation_reauthorized':True,
-                'expired_proxy_refresh_recovered':True,
+                'expired_proxy_refresh_recovered':True, 'identity_only_refresh_kept_usage':True,
                 'concurrent_refresh_calls':1,'lost_reply_recovered':True,'restart_recovered':True,'wrong_identity_rejected':True,'manual_import_recovered':True,'reauth_original_account':True,'model_submissions':0}))
         finally:
             process.terminate()

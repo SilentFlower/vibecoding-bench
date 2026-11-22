@@ -531,10 +531,12 @@ impl AccountStore {
                     .unwrap_or(""),
             )
             .bind(i32::from(observation.is_some_and(|value| {
-                value
-                    .usage_data
-                    .get("capabilities")
-                    .is_some_and(|value| !value.is_null())
+                // 仅凭据核验沿用旧观测，保持用量与原采集时间对应。
+                value.usage_data != expected.usage_data
+                    && value
+                        .usage_data
+                        .get("capabilities")
+                        .is_some_and(|capabilities| !capabilities.is_null())
             })))
             .bind(
                 observation

@@ -15,6 +15,7 @@ import zlib
 from pathlib import Path
 
 from runtime_files import atomic_json, directory_fd
+from .system_prompt import POLICY_SOURCE, RULE_VERSION, USER_REMINDER_SOURCE
 
 BODY_LIMIT = 2 * 1024 * 1024
 FILE_LIMIT = 6 * 1024 * 1024
@@ -262,7 +263,7 @@ def _read(root, account_id, attempt_id, stage, allow_expired=False):
         policy=value.get('system_prompt_policy')
         if policy is not None:
             if not isinstance(policy,dict) or set(policy)!={'schema_version','enabled','rule_version','rule_sha256','source','changed','replaced_codepoints','system_codepoints'}:raise ValueError('策略回执字段无效')
-            if type(policy['schema_version']) is not int or policy['schema_version']!=1 or type(policy['enabled']) is not bool or type(policy['changed']) is not bool or policy['rule_version']!='new-api-homoglyph-v1' or policy['source']!='cortex_custom_system' or not isinstance(policy['rule_sha256'],str) or not re.fullmatch('[0-9a-f]{64}',policy['rule_sha256']):raise ValueError('策略回执来源无效')
+            if type(policy['schema_version']) is not int or policy['schema_version']!=1 or type(policy['enabled']) is not bool or type(policy['changed']) is not bool or policy['rule_version']!=RULE_VERSION or policy['source'] not in (POLICY_SOURCE, USER_REMINDER_SOURCE) or not isinstance(policy['rule_sha256'],str) or not re.fullmatch('[0-9a-f]{64}',policy['rule_sha256']):raise ValueError('策略回执来源无效')
             if any(type(policy[key]) is not int or policy[key]<0 for key in ['replaced_codepoints','system_codepoints']):raise ValueError('策略回执计数无效')
         if value.get('source')!='cortex_submission' or value.get('representation')!='native_cascade_prompt_sections':raise ValueError('原生提交来源无效')
         if not isinstance(value.get('stages'),list) or len(value['stages'])!=3:raise ValueError('原生阶段数量无效')

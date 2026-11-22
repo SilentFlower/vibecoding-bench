@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 from agy_runtime.capture import BODY_LIMIT, RETENTION_MS, cleanup_snapshot_steps, read_snapshot, save_egress, save_ingress, save_submission
 from agy_runtime.safety_egress import MODEL_PATH
+from agy_runtime.system_prompt import USER_REMINDER_SOURCE, default_policy, prepare_system
 from agy_runtime.wire_capture import WireTrace
 from runtime_files import atomic_json
 
@@ -40,6 +41,16 @@ class AgyCaptureTests(unittest.TestCase):
         self.assertEqual(value['original_body_sha256'],hashlib.sha256(json.dumps(self.submitted,ensure_ascii=False).encode()).hexdigest())
         self.assertIn('ΑΒС',value['body']);self.assertIn('ABC',value['decoded_gemini']['body'])
         self.assertEqual(value['stages'][-1]['status'],'unavailable')
+
+    def test_native_reminder_policy_source_survives_capture_validation(self):
+        """管理快照保留原生适配器确认的用户提醒来源。@return 无。"""
+        contents = [{'role': 'user', 'parts': [{'text': '合成用户消息'}]}]
+        policy = {**default_policy(), 'enabled': True, 'user_reminder_index': 0}
+        _, _, report = prepare_system('ABC 中文', contents, policy)
+        save_submission(self.capture, 7, self.attempt, self.decoded, self.submitted, 'synthetic-at', report)
+        value = read_snapshot(self.root, 7, self.attempt)
+        self.assertEqual(value['system_prompt_policy']['source'], USER_REMINDER_SOURCE)
+        self.assertEqual(value['system_prompt_policy']['replaced_codepoints'], 3)
 
     def test_ingress_is_independent_and_has_shared_preview_budget(self):
         """原生与入口独立原子文件合并，UTF-8与总预算准确。@return 无。"""

@@ -11,8 +11,9 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from account_runtime import AccountRuntime, derive_v3_fingerprint
-from agy_environment import SOURCE_SHA256, capture, lookup, lookup_environment, maintenance, quiesce, register, sender_config, summary, transport
+from agy_environment import BackgroundPreparationDeferred, SOURCE_SHA256, background_wake, capture, lookup, lookup_environment, maintenance, quiesce, register, register_ready, sender_config, stop_environment, summary, transport
 from agy_kernel import activate, catalog, module_root, selection, stage, work_root
+from agy_tool_continuation import configured_binding, read_policy, save_policy
 from cluster_service import ClusterService
 from cluster_store import ClusterStore
 from database_migrations import apply_migrations, migration_plan
@@ -58,13 +59,34 @@ class AgyEnvironmentTests(unittest.TestCase):
         connection=self.database()
         try:
             self.assertEqual(connection.execute('SELECT COUNT(*) FROM accounts').fetchone()[0],1)
-            self.assertEqual(migration_plan(connection)['current_version'],5)
+            self.assertEqual(migration_plan(connection)['current_version'],6)
         finally:
             connection.close()
+
+    def test_tool_continuation_is_frozen_per_environment_and_checked_on_save(self):
+        """核对默认值、旧版本写入拒绝、历史能力以及已派发的绑定。@return 无。"""
+        first=register(self.runtime,17)['environment_id']
+        second=register(self.runtime,18)['environment_id']
+        binding={'environment_id':first,'agy_tool_continuation_protocol':1}
+        original=configured_binding(self.root,binding)
+        self.assertEqual(read_policy(self.root,first),{'mode':'claim','revision':0})
+        with self.assertRaisesRegex(ValueError,'暂不支持'):
+            save_policy(self.root,first,0,'history',supported=False)
+        saved=save_policy(self.root,first,0,'history',supported=True)
+        self.assertEqual(saved,{'mode':'history','revision':1})
+        self.assertNotIn('agy_tool_continuation_mode',original)
+        self.assertEqual(configured_binding(self.root,binding)['agy_tool_continuation_mode'],'history')
+        self.assertEqual(read_policy(self.root,second),{'mode':'claim','revision':0})
+        with self.assertRaisesRegex(ValueError,'已变化'):
+            save_policy(self.root,first,0,'claim_with_history',supported=True)
+        self.assertEqual(save_policy(self.root,first,1,'claim_with_history',supported=True)['revision'],2)
+        self.assertEqual(configured_binding(self.root,binding)['agy_tool_continuation_mode'],'claim_with_history')
 
     def test_stopped_environment_shows_configured_local_node(self):
         """停止的环境也显示本机归属，实际进程状态沿原取值。@return 无。"""
         row = register(self.runtime, 17)
+        with patch.object(self.runtime, '_stop_environment'):
+            stop_environment(self.runtime, row, remove=False)
         connection = self.database()
         try:
             connection.execute("UPDATE cluster_nodes SET name=? WHERE node_key='local'", ('合成中央节点',))
@@ -77,6 +99,41 @@ class AgyEnvironmentTests(unittest.TestCase):
         self.assertEqual(result['node'], {'node_id': node_id, 'node_key': 'local',
             'node_name': '合成中央节点', 'kind': 'local', 'enabled': True})
         self.assertEqual(result['agy_runtime']['state'], 'sleeping')
+
+    def test_ready_gateway_accounts_share_default_binding_and_stop_retires_initial_preparation(self):
+        """并发默认登记及业务登记复用唯一环境，显式停止收口首启资格。@return 无。"""
+        config = {'account_id': 17, 'platform': 'antigravity', 'auth_type': 'oauth', 'status': 'active',
+            'api_accepting': True, 'work_enabled': True, 'credential_state': {'phase': 'ready'}}
+        self.runtime.gateway._request.return_value = {**config, 'credential_state': {'phase': 'reauth'}}
+        with self.assertRaisesRegex(ValueError, '凭据尚未就绪'):
+            register_ready(self.runtime, 17)
+        self.assertIsNone(lookup(self.runtime, 17))
+        self.runtime.gateway._request.return_value = config
+        start = threading.Barrier(2)
+        rows = []
+
+        def create(register_account):
+            start.wait(2)
+            rows.append(register_account(self.runtime, 17))
+
+        threads = [threading.Thread(target=create, args=(entry,)) for entry in (register_ready, register)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(2)
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]['environment_id'], rows[1]['environment_id'])
+        row = rows[0]
+        self.assertTrue(background_wake(row, config))
+        self.assertEqual(summary(self.runtime, row)['agy_runtime']['state'], 'unprepared')
+        with self.assertRaisesRegex(BackgroundPreparationDeferred, 'account_disabled'):
+            background_wake(row, {**config, 'work_enabled': False})
+        with patch.object(self.runtime, '_stop_environment'):
+            stop_environment(self.runtime, row, remove=True, retire_initial=False)
+            self.assertTrue(background_wake(row, config))
+            stop_environment(self.runtime, row, remove=False)
+        with self.assertRaisesRegex(BackgroundPreparationDeferred, 'environment_stopped'):
+            background_wake(register_ready(self.runtime, 17), config)
 
     def test_finite_resources_stay_inside_original_total(self):
         """AGY物理进程上限沿账号并发，有限RAM不足在创建前拒绝。@return 无。"""
@@ -127,8 +184,9 @@ class AgyEnvironmentTests(unittest.TestCase):
         folder=self.runtime._root(row)/'runtime/sender';folder.mkdir(parents=True)
         atomic_json(folder/'sender.json',{'binding':binding,'agy':sender_config(config,json.loads(row['fingerprint_json']),labels),'proxy_source':config['proxy_url']})
         self.runtime._make_room=Mock();self.runtime._wait_network=Mock();self.runtime._sender_active=Mock(return_value=0)
+        container = SimpleNamespace(status='running', attrs={'Image': 'synthetic-image'}, reload=lambda:None)
         with patch('agy_environment.configured_release',return_value='synthetic-release'),patch('agy_environment.role_release',return_value='synthetic-release'), \
-                patch('agy_environment.image_origin',return_value={'image_id':'synthetic-image'}),patch('agy_environment.role_container',return_value=SimpleNamespace(status='running',reload=lambda:None)):
+                patch('agy_environment.role_container',return_value=container):
             self.assertEqual(transport(self.runtime,17),binding)
             self.assertEqual(transport(self.runtime,17),binding)
             self.assertEqual(transport(self.runtime,17,wake=False),binding)

@@ -47,6 +47,10 @@
   .request-status-code { color: var(--ui-color-text-3); }
   .request-session { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 1); min-width: 0; }
   .request-session code { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  /* 原始值缺省时展示的网关派生 Session ID 标记。列表列较窄，标记按「主值下一行」放在 ID 下方，ID 与复制按钮保留首行；详情整行展示。 */
+  .request-session-source { flex: none; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 550; white-space: nowrap; }
+  .request-session:not(.request-session-full):has(> .request-session-source) { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+  .request-session:not(.request-session-full) > .request-session-source { grid-row: 2; grid-column: 1; margin-top: 2px; }
   .request-missing { color: var(--ui-color-text-4); }
   .request-detail-button { padding-inline: calc(var(--ui-space-unit) * .5); }
   .request-table .request-empty { height: auto; padding: 0; white-space: normal; }

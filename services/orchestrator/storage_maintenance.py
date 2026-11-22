@@ -111,12 +111,13 @@ def tree_inventory(root: Path, excluded: set[str] | None = None, *, durable: boo
     return entries
 
 
-def iter_tree_inventory(root: Path, excluded: set[str] | None = None, *, durable: bool = False):
+def iter_tree_inventory(root: Path, excluded: set[str] | None = None, *, durable: bool = False, include=None):
     """逐条盘点原树，供迁移落磁盘索引以控制内存。
 
     :param root: 非链接环境根。
     :param excluded: 精确排除项。
     :param durable: 是否同步已核验资料。
+    :param include: 可选路径准入函数，拒绝的目录不再遍历。
     :return: 与原盘点相同的路径和元数据迭代器。
     """
     ignored = excluded or set()
@@ -131,7 +132,7 @@ def iter_tree_inventory(root: Path, excluded: set[str] | None = None, *, durable
                 'uid': metadata.st_uid, 'gid': metadata.st_gid}
             for name in sorted(folders + names):
                 relative = str(PurePosixPath(directory) / name)
-                if relative in ignored:
+                if relative in ignored or include is not None and not include(relative):
                     if name in folders:
                         folders.remove(name)
                     continue

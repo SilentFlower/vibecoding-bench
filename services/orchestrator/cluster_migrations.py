@@ -21,15 +21,38 @@ class NodeMigrations:
     :param store: 与中央账号共用写锁和连接工厂的节点存储。
     """
 
-    def __init__(self, store: ClusterStore) -> None:
-        """保存中央权威依赖。:param store: 节点存储。:return: None。"""
+    def __init__(self, store: ClusterStore, *, agy: bool = False) -> None:
+        """保存中央权威依赖。:param store: 节点存储。:param agy: 反重力网关命名空间。:return: None。"""
         self.store = store
+        self.agy = agy
+        self.migrations = 'agy_node_migrations' if agy else 'node_migrations'
+        self.assignments = 'agy_node_assignments' if agy else 'account_node_assignments'
+        self.account_scope = ('JOIN platform_api_environments p ON p.gateway_account_id=b.account_id'
+            if agy else 'JOIN accounts a ON a.id=b.account_id AND a.deleted_at IS NULL')
+        self.environment_scope = ("account_id IS NULL AND environment_id IN "
+            "(SELECT environment_id FROM platform_api_environments WHERE gateway_account_id=?)"
+            if agy else 'account_id=?')
+
+    def assignment(self, account_id: int) -> dict:
+        """读取本迁移命名空间中的权威归属。@param account_id 原账号。@return 节点归属。"""
+        return self.store.agy_assignment(account_id) if self.agy else self.store.assignment(account_id)
+
+    def history(self, account_id: int) -> list:
+        """读取活动优先的近期原操作。@param account_id 原账号。@return 迁移身份列表。"""
+        self.assignment(account_id)
+        connection = self.store.database()
+        try:
+            return connection.execute(f'SELECT operation_id FROM {self.migrations} WHERE account_id=? '
+                "ORDER BY CASE WHEN phase IN ('completed','cancelled') THEN 1 ELSE 0 END,created_at DESC LIMIT 20",
+                (account_id,)).fetchall()
+        finally:
+            connection.close()
 
     def get(self, operation_id: str) -> dict:
         """读取内部完整迁移记录。:param operation_id: 原操作。:return: 内部回执和冻结范围。"""
         connection = self.store.database()
         try:
-            row = connection.execute('SELECT * FROM node_migrations WHERE operation_id=?', (operation_id,)).fetchone()
+            row = connection.execute(f'SELECT * FROM {self.migrations} WHERE operation_id=?', (operation_id,)).fetchone()
             if row is None:
                 raise ValueError('迁移操作不存在')
             return {**dict(row), 'record': json.loads(row['record_json'])}
@@ -52,7 +75,12 @@ class NodeMigrations:
             connection = self.store.database()
             try:
                 with connection:
-                    existing = connection.execute('SELECT * FROM node_migrations WHERE operation_id=?', (operation_id,)).fetchone()
+                    connection.execute('BEGIN IMMEDIATE')
+                    other = 'node_migrations' if self.agy else 'agy_node_migrations'
+                    if (self.agy or ClusterStore.has_agy_nodes(connection)) and connection.execute(
+                            f'SELECT 1 FROM {other} WHERE operation_id=?', (operation_id,)).fetchone():
+                        raise ValueError('迁移操作身份已用于其他平台')
+                    existing = connection.execute(f'SELECT * FROM {self.migrations} WHERE operation_id=?', (operation_id,)).fetchone()
                     if existing is not None:
                         record = json.loads(existing['record_json'])
                         if (existing['account_id'], existing['target_node_id'], record['source_revision']) != (account_id, target_id, revision):
@@ -60,8 +88,8 @@ class NodeMigrations:
                         if execution is not None and record.get('checkpoints', {}).get('execution', {}).get('version') != execution.get('version'):
                             raise ValueError('原迁移冻结CLI版本已变化')
                     else:
-                        assignment = connection.execute('SELECT b.* FROM account_node_assignments b JOIN accounts a ON a.id=b.account_id '
-                            'WHERE b.account_id=? AND a.deleted_at IS NULL', (account_id,)).fetchone()
+                        assignment = connection.execute(f'SELECT b.* FROM {self.assignments} b {self.account_scope} '
+                            'WHERE b.account_id=?', (account_id,)).fetchone()
                         if assignment is None or assignment['revision'] != revision or assignment['phase'] != 'ready':
                             raise ValueError('账号归属已变化或已有维护操作')
                         if assignment['node_id'] == target_id:
@@ -76,23 +104,26 @@ class NodeMigrations:
                                 raise ValueError(side + '节点归属需要核对')
                             if side == '原' and node['kind'] == 'ssh' and json.loads(node['preparation_json'] or '{}').get('state') != 'prepared':
                                 raise ValueError(side + '节点正在同步组件，请完成后再开始迁移')
-                        environment = connection.execute('SELECT * FROM account_environments WHERE account_id=?', (account_id,)).fetchone()
+                        environment = connection.execute(f'SELECT * FROM account_environments WHERE {self.environment_scope}',
+                            (account_id,)).fetchone()
                         if environment is None:
                             raise ValueError('账号尚无环境，请选择首次执行节点')
-                        if connection.execute("SELECT 1 FROM node_migrations WHERE account_id=? AND phase NOT IN ('completed','cancelled')", (account_id,)).fetchone():
+                        if connection.execute(f"SELECT 1 FROM {self.migrations} WHERE account_id=? AND phase NOT IN ('completed','cancelled')", (account_id,)).fetchone():
                             raise ValueError('账号已有未收口迁移，请继续原操作')
                         record = {'protocol': 1, 'operation_id': operation_id, 'account_id': account_id,
                             'environment_id': environment['environment_id'], 'source_revision': revision,
                             'source_generation': environment['generation'], 'source_state': environment['state'],
                             'source_fingerprint_sha256': hashlib.sha256(environment['fingerprint_json'].encode()).hexdigest(),
                             'receipts': {}, 'last_confirmed_phase': 'requested'}
+                        if self.agy:
+                            record['platform'] = 'antigravity'
                         if execution is not None:
                             record['checkpoints'] = {'execution': execution}
                         now = time.time()
-                        connection.execute('INSERT INTO node_migrations(operation_id,account_id,source_node_id,target_node_id,phase,record_json,created_at,updated_at) '
+                        connection.execute(f'INSERT INTO {self.migrations}(operation_id,account_id,source_node_id,target_node_id,phase,record_json,created_at,updated_at) '
                             "VALUES(?,?,?,?,'requested',?,?,?)", (operation_id, account_id, assignment['node_id'], target_id,
                                 json.dumps(record, ensure_ascii=False, allow_nan=False), now, now))
-                        result = connection.execute("UPDATE account_node_assignments SET phase='maintenance' "
+                        result = connection.execute(f"UPDATE {self.assignments} SET phase='maintenance' "
                             "WHERE account_id=? AND node_id=? AND revision=? AND phase='ready'",
                             (account_id, assignment['node_id'], revision))
                         if result.rowcount != 1:
@@ -113,14 +144,24 @@ class NodeMigrations:
             connection = self.store.database()
             try:
                 with connection:
-                    row = connection.execute('SELECT * FROM node_migrations WHERE operation_id=?', (operation_id,)).fetchone()
+                    row = connection.execute(f'SELECT * FROM {self.migrations} WHERE operation_id=?', (operation_id,)).fetchone()
                     if row is None or _NEXT.get(row['phase']) != phase:
                         raise ValueError('迁移阶段已变化或不能跳过核验')
                     record = json.loads(row['record_json'])
+                    if phase == 'draining' and record.get('checkpoints', {}).get('cancellation', {}).get('before_fence'):
+                        return {**dict(row), 'record': record}
+                    if phase == 'draining' and self.agy:
+                        current = connection.execute(f'SELECT * FROM account_environments WHERE environment_id=? '
+                            f'AND {self.environment_scope}', (record['environment_id'], row['account_id'])).fetchone()
+                        if current is None or current['state'] not in ('ready', 'stopped'):
+                            raise ValueError('排空后 AGY 原环境仍需要核对')
+                        # 正在准备的已接纳请求可以在排空期间创建原节点的新代次。
+                        record.update(source_generation=current['generation'], source_state=current['state'],
+                            source_fingerprint_sha256=hashlib.sha256(current['fingerprint_json'].encode()).hexdigest())
                     if phase == 'source_fenced':
                         # SSH源的真实停止也同步到中央，避免维护把已隔离源误认为仍在运行。
                         changed = connection.execute("UPDATE account_environments SET state='stopped' "
-                            'WHERE environment_id=? AND account_id=? AND generation=?',
+                            f'WHERE environment_id=? AND {self.environment_scope} AND generation=?',
                             (record['environment_id'], row['account_id'], record['source_generation']))
                         if changed.rowcount != 1:
                             raise ValueError('源隔离期间中央环境代次已变化')
@@ -139,7 +180,7 @@ class NodeMigrations:
             connection = self.store.database()
             try:
                 with connection:
-                    row = connection.execute('SELECT phase,record_json FROM node_migrations WHERE operation_id=?', (operation_id,)).fetchone()
+                    row = connection.execute(f'SELECT phase,record_json FROM {self.migrations} WHERE operation_id=?', (operation_id,)).fetchone()
                     if row is None or row['phase'] in _TERMINAL:
                         return
                     record = json.loads(row['record_json'])
@@ -147,6 +188,45 @@ class NodeMigrations:
                     self._save(connection, operation_id, row['phase'], record)
             finally:
                 connection.close()
+
+    def request_drain_cancel(self, operation_id: str) -> dict:
+        """原子登记排空阶段的取消。@param operation_id 原迁移。@return 仍待解除原门禁的记录。"""
+        return self._drain_cancel(operation_id, finish=False)
+
+    def finish_drain_cancel(self, operation_id: str) -> dict:
+        """原持有者释放门禁后开放未经隔离的原节点。@param operation_id 原迁移。@return 已取消记录。"""
+        return self._drain_cancel(operation_id, finish=True)
+
+    def _drain_cancel(self, operation_id: str, *, finish: bool) -> dict:
+        if not self.agy:
+            raise ValueError('此迁移尚未收口执行阶段')
+        with self.store.lock:
+            connection = self.store.database()
+            try:
+                with connection:
+                    row = connection.execute(f'SELECT * FROM {self.migrations} WHERE operation_id=?',
+                        (operation_id,)).fetchone()
+                    if row is None or row['phase'] not in ('requested', 'reconcile'):
+                        raise ValueError('迁移已进入源隔离，请刷新原操作')
+                    record = json.loads(row['record_json'])
+                    if record['last_confirmed_phase'] != 'requested':
+                        raise ValueError('迁移已进入源隔离，请刷新原操作')
+                    checkpoints = record.setdefault('checkpoints', {})
+                    if finish:
+                        if checkpoints.get('cancellation', {}).get('before_fence') is not True:
+                            raise ValueError('迁移未登记排空取消')
+                        changed = connection.execute(f"UPDATE {self.assignments} SET phase='ready' "
+                            "WHERE account_id=? AND node_id=? AND revision=? AND phase IN ('maintenance','reconcile')",
+                            (row['account_id'], row['source_node_id'], record['source_revision']))
+                        if changed.rowcount != 1:
+                            raise ValueError('排空取消期间原节点归属已变化')
+                        record['last_confirmed_phase'] = 'cancelled'
+                    else:
+                        checkpoints['cancellation'] = {'requested': True, 'before_fence': True}
+                    self._save(connection, operation_id, 'cancelled' if finish else row['phase'], record)
+            finally:
+                connection.close()
+        return self.get(operation_id)
 
     def isolate(self, operation_id: str, reason: str, *, failure: dict | None = None) -> dict:
         """将未知结果保留在原归属的维护状态。
@@ -162,7 +242,7 @@ class NodeMigrations:
             connection = self.store.database()
             try:
                 with connection:
-                    row = connection.execute('SELECT * FROM node_migrations WHERE operation_id=?', (operation_id,)).fetchone()
+                    row = connection.execute(f'SELECT * FROM {self.migrations} WHERE operation_id=?', (operation_id,)).fetchone()
                     if row is None or row['phase'] in _TERMINAL:
                         raise ValueError('迁移操作已结束或不存在')
                     record = json.loads(row['record_json'])
@@ -170,7 +250,7 @@ class NodeMigrations:
                     if failure is not None:
                         record['failure'] = public_failure(failure)
                     self._save(connection, operation_id, 'reconcile', record)
-                    connection.execute("UPDATE account_node_assignments SET phase='reconcile' WHERE account_id=?", (row['account_id'],))
+                    connection.execute(f"UPDATE {self.assignments} SET phase='reconcile' WHERE account_id=?", (row['account_id'],))
             finally:
                 connection.close()
         return self.get(operation_id)
@@ -190,7 +270,7 @@ class NodeMigrations:
             connection = self.store.database()
             try:
                 with connection:
-                    row = connection.execute('SELECT * FROM node_migrations WHERE operation_id=?', (operation_id,)).fetchone()
+                    row = connection.execute(f'SELECT * FROM {self.migrations} WHERE operation_id=?', (operation_id,)).fetchone()
                     if row is None or row['phase'] in _TERMINAL:
                         raise ValueError('迁移操作已结束或不存在')
                     record = json.loads(row['record_json'])
@@ -219,7 +299,7 @@ class NodeMigrations:
             connection = self.store.database()
             try:
                 with connection:
-                    row = connection.execute('SELECT * FROM node_migrations WHERE operation_id=?', (operation_id,)).fetchone()
+                    row = connection.execute(f'SELECT * FROM {self.migrations} WHERE operation_id=?', (operation_id,)).fetchone()
                     if row is None or row['phase'] != 'exporting':
                         raise ValueError('原迁移已离开上传阶段，拒绝更换尝试')
                     record = json.loads(row['record_json'])
@@ -246,7 +326,7 @@ class NodeMigrations:
             connection = self.store.database()
             try:
                 with connection:
-                    row = connection.execute('SELECT * FROM node_migrations WHERE operation_id=?', (operation_id,)).fetchone()
+                    row = connection.execute(f'SELECT * FROM {self.migrations} WHERE operation_id=?', (operation_id,)).fetchone()
                     if row is None or row['phase'] != 'reconcile':
                         raise ValueError('迁移当前阶段不属于待核对恢复')
                     record = json.loads(row['record_json'])
@@ -256,7 +336,7 @@ class NodeMigrations:
                     committed = phase == 'committed'
                     node_id = row['target_node_id'] if committed else row['source_node_id']
                     revision = record['target_revision'] if committed else record['source_revision']
-                    result = connection.execute("UPDATE account_node_assignments SET phase='maintenance' "
+                    result = connection.execute(f"UPDATE {self.assignments} SET phase='maintenance' "
                         "WHERE account_id=? AND node_id=? AND revision=? AND phase='reconcile'",
                         (row['account_id'], node_id, revision))
                     if result.rowcount != 1:
@@ -279,7 +359,7 @@ class NodeMigrations:
             connection = self.store.database()
             try:
                 with connection:
-                    row = connection.execute('SELECT * FROM node_migrations WHERE operation_id=?', (operation_id,)).fetchone()
+                    row = connection.execute(f'SELECT * FROM {self.migrations} WHERE operation_id=?', (operation_id,)).fetchone()
                     if row is None or row['phase'] in _TERMINAL:
                         raise ValueError('迁移操作已结束或不存在')
                     record = json.loads(row['record_json'])
@@ -291,13 +371,13 @@ class NodeMigrations:
                     target = {**base, 'node_id': row['target_node_id'], 'revision': record['source_revision'] + 1, 'phase': 'revoked'}
                     if source_receipt != source or target_receipt != target:
                         raise ValueError('取消迁移的双端收据与原冻结范围不一致')
-                    result = connection.execute("UPDATE account_node_assignments SET phase='ready' WHERE account_id=? "
+                    result = connection.execute(f"UPDATE {self.assignments} SET phase='ready' WHERE account_id=? "
                         "AND node_id=? AND revision=? AND phase IN ('maintenance','reconcile')",
                         (row['account_id'], row['source_node_id'], record['source_revision']))
                     if result.rowcount != 1:
                         raise ValueError('取消迁移期间原归属已变化')
                     environment = connection.execute("UPDATE account_environments SET state='stopped' "
-                        'WHERE environment_id=? AND account_id=? AND generation=?',
+                        f'WHERE environment_id=? AND {self.environment_scope} AND generation=?',
                         (record['environment_id'], row['account_id'], record['source_generation']))
                     if environment.rowcount != 1:
                         raise ValueError('取消迁移期间源实际代次已变化')
@@ -322,15 +402,18 @@ class NodeMigrations:
             connection = self.store.database()
             try:
                 with connection:
-                    row = connection.execute('SELECT * FROM node_migrations WHERE operation_id=?', (operation_id,)).fetchone()
+                    row = connection.execute(f'SELECT * FROM {self.migrations} WHERE operation_id=?', (operation_id,)).fetchone()
                     if row is None or row['phase'] != 'verified':
                         raise ValueError('迁移尚未完成目标核验')
                     record = json.loads(row['record_json'])
-                    old = connection.execute('SELECT * FROM account_environments WHERE environment_id=? AND account_id=?',
+                    old = connection.execute(f'SELECT * FROM account_environments WHERE environment_id=? AND {self.environment_scope}',
                         (record['environment_id'], row['account_id'])).fetchone()
                     if (old is None or old['generation'] != record['source_generation']
                             or environment.get('environment_id') != record['environment_id']
-                            or environment.get('account_id') != row['account_id'] or environment.get('name') != old['name']
+                            or environment.get('account_id') != (None if self.agy else row['account_id'])
+                            or self.agy and (environment.get('gateway_account_id') != row['account_id']
+                                or environment.get('platform') != 'antigravity')
+                            or environment.get('name') != old['name']
                             or type(environment['generation']) is not int or environment['generation'] <= old['generation']
                             or environment['isolation_version'] != 2 or environment['state'] not in ('ready', 'stopped')):
                         raise ValueError('目标环境身份或代次与源冻结范围不一致')
@@ -342,7 +425,7 @@ class NodeMigrations:
                     target = connection.execute('SELECT 1 FROM cluster_nodes WHERE id=? AND enabled=1 AND deleted_at IS NULL', (row['target_node_id'],)).fetchone()
                     if target is None:
                         raise ValueError('目标节点已暂停或移除')
-                    result = connection.execute("UPDATE account_node_assignments SET node_id=?,revision=revision+1 "
+                    result = connection.execute(f"UPDATE {self.assignments} SET node_id=?,revision=revision+1 "
                         "WHERE account_id=? AND node_id=? AND revision=? AND phase='maintenance'",
                         (row['target_node_id'], row['account_id'], row['source_node_id'], record['source_revision']))
                     if result.rowcount != 1:
@@ -368,7 +451,7 @@ class NodeMigrations:
             connection = self.store.database()
             try:
                 with connection:
-                    row = connection.execute("SELECT * FROM node_migrations WHERE operation_id=? AND phase='committed'", (operation_id,)).fetchone()
+                    row = connection.execute(f"SELECT * FROM {self.migrations} WHERE operation_id=? AND phase='committed'", (operation_id,)).fetchone()
                     if row is None:
                         raise ValueError('迁移提交或激活状态需要核对')
                     record = json.loads(row['record_json'])
@@ -378,11 +461,12 @@ class NodeMigrations:
                     if receipt != expected:
                         raise ValueError('目标激活回执与提交身份不一致')
                     state = 'stopped' if record['source_state'] == 'stopped' else 'ready'
-                    environment = connection.execute('UPDATE account_environments SET state=? WHERE environment_id=? AND account_id=? AND generation=?',
+                    environment = connection.execute(f'UPDATE account_environments SET state=? WHERE environment_id=? '
+                        f'AND {self.environment_scope} AND generation=?',
                         (state, record['environment_id'], row['account_id'], record['target_generation']))
                     if environment.rowcount != 1:
                         raise ValueError('目标激活后的环境代次已变化')
-                    result = connection.execute("UPDATE account_node_assignments SET phase='ready' WHERE account_id=? "
+                    result = connection.execute(f"UPDATE {self.assignments} SET phase='ready' WHERE account_id=? "
                         "AND node_id=? AND revision=? AND phase='maintenance'", (row['account_id'], row['target_node_id'], record['target_revision']))
                     if result.rowcount != 1:
                         raise ValueError('提交后的账号节点归属已变化')
@@ -394,7 +478,7 @@ class NodeMigrations:
         return self.get(operation_id)
 
     def _save(self, connection, operation_id: str, phase: str, record: dict) -> None:
-        connection.execute('UPDATE node_migrations SET phase=?,record_json=?,updated_at=? WHERE operation_id=?',
+        connection.execute(f'UPDATE {self.migrations} SET phase=?,record_json=?,updated_at=? WHERE operation_id=?',
             (phase, json.dumps(record, ensure_ascii=False, allow_nan=False), time.time(), operation_id))
 
 

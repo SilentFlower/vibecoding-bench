@@ -1,32 +1,55 @@
 """将原生 Gemini 源帧投影为现有 new-api 可消费的单 Part 流。"""
 import base64
 import copy
+import hashlib
 import json
 from uuid import uuid4
+
+
+RESULT_FINISH_REASONS = ('STOP', 'MAX_TOKENS')
+
+
+def _token_count(value):
+    return type(value) is int and 0 <= value < 2**64
 
 
 class Frames:
     """保存本请求的输出归属和函数调用摘要。"""
 
-    def __init__(self):
-        """创建独立帧状态。@return 无。"""
+    def __init__(self, previous_ids=()):
+        """创建独立帧状态。@param previous_ids 原历史的公开调用 ID。@return 无。"""
         self.calls=[];self.sequence=0;self.terminal=False;self.finish_reason=None
-        self.call_ids=set()
+        self.call_ids=set(previous_ids)
+        self.source_call_ids=[]
+        self.last_source_frame=None
         self.source_error=False;self.usage_complete=False;self.visible_text=False
+        self.max_tokens_usage_complete = False
+        self.thought_or_media = False
 
     def recovery_blocker(self):
         """报告源帧阻止保留结果的首个条件。@return 受控代码，完整普通结果返回空。"""
         if self.source_error:return 'source_error'
         if self.calls:return 'tool_pending'
-        if self.finish_reason!='STOP':return 'missing_stop'
-        if not self.visible_text:return 'missing_text'
-        if not self.usage_complete:return 'missing_usage'
+        if self.finish_reason not in RESULT_FINISH_REASONS:return 'missing_stop'
+        truncated = self.finish_reason == 'MAX_TOKENS'
+        if not (self.visible_text or truncated and self.thought_or_media):return 'missing_text'
+        if not (self.max_tokens_usage_complete if truncated else self.usage_complete):return 'missing_usage'
         return None
 
     def project(self, event):
         """拆分候选 Part，保留终态和用量。@param event 原生源事件。@return 兼容事件数组。"""
         raw=base64.b64decode(event['data_base64'],validate=True)
         if event.get('source')=='codeassist_scanner_block':
+            epoch=event.get('raw_epoch')
+            if type(epoch) is int:
+                identity=(event['call_id'],epoch)
+                checksum=hashlib.sha256(raw).digest()
+                if self.last_source_frame:
+                    previous,digest=self.last_source_frame
+                    if identity==previous and checksum==digest:return []
+                    if identity[0]!=previous[0] or epoch<=previous[1]:
+                        raise RuntimeError('native_tool_frame_identity')
+                self.last_source_frame=(identity,checksum)
             # OAuth的Scanner逻辑块包含SSE前缀及response信封，原始块仍由桥接归档保存。
             data=b'\n'.join(line[5:].lstrip(b' ') for line in raw.splitlines() if line.startswith(b'data:'))
             if not data:return []
@@ -41,8 +64,13 @@ class Frames:
         self.source_error |= 'error' in body
         usage=body.get('usageMetadata')
         if isinstance(usage,dict):
-            fields=('promptTokenCount','candidatesTokenCount','totalTokenCount')
-            self.usage_complete=all(type(usage.get(key)) is int and 0<=usage[key]<2**64 for key in fields)
+            base_usage = all(_token_count(usage.get(key)) for key in ('promptTokenCount', 'totalTokenCount'))
+            self.usage_complete = base_usage and _token_count(usage.get('candidatesTokenCount'))
+            thoughts = usage.get('thoughtsTokenCount')
+            # 达到上限时，原生可能只报告已发生的思考用量。保留字段实际缺省，兼容性只用于恢复判断。
+            thinking_usage = base_usage and 'candidatesTokenCount' not in usage and _token_count(thoughts) and thoughts > 0
+            self.max_tokens_usage_complete = (self.usage_complete or thinking_usage) and (
+                'thoughtsTokenCount' not in usage or _token_count(thoughts))
         candidates=body.get('candidates',[])
         # 官方控制RPC和通道EOF都可能在截断后正常返回，业务成功还须有源终态。
         feedback=body.get('promptFeedback',{})
@@ -56,17 +84,30 @@ class Frames:
         if isinstance(reason,str) and reason not in ['','FINISH_REASON_UNSPECIFIED']:
             self.finish_reason=reason;self.terminal=True
         if not isinstance(parts,list):raise RuntimeError('invalid_native_gemini_parts')
-        self.visible_text |= any(isinstance(part.get('text'),str) and bool(part['text']) and part.get('thought') is not True for part in parts)
+        for part in parts:
+            text = part.get('text')
+            if isinstance(text, str) and text:
+                if part.get('thought') is True:
+                    self.thought_or_media = True
+                else:
+                    self.visible_text = True
+            inline = part.get('inlineData', part.get('inline_data'))
+            if isinstance(inline, dict):
+                mime = inline.get('mimeType', inline.get('mime_type'))
+                data = inline.get('data')
+                self.thought_or_media |= isinstance(mime, str) and bool(mime) and isinstance(data, str) and bool(data)
         calls=[p['functionCall'] for p in parts if 'functionCall' in p]
         assigned_id=False
         for call in calls:
             identifier=call.get('id')
-            if identifier is None or identifier=='':
+            if identifier is not None and not isinstance(identifier,str):
+                raise RuntimeError('invalid_native_tool_id')
+            self.source_call_ids.append(identifier or None)
+            # 原版可在多个独立步骤沿用同一 ID。仅在公开边界分配唯一身份。
+            if not identifier or identifier in self.call_ids:
                 identifier='call_'+uuid4().hex
                 call['id']=identifier
                 assigned_id=True
-            if not isinstance(identifier,str) or identifier in self.call_ids:
-                raise RuntimeError('ambiguous_parallel_function_calls')
             self.call_ids.add(identifier)
         self.calls.extend(copy.deepcopy(calls))
         if len(parts)<2:

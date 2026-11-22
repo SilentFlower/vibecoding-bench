@@ -109,7 +109,7 @@ class MigrationLease:
         record = self.ledger.get(self.operation_id)
         if record['phase'] in ('completed', 'cancelled'):
             raise ValueError('迁移已经结束')
-        assignment = self.ledger.store.assignment(self.account_id)
+        assignment = self.ledger.assignment(self.account_id)
         if assignment['phase'] not in ('maintenance', 'reconcile'):
             raise ValueError('迁移账号尚未关闭新准入')
         previous = record['record'].get('checkpoints', {}).get('gateway_lease')
@@ -164,24 +164,29 @@ class MigrationLease:
         if self.failed.is_set():
             raise ValueError('迁移网关续约失效，请核对原操作')
 
-    def drain(self, timeout: float | None = None) -> None:
+    def drain(self, timeout: float | None = None, *, cancelled=None) -> bool:
         """等待实际API与节点流收口后认领排他操作。
 
         :param timeout: 可选单次等待期限；默认沿原操作后台等待。
-        :return: None；到期保留原维护状态。
+        :param cancelled: 排空阶段的持久取消检查。
+        :return: 是否实际排空；到期保留原维护状态。
         """
         deadline = None if timeout is None else time.monotonic() + timeout
         while True:
             self.check()
+            if cancelled is not None and cancelled():
+                return False
             snapshot = self.gateway._request('GET', self.path)
             if self._owned(snapshot) != self.proof or snapshot.get('importing') != 0:
                 raise ValueError('迁移排空期间原网关门禁发生变化')
             active = snapshot.get('active')
             if type(active) is not int or active < 0:
                 raise ValueError('迁移实际API活动计数无效')
-            if active == 0 and self.transports.account_streams(self.account_id) == 0:
+            streams = (self.transports.account_streams(self.account_id, agy=True) if self.ledger.agy
+                else self.transports.account_streams(self.account_id))
+            if active == 0 and streams == 0:
                 self._update('claim')
-                return
+                return True
             if deadline is not None and time.monotonic() >= deadline:
                 raise ValueError('迁移原有工作尚未完成，请等待并继续原操作')
             self.stopping.wait(0.2)

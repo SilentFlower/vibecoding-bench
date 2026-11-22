@@ -376,8 +376,8 @@ class AgyAuthManager:
                 time.sleep(.1)
             raise ValueError('AGY 原生认证仍待完成，请查询原会话')
 
-    def verify(self, document: dict, proxy_url: str, *, include_quota: bool = False) -> dict:
-        """使用 AT-only 原生进程读取账号状态。@param document 原生凭据。@param proxy_url 固定代理。@param include_quota 同时读取平台额度。@return 真实身份、能力和可选额度。"""
+    def verify(self, document: dict, proxy_url: str, *, include_quota: bool = False, identity_only: bool = False) -> dict:
+        """使用 AT-only 原生进程读取账号状态。@param document 原生凭据。@param proxy_url 固定代理。@param include_quota 同时读取平台额度。@param identity_only 只核验认证身份。@return 真实身份及所请求的观测。"""
         document = native_document(document)
         expiry = datetime.fromisoformat(document['token']['expiry'].replace('Z', '+00:00')).timestamp()
         if expiry <= time.time() + 60:
@@ -435,6 +435,8 @@ with ThreadPoolExecutor(max_workers=len(sys.argv[3:])) as pool:
             email = status.get('email')
             if not isinstance(email, str) or not email.strip() or len(email) > 320:
                 raise ValueError('AGY 已认证身份缺失')
+            if identity_only:
+                return {'email_address': email.strip()}
             model_code = 'import subprocess,sys; r=subprocess.run([sys.argv[1],"models"],capture_output=True,timeout=25); sys.stdout.buffer.write((r.stdout+bytes([10])+r.stderr)[:1048576]); sys.exit(r.returncode)'
             models = container.exec_run(['python3', '-c', model_code, BINARY], user='1001:1001')
             if models.exit_code != 0:
@@ -476,6 +478,9 @@ with ThreadPoolExecutor(max_workers=len(sys.argv[3:])) as pool:
 
     def refresh(self, identity: str, account_id: int, generation: int, document: dict, proxy_url: str) -> dict:
         """在同账号锁内执行一次原生刷新并保存回执。@param identity 操作ID。@param account_id 账号。@param generation 原代次。@param document 权威凭据。@param proxy_url 代理。@return 私有刷新结果。"""
+        # 固定宿主更新器也会导入本模块，Docker HTTP 依赖只在执行刷新时加载。
+        from requests.exceptions import ReadTimeout
+
         document = native_document(document)
         if type(account_id) is not int or account_id < 1 or type(generation) is not int or generation < 1:
             raise ValueError('AGY 刷新归属无效')
@@ -499,23 +504,27 @@ with ThreadPoolExecutor(max_workers=len(sys.argv[3:])) as pool:
             pending['token']['expiry'] = '1970-01-01T00:00:00Z'
             try:
                 container = self._launch(folder, state, interactive=False, document=pending, native_args=['models'])
-                result = container.wait(timeout=45)
-                if result.get('StatusCode') != 0:
-                    raise ValueError('AGY 原生刷新未完成')
+                try:
+                    models_completed = container.wait(timeout=45).get('StatusCode') == 0
+                except (ReadTimeout, TimeoutError):
+                    models_completed = False
+                # 原生可能已写入新凭据，随后才在模型目录卡住。确认唯一写者退出后再读取。
+                self._stop(state)
                 updated = self._refresh_document(folder)
                 if datetime.fromisoformat(updated['token']['expiry'].replace('Z', '+00:00')).timestamp() <= time.time() + 60:
                     raise ValueError('AGY 刷新后的有效期不足')
-                self._stop(state)
-                verified = self.verify(updated, proxy_url)
+                verified = self.verify(updated, proxy_url, identity_only=not models_completed)
                 outcome = {'document': updated, **verified, 'proxy_url': proxy_url, 'account_id': account_id, 'generation': generation, 'operation_id': identity}
                 atomic_json(folder / 'result.json', outcome)
                 state['phase'] = 'completed'
                 atomic_json(folder / 'state.json', state)
                 return outcome
             except Exception:
-                self._stop(state)
-                state['phase'] = 'reconcile'
-                atomic_json(folder / 'state.json', state)
+                try:
+                    self._stop(state)
+                finally:
+                    state['phase'] = 'reconcile'
+                    atomic_json(folder / 'state.json', state)
                 raise ValueError('AGY 原生刷新结果待对账') from None
 
     def _refresh_document(self, folder: Path) -> dict:

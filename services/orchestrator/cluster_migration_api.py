@@ -62,6 +62,11 @@ class MigrationOperations:
         if cancel and (record['phase'] == 'completed' or record['record']['last_confirmed_phase'] == 'committed'):
             raise ValueError('归属已提交，请继续目标激活')
         cancelling = cancel or 'cancellation' in record['record'].get('checkpoints', {})
+        if cancel and getattr(self.coordinator.ledger, 'agy', False):
+            with self.lock:
+                if operation_id in self.workers:
+                    self.coordinator.ledger.request_drain_cancel(operation_id)
+                    return self.get(account_id, operation_id)
         activity = UPDATE_GATE.reserve('node-migration:' + operation_id)
         try:
             return self._launch(record, 'cancel' if cancelling else 'run', activity)
@@ -137,7 +142,10 @@ class MigrationOperations:
             'message': (_STAGES.get(record.get('progress', {}).get('stage')) if running else None)
                 or _PHASES.get(migration['phase'], '迁移状态需要核对'), 'running': running,
             'failure': public_failure(record.get('failure')) if migration['phase'] == 'reconcile' and not running else None,
-            'can_resume': not running and not terminal, 'can_cancel': not running and not terminal and not committed,
+            'can_resume': not running and not terminal,
+            'can_cancel': (not running or getattr(self.coordinator.ledger, 'agy', False)
+                and record['last_confirmed_phase'] == 'requested' and 'cancellation' not in record.get('checkpoints', {}))
+                and not terminal and not committed,
             'source_revision': record['source_revision'], 'target_revision': record.get('target_revision'),
             'cancelling': 'cancellation' in record.get('checkpoints', {}),
             'created_at': migration['created_at'], 'updated_at': migration['updated_at']}
@@ -148,16 +156,7 @@ class MigrationOperations:
         :param account_id: 当前账号。
         :return: 脱敏列表，活动迁移优先。
         """
-        connection = self.coordinator.service.store.database()
-        try:
-            account = connection.execute('SELECT 1 FROM accounts WHERE id=? AND deleted_at IS NULL', (account_id,)).fetchone()
-            if account is None:
-                raise ValueError('账号不存在')
-            rows = connection.execute('SELECT operation_id FROM node_migrations WHERE account_id=? '
-                "ORDER BY CASE WHEN phase IN ('completed','cancelled') THEN 1 ELSE 0 END,created_at DESC LIMIT 20",
-                (account_id,)).fetchall()
-        finally:
-            connection.close()
+        rows = self.coordinator.ledger.history(account_id)
         return {'items': [self.get(account_id, row['operation_id']) for row in rows]}
 
     def close(self) -> None:
@@ -170,13 +169,15 @@ class MigrationOperations:
             worker.join(timeout=1)
 
 
-def migration_router(operations) -> APIRouter:
+def migration_router(operations, *, agy: bool = False) -> APIRouter:
     """提供已鉴权管理桥中的迁移资源路由。
 
     :param operations: 当前后台迁移作业服务回调。
+    :param agy: 反重力使用独立网关账号路由。
     :return: 按账号限制的公开路由。
     """
-    router = APIRouter(prefix='/api/accounts/{account_id}/node-migrations', route_class=NodeRoute)
+    domain = 'agy-accounts' if agy else 'accounts'
+    router = APIRouter(prefix=f'/api/{domain}/{{account_id}}/node-migrations', route_class=NodeRoute)
 
     def current():
         service = operations()

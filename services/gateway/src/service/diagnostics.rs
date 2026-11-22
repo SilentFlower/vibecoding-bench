@@ -23,6 +23,7 @@ use crate::model::request_diagnostics::{
     RequestDiagnostic, RequestLogMode, normalize_correlation_id, safe_model,
 };
 use crate::service::native_capture;
+use crate::service::request_session::RequestSession;
 use crate::service::rewriter::extract_session_id_from_body;
 use crate::service::system_update::InferenceCutover;
 use crate::service::usage::UsageCapture;
@@ -72,7 +73,7 @@ pub(super) fn current_cutover() -> Option<InferenceCutover> {
 struct TraceState {
     retention: Option<ActiveDiagnostic>,
     request: RequestDiagnostic,
-    original_session_recorded: bool,
+    request_session_recorded: bool,
     profile_selection: String,
     sessions: DiagnosticSessions,
     local_outcome: Option<&'static str>,
@@ -97,11 +98,11 @@ pub(crate) struct TraceContext {
 }
 
 impl TraceContext {
-    /// 创建内部请求 UUID 并记录采集开始。
+    /// 创建 Messages 请求 UUID，平台由正文解码后的路由确定。
     /// @param store 独立诊断存储。
     /// @return 当前请求的观测上下文。
     pub(crate) fn new(store: Arc<DiagnosticsStore>) -> Self {
-        Self::for_protocol(store, "claude_code", "anthropic_messages")
+        Self::new_for_entry(store, None, "anthropic_messages")
     }
 
     /// 在首次入队前冻结真实入口，保持筛选投影一致。@param store 诊断存储。@param platform 已知平台。@param protocol 已知入口。@return 根上下文。
@@ -110,6 +111,10 @@ impl TraceContext {
         platform: &str,
         protocol: &str,
     ) -> Self {
+        Self::new_for_entry(store, Some(platform), protocol)
+    }
+
+    fn new_for_entry(store: Arc<DiagnosticsStore>, platform: Option<&str>, protocol: &str) -> Self {
         let request_id = Uuid::new_v4().to_string();
         let retention = store.track_request(&request_id);
         let trace = Self {
@@ -119,7 +124,7 @@ impl TraceContext {
                 retention: Some(retention),
                 request: RequestDiagnostic {
                     context: Some(DiagnosticContext {
-                        platform: Some(platform.into()),
+                        platform: platform.map(str::to_owned),
                         entry_protocol: Some(protocol.into()),
                         ..Default::default()
                     }),
@@ -128,6 +133,7 @@ impl TraceContext {
                     log_mode: Some(current_log_mode()),
                     request_id,
                     original_session_id: None,
+                    derived_session_id: None,
                     started_at: now(),
                     finished_at: None,
                     status_code: None,
@@ -140,7 +146,7 @@ impl TraceContext {
                     attempt_count: 0,
                 },
                 profile_selection: "unresolved".into(),
-                original_session_recorded: false,
+                request_session_recorded: false,
                 sessions: DiagnosticSessions::default(),
                 local_outcome: None,
                 next_retry: None,
@@ -183,6 +189,34 @@ impl TraceContext {
     fn lock(&self) -> MutexGuard<'_, TraceState> {
         // 观测锁不包裹 await；即使异常展开污染锁，也不能中断业务转发。
         self.state.lock().unwrap_or_else(|error| error.into_inner())
+    }
+
+    /// 为重试保留本地 HTTP 根和原生成关联，零次上游尝试。
+    /// @param account_id 原账号。@param request_id 原生成根。@param attempt_id 原尝试。
+    /// @param submission_state 已观察到的发送状态。@return 无。
+    pub(super) fn agy_replayed(
+        &self,
+        account_id: i64,
+        request_id: &str,
+        attempt_id: Option<&str>,
+        submission_state: &'static str,
+    ) {
+        let mut state = self.lock();
+        state.local_outcome = Some("cache_hit");
+        state.request.account_id = Some(account_id);
+        state.request.error_stage = Some("tool_continuation".into());
+        if let Some(context) = state.request.context.as_mut() {
+            context.replay_of_request_id = Some(request_id.to_owned());
+            context.replay_of_attempt_id = attempt_id.map(str::to_owned);
+            context.replay_submission_state = Some(submission_state.into());
+        }
+        drop(state);
+        self.emit(None);
+    }
+
+    /// SSE 已发头时保留原响应的失败终态。@return 无。
+    pub(super) fn agy_replay_failed(&self) {
+        self.lock().local_outcome = Some("incomplete");
     }
 
     fn save_rejected_ingress(
@@ -292,6 +326,12 @@ impl TraceContext {
             if state.request.outcome == "local_rejected" && state.request.error_stage.is_none() {
                 state.request.error_stage = Some("admission".into());
             }
+            if let Some(context) = state.request.context.as_mut()
+                && context.entry_protocol.as_deref() == Some("anthropic_messages")
+            {
+                // 正文解码前终结的请求沿现有 Messages 入口平台记账。
+                context.platform.get_or_insert_with(|| "claude_code".into());
+            }
             state.request.finished_at = Some(now());
             state.retention.take();
         }
@@ -319,11 +359,11 @@ pub(crate) fn request_context(platform: &str, protocol: &str, model: Option<&str
     });
 }
 
-/// 冻结客户端入站会话，正文优先，缺省时读取唯一会话头。
-/// @param headers 原始多值请求头。
+/// 记录 Claude 入口及该次请求的会话。
+/// @param session 入站解析结果。
 /// @param body 已解码且尚未映射的请求正文。
-/// @return 无返回值；异常标识保持未知，业务转发沿原链路。
-pub(crate) fn original_session(headers: &HeaderMap, body: &Value) {
+/// @return 无。
+pub(super) fn claude_request_session(session: &RequestSession, body: &Value) {
     request_context(
         "claude_code",
         "anthropic_messages",
@@ -332,28 +372,25 @@ pub(crate) fn original_session(headers: &HeaderMap, body: &Value) {
             .and_then(safe_model)
             .as_deref(),
     );
+    record_request_session(session.original(), session.derived());
+}
+
+/// 冻结根记录的客户端值或已有归属校验的派生值。
+/// @param original 合法的入站会话。@param derived 当前路由所用派生键。@return 无。
+pub(super) fn record_request_session(original: Option<&str>, derived: Option<&str>) {
     let _ = CURRENT_TRACE.try_with(|trace| {
         let mut state = trace.lock();
-        if state.original_session_recorded {
+        if state.request_session_recorded {
             return;
         }
-        state.original_session_recorded = true;
-        let session = extract_session_id_from_body(body).or_else(|| {
-            let mut values = headers.get_all("x-claude-code-session-id").iter();
-            let value = values.next()?;
-            // 重复单值头不合并，避免记录一个客户端未实际提供的会话。
-            if values.next().is_some() {
-                return None;
-            }
-            value.to_str().ok().map(str::to_owned)
-        });
-        state.request.original_session_id = session.filter(|value| {
-            value.len() <= 256 && !value.trim().is_empty() && !value.chars().any(char::is_control)
-        });
+        state.request_session_recorded = true;
         // 缺失值已随入口记录入队，避免额外写入相同摘要。
-        if state.request.original_session_id.is_none() {
+        if original.is_none() && derived.is_none() {
             return;
         }
+        state.request.original_session_id = original.map(str::to_owned);
+        state.request.derived_session_id =
+            derived.filter(|_| original.is_none()).map(str::to_owned);
         drop(state);
         trace.emit(None);
     });
@@ -894,7 +931,10 @@ impl RequestTraceGuard {
             AppError::TooManyRequests(_) => "admission",
             AppError::AgyUpstreamQuota => "upstream_model",
             AppError::AgyControl(_) => "native_control",
-            AppError::AgyToolTurnFailed => "tool_continuation",
+            AppError::AgyToolTurnFailed
+            | AppError::AgyToolReplayUnavailable
+            | AppError::AgyToolContinuationTerminal { .. }
+            | AppError::AgyToolResponseExpired => "tool_continuation",
             AppError::BadGateway(_) => "transport",
             // 503 可来自凭据、环境或原生准备，具体阶段由失败边界记录。
             AppError::ServiceUnavailable(_) => "gateway",
@@ -1046,12 +1086,13 @@ fn identity_hash(account: i64, kind: &str, value: &str) -> String {
 mod tests {
     use super::{
         CURRENT_LOG_MODE, CURRENT_TRACE, RequestTraceGuard, TraceContext, begin_attempt,
-        error_stage, local_outcome, native_rejection, now, original_session, profile_selection,
-        selected_account, session_context,
+        claude_request_session, error_stage, local_outcome, native_rejection, now,
+        profile_selection, selected_account, session_context,
     };
     use crate::error::AppError;
     use crate::model::account::Account;
     use crate::model::request_diagnostics::{AttemptDiagnostic, DiagnosticQuery, RequestLogMode};
+    use crate::service::request_session::RequestSession;
     use crate::service::usage::USAGE_BUFFER_LIMIT;
     use crate::service::v3_scheduling::{SchedulingCandidate, V3Scheduler, now_ms};
     use crate::store::cache::{UpstreamSessionPoolAction, UpstreamSessionPoolResolve};
@@ -1229,9 +1270,10 @@ mod tests {
                     }
                     let body = session.as_ref().map(|session| json!({"metadata":{"user_id":json!({"session_id":session}).to_string()}})).unwrap_or_else(|| json!({}));
                     let response = CURRENT_TRACE.scope(trace, async {
-                        original_session(&headers, &body);
+                        claude_request_session(&RequestSession::claude(None, &headers, &body), &body);
                         // 后续解析与映射只能补充匿名尝试，不能改写入口原值或未知结果。
-                        original_session(&HeaderMap::new(), &json!({"metadata":{"user_id":"user_session_later-session"}}));
+                        let later = json!({"metadata":{"user_id":"user_session_later-session"}});
+                        claude_request_session(&RequestSession::claude(None, &HeaderMap::new(), &later), &later);
                         session_context(7, Some("mapped-session"), None);
                         local_outcome("mock");
                         guard.wrap(Response::new(Body::empty()))
@@ -1266,7 +1308,7 @@ mod tests {
             let trace = TraceContext::new(store.clone());
             CURRENT_TRACE
                 .scope(trace.clone(), async {
-                    original_session(&headers, &body);
+                    claude_request_session(&RequestSession::claude(None, &headers, &body), &body);
                 })
                 .await;
             assert_eq!(

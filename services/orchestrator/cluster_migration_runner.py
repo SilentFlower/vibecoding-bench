@@ -10,7 +10,7 @@ import threading
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
 
 from account_update_identity import configured_release
-from cluster_archive import ArchiveIdentity
+from cluster_archive import AgyArchiveIdentity, ArchiveIdentity
 from cluster_environment import EnvironmentFence
 from cluster_execution import ImportActivation, ImportPreparation, ImportRevocation, NodeInspection
 from cluster_deployment import node_container_name
@@ -36,7 +36,7 @@ class MigrationStart(BaseModel):
     operation_id: StrictStr = Field(pattern=r'^[a-f0-9]{32}$')
     node_id: StrictInt = Field(ge=1)
     revision: StrictInt = Field(ge=1)
-    version: StrictStr = Field(pattern=r'^2\.1\.[0-9]{1,6}$')
+    version: StrictStr = Field(pattern=r'^(2\.1\.[0-9]{1,6}|1\.5\.9)$')
 
 
 class MigrationCoordinator:
@@ -73,6 +73,8 @@ class MigrationCoordinator:
         """
         if self.stopping.is_set():
             raise ValueError('迁移服务正在关闭，请稍后继续原操作')
+        if not request.version.startswith('2.1.'):
+            raise ValueError('当前账号的 CLI 迁移版本无效')
         try:
             existing = self.ledger.get(request.operation_id)
         except ValueError:
@@ -113,16 +115,19 @@ class MigrationCoordinator:
                             node_container_name(self.runtime.deployment, source['node_key']), inspection.model_dump(), inspect=True)
                         self._receipt(observed, {'protocol': 1, 'node_key': source['node_key'], 'account_id': account_id,
                             'environment_id': row['environment_id'], 'assignment_revision': original['revision'], 'generation': 0})
-                execution = {'account_name': account['name'], 'profile_path': account['profile_path'],
-                    'gateway_account_id': account['cc2api_account_id'], 'version': request.version,
-                    'attempt_id': uuid.uuid4().hex, 'transfer_id': uuid.uuid4().hex,
-                    'source_node_key': source['node_key'], 'source_node_revision': source['revision'],
-                    'source_node_config_sha256': hashlib.sha256(source['config_json'].encode()).hexdigest(),
-                    'source_node_location': self._node_location(source),
-                    'target_node_key': target['node_key'], 'target_node_revision': target['revision'],
-                    'target_node_config_sha256': hashlib.sha256(target['config_json'].encode()).hexdigest(),
-                    'target_node_location': self._node_location(target)}
+                execution = self._execution(account, request.version, source, target)
                 return self.ledger.begin(request.operation_id, account_id, request.node_id, request.revision, execution=execution)
+
+    def _execution(self, account, version, source, target):
+        return {'account_name': account['name'], 'profile_path': account['profile_path'],
+            'gateway_account_id': account['cc2api_account_id'], 'version': version,
+            'attempt_id': uuid.uuid4().hex, 'transfer_id': uuid.uuid4().hex,
+            'source_node_key': source['node_key'], 'source_node_revision': source['revision'],
+            'source_node_config_sha256': hashlib.sha256(source['config_json'].encode()).hexdigest(),
+            'source_node_location': self._node_location(source),
+            'target_node_key': target['node_key'], 'target_node_revision': target['revision'],
+            'target_node_config_sha256': hashlib.sha256(target['config_json'].encode()).hexdigest(),
+            'target_node_location': self._node_location(target)}
 
     def _fresh_row(self, account_id: int, environment_id: str) -> dict:
         connection = self.service.store.database()
@@ -183,9 +188,11 @@ class MigrationCoordinator:
                 hashlib.sha256(node['config_json'].encode()).hexdigest() == execution[side + '_node_config_sha256'])
             if node['node_key'] != execution[side + '_node_key'] or not same_location:
                 raise ValueError('迁移原节点配置版本已变化，请核对原操作')
-        identity = ArchiveIdentity(operation_id=operation_id, deployment_id=self.runtime.deployment,
+        identity_type = AgyArchiveIdentity if self.ledger.agy else ArchiveIdentity
+        identity = identity_type(operation_id=operation_id, deployment_id=self.runtime.deployment,
             source_node_key=execution['source_node_key'], account_id=account['id'],
-            environment_id=record['environment_id'], assignment_revision=record['source_revision'])
+            environment_id=record['environment_id'], assignment_revision=record['source_revision'],
+            **({'platform': 'antigravity', 'kernel': execution.get('kernel')} if self.ledger.agy else {}))
         fence = EnvironmentFence(operation_id=operation_id, node_key=execution['source_node_key'], account_id=account['id'],
             environment_id=record['environment_id'], assignment_revision=record['source_revision'], generation=record['source_generation'])
         return migration, execution, identity, fence
@@ -208,7 +215,7 @@ class MigrationCoordinator:
         step = 'context'
         try:
             # 同步在两端操作锁之外等待；后台安装器使用同一把节点锁。
-            if migration['record']['last_confirmed_phase'] != 'committed':
+            if migration['record']['last_confirmed_phase'] != 'committed' and not self.ledger.agy:
                 step = 'preflight'
                 self.ledger.progress(operation_id, step)
                 self._ready(self.service.store.get(migration['target_node_id']), synchronize=True)
@@ -216,12 +223,20 @@ class MigrationCoordinator:
                 migration, execution, identity, fence = self._context(operation_id, account)
                 if migration['phase'] in ('completed', 'cancelled'):
                     return migration
-                if 'cancellation' in migration['record'].get('checkpoints', {}):
+                early_cancel = self.ledger.agy and self._early_cancel(operation_id)
+                if early_cancel:
+                    return self.cancel(operation_id)
+                if 'cancellation' in migration['record'].get('checkpoints', {}) and not early_cancel:
                     raise ValueError('迁移已经开始取消，请继续原取消操作')
                 with self._lease(operation_id, execution, account['id']) as lease:
                     step = 'draining'
                     self.ledger.progress(operation_id, step)
-                    lease.drain()
+                    if self.ledger.agy:
+                        if not lease.drain(cancelled=lambda: self._early_cancel(operation_id)):
+                            lease.release()
+                            return self.ledger.finish_drain_cancel(operation_id)
+                    else:
+                        lease.drain()
                     # 先排空，再取环境锁，允许排空中的既有transport完成原准备。
                     with self.runtime.environment_lock(fence.environment_id):
                         row = self._fresh_row(account['id'], fence.environment_id)
@@ -232,21 +247,33 @@ class MigrationCoordinator:
                             self._ready(self.service.store.get(target_id))
                         if migration['phase'] == 'requested':
                             migration = self.ledger.advance(operation_id, 'draining', {'active': 0, 'node_streams': 0})
+                            if self.ledger.agy:
+                                if migration['phase'] == 'requested':
+                                    lease.release()
+                                    return self.ledger.finish_drain_cancel(operation_id)
+                                fence = fence.model_copy(update={'generation': migration['record']['source_generation']})
                         if migration['phase'] == 'draining':
                             lease.check()
                             step = 'fence'
                             self.ledger.progress(operation_id, step)
+                            if self.ledger.agy:
+                                lease.drain()
+                                self._before_fence(migration, account, row, execution)
                             receipt = self.io.command(source_id, 'fence', fence.model_dump())
                             self._receipt(receipt, {'protocol': 1, **fence.model_dump(), 'phase': 'fenced'})
                             migration = self.ledger.advance(operation_id, 'source_fenced', receipt)
                         if migration['phase'] == 'source_fenced':
                             lease.check()
-                            request = ArchiveExport(**fence.model_dump(), attempt_id=execution['attempt_id'], version=execution['version'])
                             step = 'export'
                             self.ledger.progress(operation_id, step)
-                            archive = ArchiveDescriptor.model_validate(self.io.command(source_id, 'export', request.model_dump())['archive'])
+                            request = {**fence.model_dump(), 'attempt_id': execution['attempt_id']}
+                            if self.ledger.agy:
+                                request['kernel'] = execution['kernel']
+                            else:
+                                request = ArchiveExport(**request, version=execution['version']).model_dump()
+                            archive = ArchiveDescriptor.model_validate(self.io.command(source_id, 'export', request)['archive'])
                             if (archive.identity != identity or archive.environment_generation != fence.generation
-                                    or archive.cli_version != execution['version'] or archive.cli_identity is None):
+                                    or not self.ledger.agy and (archive.cli_version != execution['version'] or archive.cli_identity is None)):
                                 raise ValueError('迁移包与原源身份或代次不一致')
                             self.ledger.checkpoint(operation_id, 'archive', archive.model_dump())
                             migration = self.ledger.advance(operation_id, 'exporting', {'sha256': archive.sha256, 'bytes': archive.bytes})
@@ -279,17 +306,9 @@ class MigrationCoordinator:
                                     self._receipt(verified, {'protocol': 1, 'node_key': stage.node_key, 'operation_id': operation_id,
                                         'transfer_id': stage.transfer_id, 'phase': 'verified', 'sha256': archive.sha256})
                                 frozen = {**row, 'generation': fence.generation, 'state': migration['record']['source_state']}
-                                profiles = MigrationProfiles(self.service.data, operation_id)
-                                preparation = self.service.build_preparation(account, frozen, stage.node_key, stage.target_revision,
-                                    self.runtime, self.gateway, self.quota_identity(account), profile_sink=profiles.save,
-                                    **({'cli_only':True} if account['cc2api_account_id'] is None else {}))
                                 step = 'prepare-import'
                                 self.ledger.progress(operation_id, step)
-                                if profiles.references:
-                                    self.io.upload_profiles(target_id, stage, profiles)
-                                peer = self.io.command(target_id, 'prepare-import', ImportPreparation(stage=stage, preparation=preparation,
-                                    profile_references=profiles.references).model_dump())
-                                self._prepared(peer, account, stage)
+                                peer = self._prepare_import(target_id, stage, account, frozen)
                                 self.ledger.checkpoint(operation_id, 'target', {'environment': peer['environment']})
                                 migration = self.ledger.advance(operation_id, 'verified', {'transfer_id': stage.transfer_id,
                                     'generation': peer['environment']['generation']})
@@ -316,6 +335,22 @@ class MigrationCoordinator:
             if self.ledger.get(operation_id)['phase'] not in ('completed', 'cancelled'):
                 self.ledger.isolate(operation_id, 'migration_step_unconfirmed', failure=migration_failure(error, step))
             raise
+
+    def _early_cancel(self, operation_id):
+        checkpoints = self.ledger.get(operation_id)['record'].get('checkpoints', {})
+        return checkpoints.get('cancellation', {}).get('before_fence') is True
+
+    def _prepare_import(self, target_id, stage, account, frozen):
+        profiles = MigrationProfiles(self.service.data, stage.archive.identity.operation_id)
+        preparation = self.service.build_preparation(account, frozen, stage.node_key, stage.target_revision,
+            self.runtime, self.gateway, self.quota_identity(account), profile_sink=profiles.save,
+            **({'cli_only': True} if account['cc2api_account_id'] is None else {}))
+        if profiles.references:
+            self.io.upload_profiles(target_id, stage, profiles)
+        peer = self.io.command(target_id, 'prepare-import', ImportPreparation(stage=stage, preparation=preparation,
+            profile_references=profiles.references).model_dump())
+        self._prepared(peer, account, stage)
+        return peer
 
     def cancel(self, operation_id: str) -> dict:
         """提交前撤销目标，再恢复源；原操作的迟到节点命令持续被拒绝。

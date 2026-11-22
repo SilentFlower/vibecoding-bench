@@ -55,7 +55,10 @@ src/tlsfp/
 - 响应流日志按网关根request_id、原生job/attempt UUID、worker/PID关联。本层EOF、body_error、静默超时、下游Drop及IPC/运行时错误分别记录，含持续时间、片段/字节及最后收包间隔。错误链最多八层，仅投影reqwest/hyper/io类型标志及OS代码；运行时原错误只保存SHA与受控code。代理隧道仅记录worker/tunnel UUID及密文流量数字，不能据双向复制收口断言首个关闭方。普通日志禁止异常原文、URL、代理凭据及正文。
 - account-sender 启动时初始化 JSON tracing 日志，默认 info，支持 RUST_LOG，关闭 ANSI。原生 error 事件的可选 diagnostics 经 native_error::project 独立有界校验后，记录实际阶段、最多八层白名单 name/code 及截断/循环/读取失败标记；保留原错误 SHA。日志包含 job、worker/PID、account_id、generation。缺省摘要记 unavailable，畸形记 invalid，均保持原业务响应。TS/Rust 目录及实际事件结构由 tests/fixtures/native-error-diagnostics.json 交叉验证；进程退役前记录，保留期沿 Docker 日志轮转。
 - sender 校验现有绑定、代次、deadline、目标及秘密，原生目标仅 POST `/v1/messages` 且无 query。response 继续经过共用用量观察及流许可，取消、EOF、Drop 各按既有一次收口。
+- sender 的私有 POST 在 `Bytes` 或 `Json` 读取正文前校验账号 Bearer。已授权的 handler 在业务提交边界再次读取当前配置并核对环境与代次。前置拒绝使用本地 `x-v3-transport-error: before-send`。
+- `x-v3-transport-error` 是 sender 保留的提交状态头。Legacy 及原生响应均过滤上游同名头，保持实际上游状态、正文和其它公开协议头。
 - 私有`deadline_unix_ms`采用一次墙钟采样：过期拒绝，未来上限允许120秒预算加5秒跨进程时钟偏差，实际剩余预算钳制120秒。legacy发送和原生启动、首响应共用接收时冻结的单调截止；池内不重复按墙钟验期。暖进程在业务投递前复核单调截止，启动耗时不能换取新预算。
+- 原生 worker 的 `request_input` 写 stdin 沿用同一单调截止，消息序列化完成后再次核对。写入超时可能留下部分帧，以 502 提交状态未知收口并退役该进程。
 - 准备仅 checkout/真实 worker_ready/回池，禁止调用 execute、模型或计费。后台协调并行2、待处理账号最多128；启动及5/20/60秒补偿只解析运行绑定。bench 环境就绪在生命周期锁外按环境/代次通知一次；在途新提示合并为一次后续执行。账号更新、凭据提交及交接重新开放门禁后触发准备。
 - 准备执行时重读权威账号，解析 bearer 后核对同一身份；成功前再次核对账号及只读运行绑定。失效、维护、凭据门禁关闭及取消优先收口，已处理取消的迟到完成不能发布 ready。取消按账号/环境/代次/准备 UUID 隔离，保留130秒撤销记录覆盖提前到达与迟到重放；最多16个在途和256条登记，满时明确拒绝。
 - 原生能力检查和热路径复用保持打开的已验证分发体 FD；每轮检查规范路径、dev/inode、大小、mode/uid/gid、纳秒 mtime/ctime，变化后重新完整校验 SHA。新进程启动仍执行固定分发体、精确执行 FD、执行体 SHA 和四项封存核验。
@@ -69,9 +72,10 @@ src/tlsfp/
 | 未知 request_backend、Fast/1M 超出账号权限 | 400，原账号或模型零发送 |
 | 忙时切换后端 | 现有忙门禁拒绝，归属保持 |
 | 缺 V3/二进制/预算、能力或代次不符、平台不支持 | 503 准备失败 |
+| 私有 POST 凭据缺失或错误 | 401，读取正文前拒绝 |
 | 私有期限已过期或剩余超过125秒 | sender在提交前拒绝；原生网关映射为503准备失败，模型零发送 |
 | 固定 293 无法接纳正文版本或参数 | 二进制受控错误，模型零发送 |
-| 提交后断线或状态不明 | 502，保持单次提交语义 |
+| 原生输入写入超时、提交后断线或状态不明 | 502，保持单次提交语义 |
 | 原生上游状态错误（下列可恢复情形除外） | 返回本次状态及响应，管理员空闲时显式切回 legacy |
 | 原生明确429 | 依共用分类透传、有限退避或排除当前账号后重新选号 |
 | 明确签名400且正文可修复、预算尚余 | 同账号追加最多一次修复；获2xx后记录历史摘要，续轮命中则首发前修复 |
@@ -96,6 +100,7 @@ src/tlsfp/
 
 - `account_backend_defaults_validate_and_obey_busy_gate`、`historical_backend_migration_and_account_updates_are_independent`：默认/非法值/忙门禁/两账号和回退。
 - `native_backend_preserves_account_feature_authorization_without_rewriting`：Fast/1M 权限拒绝且正文保持；前端 `npm run build` 及创建/编辑/reset 链路核对。
+- `runtime_transport_test` 覆盖私有 POST 鉴权早于正文、原绑定拒绝、过滤上游保留头和实际状态字节保真。`native_execution_logs_error_event_eof_and_deadline` 核对首响应等待与输入管道阻塞分别受原期限约束，并验证输入超时按提交状态未知处理。
 - `tests/native_signature_fixture.py`经真实Gateway及回环sender覆盖280/293首次400→2xx、续轮单发、同一实际会话跨账号/版本/模型复用、正文与头部会话关联、不同/缺失实际会话独立判断、失败不学习、独立诊断尝试、普通400/业务透传429/提交未知保持单发和预算耗尽；`native_signature_repair`单测覆盖完整思考前缀、不同会话及变更历史隔离、跨模型复用、新建实例重新学习、7天过期及4096项上限。
 - 同一回环夹具用首发屏障模拟在途换票，断言 280/293 各以旧、新凭据依次向同账号发送，正文相同，200 及再次 401 均为两次尝试。覆盖凭据未变、裸 401、其他错误类型、缺上游观察及期限耗尽时单次发送并保留首次关联 ID。
 - `native_real_binary`、`native_real_gateway`：实际附件、独立 TLS/CCH、HTTP/SOCKS、多值白名单、工具/thinking、主子会话、单次发送、取消/代次和诊断来源。跨平台备用实现编译验证明确 503。
@@ -173,6 +178,50 @@ src/tlsfp/
 - `native_real_gateway`：终止预热进程后周期恢复为新 PID，恢复模型计数增量0；业务诊断持久化真实 PID、暖命中与启动字段，凭据轮换隔离。
 - `native_real_gateway`另核候选激活/回滚后首次补写quota_identity保持预热PID；设置强制1h经真实SettingsStore和能力声明到达回环出站。`stream_error`及流日志测试覆盖截断、超时、EOF、Drop、秘密过滤与关联字段。
 - 诊断与历史记录单测覆盖缺字段、非法 PID/UUID 和计时越界；前端构建及合成浏览器覆盖历史未观测、实际暖命中与阶段口径。
+
+## Scenario: AGY 跨模型进程复用与 CRIU 启动
+
+### 1. Scope / Trigger
+
+- 修改 AGY 的已授权模型提交、工作进程选择、CRIU 模板补位、请求详情或运行环境账号名称时适用。账号和内部传输的现有归属校验见 [AGY账号运行环境与Gemini业务接入](../../orchestrator/backend/account-runtime-v3.md#scenario-agy账号运行环境与gemini业务接入)。
+
+### 2. Signatures
+
+- 网关以 `AgySubmission.model: String` 和 `native_model: AgyModelId` 传递同一次已核验的目录映射。受管监督器在私有 `gemini_request` 信封中传入这对字段。公有 Gemini 正文继续按原字段集合验证。
+- `GET /admin/request-diagnostics/:request_id` 的每次尝试可带 `runtime.start_source: "exec" | "criu_restore"`。字段缺省代表未观测。沿用现有运行观察和持久化结构。
+- 编排的 `GET /api/environments` 可返回 `gateway_account_name: string | null`。反重力环境从 `GET /admin/accounts?platform=antigravity` 分页查询后按 `gateway_account_id` 投影名称。
+
+### 3. Contracts
+
+- 每个账号和环境的监督器按凭据代次、AT 摘要、代理与实际启动采集配置选择工作进程。池内优先选择热进程。作业自身冻结原生执行 ID，并用于 `StartCascade.requestedModel`、`plannerConfig.planModel` 和历史步骤的模型字段。原工具结果沿原作业身份回填。
+- 每个账号保留一个最近使用且仍有效的空闲热进程。额外热进程空闲 120 秒后回收。凭据过期、换代或进程退出时回收对应空闲资源。停放的模板保留到凭据过期、换代、环境变更或退役。模板与业务共用物理池上限。恢复交接释放模板名额，原控制连接继续负责恢复进程的退出清理。监督器清除已消费标记，并在原请求截止与池容量内补位。
+- `warm_hit` 表示此次请求入池前进程已就绪。恢复及失败回退计入 `checkout_ms`，首次启动或恢复到就绪的阶段计入 `worker_start_ms`。环境 `last_start_source` 记录当前凭据代次最近的实际扩容来源。热命中保持该记录。
+- `restore.state` 依据监督器的实际状态表示等待模板、准备中、模板就绪或不可用。保存与恢复失败沿可见的白名单阶段和原因，普通回退继续使用原截止。
+- 运行环境卡片和详情优先展示 `gateway_account_name`。网关名称缺失、平台或绑定不匹配、查询失败时使用环境原名。账号编号和环境归属沿原字段读取。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 模型字段缺失或超出可信目录映射形状 | 受管私有请求在调用原生 RPC 前拒绝 |
+| 旧独立内核的启动配置提供固定模型 | 旧信封可省略 `native_model`，采用固定执行 ID |
+| 模板换代、过期或进程已退出 | 模板失去可用状态，业务凭当前已准入凭据获取进程 |
+| 保存或恢复失败 | 记录受控失败，普通回退沿原截止，模型至多发送一次 |
+| 诊断缺来源或来源非法 | 缺省保留其余已核验字段，非法值拒绝该进程观察 |
+
+### 5. Scenarios and Examples
+
+- 同一账号收到 A、B、A 三次请求。热进程的 PID 可保持一致，每次 RPC 使用对应的原生型号。
+- 连续两批并发的间隔少于 120 秒时可复用额外热进程。空闲超时后保留最近使用的有效热进程，最后一个热进程可在 300 秒后继续接单。
+- 容量为 1 时，恢复进程占住唯一名额，后续准备在空位可用时继续。容量允许时，原恢复进程在线期间可补下一份模板。
+- 若将 `warm_hit=true` 计为普通启动，统计会把已有进程重复算作扩容。按 `warm_hit` 判断复用，按 `start_source` 展示该进程的启动来源。
+
+### 6. Tests Required
+
+- `test_agy_supervisor` 核对跨模型复用、额外进程的 120 秒边界、基础热进程与快照寿命、凭据换代、满槽和单次回退。固定配置与历史引用由 `test_agy_runtime` 覆盖。
+- `verify_agy_native_loopback.py --shared-models` 检查真实网关的目录映射、TLS 回环出站模型、同 PID 和热命中。Linux 6.1 隔离 OCI 验证同 PID 恢复、第二份模板保存和保存或恢复失败时的单次模型发送。
+- `keeps_verified_runtime_start_source` 验证实际 PID 与来源持久化、历史缺省及非法值拒绝。浏览器核对性能页的 CRIU 恢复、普通启动和热命中。
+- `test_environment_summary` 核对分页平台、账号 ID、环境原名和网关失败。 `verify_agy_environment_ui.py` 验证浏览器中的反重力账号名称、详情和原账号编号。
 
 ## Gateway 热路径规则
 
@@ -1448,17 +1497,19 @@ AccountService::create_cli_account(&mut Account) -> Result<(), AppError>
 ### 1. Scope / Trigger
 
 - 修改 `v3_scheduling`、`SchedulingStore`、Gateway 最终发送准入或管理端调度可视化时适用。`main` 在 `V3_RUNTIME_URL` 或 `V3_DEPLOYMENT_ID` 非空时装配；部分配置缺失仍由传输层失败关闭。
-- 仅接管 API Gateway 的精确 `/v1/messages` 到账号 sender。原生 CLI、项目、养号、Hello、count_tokens 和后台独立请求不共享本预算；非 v3 保留原调度行为。
+- 平滑发送预算只接管 API Gateway 的精确 `/v1/messages` 到账号 sender。反重力的 `generateContent`、`streamGenerateContent` 共用持久绑定，发送准入沿反重力原 RPM。原生 CLI、项目、养号、Hello、count_tokens 和后台独立请求不共享 Claude 发送预算；非 v3 Claude 保留原调度行为。
 
 ### 2. Signatures
 
 ```rust
 V3Scheduler::begin(self: &Arc<Self>, token_id: i64, session_id: Option<&str>) -> SchedulingRequest
 V3Scheduler::begin_with_parameters(self: &Arc<Self>, token_id: i64, session_id: Option<&str>, parameters: &DiagnosticParameters) -> SchedulingRequest
+V3Scheduler::begin_with_key(self: &Arc<Self>, key: Option<&str>, parameters: &DiagnosticParameters) -> SchedulingRequest
 AccountService::select_v3_account(&self, request: &SchedulingRequest, exclude_ids: &[i64], allowed_ids: &[i64], context: &AccountSelectionContext, slot_units: u32) -> Result<SelectedAccount, AppError> // 异步
 SchedulingRequest::admit(&self, account: &Account) -> Result<SendPermit, AppError> // 异步
 SendPermit::submitted(self)
 SchedulingStore::claim_current(&self, account_id: i64, key: Option<&str>, expected: Option<&SessionBinding>, last_released_at: Option<Instant>) -> Result<SendClaim, AppError> // 异步
+SchedulingStore::claim_binding(&self, account_id: i64, key: &str, expected: Option<&SessionBinding>) -> Result<Option<SessionBinding>, AppError> // 异步
 ```
 
 - `SchedulingStore::claim(account_id, interval_ms, now_ms, key, expected)` 是受控时钟验证入口；生产使用 `claim_current`，不能从选号快照传入旧 RPM／旧时间。
@@ -1468,12 +1519,14 @@ SchedulingStore::claim_current(&self, account_id: i64, key: Option<&str>, expect
 
 ### 3. Contracts
 
-- 绑定 key 是固定域、Token ID 与改写前显式 SID 的 SHA256；不存原 SID／提示词／凭据，不与原协议 `session_hash` 混用。无 SID 不制造稳定会话；不同 Token 不串号。
+- 网关在入站正文改写前解析会话。Claude V3 依次读取 `metadata.user_id` 的既有 session ID、`X-Claude-Code-Session-Id`、`X-Session-Id`，保留既有显式键域。反重力 Gemini 读取 `X-Session-Id`，使用独立显式键域。头只接受单值、非空白、无控制字符且最多 256 字节；通用头由网关消费。
+- 无显式会话时，使用按平台和版本分域的 SHA256，输入包含 Token ID、入站模型、工具、系统指令和首个有效用户内容。对象键按序编码，数组维持输入顺序，Claude 已知协议块的 `cache_control` 不参与计算。后续轮次、客户端 UA、流式开关和上游身份不参与计算。没有可用的模型或首轮输入时沿无绑定路径。绑定表保存摘要，原协议 `session_hash`、上游池会话及策略封禁键各沿自身合同。
 - 硬资格保留 Token 范围、账号状态、真实 5h／7d 控制线、Fable 门禁及既有故障排除。有效老绑定遇到本地并发繁忙、队满、发送等待或超时不迁移；新 v3 路径不再读写旧缓存绑定。
 - 新会话先剔除完全无有界容量的账号，再保留人工优先级，组内优先即时容量。没有即时候选时仅进入可容纳且预计等待不超预算的队列；最终真实许可裁决竞争，排队不扣发送名额。
 - 普通请求 2 单位、Haiku 1 单位及 `2 × concurrency` 个等待请求的 FIFO 保持。请求租约随并发许可和响应流存活，取消／结束 Drop 回收；不把长流与准入超时混为一类。
 - 配置和绝对准入期限在请求开始时冻结。默认 120 秒，可配置 1–120；并发、退避、凭据、池／Hello、环境准备、发送及既有重试共用期限，不重置。实际提交后使用原 TTFB／流生命周期。
 - 环境与身份验证完成后才进发送 FIFO；绑定 CAS 与当前发送许可同事务。CAS 冲突回滚预算、释放当前资源并跟随最新绑定；响应结束不把旧账号写回。
+- 反重力普通生成先按 Token、模型档位和附件资格筛选，在可接单档位内优先使用原绑定。原账号临时繁忙时等待其并发和 RPM，暂停接单时返回 503 并保留绑定。准备凭据及传输后调用 `claim_binding`，获胜后进入原 RPM；CAS 冲突释放候选资源，在同一请求截止前重新选号。已核验的工具接续或重读沿原工具轮账号和许可处理，不用会话键重新选号。
 - 取得发送行写锁后读取账号表当前 RPM 并采样时间。间隔 `ceil(60000/RPM)` 毫秒，非正值不限；绑定 CAS 后、提交事务前记录认领时间。等待不持数据库锁，不积攒空闲名额或分钟补发。
 - `SendPermit` 持有公平队首至真实提交记点，释放时保存单调时钟；下一裁决同时检查持久时间和真实已过间隔。不能把数据库／提交准备耗时抵扣后一个请求的间隔。已认领但取消／发送失败保守消耗名额，不生成假提交点；空闲队列至少保留最大间隔 60 秒后才可回收。
 - `AccountService::update_account`／`update_account_options` 成功保存后通知对应发送队首；等待者重新读取 RPM，支持调低和调高，但原截止时间、协议身份快照不变。仅重新传入旧 `Account` 不能覆盖当前 RPM。
@@ -1517,6 +1570,7 @@ SchedulingStore::claim_current(&self, account_id: i64, key: Option<&str>, expect
 | 有效老绑定但并发繁忙／队满／等待到期 | 原账号等待或本地 429，保留绑定，`Retry-After: 1` |
 | 新会话没有有界容量 | 本地 429，不提前绑定或消费发送名额 |
 | 同 key 并发认领不同账号 | CAS 唯一赢家，失败事务预算回滚 |
+| 反重力首次绑定竞争／原绑定暂停接单 | 冲突候选释放资源并跟随现绑定／返回 503，保留绑定 |
 | 写锁／环境同批就绪／分钟切换／重启 | 不积攒许可；持久与单调时钟共同控制提交间隔 |
 | 等待中调整 RPM | 当前值参与下一裁决，唤醒等待但不重置期限 |
 | 调度状态不可读写／数值非法 | 固定 503，停止新增提交，不泄露底层错误 |
@@ -1532,7 +1586,8 @@ SchedulingStore::claim_current(&self, account_id: i64, key: Option<&str>, expect
 ### 5. Scenarios and Examples
 
 - 正常：A 已绑定且繁忙、B 空闲时，老会话留 A，新会话可进 B；50 RPM 的发送间隔至少 1200ms。
-- 基础：无显式 SID 只按新请求准入；网关重启恢复有效绑定与许可时间，时间轴从新进程采集起点开始。
+- 基础：无显式 SID 且无有效首轮输入时按无绑定请求准入；网关重启恢复有效绑定与许可时间，时间轴从新进程采集起点开始。
+- 正常：同一 Token 的两个 API 请求保留相同模型、工具、系统指令和首轮用户内容，第二次追加历史并切换流式，仍查到同一绑定。单轮客户端可用 `X-Session-Id: chat-42` 关联后续不同输入。直接以全文或 UA 派生会使追加历史或更换客户端时的关联丢失，应使用冻结的入站会话键。
 - 正常：同等条件下 1 小时后重置的窗口获得高于 3 小时窗口的偏好；等待模式中，较快账号即使排队单位更多，也可因较短的成功总耗时估计获选。错误用法是用首输出替代并发槽释放耗时；正确处理是分别保存成功总耗时与首输出。
 - 边界：旧 5h 到期且 7d 已用 4% 时，状态为 `reset_pending`，额度分沿用有效 7d 的 0.96。刷新取得 5h 零用量且无 reset 后，状态为 `observed`，额度分仍为 0.96；错误做法是把明确零用量也当未知，正确处理是接受该官方观测。
 - 边界：头部 100ms、首个有效思考 3000ms 时，调度使用 3000ms；错误做法是沿用 `ttft_ms=100`，正确处理是读取成功终态的 `first_output_ms` 并写入请求冻结分组。
@@ -1552,6 +1607,7 @@ transport.submit(prepared, body, ttfb_timeout).await
 
 - `unknown_feedback_baseline_allows_near_best_rotation`、`health_feedback_starts_from_healthy_baseline_and_decays`：未知健康／延迟为 1.0、额度为 0.5；实际近优轮换、首次成功／失败／容量拒绝、十五分钟半衰期及成功恢复。分组隔离与 SSE 错误反馈回归沿用满分未知基线。
 - `tests/v3_scheduling_test.rs`：SQLite／隔离 PG 共用 CAS、回滚、完整 UTC 毫秒、续租、清理、账号删除及跨分钟／重启合同；不得只用小于 i32 上限的模拟时间证明持久精度。
+- `service::request_session` 和 `v3_messages_routes_and_records_derived_sessions` 覆盖首轮内容稳定性、非法头、Token／平台隔离、显式旧绑定及双账号优先级变化。`verify_agy_gemini.py::verify_session_affinity` 以真实 HTTP 验证两次首轮先选不同账号、实际提交同账号，以及暂停和过期后的行为。
 - `sqlite_write_lock_and_held_permit_cannot_bank_send_time`：写锁延迟后才采样；持有许可时后续不抢跑，提交后仍符合间隔。
 - `waiting_requests_reload_current_rpm_without_resetting_deadline` 及 PG `current_rpm_contract`：300→60、1→300，旧快照不能绕过新 RPM，唤醒及时，期限不变。
 - `capacity_reason_matches_pending_work_and_wait_budget`：无容量时非 ready，前方请求和超期各有原因；原有绑定、Token 隔离、近优轮转、取消、状态故障与只读查询回归保持。
@@ -1606,6 +1662,47 @@ transport.submit(prepared, body, ttfb_timeout).await
 - `account_queue_hot_shrink_*`：缩容前已排队请求不能抢跑、再次扩容无残留、门禁等待取消也正确归还；原加权 FIFO 与活动计数回归保持。
 - `account_store_timestamp_test` 的 SQLite／独立 PostgreSQL 共享合同：选列保存保留并行状态、凭据和指标，未知字段整次拒绝，可空套餐文本／清除反复切换。
 - `node --experimental-strip-types --test web/tests/accountUpdate.test.mjs` 验证增量载荷、凭据空值和清除；前端 build 与完整 Rust 回归通过。
+
+## Scenario: 反重力账号并发上限在线调整
+
+### 1. Scope / Trigger
+
+- 适用于反重力账号编辑、网关队列容量、原生工作池及 Docker 角色额度变更。三角色初始分配见[账号运行环境合同](../../orchestrator/backend/account-runtime-v3.md#scenario-agy账号运行环境与gemini业务接入)。
+
+### 2. Signatures
+
+- 原管理入口 `PUT /admin/accounts/{id}` 接收整数 `concurrency`，反重力范围为 1 至 64。
+- 受信 `POST /internal/v3/agy-capacity/{account_id}` 接收 `{operation_id,before,target,phase}`。操作 ID 为 32 位小写十六进制，`phase` 为 `prepare|settle|reconcile`。成功回执为 `{ok:true,operation_id}`。
+- `GET /admin/runtime/accounts/{id}/config?capacity_operation=<id>` 可返回 `capacity_edit_active` 布尔值。省略查询参数保持既有配置响应。
+- 发送器 `POST /internal/agy/capacity` 接收 `{account_id,environment_id,generation,max_workers}`，通过账号私有 Bearer 鉴权后核对当前配置并回传相同四字段。监督器命令 `capacity` 携带 `max_workers`、`restore_allowed`，对应 `capacity_applied` 回执。状态提供 `capacity_protocol=1`、`allocated_workers` 和生效的 `max_workers`。
+
+### 3. Contracts
+
+- 网关在原账号更新路径登记操作。扩容核对并实际应用角色及工作池额度后按列保存，在原 `AccountQueue` 增加容量。缩容先保存网关上限，原队列通过归还许可收紧准入。真实代理或组合凭据变更沿原维护边界。
+- 监督器身份继续绑定账号、环境、代次、内核和代理。容量字段由原监督器在池锁内应用。已接单和待回填的实例继续运行，超出的空闲实例先回收，基础热进程保留到可用名额耗尽或原失效条件成立。CRIU 继续按当前额度准入。
+- 编排器按同一资源计算更新角色 `Memory`、`MemorySwap` 和发送器 `PidsLimit`，核对实际容量和角色主进程。有限 RAM 在账号总额内分配，发送器额度为 `512 + 256 × max_workers` MiB，进程数额度为 `128 + 64 × max_workers`。缩容时在途数量或实际占用高于新额度则暂留原角色额度。
+- 私有 `runtime/agy-capacity.json` 记录 schema 版本、账号、环境、代次、操作 ID 和原目标容量。准备中的合法差异继续使用原传输绑定。原操作结束后按持久 `concurrency` 收口；未知回包先查询实际资源及原回执，确认后清记录。新准备读取权威上限，停止环境保存容量时保持停止。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 容量非法、环境代次不符、原操作未持有 | 拒绝写入或应用该容量 |
+| 旧运行发送器缺少容量协议 | 显示升级提示，保留原运行容量 |
+| 内存不足或资源暂不可安全划拨 | 返回对应的资源原因，保留原网关上限 |
+| 4 路在途时缩到 3 | 保留原许可和在途实例。继续按新目标归还许可和回收资源 |
+| Docker 或发送器的应用结果未知 | 读取同代实例和已保存的网关上限后继续原操作 |
+
+### 5. Scenarios and Examples
+
+- 执行 3 路时提交 `{"concurrency":4}`。先确认发送器容纳第 4 个进程，再由原队列放行等待者。
+- 缩容后仍有工具结果待回填时，回填沿原账号和进程执行。对应角色额度在实际占用允许时调低。
+- 仅修改 `sender.json` 会漏过监督器回执与网关队列更新。通过原管理入口执行，按同一个操作 ID 比较角色和工作池实际状态。
+
+### 6. Tests Required
+
+- `test_agy_capacity` 覆盖有限额度、停止环境、连续缩扩、旧发送器以及 Docker 回包丢失恢复。`test_agy_supervisor` 核对动态进程数和原工具续接。
+- `agy_sender_test` 核对鉴权、过时代次与配置不符的容量拒绝。`verify_agy_native_loopback.py --live-capacity` 验证同一监督器下 3→4→3、五笔请求各提交一次。
 
 ## Scenario: Claude 会话策略封禁
 
@@ -1857,3 +1954,179 @@ transport.submit(prepared, body, ttfb_timeout).await
 - verify_agy_accounts_api.py：真实HTTP/SQLite配合合成原生服务，断连、重启、错账号、未落盘恢复及重授权、能力回读、新代理到期刷新和丢回执。
 - 前端构建与verify_accounts_design.py、verify_agy_accounts_ui.py、verify_account_filters_ui.py：旧CC载荷、两账号开关、草稿/焦点、取消与迟到结果、组合筛选及390/720/1440/1920px。
 - 原生OOB启动/取消与合成身份回执分别记证据。真实Google登录、身份及刷新由具备授权测试账号的外部验收独立记录，不能用合成通过冒充真实验收，模型提交预算为0。
+
+## Scenario: 反重力 Messages 与 WebSearch
+
+### 1. Scope / Trigger
+
+- 修改 Flower2API 的 Anthropic Messages 到反重力 Gemini 转换、会话或工具续轮、独立搜索执行及来源过滤时适用。账号、凭据和环境许可沿[账号环境共同合同](../../orchestrator/backend/account-runtime-v3.md#scenario-agy账号运行环境与gemini业务接入)。
+
+### 2. Signatures
+
+- 已鉴权的 `POST /v1/messages` 按正文中的 `gemini-*` 模型进入反重力。`stream: true` 返回 Anthropic SSE，缺省返回 Anthropic JSON。目录模型与账号权限沿现有 Gemini 准入校验。
+- 普通 Messages 请求可带 `thinking: {"type":"enabled","budget_tokens":<正整数>}` 或顶层 `output_config.effort`。思考选项作为网关内部的档位偏好，生成正文沿原有 Gemini 形状。
+- 唯一工具声明 `{"type":"web_search_20250305","name":"web_search"}` 时，解析最后一条用户消息的文本查询及可选的 `allowed_domains` 或 `blocked_domains`。兼容 Claude Code 的 `Perform a web search for the query: ` 前缀。
+- 发送器私有 `POST /internal/agy/search` 使用已有 `AgySubmission`、Bearer 和环境归属。操作正文为 `{"query":<非空字符串>,"previous_request_id":<原作业 UUID 或 null>}`。监督器命令为 `search`，成功时先发 `search_result`，再发同请求的 `job_finalized`。
+
+### 3. Contracts
+
+- 顶层 `system` 和归属全局的历史系统文本按顺序构成 Gemini 的 `systemInstruction`。同一用户轮中，遇到已通过 `tool_use_id` 找到原调用的工具结果后，后续的 `messages[].role = "system"` 文本归入该轮，适用于 Read 截断提示、后台任务通知和其他补充文本。已有用户内容时，以 `UserPromptSubmit hook additional context: ` 开头的钩子文本同样归入该轮。
+- 下一条 `assistant` 消息或历史末尾结束当前用户轮。将该轮已收集的补充按原顺序作为 `text` Part 追加到最后一条用户内容，分批工具结果排在补充文本之前。字符串和文本块数组采用同一投影。重发历史时按同一规则复用旧轮位置。其余历史系统文本归入 `systemInstruction`。
+- 图片沿原生媒体校验。普通函数调用和工具回填按 `tool_use_id` 对应，续轮补回已匹配原调用的真实模型签名。
+- 正整数手动预算优先，沿 Gemini 的预算区间选择低、中、高档。否则 `effort` 的 `low`、`medium`、`high`、`xhigh` 对应同名档，`none` 和 `minimal` 对应低档，`max` 对应 `xhigh`。基础模型优先尝试目标档位，再用原来可接单的同系目录候选。显式型号按精确名称匹配。工具续轮复用原账号和实际档位。思考 token 数由所选原生型号决定。
+- AGY 返回的栅格图片 `inlineData` 按源 MIME 与 Base64 数据生成 Markdown 图片文本。Messages JSON 使用 `text` 内容块，SSE 使用 `text_delta`，都保留原 Part 顺序。原生 Gemini JSON 和 SSE 保留 `inlineData` 结构，原生 `thinkingConfig` 沿账号环境共同合同。
+- 会话依次使用正文中合法的显式值、`X-Claude-Code-Session-Id`、`X-Session-Id`。网关在反重力域内结合 API 令牌派生选号键，管理诊断显示原始 Session ID。待回填轮的搜索复用同令牌、显式会话、模型和查询所对应的原账号许可。该轮的相同查询复用原搜索回执，每次回包按请求的域名规则过滤。
+- 发送器以固定原版 `agy 1.5.9` 的 `-p` 和 `stream-json` 输入、输出执行 `search_web`。只读取本次成功工具步骤的 SQLite 轨迹结构，使用原生标题和 URL。外部回包在收口后生成同 ID 的 `server_tool_use` 和 `web_search_tool_result`。一次成功搜索计为 `usage.server_tool_use.web_search_requests = 1`。
+- 来源规则按域名和子域匹配。固定原版对 `vertexaisearch.cloud.google.com` 的 Google 跳转只保存跳转地址和标题。存在非空允许域或禁止域列表时省略这类链接。无域名规则时保留原链接。来源标题仅用于显示。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| Messages 思考选项缺省或无法映射 | 使用该模型原有的目录选号规则 |
+| Messages 图片 MIME 不受支持或 Base64 无效 | 省略该图片 Part，记录脱敏告警，保留其余内容 |
+| 空查询、无效域名或同时声明允许域与禁止域 | HTTP 400 |
+| 域规则过滤掉全部来源 | 成功的 `web_search_tool_result`，`content` 为 `[]` |
+| 原作业失败或无法核验来源回执终态 | `web_search_tool_result_error`，`error_code` 为 `unavailable` |
+
+### 5. Scenarios and Examples
+
+- 两轮工具回填后分别追加运行状态和 `<task-notification>`。提前合入全局系统指令会改写缓存前缀。每段补充应随对应工具轮发送，后续回放中旧轮的位置固定。
+- 手动预算 1024 优先匹配同一基础型号的 `-low`。目录缺少目标档位时，按原候选选择实际可用型号，实际命中以请求诊断为准。直接指定 `-low` 时按该精确型号选号。
+- 原生发送器的生成请求接受默认或 `TEXT` 模式。要求 `responseModalities: ["IMAGE"]` 会收到字段级 400。Messages 只投影模型实际回传的图片。真实出图需在有授权的环境按固定 AGY 和目录型号验证。
+- 正常查询 `IANA Example Domains`。声明 `allowed_domains: ["iana.org"]` 时保留 `www.iana.org` 直链。声明 `blocked_domains: ["iana.org"]` 时过滤该直链。
+- 把 Google 跳转域填入允许列表无法确认来源站点。需要域名约束时应声明来源站点域名，回包仅包含同规则匹配且来源域可核对的结果。
+
+### 6. Tests Required
+
+- `messages_prompt_hook_*` 核对两种钩子文本形状的 `systemInstruction` 和历史前缀，以及普通系统提示和分批工具结果的顺序。
+- `messages_tool_result_system_supplements_keep_the_cached_prefix` 核对四轮累积历史中的两批任意补充、工具回填 ID、`systemInstruction` 和已发送的消息前缀。`messages_read_truncation_notice_keeps_its_position_across_tool_turns` 核对 Read 截断提示及普通用户轮的系统归属。`verify_agy_native_loopback.py --messages-search` 核对截断提示和后台任务通知在实际出站中唯一出现、排在原工具结果之后且维持原顺序。
+- `verify_agy_native_loopback.py --image <离线测试镜像> --messages-search` 核对来源直链与跳转、允许域与禁止域、无域规则、重复查询、账号和工具回填 ID、取消清理。
+- 同一回环核对思考选号、目录缺档、显式档位和改 effort 后的同账号工具续轮。用同一图片源核对 Messages JSON 和 SSE 的 Markdown 数据及顺序，以及原生 Gemini 两种响应的原始 `inlineData` 和终态。
+- 加 `--claude-code <可执行文件>` 核对真实客户端 `searchCount=1`、来源链接和后续生成。真实 Google 联网由有授权的测试账号单独验收。
+
+## Scenario: AGY Messages 账号级系统提示词位置
+
+### 1. Scope / Trigger
+
+- 修改 AGY 账号的 Messages 系统提示词位置、同形体组合、私有策略或相应采集来源时适用。未选择用户提醒时，沿[独立系统段的同形体合同](../../orchestrator/backend/account-runtime-v3.md#scenario-agy账号系统文本同形体策略)。
+
+### 2. Signatures
+
+- `POST /admin/accounts`、`PUT /admin/accounts/{id}` 和账号读回使用 `agy_system_prompt_as_user_reminder: boolean`。账号表存为 `INTEGER NOT NULL DEFAULT 0`。SQLite 由 `gateway.agy-system-reminder.10` 追加，PostgreSQL 初始化沿同名列。
+- `AgySubmission.system_prompt_policy` 的 `schema_version=1` 增加可选 `user_reminder_index`，为 `contents` 的非负下标。启用同形体仍由 `enabled` 表示。原生回执沿现有字段，用户提醒落点使用 `source="cortex_user_reminder"`。
+
+### 3. Contracts
+
+- 账号管理页独立保存两个布尔值，新旧账号的位置开关默认关闭。网关按实际选中的 AGY 账号冻结设置。普通 Messages 生成有独立系统文本时选择第一条不含函数结果的用户内容，公开请求正文不提供策略索引。
+- 原生入口以换行合并系统文本，先执行现有 `transform_system`，再按可选索引追加一个 `<system-reminder>` 文本块。此时独立系统段使用 `REMINDER_SYSTEM_INSTRUCTION`。字符映射只处理原系统文本。标签、固定英文指令和已有消息逐字保留。Gemini 原生直连沿独立系统段。
+- `REMINDER_SYSTEM_INSTRUCTION` 为 `Use the provided context to answer the user's request. When working on multi-step tasks or calling tools, briefly share your progress and explain what you are doing and why. For strict-format requests such as JSON-only output, or auxiliary tasks such as compaction, summaries, titles, and classification, return only the requested output.`
+- 领取和历史续轮依据投影前正文及原有工具签名、调用 ID 和结果定位。新生成采用当前账号值。同一 HTTP 的认证恢复复用首次策略。开启位置或同形体时，网关先核对实际落点和转换回执再交付源帧。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 省略位置字段或保存关闭 | 私有信封省略索引。两个策略均关闭时省略策略扩展 |
+| 系统文本为空或缺少普通用户内容 | 沿独立系统段，保留同形体开关语义 |
+| 非 AGY 账号启用或更新字段类型无效 | 管理请求受控拒绝 |
+| 私有索引畸形、越界或指向工具结果 | 原生组装前拒绝 |
+| 运行组件缺少位置策略支持或回执不符 | 受控失败，公开响应不交付未经验证的源帧 |
+
+### 5. Scenarios and Examples
+
+- 两项开启时，`system = "ABC system"` 在用户消息追加 `<system-reminder>\nΑΒС ѕуѕtеm\n</system-reminder>`，独立系统段留下中性指令。仅启用位置时，同一标签承载 `ABC system` 原文。
+- 工具等待期间关闭位置开关。原工具结果按既有归属收口，回填后的新模型请求使用独立系统段，同一回填重读复用原终态。
+- 直接对整个用户消息执行同形体替换会改变原输入。配套实现先转换独立系统文本，再将结果作为新文本块追加。
+
+### 6. Tests Required
+
+- 真实管理 HTTP、SQLite 和浏览器覆盖两个账号独立保存、旧账号默认关闭、非 AGY 约束、重新编辑与 390px 布局。迁移核对旧版本台账、重跑幂等与原数据。
+- `verify_agy_native_loopback.py --system-reminder` 在断网容器核对四种组合的实际原生 TLS 体和回执来源。覆盖领取、历史续轮、历史兜底、待回填切换、签名及单次回填。
+- `verify_agy_gemini.py` 覆盖两个账号的私有快照、首次冻结及认证恢复。Python 单测覆盖已存在提醒、工具历史、非法索引及快照读回。
+
+## Scenario: 反重力工具续轮与开流失败边界
+
+### 1. Scope / Trigger
+
+- 修改反重力运行环境续轮设置、工具批次接续、Claude Code 后台摘要或 AGY 的公开响应首帧时适用。账号准入、工具等待和原生模型约束沿[账号环境共同合同](../../orchestrator/backend/account-runtime-v3.md#scenario-agy账号运行环境与gemini业务接入)。
+
+### 2. Signatures
+
+- 管理 GET 和 POST `/runtime/api/environments/{environment_id}/agy-tool-continuation`。POST 接受 `{"expected_generation":0,"expected_revision":0,"mode":"claim_with_history"}`。返回 `mode`、`revision`、`generation` 和 `supported`。环境代次由实际管理目录提供。版本 `0` 表示缺省记录。
+- 内部传输绑定可携带 `agy_tool_continuation_mode` 与 `agy_tool_continuation_protocol`。包含历史的策略要求协议 `1`。`job_finalized.history_closed` 可包含 `{request_id,generation,request_seq}`，其中 `generation` 是原工作进程代次。
+- 回填重读诊断的 `replay_of_request_id` 关联原 HTTP 根。`replay_of_attempt_id` 关联已进入发送边界的尝试。`replay_submission_state` 取 `preparing`、`sending` 或 `model_observed`。历史记录可省略新增字段。
+
+### 3. Contracts
+
+- 中央管理面按逻辑环境原子保存策略。本机与远端共用同一配置源。缺省为 `claim`，另外支持 `history` 与 `claim_with_history`。能力取当前发送镜像和选中内核的声明。派发时冻结选择，已交付工具批次按自己的选择接续。
+- 历史续轮在完整工具批次交付后触发原生取消。用同账号、环境与工作进程归属核验原作业的实际退出证明，再导入原前缀、真实调用 ID、签名与完整结果。已有显式会话标识时按原值校验。领取优先仅在旧轮退出已确认且真实结果尚未向旧轮派发时允许历史兜底。两条路径共用一次提交权与正文重读记录。有原生 WebSearch 回调绑定的批次使用领取。
+- 已鉴权的 AGY Messages 请求匹配 Claude Code 固定后台摘要模板、可选 `Previous:` 行和完整工具配对时，本地生成 3–5 词状态。匹配在合入当轮系统补充文本之前进行。原工具归属与发送许可由真实回填持有。普通追加文字继续走生成路径。
+- 首块有效内容、完整工具批次或确认成功的明确终态才提交公开首帧。用量和元数据先累计。原生接收先结束且源终态缺失时，在原预算内等待同一次控制结果。诊断分别记录 `native_receive_ended`、`native_source_terminal`、`observed_control_http_status` 与可选 `control_error_detail`。`tool_continuation_mode`、`tool_continuation_path` 和 `tool_continuation_reason` 分别记录配置、实际路径及原因。
+- 固定 AGY 1.5.9 的观察器按调用 goroutine 的 `g.goid` 关联 Receive，按 Scanner 的 `g.parentGoid` 和同一活动作业关联原始帧。已验证映像中的槽为 `0x98` 和 `0x118`。主调用 STOP 并收到 EOF 后，与主根独立的原生调用沿各自 `call_id` 隔离。空会话的侧调用沿主工具等待阶段和独立调用身份核验。同根再次启动或无法定位归属的主帧仍进入原生失败路径。
+- SQLite 的 gateway.agy-tool-receipts.11 和 PostgreSQL 初始化持久登记工具批次。记录正文、调用、签名和会话摘要，以及账号、尝试归属、阶段和恢复额度。正文和成功响应帧只走有界内存。重读权限仍按令牌、账号及会话核对。严格身份优先，省略 ID 时仅用唯一的前缀与参数别名。
+- 准备中的续轮使用进程内位置，同正文重读附着到该位置。选号冲突和准备取消同步释放该位置，并归还仍可用的旧快照。数据库在原生外发前比较原阶段及尝试所有者。首次历史在这一步才绑定选中的账号。选定 sender 的实际预算约束会话认领、RPM 等待和发送边界。
+- 已受理续轮保留实际 sender 生成截止，客户端断开后仍可读取原生成。成功帧在该截止回收，轻量回执有独立的工具等待窗口。只有实际 model_start 才标记 model_observed。失败后的请求不从头重放部分正文及用量。
+- 同一账号、环境代次及实际尝试的可信 job_finalized 确认关闭后，暂时性失败、超时或取消可以原样历史恢复一次。维护取消适用同一证明。原工具结果只导入历史。明确未发送时恢复原阶段和额度。已登记的重复请求、送达未知以及不匹配的环境回执保留实际发送保护。原样重试及追加固定 Claude Code 断流提示的请求共用额度。实际派发时保留新请求中的提示。恢复会产生实际模型用量。
+- 活跃 Gemini Claim 接受合法回填的旧式占位签名，并用原生签名组装已核对的历史。Messages 和历史路径核对签名。恢复使用仍可用的受信快照或经过校验的客户端记录。可选恢复快照使用独立的 64 MiB 预算，最长保留到生成截止加 25 秒收口和 240 秒恢复窗口。待回填工具轮保持自己的预算。
+- 成功响应先发布完整终态，再写持久成功记录。写入异常进入诊断，进程内完整响应继续可重读。
+- 缺少可信关闭、恢复用尽或原失败不适合继续时返回 HTTP 400，分类 AGY_TOOL_CONTINUATION_TERMINAL，带原 HTTP 根。成功但响应字节已过期的状态仍为 410。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 设置代次或版本过期，或内核缺少所选模式的能力 | 管理 POST 返回 409 |
+| 工具回填归属冲突 | 400，零新增模型提交 |
+| 同一回填的响应字节已回收且提交回执仍有效 | 原成功的响应返回 410。失败按物理收口及恢复额度决定是否进行一次合法历史恢复 |
+| 历史续轮等待真实退出证明时到期 | 返回失败，零新增模型提交 |
+| 已选择旧 sender 且发送前到期 | 429，释放未发送权和恢复额度 |
+| 已知在作业登记前拒绝 | 原失败原因，恢复此前回执阶段 |
+| 首块前缺少源终态，控制结果为 200 | 503，诊断保留实际控制 200 |
+| 首块前确认控制 HTTP 500 或源配额 429 | 保留实际错误状态 |
+| Messages 已交付正文后失败 | 保留原 HTTP 响应头，发送 SSE `error` |
+
+### 5. Scenarios and Examples
+
+- 正常领取优先收到匹配结果后直接收口。原轮先确认退出且未领取结果时，同一回填从历史生成一次。客户端在实际生成预算内可重读该成功响应。回执持久保留原状态及恢复额度。
+- 连接断开只表示传输状态未知。收到匹配的 `history_closed` 后才具备历史接续的退出依据。网关重启会丢失进程内的待续轮归属。
+
+### 6. Tests Required
+
+- `verify_agy_native_loopback.py --continuation-modes` 核对原版 1.5.9 四条接续路径、配置冻结、错误会话与签名拒绝、正文重读、缓存前缀及首帧前后错误。`--messages-search` 核对历史偏好下的 WebSearch 回调与 Read 截断前缀。
+- `usage_prefix_retains_http_error_until_the_first_deliverable_frame` 核对首帧之前的错误、开流后 SSE 终态和缓存用量保留。`history_closure_requires_the_original_worker_and_request` 核对回执归属和缺失证明。
+- `verify_agy_native_loopback.py --tool-receipts` 以两笔重叠的原版调用验证 Scanner 帧归属，并重放一笔侧调用的空会话。核对真实 EOF 失败的 16 次重试、一次历史恢复、恢复用尽的 400、跨重启回执、维护收口恢复与成功记录存储异常。`--continuation-modes` 同时核对 Gemini Claim 占位签名。`--tool-deadlines` 核对长工具等待和已回收响应的 410。
+
+## Scenario: AGY 本地进度标签回执
+
+### 1. Scope / Trigger
+
+- 修改 `/v1/messages` 的本地工具进度回包或供外层计费网关使用的回执时适用。
+
+### 2. Signatures
+
+- `agent_summary_response(summary: String, model: &str, streaming: bool) -> Response`
+- HTTP 200，响应头 `X-Flower2API-Local-Response: agy_agent_summary`。
+
+### 3. Contracts
+
+- 鉴权、固定摘要模板与工具结果配对、可用候选校验通过后，本地标签分支生成回执。此时上游模型尝试为 0。
+- JSON 返回文本、`stop_reason=end_turn` 和明确的零输入、零输出、零缓存读取用量。SSE 在 `message_start` 和 `message_delta` 都提供相同的零用量，并以 `message_stop` 收尾。
+- 外层计费网关从受信任渠道的实际响应中取得回执，用它区分明确零用量与缺失用量。只有本地进度标签成功响应携带此值。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 本地进度标签匹配且账号候选可用 | HTTP 200、局部生成的标签和回执 |
+| 本地进度标签匹配但候选为空 | 503 |
+| 普通模型响应 | 模型内容和供应方用量 |
+
+### 5. Scenarios and Examples
+
+- 正常示例。匹配后台摘要的工具历史在本地生成 `Reading sample file`，两种响应形式都携带回执。
+- 误用示例。给普通生成的空用量帧添加回执会把缺失用量解释为零消费。应由成功生成标签的本地分支签发回执。
+
+### 6. Tests Required
+
+- `agent_summary_response_provides_local_receipt_and_zero_usage` 核对流式及非流式的回执、内容、零用量与完整终态，并验证普通生成响应头。

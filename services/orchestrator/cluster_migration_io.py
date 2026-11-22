@@ -28,9 +28,10 @@ class MigrationIO:
     :param runtime: 中央原运行时。
     """
 
-    def __init__(self, service, runtime) -> None:
+    def __init__(self, service, runtime, *, agy=None) -> None:
         """冻结原执行依赖。:param service: 节点服务。:param runtime: 中央运行时。:return: None。"""
         self.service, self.runtime = service, runtime
+        self.agy = agy
         self.local_target = None
 
     def command(self, node_id: int, operation: str, payload: dict) -> dict:
@@ -41,6 +42,8 @@ class MigrationIO:
         :param payload: 已绑定账号、环境和操作的私有输入。
         :return: 执行组件的原始私有收据。
         """
+        if self.agy is not None:
+            return self.agy.command(node_id, 'agy-' + operation, payload)
         types = {'fence': EnvironmentFence, 'restore-source': EnvironmentFence, 'export': ArchiveExport,
             'stage-import': ImportStage, 'verify-import': ImportStage, 'prepare-import': ImportPreparation,
             'activate-import': ImportActivation, 'revoke-import': ImportRevocation}

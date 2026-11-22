@@ -43,7 +43,8 @@ raise SystemExit(7)
         """固定扫描范围，并拒绝同名链接和其他工作根。@return 无。"""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            workers = root / 'workers'
+            generation = root / ('c' * 32)
+            workers = generation / 'state/workers'
             worker = workers / ('a' * 32)
             worker.mkdir(parents=True)
             outside = root / ('b' * 32)
@@ -51,10 +52,17 @@ raise SystemExit(7)
             linked = workers / ('b' * 32)
             linked.symlink_to(outside, target_is_directory=True)
             controller = AgyController(1, root, root / 'criu', root)
-            with patch.object(Path, 'read_bytes', return_value=f'TMPDIR={worker}\0'.encode()):
+            environment = {Path('/proc/123/environ'): f'TMPDIR={worker}\0'.encode(),
+                Path('/proc/99/environ'): f'TMPDIR={generation}\0'.encode()}
+            with patch('agy.process_identity', return_value=(99, 1001, {})), \
+                    patch.object(Path, 'read_bytes', autospec=True, side_effect=environment.__getitem__):
                 self.assertEqual(controller._worker_directory(123), worker)
-            for directory in (outside, linked):
+            other_generation = root / ('d' * 32) / 'state/workers' / ('a' * 32)
+            other_generation.mkdir(parents=True)
+            for directory in (outside, linked, other_generation):
+                environment[Path('/proc/123/environ')] = f'TMPDIR={directory}\0'.encode()
                 with self.subTest(directory=directory), \
-                        patch.object(Path, 'read_bytes', return_value=f'TMPDIR={directory}\0'.encode()), \
+                        patch('agy.process_identity', return_value=(99, 1001, {})), \
+                        patch.object(Path, 'read_bytes', autospec=True, side_effect=environment.__getitem__), \
                         self.assertRaisesRegex(ValueError, '^AGY_CRIU_DUMP$'):
                     controller._worker_directory(123)

@@ -27,8 +27,11 @@ BENCH_SCHEMA_SOURCES = {
     'bench.node-executions.3': 'orchestrator/node_execution_schema.py',
     'bench.node-login-drafts.4': 'orchestrator/node_login_draft_schema.py',
     'bench.agy-environments.5': 'orchestrator/agy_environment_schema.py',
+    'bench.agy-nodes.6': 'orchestrator/agy_node_schema.py',
 }
 GATEWAY_SCHEMA_SOURCES = {
+    'gateway.agy-tool-receipts.11': 'cc2api/src/store/agy_tool_receipts_schema.rs',
+    'gateway.agy-system-reminder.10': 'cc2api/src/store/agy_system_reminder_schema.rs',
     'gateway.agy-safety.9': 'cc2api/src/store/agy_safety_schema.rs',
     'gateway.agy-media.8': 'cc2api/src/store/agy_media_schema.rs',
     'gateway.account-work.7': 'cc2api/src/store/account_work_schema.rs',

@@ -33,6 +33,11 @@ export interface EnvironmentKernel {
 }
 /** 反重力环境内核选择与本环境已登记制品。 */
 export interface AgyKernelCatalog { generation: number; kernel: string | null; candidates: string[] }
+/** 环境当前工具续轮策略、版本和历史能力。 */
+export interface AgyToolContinuationPolicy { generation: number; revision: number; mode: string; supported: boolean }
+export const agyToolContinuationLabels: Record<string, string> = {
+  claim: '领取续轮', history: '历史续轮', claim_with_history: '领取优先，历史兜底',
+};
 /** 某一源版本的实际准备观察，版本集合保持独立归属。 */
 export interface NativePreparationSnapshot {
   state: string; reason?: string; checking?: boolean; idle_workers?: number; live_workers?: number;
@@ -43,7 +48,7 @@ export interface NativePreparationSnapshot {
 export interface RuntimeEnvironment {
   platform?: 'claude_code' | 'antigravity';
   agy_runtime?: { version: string; source_sha256: string; state: string; workers?: number; active?: number;
-    idle_workers?: number; idle_pid?: number | null; warming_workers?: number;
+    idle_workers?: number; idle_pid?: number | null; warming_workers?: number; preparation_reason?: string | null;
     tool_waiting?: number; max_workers?: number; image_bytes?: number; image_decode_calls?: number;
     controller?: { Rss?: number; Pss?: number; USS?: number }; processes?: unknown[]; loaded_kernel?: string | null };
   node?: Pick<AccountNodeAssignment, 'node_id' | 'node_key' | 'node_name' | 'kind' | 'enabled'>; node_observed?: boolean; node_message?: string;

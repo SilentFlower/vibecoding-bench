@@ -9,6 +9,8 @@ services/orchestrator/ 的 Python 服务、数据库、账号运行环境和工�
 | 规范 | 说明 |
 | --- | --- |
 | [v3 固定账号运行环境契约](./account-runtime-v3.md) | 当前合同与验证要求 |
+| [反重力账号节点迁移](./agy-node-migration.md) | 网关归属、排空、双向迁移与平台换批 |
+| [迁移目标撤销与重试](./node-migration-revocation.md) | CC 和 AGY 的旧目标隔离证明、同版本重试 |
 | [Database Guidelines](./database-guidelines.md) | 当前合同与验证要求 |
 | [Directory Structure](./directory-structure.md) | 当前合同与验证要求 |
 | [Error Handling](./error-handling.md) | 当前合同与验证要求 |
