@@ -48,6 +48,7 @@ use credential_ownership::CredentialGate;
 const STICKY_SESSION_TTL: Duration = Duration::from_secs(60 * 60);
 const OAUTH_REFRESH_BUFFER_SECONDS: i64 = 5 * 60;
 const OAUTH_MISSING_REFRESH_TOKEN_REASON: &str = "OAuth refresh unavailable: missing refresh token";
+pub(super) const NATIVE_OAUTH_REVOKED_REASON: &str = "401 OAuth 访问令牌已撤销";
 const OAUTH_LOCK_TTL: Duration = Duration::from_secs(30);
 const OAUTH_WAIT_RETRY: Duration = Duration::from_millis(500);
 const OAUTH_WAIT_ATTEMPTS: usize = 20;
@@ -2447,6 +2448,7 @@ fn oauth_import_restores_auth(account: &Account) -> bool {
             "401 OAuth 认证恢复失败"
                 | "401 OAuth 认证失败"
                 | "401 OAuth 刷新后仍认证失败"
+                | NATIVE_OAUTH_REVOKED_REASON
                 | OAUTH_MISSING_REFRESH_TOKEN_REASON
         ) || permanent_grant)
 }
@@ -2767,6 +2769,25 @@ impl AccountService {
         failed_access_token: &str,
         reason: &str,
     ) -> Result<bool, AppError> {
+        self.disable_oauth_for_failed_token_digest(
+            id,
+            Sha256::digest(failed_access_token).into(),
+            reason,
+        )
+        .await
+    }
+
+    /// 以实际发送的 AT 摘要复用认证停用，避免跨原生提交保留明文令牌。
+    /// @param id 原请求账号。
+    /// @param failed_digest 已拒绝的 AT 的请求内摘要。
+    /// @param reason 脱敏认证停用原因。
+    /// @return 只在当前凭据通过 CAS 并被停用时返回 true。
+    pub(super) async fn disable_oauth_for_failed_token_digest(
+        &self,
+        id: i64,
+        failed_digest: [u8; 32],
+        reason: &str,
+    ) -> Result<bool, AppError> {
         // 维护阻止了 401 恢复时，不能把本地门禁误记为凭据永久失效。
         let _credential_activity = match self.upstream_activity(id).await {
             Ok(permit) => permit,
@@ -2774,7 +2795,7 @@ impl AccountService {
             Err(error) => return Err(error),
         };
         let current = self.store.get_by_id(id).await?;
-        if current.access_token != failed_access_token {
+        if <[u8; 32]>::from(Sha256::digest(&current.access_token)) != failed_digest {
             return Ok(false);
         }
         // 恢复可能已经轮换 RT，重读后仍按 AT/RT 条件落库，防止第二次并发变化。

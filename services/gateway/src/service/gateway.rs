@@ -41,7 +41,8 @@ use crate::service::access_policy::{
 };
 use crate::service::account::{
     AccountSelectionContext, AccountService, AccountSlotPermit, DEFAULT_REQUEST_SLOT_UNITS,
-    HAIKU_REQUEST_SLOT_UNITS, QueueWaitError, RateLimitDecision, UsageObservationKind,
+    HAIKU_REQUEST_SLOT_UNITS, NATIVE_OAUTH_REVOKED_REASON, QueueWaitError, RateLimitDecision,
+    UsageObservationKind,
 };
 use crate::service::diagnostics::{
     self, CURRENT_TRACE, RequestDiagnosticsConfig, RequestTraceGuard, TraceContext,
@@ -295,11 +296,19 @@ fn upstream_request_client(account: &Account) -> Result<reqwest::Client, AppErro
 struct RateLimitResponseDecision(Arc<RateLimitDecision>);
 
 /// 私有标记：已完整收到真实原生上游的认证拒绝。
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum NativeOAuthRejection {
+    Authentication,
+    Revoked,
+}
+
+/// 已确认撤销的原请求只由原身份收口，包括同账号恢复后的限流响应。
 #[derive(Clone)]
-struct NativeOAuthRejection;
+struct NativeOAuthIdentityBound;
 
 /// 只在同一调用中比较首发凭据并复用原有的出站映射。
 struct RejectedNativeOAuthAttempt {
+    reason: NativeOAuthRejection,
     bearer_digest: [u8; 32],
     session_rewrite: UpstreamSessionRewrite,
     cache_ttl: CacheControlTtlRewrite,
@@ -3271,6 +3280,10 @@ impl GatewayService {
             .extensions()
             .get::<RateLimitResponseDecision>()
             .map(|decision| decision.0.as_ref());
+        let identity_bound = response
+            .extensions()
+            .get::<NativeOAuthIdentityBound>()
+            .is_some();
         if matches!(decision, Some(RateLimitDecision::PassThrough)) {
             return Ok(Some(response));
         }
@@ -3278,7 +3291,7 @@ impl GatewayService {
             self.account_svc
                 .set_transient_rate_limit_backoff(account.id, *delay)
                 .await;
-            if !backoff_retry_ids.contains(&account.id) {
+            if !identity_bound && !backoff_retry_ids.contains(&account.id) {
                 backoff_retry_ids.push(account.id);
                 diagnostics::retry_reason("transient_rate_limit");
                 // 退避与下一轮准备共用原截止，等待期间归还槽位及凭据活动。
@@ -3290,6 +3303,9 @@ impl GatewayService {
                 .await?;
                 return Ok(None);
             }
+        }
+        if identity_bound {
+            return Ok(Some(response));
         }
         warn!(
             "account {} returned 429, excluding and retrying",
@@ -3784,13 +3800,27 @@ impl GatewayService {
                 trace.buffered(&upstream_body_bytes, complete);
             }
             // sender 已去除压缩头并返回逻辑字节；仅识别完整的有界 JSON 认证拒绝。
-            let native_oauth_rejected = native_upstream
+            let native_oauth_rejected = if native_upstream
                 && status_code == 401
                 && complete
                 && upstream_body_bytes.len() <= NATIVE_AUTH_ERROR_BODY_LIMIT
                 && response_content_codings(&response_headers).is_empty()
-                && serde_json::from_slice::<JsonValue>(&upstream_body_bytes)
-                    .is_ok_and(|error| error["error"]["type"] == "authentication_error");
+            {
+                serde_json::from_slice::<JsonValue>(&upstream_body_bytes)
+                    .ok()
+                    .and_then(|value| {
+                        let error = &value["error"];
+                        (error["type"] == "authentication_error").then(|| {
+                            if error["message"] == "OAuth access token has been revoked." {
+                                NativeOAuthRejection::Revoked
+                            } else {
+                                NativeOAuthRejection::Authentication
+                            }
+                        })
+                    })
+            } else {
+                None
+            };
             warn!(
                 "上游错误响应: account={} path={} status={} body={}",
                 account.id,
@@ -3824,8 +3854,8 @@ impl GatewayService {
                 response
                     .extensions_mut()
                     .insert(session_policy_block::PolicyRefusal);
-            } else if native_oauth_rejected {
-                response.extensions_mut().insert(NativeOAuthRejection);
+            } else if let Some(rejection) = native_oauth_rejected {
+                response.extensions_mut().insert(rejection);
             } else if status_code == 400
                 && complete
                 && upstream_body_bytes.len() <= SIGNATURE_ERROR_BODY_LIMIT
@@ -4051,9 +4081,12 @@ impl GatewayService {
             // 尚未提交时保持原 401；提交状态不明时不得再次发送。
             return if submitted {
                 *oauth_retry_used = true;
-                retried
-                    .map_err(|_| AppError::BadGateway("原生认证恢复超时，提交状态未知".into()))?
-                    .map(|(response, _)| response)
+                let (mut response, _) = retried
+                    .map_err(|_| AppError::BadGateway("原生认证恢复超时，提交状态未知".into()))??;
+                if first.reason == NativeOAuthRejection::Revoked {
+                    response.extensions_mut().insert(NativeOAuthIdentityBound);
+                }
+                Ok(response)
             } else {
                 Ok(response)
             };
@@ -4196,8 +4229,8 @@ impl GatewayService {
             .await?
             .inspect_err(|_| diagnostics::error_stage("credentials"))?
         };
-        let bearer_digest = (oauth_retry.is_none() && account.auth_type == AccountAuthType::Oauth)
-            .then(|| Sha256::digest(&bearer).into());
+        let bearer_digest =
+            (account.auth_type == AccountAuthType::Oauth).then(|| Sha256::digest(&bearer).into());
         let ingress_capture =
             super::native_capture::ingress(log_mode, ingress_headers, body, ingress_body, &bearer);
         let transport = await_preparation(
@@ -4374,36 +4407,51 @@ impl GatewayService {
             diagnostics::error_stage("native_prepare");
         }
         // 此处分流尚无最终出站正文；禁止把调用方快照写成最终构造的全文证据。
-        self.finish_forward_response(
-            response,
-            diagnostic,
-            native_upstream && bearer_digest.is_some(),
-            "/v1/messages",
-            "",
-            &HashMap::new(),
-            body,
-            account,
-            selection,
-            RequestCapturePolicy::SummaryOnly,
-            scheduling,
-        )
-        .await
-        .map(|mut response| {
-            let rejected_oauth = response
-                .extensions_mut()
-                .remove::<NativeOAuthRejection>()
-                .and(bearer_digest)
-                .map(|bearer_digest| RejectedNativeOAuthAttempt {
-                    bearer_digest,
-                    session_rewrite: rewrite,
-                    cache_ttl,
-                });
-            let codings = response_content_codings(response.headers());
-            (
-                session_policy_block::observe_response(response, account.id, codings),
-                rejected_oauth,
+        let mut response = self
+            .finish_forward_response(
+                response,
+                diagnostic,
+                native_upstream && bearer_digest.is_some(),
+                "/v1/messages",
+                "",
+                &HashMap::new(),
+                body,
+                account,
+                selection,
+                RequestCapturePolicy::SummaryOnly,
+                scheduling,
             )
-        })
+            .await?;
+        let rejected_oauth = response
+            .extensions_mut()
+            .remove::<NativeOAuthRejection>()
+            .zip(bearer_digest)
+            .map(|(reason, bearer_digest)| RejectedNativeOAuthAttempt {
+                reason,
+                bearer_digest,
+                session_rewrite: rewrite,
+                cache_ttl,
+            });
+        if let Some(rejection) = &rejected_oauth
+            && rejection.reason == NativeOAuthRejection::Revoked
+            && self
+                .account_svc
+                .disable_oauth_for_failed_token_digest(
+                    account.id,
+                    rejection.bearer_digest,
+                    NATIVE_OAUTH_REVOKED_REASON,
+                )
+                .await
+                .is_err()
+        {
+            // 隔离写入异常时仍交付已经收到的上游鉴权证据。
+            warn!(account_id = account.id, "原生撤销凭据条件停用失败");
+        }
+        let codings = response_content_codings(response.headers());
+        Ok((
+            session_policy_block::observe_response(response, account.id, codings),
+            rejected_oauth,
+        ))
     }
 
     /// 发送独立 count_tokens 请求，在传输边界恢复入站编码。
@@ -11278,6 +11326,7 @@ mod tests {
             "原预算已耗尽时保持首次拒绝"
         );
         assert_native_oauth_recovery().await;
+        assert_native_revoked_oauth().await;
     }
 
     /// 用首发屏障精确模拟在上游返回 401 前已有另一路完成换票。
@@ -11445,6 +11494,270 @@ mod tests {
                 AccountStatus::Active
             );
         }
+    }
+
+    /// 用双候选回环验证撤销隔离、并发换票及原身份重新授权。
+    /// @return 无；实际出站身份、状态或发送次数不符时失败。
+    async fn assert_native_revoked_oauth() {
+        use crate::model::account::OAuthCredentialImport;
+        use crate::model::api_token::ApiTokenStatus;
+
+        let base = std::env::var("V3_RUNTIME_URL").unwrap();
+        let (service, store) = test_gateway_service_with_scheduling(
+            Arc::new(MemoryStore::new()),
+            "https://api.anthropic.com".into(),
+            "http://127.0.0.1:1".into(),
+            true,
+        )
+        .await;
+        let mut primary = create_oauth_gateway_account(
+            &service,
+            "revoked@example.invalid",
+            "synthetic-oauth-old",
+        )
+        .await;
+        let mut backup = create_oauth_gateway_account(
+            &service,
+            "revoked-backup@example.invalid",
+            "synthetic-oauth-backup",
+        )
+        .await;
+        primary.request_backend = "native293".into();
+        backup.request_backend = "native293".into();
+        primary.priority = 10;
+        backup.priority = 90;
+        store.update(&primary).await.unwrap();
+        store.update(&backup).await.unwrap();
+        let token = ApiToken {
+            id: 1,
+            name: "合成仅原账号".into(),
+            token: "synthetic-gateway-token".into(),
+            allowed_accounts: primary.id.to_string(),
+            blocked_accounts: String::new(),
+            status: ApiTokenStatus::Active,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        let session = Uuid::new_v4().to_string();
+        let make_request = |label: &str, session: &str| {
+            Request::builder()
+                .method("POST")
+                .uri("/v1/messages")
+                .header("user-agent", "claude-cli/2.1.293 (external, cli)")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({
+                        "model":"claude-opus-5-5","max_tokens":128,"stream":false,
+                        "metadata":{"user_id":json!({"session_id":session}).to_string()},
+                        "messages":[{"role":"user","content":label}]
+                    })
+                    .to_string(),
+                ))
+                .unwrap()
+        };
+        let client = reqwest::Client::builder().no_proxy().build().unwrap();
+        let observations = format!("{base}/observations");
+        let snapshot = || async {
+            client
+                .get(&observations)
+                .send()
+                .await
+                .unwrap()
+                .json::<Vec<Value>>()
+                .await
+                .unwrap()
+        };
+
+        for label in [
+            "oauth-revoked-no-observation",
+            "oauth-revoked-oversize",
+            "oauth-revoked-current",
+        ] {
+            let before = snapshot().await.len();
+            let response = service
+                .handle_request(make_request(label, &session), None)
+                .await;
+            assert_eq!(response.status(), 401, "{label}");
+            assert_eq!(
+                response.headers()["request-id"],
+                format!("req_fixture_{}", before + 1)
+            );
+            let raw = body::to_bytes(response.into_body(), 8192).await.unwrap();
+            assert_eq!(
+                serde_json::from_slice::<Value>(&raw).unwrap()["error"]["message"],
+                "OAuth access token has been revoked."
+            );
+            let sent = snapshot().await;
+            assert_eq!(sent.len(), before + 1);
+            assert_eq!(sent[before]["account_id"], primary.id);
+            assert_eq!(sent[before]["bearer_kind"], "old");
+            let current = service.account_svc.get_account(primary.id).await.unwrap();
+            if label == "oauth-revoked-current" {
+                assert_eq!(current.status, AccountStatus::Disabled);
+                assert_eq!(current.auth_error, "401 OAuth 访问令牌已撤销");
+                assert_eq!(current.disable_reason, current.auth_error);
+            } else {
+                assert_eq!(current.status, AccountStatus::Active);
+                assert!(current.auth_error.is_empty());
+            }
+        }
+
+        for next_session in [&session, &Uuid::new_v4().to_string()] {
+            let before = snapshot().await.len();
+            let response = service
+                .handle_request(make_request("合成后续请求", next_session), None)
+                .await;
+            assert_eq!(response.status(), 200);
+            body::to_bytes(response.into_body(), 8192).await.unwrap();
+            let sent = snapshot().await;
+            assert_eq!(sent.len(), before + 1);
+            assert_eq!(sent[before]["account_id"], backup.id);
+        }
+        let before = snapshot().await.len();
+        let response = service
+            .handle_request(make_request("合成受限请求", &session), Some(&token))
+            .await;
+        assert_eq!(response.status(), 503);
+        body::to_bytes(response.into_body(), 8192).await.unwrap();
+        assert_eq!(snapshot().await.len(), before);
+
+        let expiry = Utc::now() + chrono::Duration::hours(1);
+        let queue = service
+            .account_svc
+            .get_or_create_queue(primary.id, primary.concurrency)
+            .await;
+        let lease = queue.runtime_gate.prepare("login:abcdef123456").unwrap();
+        queue
+            .runtime_gate
+            .update(&lease.owner, &lease.generation, "claim")
+            .unwrap();
+        service
+            .account_svc
+            .import_oauth_credentials(
+                primary.id,
+                &OAuthCredentialImport {
+                    operation_id: Uuid::new_v4().simple().to_string(),
+                    owner: lease.owner.clone(),
+                    generation: lease.generation.clone(),
+                    email: primary.email.clone(),
+                    account_uuid: primary.account_uuid.clone(),
+                    organization_uuid: primary.organization_uuid.clone(),
+                    access_token: "synthetic-oauth-new".into(),
+                    refresh_token: "synthetic-rt-new".into(),
+                    expires_at: expiry.timestamp_millis(),
+                    subscription_type: None,
+                    rate_limit_tier: None,
+                },
+            )
+            .await
+            .unwrap();
+        queue
+            .runtime_gate
+            .update(&lease.owner, &lease.generation, "release")
+            .unwrap();
+        let restored = service.account_svc.get_account(primary.id).await.unwrap();
+        assert_eq!(restored.status, AccountStatus::Active);
+        assert!(restored.auth_error.is_empty() && restored.disable_reason.is_empty());
+        let before = snapshot().await.len();
+        let response = service
+            .handle_request(make_request("合成重授权成功", &session), Some(&token))
+            .await;
+        assert_eq!(response.status(), 200);
+        body::to_bytes(response.into_body(), 8192).await.unwrap();
+        let sent = snapshot().await;
+        assert_eq!(sent.len(), before + 1);
+        assert_eq!(sent[before]["account_id"], primary.id);
+        assert_eq!(sent[before]["bearer_kind"], "new");
+
+        for (label, status) in [
+            ("oauth-revoked-rotated", 200),
+            ("oauth-revoked-limited", 429),
+            ("oauth-revoked-repeated", 401),
+        ] {
+            service
+                .account_svc
+                .enable_account(primary.id)
+                .await
+                .unwrap();
+            store
+                .update_oauth_tokens(
+                    primary.id,
+                    "synthetic-oauth-old",
+                    "synthetic-rt-old",
+                    expiry,
+                )
+                .await
+                .unwrap();
+            let before = snapshot().await.len();
+            let release_first = async {
+                let first_id = timeout(std::time::Duration::from_secs(4), async {
+                    loop {
+                        if let Some(item) = snapshot().await.get(before) {
+                            assert_eq!(item["account_id"], primary.id);
+                            assert_eq!(item["bearer_kind"], "old");
+                            break item["id"].as_str().unwrap().to_owned();
+                        }
+                        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                    }
+                })
+                .await
+                .expect("撤销测试首发未到达回环上游");
+                store
+                    .update_oauth_tokens(
+                        primary.id,
+                        "synthetic-oauth-new",
+                        "synthetic-rt-new",
+                        expiry,
+                    )
+                    .await
+                    .unwrap();
+                client
+                    .get(format!("{base}/oauth-release/{first_id}"))
+                    .send()
+                    .await
+                    .unwrap()
+                    .error_for_status()
+                    .unwrap();
+            };
+            let fresh_session = Uuid::new_v4().to_string();
+            let (response, ()) = tokio::join!(
+                service.handle_request(make_request(label, &fresh_session), None),
+                release_first
+            );
+            assert_eq!(response.status(), status, "{label}");
+            body::to_bytes(response.into_body(), 8192).await.unwrap();
+            let sent = snapshot().await;
+            assert_eq!(sent.len(), before + 2, "{label}");
+            assert_eq!(sent[before + 1]["account_id"], primary.id);
+            assert_eq!(sent[before + 1]["bearer_kind"], "new");
+            let current = service.account_svc.get_account(primary.id).await.unwrap();
+            assert_eq!(
+                current.status,
+                if status == 401 {
+                    AccountStatus::Disabled
+                } else {
+                    AccountStatus::Active
+                }
+            );
+        }
+
+        service
+            .account_svc
+            .enable_account(primary.id)
+            .await
+            .unwrap();
+        let before = snapshot().await.len();
+        let response = service
+            .handle_request(
+                make_request("native-account-forbidden", &Uuid::new_v4().to_string()),
+                None,
+            )
+            .await;
+        assert_eq!(response.status(), 403);
+        body::to_bytes(response.into_body(), 8192).await.unwrap();
+        let sent = snapshot().await;
+        assert_eq!(sent.len(), before + 1);
+        assert_eq!(sent[before]["account_id"], primary.id);
     }
 
     /// 独立网络夹具通过真实 Gateway、私有 HTTP sender 和实际二进制执行单次模型提交。

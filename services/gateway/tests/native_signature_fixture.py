@@ -63,9 +63,11 @@ class Handler(BaseHTTPRequestHandler):
             if isinstance(message.get('content'), list) for block in message['content'])
         request_id = submission['request']['request_id']
         oauth_case = next((label for label in labels if label.startswith('oauth-')), None)
-        bearer_kind = {'synthetic-oauth-old': 'old', 'synthetic-oauth-new': 'new'}.get(submission['bearer'])
+        bearer_kind = {'synthetic-oauth-old': 'old', 'synthetic-oauth-new': 'new',
+            'synthetic-oauth-backup': 'backup'}.get(submission['bearer'])
         release = None
-        if oauth_case and oauth_case != 'oauth-unchanged' and bearer_kind == 'old':
+        if oauth_case and oauth_case not in ('oauth-unchanged', 'oauth-revoked-current',
+                'oauth-revoked-no-observation', 'oauth-revoked-oversize') and bearer_kind == 'old':
             release = self.oauth_releases[request_id] = threading.Event()
         self.records.append({'account_id': submission['request']['account_id'], 'id': request_id,
             'version': submission.get('source_version', '2.1.293'), 'body': body, 'bearer_kind': bearer_kind})
@@ -81,13 +83,29 @@ class Handler(BaseHTTPRequestHandler):
             return
         if 'budget-exhausted' in labels or oauth_case == 'oauth-budget':
             time.sleep(1.2)
-        if oauth_case == 'oauth-unobserved':
+        revoked = {'type': 'error', 'error': {'type': 'authentication_error',
+            'message': 'OAuth access token has been revoked.'}}
+        if oauth_case == 'oauth-revoked-no-observation' and bearer_kind == 'old':
+            self.reply(401, revoked, {'request-id': headers['request-id']})
+        elif oauth_case == 'oauth-revoked-oversize' and bearer_kind == 'old':
+            self.reply(401, {**revoked, 'padding': 'x' * 4096}, headers)
+        elif oauth_case and oauth_case.startswith('oauth-revoked-') and (
+                bearer_kind == 'old' or oauth_case == 'oauth-revoked-repeated' and bearer_kind == 'new'):
+            self.reply(401, revoked, headers)
+        elif oauth_case == 'oauth-revoked-limited' and bearer_kind == 'new':
+            self.reply(429, {'type': 'error', 'error': {'type': 'rate_limit_error',
+                'message': 'synthetic capacity rejection'}}, {**headers, 'retry-after': '60'})
+        elif 'native-account-forbidden' in labels and bearer_kind != 'backup':
+            self.reply(403, {'type': 'error', 'error': {'type': 'permission_error',
+                'message': 'This account has been disabled.'}}, headers)
+        elif oauth_case == 'oauth-unobserved':
             self.reply(401, {'error': {'type': 'authentication_error'}}, {'request-id': headers['request-id']})
         elif oauth_case == 'oauth-bare':
             self.reply(401, {}, headers)
         elif oauth_case == 'oauth-other':
             self.reply(401, {'error': {'type': 'invalid_request_error'}}, headers)
-        elif oauth_case and (bearer_kind != 'new' or oauth_case == 'oauth-repeated'):
+        elif oauth_case and not oauth_case.startswith('oauth-revoked-') and (
+                bearer_kind != 'new' or oauth_case == 'oauth-repeated'):
             self.reply(401, {'error': {'type': 'authentication_error', 'message': '合成凭据失效'}}, headers)
         elif 'transport-failure' in labels:
             self.reply(502, {}, {'x-v3-transport-error': 'unknown'})
