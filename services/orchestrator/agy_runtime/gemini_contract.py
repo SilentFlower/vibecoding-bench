@@ -175,6 +175,10 @@ def native_history(contents, tool_names=(), gif=None, *, native_model):
         response=[];thinking=[];calls=[];thinking_signature=None;media=[]
         for j,part in enumerate(parts):
             location=path+'/parts/'+str(j);checked_fields(part,{'text','thought','thoughtSignature','functionCall','functionResponse','inlineData','inline_data'},location)
+            if (not part and role == 'model' and j == 0 and len(parts) == 2
+                    and isinstance(parts[1], dict) and 'functionCall' in parts[1]):
+                # 保留 Part 原位，避免合成调用 ID 和校验错误路径中的索引左移。
+                continue
             image = media_part(part, location, role, gif)
             if image is not None:
                 media.extend(image)

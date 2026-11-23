@@ -749,6 +749,46 @@ class AgyRuntimeTests(unittest.TestCase):
         with self.assertRaisesRegex(InputError, 'gif_conversion_limit'):
             gemini_contract.decode_request(raw, fixed_model=self.fixed_model)
 
+    def test_model_tool_placeholder_keeps_history_indices(self):
+        """验证首次请求可转换带五个空占位的 293 条合成历史。@return 无。"""
+        indices = (273, 275, 277, 281, 283)
+        contents = [{'role': 'model' if i % 2 else 'user', 'parts': [{'text': str(i)}]} for i in range(293)]
+        for i in indices:
+            contents[i]['parts'] = [{}, {'functionCall': {'name': 'synthetic_tool', 'args': {'index': i}}}]
+            contents[i + 1]['parts'] = [{'functionResponse': {'name': 'synthetic_tool', 'response': {'index': i}}}]
+        raw = {'schema_version': 1, 'type': 'gemini_request', 'request_id': 'synthetic-history',
+            'model': self.fixed_model[0], 'body': {'contents': contents}}
+        original = copy.deepcopy(raw['body'])
+
+        decoded = request(raw, fixed_model=self.fixed_model)
+
+        self.assertEqual(raw['body'], original)
+        self.assertEqual(decoded['gemini_body'], original)
+        steps = decoded['native_steps']
+        self.assertEqual(len(steps), len(contents))
+        for i in indices:
+            call, = steps[i]['plannerResponse']['toolCalls']
+            self.assertEqual(call['id'], f'gemini-history-{i}-1')
+            self.assertEqual(steps[i + 1]['metadata']['toolCall'], call)
+            self.assertEqual(steps[i + 1]['generic']['result']['resultValue'],
+                gemini_contract.native_value({'index': i}))
+
+    def test_history_only_accepts_empty_part_before_single_model_call(self):
+        """其他空 Part 和非法调用沿原索引拒绝。@return 无。"""
+        call = {'functionCall': {'name': 'synthetic_tool'}}
+        for role, parts, error in (
+                ('user', [{}, call], 'invalid_gemini_part:/body/contents/0/parts/0'),
+                ('model', [{}], 'invalid_gemini_part:/body/contents/0/parts/0'),
+                ('model', [{}, {'text': '合成答复'}], 'invalid_gemini_part:/body/contents/0/parts/0'),
+                ('model', [call, {}], 'invalid_gemini_part:/body/contents/0/parts/1'),
+                ('model', [{}, call, call], 'invalid_gemini_part:/body/contents/0/parts/0'),
+                ('model', [{'thought': False}, call], 'invalid_gemini_part:/body/contents/0/parts/0'),
+                ('model', [None, call], 'invalid_gemini_object:/body/contents/0/parts/0'),
+                ('model', [{}, {'functionCall': None}], 'invalid_gemini_object:/body/contents/0/parts/1/functionCall'),
+        ):
+            with self.subTest(role=role, parts=parts), self.assertRaisesRegex(InputError, error + '$'):
+                gemini_contract.native_history([{'role': role, 'parts': parts}], native_model=self.fixed_model[1])
+
     def test_legacy_letter_ids_require_prior_history_evidence(self):
         """已观测旧式编号可恢复，普通纯字母名称单独出现时仍拒绝。@return 无。"""
         call = {'role': 'model', 'parts': [{'functionCall': {'name': 'synthetic_lookup', 'args': {}}}]}
@@ -764,7 +804,7 @@ class AgyRuntimeTests(unittest.TestCase):
         """旧格式按相邻单轮恢复，多个或冲突的历史给出拒绝。@return 无。"""
         call = {'functionCall': {'name': 'synthetic_tool', 'args': {'value': 1}}}
         reply = {'functionResponse': {'name': 'call_123', 'response': {'success': True}}}
-        contents = [{'role': 'model', 'parts': [call]}, {'role': 'user', 'parts': [reply]}]
+        contents = [{'role': 'model', 'parts': [{}, call]}, {'role': 'user', 'parts': [reply]}]
         original = copy.deepcopy(contents)
         steps = gemini_contract.native_history(contents, native_model=self.fixed_model[1])
         self.assertEqual(contents, original)
@@ -877,10 +917,14 @@ class AgyRuntimeTests(unittest.TestCase):
 
     def test_tool_continuation_checks_history_arguments_and_explicit_ids(self):
         """工具续轮保持原历史和真实调用归属，拒绝改写与错ID。@return 无。"""
-        previous = {'contents': [{'role': 'user', 'parts': [{'text': '合成问题'}]}]}
+        previous = {'contents': [
+            {'role': 'user', 'parts': [{'text': '合成问题'}]},
+            {'role': 'model', 'parts': [{}, {'functionCall': {'name': 'synthetic_tool', 'id': 'earlier-call'}}]},
+            {'role': 'user', 'parts': [{'functionResponse': {'name': 'synthetic_tool', 'id': 'earlier-call', 'response': {}}}]},
+        ]}
         call = {'name': 'synthetic_tool', 'args': {'value': 1}, 'id': 'synthetic-call'}
         incoming = copy.deepcopy(previous)
-        incoming['contents'] += [{'role': 'model', 'parts': [{'functionCall': copy.deepcopy(call)}]},
+        incoming['contents'] += [{'role': 'model', 'parts': [{}, {'functionCall': copy.deepcopy(call)}]},
             {'role': 'user', 'parts': [{'functionResponse': {'name': 'synthetic_tool', 'id': 'synthetic-call',
                 'response': {'value': '合成结果'}}}]}]
         self.assertEqual(gemini_contract.continuation_results(previous, [call], incoming),
@@ -889,9 +933,22 @@ class AgyRuntimeTests(unittest.TestCase):
         continuation['contents'].append({'role':'user','parts':[{'text':'收到结果后继续'}]})
         self.assertEqual(gemini_contract.continuation_results(previous, [call], continuation),
             [{'value':'合成结果'}])
-        steps = gemini_contract.native_history(continuation['contents'], native_model=self.fixed_model[1])
+        raw = {'schema_version': 1, 'type': 'gemini_request', 'request_id': 'synthetic-continuation',
+            'model': self.fixed_model[0], 'body': continuation}
+        decoded = request(raw, fixed_model=self.fixed_model)
+        self.assertEqual(decoded['gemini_body'], continuation)
+        steps = decoded['native_steps']
         self.assertEqual(steps[-2]['type'], 'CORTEX_STEP_TYPE_GENERIC')
+        self.assertEqual(steps[-2]['metadata']['toolCall']['id'], 'synthetic-call')
         self.assertEqual(steps[-1]['userInput']['userResponse'], '收到结果后继续')
+        rewritten = copy.deepcopy(incoming)
+        rewritten['contents'][1]['parts'].pop(0)
+        with self.assertRaisesRegex(InputError, 'gemini_pending_history_mismatch'):
+            gemini_contract.continuation_results(previous, [call], rewritten)
+        rewritten = copy.deepcopy(incoming)
+        rewritten['contents'][-2]['parts'][1]['functionCall']['args']['value'] = 2
+        with self.assertRaisesRegex(InputError, 'gemini_pending_call_mismatch'):
+            gemini_contract.continuation_results(previous, [call], rewritten)
         incoming['contents'][-1]['parts'][0]['functionResponse']['name'] = 'old-result-name'
         self.assertEqual(gemini_contract.continuation_results(previous, [call], incoming),
             [{'value': '合成结果'}])
