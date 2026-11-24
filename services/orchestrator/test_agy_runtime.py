@@ -773,7 +773,7 @@ class AgyRuntimeTests(unittest.TestCase):
             self.assertEqual(steps[i + 1]['generic']['result']['resultValue'],
                 gemini_contract.native_value({'index': i}))
 
-    def test_history_only_accepts_empty_part_before_single_model_call(self):
+    def test_history_only_accepts_leading_empty_part_before_model_calls(self):
         """其他空 Part 和非法调用沿原索引拒绝。@return 无。"""
         call = {'functionCall': {'name': 'synthetic_tool'}}
         for role, parts, error in (
@@ -781,13 +781,51 @@ class AgyRuntimeTests(unittest.TestCase):
                 ('model', [{}], 'invalid_gemini_part:/body/contents/0/parts/0'),
                 ('model', [{}, {'text': '合成答复'}], 'invalid_gemini_part:/body/contents/0/parts/0'),
                 ('model', [call, {}], 'invalid_gemini_part:/body/contents/0/parts/1'),
-                ('model', [{}, call, call], 'invalid_gemini_part:/body/contents/0/parts/0'),
+                ('model', [{}, call, {'text': '合成答复'}], 'invalid_gemini_part:/body/contents/0/parts/0'),
                 ('model', [{'thought': False}, call], 'invalid_gemini_part:/body/contents/0/parts/0'),
                 ('model', [None, call], 'invalid_gemini_object:/body/contents/0/parts/0'),
                 ('model', [{}, {'functionCall': None}], 'invalid_gemini_object:/body/contents/0/parts/1/functionCall'),
         ):
             with self.subTest(role=role, parts=parts), self.assertRaisesRegex(InputError, error + '$'):
                 gemini_contract.native_history([{'role': role, 'parts': parts}], native_model=self.fixed_model[1])
+
+    def test_parallel_history_placeholder_and_numeric_result_aliases(self):
+        """同名并行调用按组内顺序恢复旧式结果 ID，保留原正文与实际回填。@return 无。"""
+        contents = [{'role': 'user', 'parts': [{'text': str(i)}]} for i in range(225)]
+        alias_ids = ['call_200', 'call_100']
+        calls = [{'functionCall': {'name': 'lookup', 'args': {'index': i}}} for i in range(2)]
+        results = [{'functionResponse': {'name': alias, 'response': {'content': str(i), 'name': alias}}}
+            for i, alias in enumerate(alias_ids)]
+        contents.extend([{'role': 'model', 'parts': [{}, *calls]}, {'role': 'user', 'parts': results}])
+        original = copy.deepcopy(contents)
+        decoded = request({'schema_version': 1, 'type': 'gemini_request', 'request_id': 'parallel-history',
+            'model': self.fixed_model[0], 'body': {'contents': contents}}, fixed_model=self.fixed_model)
+        self.assertEqual(original, contents)
+        self.assertEqual(decoded['gemini_body']['contents'], original)
+        steps = decoded['native_steps']
+        planned = steps[225]['plannerResponse']['toolCalls']
+        self.assertEqual([call['id'] for call in planned], alias_ids)
+        for i, step in enumerate(steps[226:]):
+            self.assertEqual(step['metadata']['toolCall'], planned[i])
+            self.assertEqual(step['generic']['args'], {'index': str(i)})
+            self.assertEqual(step['generic']['result']['resultValue'],
+                gemini_contract.native_value(results[i]['functionResponse']['response']))
+        self.assertEqual(len(steps), 228)
+
+        for field, value in (('other_name', 'other_lookup'), ('duplicate', alias_ids[0]),
+                ('undeclared_format', 'unknown'), ('explicit_id', 'known-call'), ('declared', alias_ids[1])):
+            broken = copy.deepcopy(contents[-2:])
+            names = []
+            if field == 'other_name':
+                broken[0]['parts'][2]['functionCall']['name'] = value
+            elif field == 'explicit_id':
+                broken[0]['parts'][2]['functionCall']['id'] = value
+            elif field == 'declared':
+                names = [value]
+            else:
+                broken[1]['parts'][1]['functionResponse']['name'] = value
+            with self.subTest(field=field), self.assertRaisesRegex(InputError, 'function_response'):
+                gemini_contract.native_history(broken, names, native_model=self.fixed_model[1])
 
     def test_legacy_letter_ids_require_prior_history_evidence(self):
         """已观测旧式编号可恢复，普通纯字母名称单独出现时仍拒绝。@return 无。"""
