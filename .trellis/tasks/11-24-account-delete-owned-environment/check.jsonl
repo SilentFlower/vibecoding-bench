@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/orchestrator/backend/agy-node-migration.md", "reason": "本机与 SSH 归属、停止状态、历史位置及后台准备"}
+{"file": ".trellis/spec/platform/deploy/agy-credential-contract.md", "reason": "区分权威凭据与可回收的运行期副本"}
+{"file": ".trellis/spec/orchestrator/backend/node-migration-revocation.md", "reason": "节点侧的停止与撤销证据以及历史副本归属"}

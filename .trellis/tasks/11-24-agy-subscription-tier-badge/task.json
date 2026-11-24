@@ -1,0 +1,41 @@
+{
+  "id": "agy-subscription-tier-badge",
+  "name": "agy-subscription-tier-badge",
+  "title": "反重力账号标签显示实际订阅档位",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-24",
+  "completedAt": "2026-11-24",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-24T07:32:55Z",
+    "blockers": []
+  },
+  "branch": "fix/account-environment-cleanup",
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-24-account-delete-owned-environment",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-24T07:32:55.407876+00:00",
+    "completedSteps": [
+      "修正反重力账号卡片及详情标题的订阅档位来源",
+      "通过 Ultra、Pro 和旧快照浏览器验收"
+    ],
+    "partialStep": null,
+    "nextStep": "安排新版发布",
+    "notes": "优先显示原生订阅档位，历史快照可回退到平台计划。"
+  }
+}
