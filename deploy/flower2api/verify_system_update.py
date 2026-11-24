@@ -36,12 +36,13 @@ import system_update_host
 from install_system_updater import finalize_installation, prepare_installation
 from manage import REPO, _image_config_digest
 from runtime_files import atomic_json, atomic_text
-from system_release import create_index, create_release, sign_file
+from system_release import create_index, create_release, migration_registries, sign_file
 from system_update_contract import safe_read, strict_json
 from system_update_gate import read_gate
 from system_update_host import HostDeployment
 from system_updater import SystemUpdater, UpdateHTTPHandler, UpdateServer
 from verify_forwarding import certificates
+from verify_native_transition import verify_ledgers, verify_stage as verify_native_stage
 from verify_database_compatibility import verify as verify_database_compatibility
 from upgrade_system_updater import upgrade
 
@@ -267,21 +268,43 @@ def worker(policy_path: Path, fault: str | None) -> None:
 
 def verify(output: Path, gateway_binary: Path, sender_binary: Path, migration_manifest: Path | None = None,
            native_root: Path | None = None, control_base: str | None = None,
-           account_base: str | None = None, fast_transition: bool = False) -> dict:
+           account_base: str | None = None, fast_transition: bool = False, *,
+           native_history_control: str | None = None, native_history_account: str | None = None,
+           native_history_source: Path | None = None, native_transition_only: bool = False) -> dict:
     """运行实际底座、控制复用、账号重建、回退及进程恢复并清理专属资源。
 
     :param output: 脱敏证据目录。
     :param gateway_binary: 启用v3-verification且匹配测试底座glibc的网关。
     :param sender_binary: 启用v3-verification且匹配测试底座glibc的发送器。
     :param migration_manifest: 可选真实迁移候选镜像清单，开启 v1→v2 接入验收。
-    :param native_root: 可选已验收的280-a／293-a制品根目录。
+    :param native_root: 启用双版到单版演练，并提供目标 293-a 制品根目录。
     :param control_base: 已准备的隔离控制底座。
     :param account_base: 已准备的隔离账号底座。
     :param fast_transition: 追加快速关断和独立节点的真实隔离场景。
+    :param native_history_control: 已验证的双版历史控制镜像。
+    :param native_history_account: 含原历史 sender 和双版执行体的账号镜像。
+    :param native_history_source: 历史镜像所用的可信源码检出，用于签名源版本数据合同。
+    :param native_transition_only: 只执行双版到 293 的真实安装、回退和公开请求。
     :return: 场景结果。
     """
     if fast_transition and (os.geteuid() != 0 or not shutil.which('sshd') or not shutil.which('ssh-keygen')):
         raise RuntimeError('隔离快速换版验收需要本机 sshd、ssh-keygen 和 Docker 节点启动权限')
+    if native_transition_only and (not native_root or migration_manifest or fast_transition):
+        raise ValueError('内核定向演练需要 --native-runtime-root；数据库迁移和快速换版使用完整演练入口')
+    if (native_history_control or native_history_account or native_history_source) and not native_root:
+        raise ValueError('历史双版镜像需要与 --native-runtime-root 一同使用')
+    if native_root and migration_manifest:
+        # 数据库历史底座可能早于双版内核；两条验收分别从各自真实的历史镜像开始。
+        platform = verify(output, gateway_binary, sender_binary, migration_manifest,
+            control_base=control_base, account_base=account_base, fast_transition=fast_transition)
+        target = strict_json(migration_manifest.read_bytes())['images']
+        native = verify(output / 'native-transition', gateway_binary, sender_binary, native_root=native_root,
+            control_base=target['control']['reference'], account_base=target['account']['reference'],
+            native_history_control=native_history_control or control_base, native_history_account=native_history_account or account_base,
+            native_history_source=native_history_source, native_transition_only=True)
+        platform['scenes'].extend(native['scenes'])
+        atomic_json(output / 'results.json', platform)
+        return platform
     output.mkdir(parents=True, exist_ok=True)
     historical_base = 'v3-verify-native-warm-20261112' if migration_manifest else 'v3-verify-kernel-online-final'
     control_base = control_base or f'vibebench-v3-control:{historical_base}'
@@ -292,6 +315,8 @@ def verify(output: Path, gateway_binary: Path, sender_binary: Path, migration_ma
     session = requests.Session()
     session.trust_env = False
     results, references = [], []
+    initial_index = 1 if native_transition_only else 0
+    initial_prefix = 'flower2api-' if native_transition_only else 'vibebench-v3-'
     child = None
     node_process = None
     with tempfile.TemporaryDirectory(prefix='v3-update-', dir='/tmp') as temporary:
@@ -343,13 +368,28 @@ LABEL vibebench.fast-system-update=$FAST_SWITCH
                 'COPY dist /app/web/dist\nCOPY dist ' + str(source_path(REPO, 'cc2api/web/dist'))
                 + '\nRUN mkdir -p ' + str(source_path(REPO, 'cc2api'))))
         if native_root:
+            native_history_control = native_history_control or control_base
+            native_history_account = native_history_account or account_base
+            history_labels = client.images.get(native_history_account).labels
+            history_revision = client.images.get(native_history_control).labels.get('vibebench.parent-revision', '')
+            if not re.fullmatch('[0-9a-f]{40}', history_revision) or history_labels.get('vibebench.parent-revision') != history_revision:
+                raise ValueError('历史双版控制与账号镜像必须来自同一有效源码提交')
+            if history_labels.get('vibebench.native-runtime-versions') != '2.1.280,2.1.293':
+                raise ValueError('历史账号底座须提供真实 280/293 和原双版 sender，请指定 --native-history-account')
+            if native_history_source is None:
+                # 从受信旧镜像的提交读取旧源码，避免把目标数据库版本写入历史清单。
+                native_history_source = root / 'native-history-source'
+                native_history_source.mkdir()
+                archive = root / 'history-source.tar'
+                subprocess.run(['git', 'archive', '--output', str(archive), history_revision, 'apps', 'deploy/flower2api',
+                    'images', 'services'], cwd=REPO, check=True)
+                with tarfile.open(archive) as source:
+                    source.extractall(native_history_source, filter='data')
             shutil.copy2(native_root / '293-a/ccrb-runtime', context / 'ccrb-runtime')
-            shutil.copy2(native_root / '280-a/ccrb-runtime', context / 'ccrb-runtime-280')
             dockerfile = context / 'Dockerfile'
             dockerfile.write_text(dockerfile.read_text() + '''COPY ccrb-runtime /usr/local/bin/ccrb-runtime
-COPY ccrb-runtime-280 /usr/local/bin/ccrb-runtime-280
-ARG NATIVE_VERSIONS
-LABEL vibebench.native-runtime-versions=$NATIVE_VERSIONS vibebench.native-platform-managed="1"
+RUN test ! -e /usr/local/bin/ccrb-runtime-280 && test ! -L /usr/local/bin/ccrb-runtime-280
+LABEL vibebench.native-runtime-versions="2.1.293" vibebench.native-platform-managed="1"
 ''')
         candidate = strict_json(migration_manifest.read_bytes()) if migration_manifest else None
         if candidate:
@@ -373,6 +413,24 @@ LABEL vibebench.release=$RELEASE vibebench.parent-revision=$REVISION vibebench.v
                 ' AS control\nRUN command -v ssh-keygen && command -v ssh || '
                 '(apt-get update && apt-get install -y --no-install-recommends openssh-client '
                 '&& rm -rf /var/lib/apt/lists/*)\n', 1))
+        if native_root:
+            # 历史阶段继承整套旧程序与镜像登记，避免新控制器或 sender 伪装成双版基线。
+            (context / 'Dockerfile.history').write_text('''ARG CONTROL_BASE
+ARG ACCOUNT_BASE
+FROM ${CONTROL_BASE} AS control
+ENV PROJECT_LIBRARY_DIR=/isolated-empty-library
+ARG RELEASE
+ARG REVISION
+ARG FAST_SWITCH=0
+ARG LOCAL_ROLLOUT=0
+LABEL vibebench.release=$RELEASE vibebench.parent-revision=$REVISION vibebench.fast-system-update=$FAST_SWITCH vibebench.local-account-rollout=$LOCAL_ROLLOUT
+FROM ${ACCOUNT_BASE} AS account
+ARG RELEASE
+ARG REVISION
+ARG CONTENT
+ARG FAST_SWITCH=0
+LABEL vibebench.release=$RELEASE vibebench.parent-revision=$REVISION vibebench.fast-system-update=$FAST_SWITCH vibebench.test-content=$CONTENT
+''')
         revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=REPO, text=True).strip()
         key = root / 'private.pem'
         subprocess.run(['openssl', 'genpkey', '-algorithm', 'ED25519', '-out', str(key)], check=True, capture_output=True)
@@ -382,7 +440,7 @@ LABEL vibebench.release=$RELEASE vibebench.parent-revision=$REVISION vibebench.v
         env = root / 'v3.env'
         compose = root / 'compose-before.yml'
         # 初始栈沿历史项目/网络名，固定更新器安装包使用当前新模板，真实覆盖名称交接。
-        compose.write_text((REPO / 'deploy/flower2api/compose.yml').read_text().replace('flower2api-${V3_DEPLOYMENT_ID', 'vibebench-v3-${V3_DEPLOYMENT_ID'))
+        compose.write_text((REPO / 'deploy/flower2api/compose.yml').read_text().replace('flower2api-${V3_DEPLOYMENT_ID', initial_prefix + '${V3_DEPLOYMENT_ID'))
         override = REPO / 'deploy/flower2api/compose-updates.yml'
         values = {}
         business_token = None
@@ -460,6 +518,34 @@ LABEL vibebench.release=$RELEASE vibebench.parent-revision=$REVISION vibebench.v
                 database.row_factory = sqlite3.Row
                 return [dict(row) for row in database.execute('SELECT * FROM account_environments ORDER BY name')]
 
+        native_history = None
+        previous_native = None
+
+        def check_native(index, stage):
+            """核对原生账号生命周期和实际执行体，并与原双版登记对照。@return 本阶段脱敏观察。"""
+            nonlocal native_history, previous_native
+            row = next(item for item in account_rows() if item['name'] == 'synthetic-running')
+            ledgers = verify_ledgers(data, migration_registries(native_history_source if stage == 'history' else REPO))
+            observed = verify_native_stage(client, row, data, releases[index]['account']['reference'], index == 1,
+                request, business_token, wait_for, stage)
+            observed['account_id'] = row['account_id']
+            observed['database_versions'] = ledgers
+            if stage == 'history':
+                native_history = observed
+            else:
+                assert observed['environment_id'] == native_history['environment_id']
+                assert observed['account_id'] == native_history['account_id']
+                assert observed['generation'] > previous_native['generation']
+                assert observed['sender_id'] != previous_native['sender_id']
+                if stage == 'rollback':
+                    assert observed['registration'] == native_history['registration']
+                    assert observed['image_id'] == native_history['image_id'] and observed['sha256'] == native_history['sha256']
+                else:
+                    assert observed['sha256']['/usr/local/bin/account-sender'] != native_history['sha256']['/usr/local/bin/account-sender']
+            previous_native = observed
+            passed('原生账号执行内核 ' + stage, **observed)
+            return observed
+
         def start_node(address):
             """启动仅监听测试桥的隔离 SSH。:param address: 当前桥地址。:return: 节点配置。"""
             nonlocal node_process
@@ -512,14 +598,14 @@ LABEL vibebench.release=$RELEASE vibebench.parent-revision=$REVISION vibebench.v
                 bundle.addfile(entry, io.BytesIO(payload))
             gateway.put_archive('/run/v3', archive.getvalue())
             proxy = client.containers.run(values['V3_CONTROL_IMAGE'], ['/fixtures/forwarding_network.py'], entrypoint='python',
-                detach=True, network='vibebench-v3-' + deployment, ports={'1081/tcp': ('0.0.0.0', 0)},
+                detach=True, network=initial_prefix + deployment, ports={'1081/tcp': ('0.0.0.0', 0)},
                 labels={'vibebench.product': 'v3', 'vibebench.deployment': deployment, 'vibebench.role': 'verification'},
                 volumes={str(REPO / 'deploy/flower2api/fixtures'): {'bind': '/fixtures', 'mode': 'ro'},
                     str(proxy_data): {'bind': '/fixtures-data', 'mode': 'rw'}})
             wait_for(lambda: proxy.exec_run(['python', '-c', "import socket;socket.create_connection(('127.0.0.1',1081),timeout=1).close()"]).exit_code == 0,
                 '本地 DNS 与代理夹具未就绪')
             proxy.reload()
-            address = client.networks.get('vibebench-v3-' + deployment).attrs['IPAM']['Config'][0]['Gateway']
+            address = client.networks.get(initial_prefix + deployment).attrs['IPAM']['Config'][0]['Gateway']
             proxy_port = int(proxy.attrs['NetworkSettings']['Ports']['1081/tcp'][0]['HostPort'])
             # 经本地宿主端口访问合成代理，使账号网络切换后仍使用同一冻结代理配置。
             # 原生账号的旧端点继续走HTTPS转发；保持权威后端，避免长流准备提前改变待迁移布局。
@@ -533,6 +619,12 @@ LABEL vibebench.release=$RELEASE vibebench.parent-revision=$REVISION vibebench.v
             response = request('POST', '/admin/tokens', json={'name': 'synthetic-update', 'allowed_accounts': str(gateway_account_id)})
             assert response.status_code == 201, response.text[:512]
             business_token = response.json()['token']
+            # 定向验收的六笔请求共用一个账号，避免额外账号启动竞争影响换版观察。
+            account_names = ('synthetic-running', 'synthetic-second', 'synthetic-stopped')
+            if native_transition_only:
+                account_names = ('synthetic-running',)
+            elif fast_transition and not candidate:
+                account_names = ('synthetic-running', 'synthetic-second', 'synthetic-slow', 'synthetic-stopped')
             code = '''import main,docker
 from account_runtime import AccountRuntime
 r=AccountRuntime(docker.from_env(),main.BENCH_DATA,main.HOST_BENCH_DATA,main.get_db,main.derive_v3_fingerprint,main.cc2api_client)
@@ -551,36 +643,45 @@ try:
    if NATIVE and name.endswith('running'):
     import json
     from runtime_files import atomic_json
-    reference={'release':'v0.1.0-beta.6','launcher_sha256':'a'*64}
-    config=json.loads(r._sender_config(row).read_text());config['native'].update(release=reference,kernel_generation='historical')
+    from native_sender import VERSION,SHA256
+    import uuid
+    reference={'release':VERSION,'launcher_sha256':SHA256}
+    config=json.loads(r._sender_config(row).read_text());config['native'].update(release=reference,kernel_generation=str(uuid.uuid4()))
     r._write_sender_config(row,config)
     atomic_json(r._root(row)/'runtime/native-kernel-upgrade.json',{'state':'active','account_id':REMOTE,'current':reference,'binding_generation':row['generation']})
   else:
    row=r._row(name,aid,'Asia/Tokyo');r._update(row,state='stopped')
 finally:r.heartbeat_pool.shutdown()
-'''.replace('ACCOUNT_NAMES', repr(('synthetic-running', 'synthetic-second', 'synthetic-slow', 'synthetic-stopped')
-    if fast_transition and not candidate else ('synthetic-running', 'synthetic-second', 'synthetic-stopped'))
-    ).replace('NATIVE', repr(bool(native_root))).replace('PROXY_PORT', str(proxy_port)).replace('PROXY', repr(address)).replace('REMOTE', str(gateway_account_id)).replace('CERTIFICATE', repr(base64.b64encode((proxy_data / 'ca.der').read_bytes()).decode()))
+'''.replace('ACCOUNT_NAMES', repr(account_names)).replace('NATIVE', repr(bool(native_root))
+    ).replace('PROXY_PORT', str(proxy_port)).replace('PROXY', repr(address)).replace('REMOTE', str(gateway_account_id)
+    ).replace('CERTIFICATE', repr(base64.b64encode((proxy_data / 'ca.der').read_bytes()).decode()))
             result = runtime.exec_run(['python', '-c', code])
             assert result.exit_code == 0, result.output.decode(errors='replace')[-2000:]
             rows = account_rows()
-            assert all(row['state'] == 'ready' for row in rows[:-1]) and rows[-1]['state'] == 'stopped'
+            if native_transition_only:
+                assert [(row['name'], row['state']) for row in rows] == [('synthetic-running', 'ready')]
+            else:
+                assert all(row['state'] == 'ready' for row in rows[:-1]) and rows[-1]['state'] == 'stopped'
             assert all(rows[0][key] for key in ('container_id', 'sender_container_id', 'network_container_id'))
 
         try:
-            for index in range(4):
+            for index in range(3 if native_transition_only else 4):
                 release = f'ci-{counter + index}-1'
                 images = {}
+                build_revision = history_revision if native_root and index <= 1 else revision
                 extra_arguments = ['--build-arg', 'CONTROL_BASE=' + control_base, '--build-arg', 'ACCOUNT_BASE=' + account_base]
                 if fast_transition and not candidate:
                     extra_arguments += ['--build-arg', 'FAST_SWITCH=' + str(int(index > 0)),
                         '--build-arg', 'LOCAL_ROLLOUT=' + str(int(index in (1, 2)))]
-                if native_root:
-                    extra_arguments += ['--build-arg', 'NATIVE_VERSIONS=' + ('2.1.293' if index == 0 else '2.1.280,2.1.293')]
                 if candidate:
                     bases = ({'control': control_base, 'account': account_base} if index == 0
                         else {role: candidate['images'][role]['reference'] for role in ('control', 'account')})
                     extra_arguments = ['--build-arg', 'CONTROL_BASE=' + bases['control'], '--build-arg', 'ACCOUNT_BASE=' + bases['account']]
+                if native_root and (index == 1 or index == 0 and not candidate):
+                    extra_arguments = ['-f', str(context / 'Dockerfile.history'),
+                        '--build-arg', 'CONTROL_BASE=' + native_history_control, '--build-arg', 'ACCOUNT_BASE=' + native_history_account,
+                        '--build-arg', 'FAST_SWITCH=' + str(int(fast_transition and index > 0)),
+                        '--build-arg', 'LOCAL_ROLLOUT=' + str(int(fast_transition and index == 1))]
                 for role in ('control', 'account'):
                     prefix = 'vibebench-v3' if index == 0 else 'flower2api'
                     reference = f'ghcr.io/silentflower/{prefix}-{role}:v3-{release}'
@@ -588,7 +689,7 @@ finally:r.heartbeat_pool.shutdown()
                     build_metadata = root / f'build-{index}-{role}.json'
                     built = subprocess.run(['docker', 'build', '--pull=false', '--progress=plain', '--target', role,
                         '--metadata-file', str(build_metadata), '--build-arg', 'RELEASE=' + release,
-                        '--build-arg', 'REVISION=' + revision, '--build-arg', 'CONTENT=' + ('new' if index >= 2 else 'old'),
+                        '--build-arg', 'REVISION=' + build_revision, '--build-arg', 'CONTENT=' + ('new' if index >= 2 else 'old'),
                         *extra_arguments, '-t', reference, str(context)], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
                     image = client.images.get(reference)
                     # 容器镜像仓库驱动可能只在明确导出的进度行公布原始配置摘要。
@@ -598,18 +699,24 @@ finally:r.heartbeat_pool.shutdown()
                         config_digest = exported.pop().decode('ascii')
                     images[role] = {'reference': reference, 'platform': 'linux/amd64', 'registry_digest': image.id,
                         'config_digest': config_digest or _image_config_digest(reference), 'unpacked_bytes': image.attrs['Size']}
+                    if native_root:
+                        if role == 'control':
+                            images[role]['cli_scratchpad_storage'] = int(image.labels.get('vibebench.cli-scratchpad-storage') == '1')
+                        else:
+                            images[role]['cli_scratchpad_protocol'] = int(image.labels.get('vibebench.cli-scratchpad-protocol') == '1')
                 manifest = root / ('v3-' + str(index) + '.json')
                 atomic_json(manifest, {'schema': 3, 'release': release, 'dirty_worktree': False, 'layout_version': 2,
                     'credential_ownership_protocol': 1, 'system_update_protocol': 1,
-                    'parent_revision': revision, 'gateway_revision': revision, 'images': images,
+                    'parent_revision': build_revision, 'gateway_revision': build_revision, 'images': images,
                     'bundle': {'name': 'v3-images.tar.gz', 'size': 1, 'sha256': 'a' * 64}})
                 folder = root / ('release-' + str(index))
                 evidence_path = None
-                if candidate and index:
+                if (candidate and index) or (native_root and index >= 2):
                     evidence_path = root / ('evidence-' + str(index) + '.json')
                     verify_database_compatibility(manifest, public, evidence_path, history_root=root / 'history')
                 value = create_release(manifest, REPO / 'deploy/flower2api/system-update-policy.json', folder, key,
-                    [counter + index, 1], '隔离平台更新验证', migration_evidence=evidence_path)
+                    [counter + index, 1], '隔离平台更新验证',
+                    root=native_history_source if native_root and index <= 1 else REPO, migration_evidence=evidence_path)
                 if candidate and index == 0:
                     # 合成历史发行绑定真实旧镜像，旧合同取自已归档的预热版本。
                     for name, digest in {'bench': 'e7232926f126ec2a3ad60b3f346c4a7ad473d66497617acc6773c0c05117674b',
@@ -622,14 +729,19 @@ finally:r.heartbeat_pool.shutdown()
                     history.mkdir()
                     shutil.copytree(folder, history / value['release'])
                     create_index(folder / 'system-release.json', None, history / 'index.json', key)
-                if index >= 2:
+                if native_root and index == 1:
+                    history = root / 'history'
+                    history.mkdir()
+                    shutil.copytree(folder, history / value['release'])
+                    create_index(folder / 'system-release.json', None, history / 'index.json', key)
+                if index >= 2 and not native_root:
                     value['account']['content_sha256'] = hashlib.sha256(b'isolated-account-new-content').hexdigest()
                     atomic_json(folder / 'system-release.json', value)
                     (folder / 'system-release.sig').unlink()
                     sign_file(folder / 'system-release.json', key)
                 releases.append(value)
                 folders.append(folder)
-                if candidate:
+                if candidate or native_root:
                     shutil.copytree(folder, output / value['release'])
                     if evidence_path:
                         shutil.copy2(evidence_path, output / ('compatibility-' + str(index) + '.json'))
@@ -639,9 +751,10 @@ finally:r.heartbeat_pool.shutdown()
             with socket.socket() as port:
                 port.bind(('127.0.0.1', 0))
                 host_port = port.getsockname()[1]
+            initial = releases[initial_index]
             values = {'V3_DEPLOYMENT_ID': deployment, 'V3_DATA_ROOT': str(data), 'V3_HOST_PORT': str(host_port),
-                'V3_RELEASE': releases[0]['control']['release'],
-                'V3_CONTROL_IMAGE': releases[0]['control']['reference'], 'V3_ACCOUNT_IMAGE': releases[0]['account']['reference'],
+                'V3_RELEASE': initial['control']['release'],
+                'V3_CONTROL_IMAGE': initial['control']['reference'], 'V3_ACCOUNT_IMAGE': initial['account']['reference'],
                 'V3_ADMIN_PASSWORD': uuid.uuid4().hex * 2, 'V3_INTERNAL_TOKEN': uuid.uuid4().hex * 2,
                 'V3_SESSION_SECRET': uuid.uuid4().hex * 2, 'V3_ACCOUNT_MEMORY': 'unlimited' if native_root else '1536m',
                 'V3_MAX_ACTIVE_ACCOUNTS': '3' if fast_transition and not candidate else '2'}
@@ -666,8 +779,8 @@ finally:r.heartbeat_pool.shutdown()
             subprocess.run(['docker', 'compose', '--env-file', str(env), '-f', str(compose), 'up', '-d'], check=True,
                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
             wait_for(runtime_ready, '初始隔离控制服务未就绪')
-            assert prepare_installation(env, folders[0], update_root, public)['status'] == 'planned'
-            prepare_installation(env, folders[0], update_root, public, apply=True)
+            assert prepare_installation(env, folders[initial_index], update_root, public)['status'] == 'planned'
+            prepare_installation(env, folders[initial_index], update_root, public, apply=True)
             subprocess.run(['docker', 'compose', '--env-file', str(update_root / 'bootstrap.env'), '-f', str(compose),
                 '-f', str(override), 'up', '-d'], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             wait_for(runtime_ready, '底座控制服务未就绪')
@@ -685,7 +798,7 @@ finally:r.heartbeat_pool.shutdown()
             state['catalog'] = strict_json(catalog_path.read_bytes())
             atomic_json(update_root / 'state.json', state)
             start_worker()
-            if candidate:
+            if candidate or native_root:
                 def control(*arguments):
                     """将底座服务控制限定为本次独立进程。:param arguments: 固定动作。@return 状态。"""
                     if arguments[0] == 'show':
@@ -720,6 +833,17 @@ assert engine.status()['migration_capability'] is True
 '''
                 subprocess.run([sys.executable, '-I', '-c', probe_source, str(update_root)], check=True, capture_output=True)
                 passed('已复制底座源码在独立解释器中完成导入及状态核验')
+            if native_transition_only:
+                check_native(1, 'history')
+                for index, action, phase in ((2, 'install', 'upgraded'), (1, 'rollback', 'rollback')):
+                    submit(index, action)
+                    operation = wait_for(finished, '原生账号换版尚未完成')
+                    assert operation['phase'] == 'succeeded', operation
+                    assert status()['current_release'] == releases[index]['release']
+                    check_native(index, phase)
+                report = {'deployment': deployment, 'scenes': results, 'real_model_calls': 0}
+                atomic_json(output / 'results.json', report)
+                return report
             assert request('POST', '/runtime/api/system-updates/install', json={}).status_code == 422
             passed('真实首次底座接入和三层管理桥', installed=status()['current_release'])
             before_accounts = account_rows()
@@ -782,22 +906,7 @@ assert engine.status()['migration_capability'] is True
                 for key in ('container_id', 'sender_container_id', 'network_container_id'))
             passed('真实旧命名部署迁入 flower2api 正式基线', operation=result)
             if native_root:
-                running = next(row for row in migrated if row['name'] == 'synthetic-running')
-                private = data / 'bench/environments' / running['environment_id']
-                config = json.loads((private / 'runtime/sender/sender.json').read_text())
-                assert config['native']['runtimes'] == {'2.1.280': {'binary_path': '/usr/local/bin/ccrb-runtime-280'}}
-                assert 'release' not in config['native'] and 'kernel_generation' not in config['native']
-                record = json.loads((private / 'runtime/native-kernel-upgrade.json').read_text())
-                assert record['management'] == 'platform' and record['current'] is None
-                for version in ('2.1.293','2.1.280'):
-                    response = request('POST', '/v1/messages', headers={'Authorization':'Bearer ' + business_token,
-                        'User-Agent':f'claude-cli/{version} (external, cli)'}, json={'model':'claude-sonnet-4-6',
-                        'max_tokens':32,'messages':[{'role':'user','content':'platform-native-' + version}]})
-                    assert response.status_code == 200, response.text[:512]
-                latest = next(row for row in account_rows() if row['name'] == 'synthetic-running')
-                assert latest['generation'] == running['generation']
-                assert all(latest[key] == running[key] for key in ('container_id','sender_container_id','network_container_id'))
-                passed('旧293登记升级后真实双版API沿原容器发送，历史独立选择归一', generation=running['generation'])
+                check_native(1, 'history')
 
             before_accounts = migrated
             if fast_transition:
@@ -886,6 +995,8 @@ assert engine.status()['migration_capability'] is True
             assert after_accounts[-1] == before_accounts[-1]
             assert all(row['generation'] > before['generation'] for row, before in zip(after_accounts[:-1], before_accounts[:-1]))
             passed('真实账号组件按需重建与停止环境保留', operation=result)
+            if native_root:
+                check_native(2, 'upgraded')
             if candidate:
                 with closing(sqlite3.connect(data / 'bench/db.sqlite')) as database, database:
                     database.execute("INSERT INTO topics(no,title) VALUES(-91212,'migration-later-business')")
@@ -893,6 +1004,8 @@ assert engine.status()['migration_capability'] is True
             result = wait_for(finished, '显式回退未结束')
             assert result['phase'] == 'succeeded', result
             assert status()['current_release'] == releases[1]['release']
+            if native_root:
+                check_native(1, 'rollback')
             if candidate:
                 with closing(sqlite3.connect(data / 'bench/db.sqlite')) as database, database:
                     assert database.execute("SELECT 1 FROM topics WHERE no=-91212 AND title='migration-later-business'").fetchone()
@@ -1021,7 +1134,11 @@ def main() -> None:
         help='启用v3-verification并兼容测试底座glibc的隔离网关二进制')
     parser.add_argument('--sender-binary', type=Path, default=source_path(REPO, 'cc2api/target/release/account-sender'),
         help='启用v3-verification并兼容测试底座glibc的隔离发送器二进制')
-    parser.add_argument('--native-runtime-root', type=Path, help='已验收280-a／293-a制品目录')
+    parser.add_argument('--native-runtime-root', type=Path, help='已验收293-a 制品目录')
+    parser.add_argument('--native-history-control', help='提供双版路由与编排器的历史控制镜像，缺省使用 control-base')
+    parser.add_argument('--native-history-account', help='含真实 280、293 及旧 sender 的历史账号镜像，缺省使用 account-base')
+    parser.add_argument('--native-history-source', type=Path, help='双版历史镜像对应源码，缺省从镜像提交本地导出')
+    parser.add_argument('--native-transition-only', action='store_true', help='仅执行签名双版基线→单版→双版回退演练')
     parser.add_argument('--control-base', help='隔离旧版控制镜像')
     parser.add_argument('--account-base', help='隔离旧版账号镜像')
     parser.add_argument('--migration-manifest', type=Path, help='使用真实旧/新镜像验收迁移底座接入及故障恢复')
@@ -1040,7 +1157,9 @@ def main() -> None:
         print(json.dumps({'passed': report['passed'], 'real_model_calls': 0}, ensure_ascii=False))
         return
     report = verify(args.output, args.gateway_binary, args.sender_binary, args.migration_manifest, args.native_runtime_root,
-        args.control_base, args.account_base, fast_transition=args.fast_transition)
+        args.control_base, args.account_base, fast_transition=args.fast_transition,
+        native_history_control=args.native_history_control, native_history_account=args.native_history_account,
+        native_history_source=args.native_history_source, native_transition_only=args.native_transition_only)
     print(json.dumps({'passed': len(report['scenes']), 'real_model_calls': 0}, ensure_ascii=False))
 
 

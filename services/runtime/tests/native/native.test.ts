@@ -18,7 +18,7 @@ import { parseInput } from '../../src/shared/input';
 const isolated = process.env.CCRB_NATIVE_ISOLATED === '1';
 const native = isolated ? describe : describe.skip;
 const sourceVersion = process.env.CCRB_TEST_SOURCE_VERSION ?? '2.1.293';
-if (!['2.1.280', '2.1.293'].includes(sourceVersion)) throw new Error('原生验收仅接受固定280/293来源');
+if (sourceVersion !== '2.1.293') throw new Error('原生验收仅接受固定293来源');
 
 native('官方 ' + sourceVersion + ' 的无外网回环链路', () => {
   let root: string;
@@ -136,7 +136,6 @@ native('官方 ' + sourceVersion + ' 的无外网回环链路', () => {
       CCRB_TIMEOUT_MS: '15000',
     });
     // 模拟凭据仅由原生端持有的配置路径，控制层不能依赖预先知道密钥来脱敏。
-    if (sourceVersion === '2.1.280') config.engine.preloadPath = join(dirname(config.engine.preloadPath), 'preload-280.mjs');
     const setupStarted = performance.now();
     nativeEngine = await createEngine(config.engine);
     app = await startServer({ ...config, engine: { ...config.engine, apiKey: undefined } }, nativeEngine);
@@ -431,7 +430,7 @@ native('官方 ' + sourceVersion + ' 的无外网回环链路', () => {
     expect(headers.get('x-client-request-id')).not.toContain(',');
     expect(headers.get('x-claude-code-request-class')).toBe('main');
     expect(headers.get('x-claude-code-session-id')).toBe(session);
-    expect(headers.get('x-claude-code-prompt-id')).toBe(sourceVersion === '2.1.293' ? prompt : null);
+    expect(headers.get('x-claude-code-prompt-id')).toBe(prompt);
     expect(JSON.stringify(request.body.metadata)).toContain(session);
     expect(request.raw).toContain('cc_prompt_id=' + prompt + ';');
     expect(headers.get('user-agent')).toContain(sourceVersion);
@@ -458,13 +457,8 @@ native('官方 ' + sourceVersion + ' 的无外网回环链路', () => {
     const system = (request.body.system as { text: string }[]).map(block => block.text);
     expect(system).toContain("You are Claude Code, Anthropic's official CLI for Claude.");
     expect(system.join('\n')).not.toContain('You are a Claude agent, built on');
-    if (sourceVersion === '2.1.293') {
-      expect(system.join('\n')).toContain('cc_turn_origin=human;');
-      expect(system.join('\n')).toContain('cc_prompt_index=1; cc_turn_index=1;');
-    } else {
-      expect(system.join('\n')).not.toContain('cc_turn_origin=');
-      expect(system.join('\n')).not.toContain('cc_turn_index=');
-    }
+    expect(system.join('\n')).toContain('cc_turn_origin=human;');
+    expect(system.join('\n')).toContain('cc_prompt_index=1; cc_turn_index=1;');
     const tools = request.body.tools as { name: string }[];
     expect(tools).toEqual([]);
     expect(request.body).toMatchObject({ max_tokens: 32000, thinking: { type: 'adaptive', display: 'updates' }, output_config: { effort: 'high' }, context_management: { edits: [{ type: 'clear_thinking_20251015', keep: 'all' }] } });
@@ -584,10 +578,6 @@ native('官方 ' + sourceVersion + ' 的无外网回环链路', () => {
   ] as const)('原生 %s 上下文保持分类与 billing 一致 %#', async (requestClass, extra) => {
     mode = 'normal'; const count = requests.length;
     const result = await send({ model: 'claude-sonnet-4-6', messages: [{ role: 'user', content: '分类验证' }], stream: false }, { requestClass, ...extra });
-    if (sourceVersion === '2.1.280' && requestClass === 'side_reply') {
-      expect(result.response.status).toBe(422); expect(requests.length).toBe(count);
-      return;
-    }
     expect(result.response.status).toBe(200); expect(result.raw).toBe(expectedResponse);
     expect(requests.length - count).toBe(1);
     const request = requests.at(-1)!; const headers = new Headers(request.headers);
@@ -742,7 +732,7 @@ native('官方 ' + sourceVersion + ' 的无外网回环链路', () => {
       expect(nativeEngine.workerPid).toBe(pid);
       const request = requests.at(-1)!;
       const headers = new Headers(request.headers);
-      expect(headers.get('x-claude-code-prompt-id')).toBe(sourceVersion === '2.1.293' ? promptId : null);
+      expect(headers.get('x-claude-code-prompt-id')).toBe(promptId);
       expect(headers.get('x-claude-code-session-id')).toBe(sessionId);
       expect(headers.get('x-claude-code-agent-id')).toBe(i % 2 ? 'child-' + i : null);
       expect(request.raw).toContain('cc_prompt_id=' + promptId);
@@ -1090,10 +1080,6 @@ native('官方 ' + sourceVersion + ' 的无外网回环链路', () => {
     const context = { requestClass, ...(child ? { agentId: 'native-child', parentAgentId: 'native-parent', agentType: 'Explore' } : {}), ...(requestClass === 'workflow' ? { workflowRunId: 'native-workflow' } : {}) };
     const count = requests.length;
     const result = await send(body, context);
-    if (sourceVersion === '2.1.280' && requestClass === 'side_reply') {
-      expect(result.response.status).toBe(422); expect(requests.length).toBe(count);
-      return;
-    }
     expect(result.response.status).toBe(200);
     const wire = requests.at(-1)!, headers = new Headers(wire.headers);
     expect(headers.get('x-claude-code-request-class')).toBe(requestClass);
@@ -1120,13 +1106,9 @@ native('官方 ' + sourceVersion + ' 的无外网回环链路', () => {
     const messages = nativeHistory.map(message => message.role === 'assistant' ? { ...message, content: (message.content as { type: string }[]).filter(block => block.type !== 'thinking') } : message);
     const before = requests.length;
     const result = await send({ model: 'claude-sonnet-5-5', messages, tools: [nativeTool], stream: true }, context);
-    if (sourceVersion === '2.1.280' && requestClass === 'side_reply') {
-      expect(result.response.status).toBe(422); expect(requests.length).toBe(before);
-      return;
-    }
     expect(result.response.status).toBe(200); expect(requests.length).toBe(before + 1);
     const wire = requests.at(-1)!, headers = new Headers(wire.headers);
-    expect(headers.get('x-claude-code-prompt-id')).toBe(sourceVersion === '2.1.293' ? promptId : null);
+    expect(headers.get('x-claude-code-prompt-id')).toBe(promptId);
     expect(headers.get('x-claude-code-session-id')).toBe(sessionId);
     expect(wire.raw).toContain('cc_prompt_id=' + promptId);
     const detail = await app.store.detail(result.id);
@@ -1152,7 +1134,7 @@ native('官方 ' + sourceVersion + ' 的无外网回环链路', () => {
       const detail = (await app.store.detail(result.id))!;
       ids.push(detail.context!.promptId);
       const wire = requests.at(-1)!;
-      expect(new Headers(wire.headers).get('x-claude-code-prompt-id')).toBe(sourceVersion === '2.1.293' ? detail.context!.promptId : null);
+      expect(new Headers(wire.headers).get('x-claude-code-prompt-id')).toBe(detail.context!.promptId);
       expect(detail.context!.promptId).not.toBe(sessionId);
       expect(wire.raw).toContain('new-ready'); expect(wire.raw).toContain('客户端补充的结果说明');
       assertCch(wire.raw);

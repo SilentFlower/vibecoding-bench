@@ -17,6 +17,7 @@ use crate::model::credential_ownership::{
     CredentialHandoffReceipt, CredentialMaterial, CredentialOwnership, CredentialOwnershipChange,
     CredentialOwnershipInput, CredentialOwnershipSummary,
 };
+use crate::service::runtime_lease::node_migration_owner;
 
 /// 账号短期活动计数，关闭后只允许既有活动收口。
 pub(super) struct CredentialGate {
@@ -341,6 +342,25 @@ impl AccountService {
         id: i64,
         admission: Option<&CredentialActivity>,
     ) -> Result<CredentialActivity, AppError> {
+        self.upstream_activity_for(id, admission, false).await
+    }
+
+    /// 仅给已持普通槽位的原 V2 工具回执放行节点排空。
+    /// @param id 固定账号。@param original_tool 已由 Gateway 与原 sender 核验的工具回执。@return 活动许可。
+    pub(in crate::service) async fn upstream_tui_activity(
+        &self,
+        id: i64,
+        original_tool: bool,
+    ) -> Result<CredentialActivity, AppError> {
+        self.upstream_activity_for(id, None, original_tool).await
+    }
+
+    async fn upstream_activity_for(
+        &self,
+        id: i64,
+        admission: Option<&CredentialActivity>,
+        original_tui_tool: bool,
+    ) -> Result<CredentialActivity, AppError> {
         let gate = self.credential_gate(id);
         if admission.is_some_and(|admission| !Arc::ptr_eq(&gate, &admission.gate)) {
             return Err(unavailable());
@@ -371,7 +391,19 @@ impl AccountService {
                     .get("owner")
                     .and_then(Value::as_str)
                     .is_some_and(|owner| owner.starts_with("node-migration:"));
-            exclusive && !original_agy
+            let original_tui = original_tui_tool
+                && account.is_claude_code()
+                && snapshot["active"].as_i64().is_some_and(|active| active > 0)
+                && lease.get("phase").and_then(Value::as_str) == Some("draining")
+                && lease
+                    .get("expires_at")
+                    .and_then(Value::as_i64)
+                    .is_some_and(|expiry| expiry > Utc::now().timestamp())
+                && lease
+                    .get("owner")
+                    .and_then(Value::as_str)
+                    .is_some_and(node_migration_owner);
+            exclusive && !original_agy && !original_tui
         }) {
             return Err(unavailable());
         }

@@ -4,7 +4,6 @@ import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { PROFILE_293 } from '../src/runtime/293/source-profile';
-import { PROFILE_280 } from '../src/runtime/280/source-profile';
 
 const LIMIT_BYTES = 27933052;
 const TOOL_SHA = 'd32657a7a0e4cdc0a8aa57cafe474746944d76e861e753e9c902b9c9356fa886';
@@ -49,12 +48,12 @@ export async function buildRuntime(args: string[]): Promise<void> {
   const source = options.get('--source'), output = options.get('--out');
   if (!source || !output) throw new Error('必须显式提供 --source 和 --out');
   const sourceDigest = await digest(source);
-  const profile = [PROFILE_293, PROFILE_280].find(value => value.sha256 === sourceDigest);
-  if (!profile) throw new Error('固定官方源程序校验不匹配');
+  const profile = PROFILE_293;
+  if (profile.sha256 !== sourceDigest) throw new Error('固定官方源程序校验不匹配');
   if (await Bun.file(output).exists() || await Bun.file(output + '.manifest.json').exists()) throw new Error('输出已存在，不能覆盖原版或其它产物');
   const root = await mkdtemp(join(tmpdir(), 'ccrb-build-'));
   try {
-    const bridgePaths = [...BRIDGE_SOURCES, 'src/shared/api-compat.ts', 'src/runtime/280/source-profile.ts', 'src/runtime/280/native.ts', 'src/runtime/280/preload.ts'];
+    const bridgePaths = [...BRIDGE_SOURCES, 'src/shared/api-compat.ts'];
     const bridgeSources = Object.fromEntries(await Promise.all(bridgePaths.map(async path => [path, await digest(join(project, path))])));
     const home = join(root, 'home');
     await mkdir(home);

@@ -4,16 +4,16 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from native_sender import SHA256, SHA256_280, VERSION, VERSION_280, builtin_config, installed_versions
+from native_sender import SHA256, VERSION, builtin_config, installed_versions, registered_293
 from runtime_files import atomic_json
 
 PENDING = {'draining', 'switching', 'restoring', 'finishing', 'reconcile'}
 TERMINAL = {'idle', 'active', 'restored', 'failed'}
-VERSIONS = ('2.1.280', '2.1.293')
+HISTORICAL_VERSIONS = ('2.1.280', '2.1.293')
 
 
 def _record(root: Path, source_version: str = '2.1.293') -> Path:
-    if source_version not in VERSIONS:
+    if source_version not in HISTORICAL_VERSIONS:
         raise ValueError('未知官方原生运行时版本')
     return root / ('runtime/native-kernel-upgrade-280.json' if source_version == '2.1.280' else 'runtime/native-kernel-upgrade.json')
 
@@ -53,7 +53,7 @@ def pending_upgrade(root: Path, *, include_preparing: bool = False) -> bool:
     if migration.exists() or migration.is_symlink():
         _read(migration)
         return True
-    records = [_load(root, version) for version in VERSIONS]
+    records = [_load(root, version) for version in HISTORICAL_VERSIONS]
     return any(record and record.get('state', 'idle') not in TERMINAL for record in records)
 
 
@@ -65,7 +65,7 @@ def validate_records(root: Path, account_id: int | None, *, reconciled: bool = F
     :param reconciled: 调用者已在原租约中完成中断对账。
     :return: 全部通过归属和维护状态核验的记录。
     """
-    records = [(version, _load(root, version)) for version in VERSIONS]
+    records = [(version, _load(root, version)) for version in HISTORICAL_VERSIONS]
     for _, record in records:
         if not record:
             continue
@@ -127,16 +127,12 @@ def status(runtime, row: dict, source_version: str = '2.1.293') -> dict | None:
     :param source_version: 官方源版本。
     :return: 已安装版本的只读信息，基础后端或缺失安装返回None。
     """
-    _record(runtime._root(row), source_version)
+    if source_version != '2.1.293':
+        return None
     try:
         config = json.loads(runtime._sender_config(row).read_text())
-        native = config.get('native')
-        if not isinstance(native, dict):
-            return None
-        selected = native.get('runtimes', {}).get(source_version)
-        if selected is None and source_version == '2.1.293':
-            selected = native
-        if not isinstance(selected, dict):
+        selected = registered_293(config.get('native'))
+        if selected is None:
             return None
         try:
             validate_records(runtime._root(row), config['binding']['account_id'])
@@ -145,8 +141,7 @@ def status(runtime, row: dict, source_version: str = '2.1.293') -> dict | None:
             # 归属或日志异常只投影维护提示，避免把旧记录误当作当前运行身份。
             pending = True
         legacy = bool(selected.get('release') or selected.get('kernel_generation'))
-        builtin = {'release': VERSION_280, 'launcher_sha256': SHA256_280} if source_version == '2.1.280' else {
-            'release': VERSION, 'launcher_sha256': SHA256}
+        builtin = {'release': VERSION, 'launcher_sha256': SHA256}
         return {'management': 'platform', 'source_version': source_version,
             'state': 'reconcile' if pending else 'migration_required' if legacy else 'builtin',
             'revision': str(row['generation']), 'current': selected.get('release') if legacy else builtin,
@@ -158,7 +153,7 @@ def status(runtime, row: dict, source_version: str = '2.1.293') -> dict | None:
 
 def recover_interrupted(root: Path) -> bool:
     """将历史中断显式标为环境对账。@param root 环境根目录。@return 是否仍需对账。"""
-    for version in VERSIONS:
+    for version in HISTORICAL_VERSIONS:
         record = _load(root, version)
         if record.get('preparing_release'):
             # 下载入口已退役；保留中断审计，避免陈旧候选占用采集和CRIU设置的维护门禁。
@@ -186,8 +181,8 @@ def reconcile_legacy(runtime, row: dict, account: dict) -> None:
     account_id = account.get('cc2api_account_id')
     if journal and not migration_context(root, row, account_id):
         raise ValueError('内置内核迁移归属或代次待核对')
-    records = journal.get('records') if journal else {version: _load(root, version) for version in VERSIONS}
-    if not isinstance(records, dict) or set(records) != set(VERSIONS) or any(not isinstance(value, dict) for value in records.values()):
+    records = journal.get('records') if journal else {version: _load(root, version) for version in HISTORICAL_VERSIONS}
+    if not isinstance(records, dict) or set(records) != set(HISTORICAL_VERSIONS) or any(not isinstance(value, dict) for value in records.values()):
         raise ValueError('历史内核迁移记录格式无效')
     pending = [record for record in records.values() if record and record.get('state', 'idle') not in TERMINAL]
     if len(pending) != 1 or not account_id:

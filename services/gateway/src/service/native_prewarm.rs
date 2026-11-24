@@ -17,7 +17,7 @@ use crate::model::request_diagnostics::RequestLogMode;
 use crate::service::account::AccountService;
 use crate::service::agy_contract::AGY_ACCESS_VALIDITY_SECONDS;
 use crate::service::diagnostics::RequestDiagnosticsConfig;
-use crate::service::native_contract::{NativePreparation, NativeSourceVersion};
+use crate::service::native_contract::NativePreparation;
 use crate::service::runtime_bridge::agy_environment;
 use crate::service::runtime_transport::{REQUEST_BUDGET_MS, now_ms, prepare, prepare_existing};
 use crate::service::system_update;
@@ -516,13 +516,7 @@ async fn check_one(
                 status = serde_json::to_value(current).map_err(|_| AppError::Internal("检查状态编码失败".into()))?;
                 status["last_preparation"] = serde_json::to_value(prepared).map_err(|_| AppError::Internal("准备状态编码失败".into()))?;
             }
-            let mut alternate = preparation.clone();
-            alternate.source_version = NativeSourceVersion::Cc280;
-            let alternate = match timeout_at(deadline.min(Instant::now() + Duration::from_secs(2)), transport.native_readiness(alternate)).await {
-                Ok(Ok(current)) => serde_json::to_value(current).map_err(|_| AppError::Internal("检查状态编码失败".into()))?,
-                _ => json!({"source_version":"2.1.280","state":"unknown","reason":"runtime_unavailable"}),
-            };
-            status["versions"] = json!({"2.1.293":status.clone(),"2.1.280":alternate});
+            status["versions"] = json!({"2.1.293":status.clone()});
             // sender 回执只代表原绑定；发布前重新读取运行环境和权威身份。
             let current_transport = prepare_existing(&account).await?;
             let current_account = accounts.get_account(id).await?;

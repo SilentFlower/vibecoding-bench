@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 from source_layout import source_path
 
-from system_release import BENCH_SCHEMA_SOURCES, GATEWAY_SCHEMA_SOURCES, REPO, migration_registries
+from system_release import BENCH_SCHEMA_SOURCES, GATEWAY_SCHEMA_SOURCES, RECEIPT_SCHEMA_SOURCE, REPO, migration_registries
 from database_migration_contract import load_registry
 
 
@@ -27,6 +27,7 @@ def source_ownership(root: Path) -> list[str]:
     python_schemas = {source_path(root, logical) for key, logical in BENCH_SCHEMA_SOURCES.items() if key in bench_registered}
     # 临时清单在每次迁移的私有目录创建并删除，不进入业务数据库版本台账；纯定义仍由此入口核验。
     python_schemas.add(source_path(root, 'orchestrator/cluster_archive_schema.py'))
+    python_schemas.add(source_path(root, RECEIPT_SCHEMA_SOURCE))
     for schema in sorted(python_schemas):
         if not schema.is_file():
             continue

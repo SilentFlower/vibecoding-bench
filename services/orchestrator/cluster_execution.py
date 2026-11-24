@@ -109,6 +109,15 @@ class NodeInspection(NodeLocation):
     observation: dict | None = None
 
 
+class NodeTransportInspection(NodeInspection):
+    """复核已运行的 V2 发送器绑定。
+
+    :param transport_gateway_account: 该环境绑定的网关账号。
+    """
+
+    transport_gateway_account: StrictInt = Field(ge=1)
+
+
 class ImportPreparation(BaseModel):
     """目标已核验私有树与当前中央账号投影。
 
@@ -329,6 +338,8 @@ class NodeExecution:
         :return: 无凭据的角色、身份、内核及观察投影。
         """
         with self._locked(read_only=True, environment_id=request.environment_id):
+            if isinstance(request, NodeTransportInspection):
+                return self._existing_transport(request)
             return self._inspect_locked(request)
 
     def _inspection_row(self, request: NodeLocation) -> dict:
@@ -349,6 +360,39 @@ class NodeExecution:
         finally:
             connection.close()
 
+    def _existing_transport(self, request: NodeTransportInspection) -> dict:
+        """复核已运行绑定，维持原工作。@param request 内部固定范围。@return 私有发送器证明或空绑定。"""
+        row = self._inspection_row(request)
+        connection = self.database()
+        try:
+            account = connection.execute('SELECT cc2api_account_id FROM accounts WHERE id=? AND deleted_at IS NULL',
+                (request.account_id,)).fetchone()
+        finally:
+            connection.close()
+        gateway_id = request.transport_gateway_account
+        if account is None or account['cc2api_account_id'] != gateway_id:
+            raise ValueError('节点已有发送器与网关账号不一致')
+        runtime = self._runtime(_GatewaySnapshot(gateway_id, {}, bench_account_id=request.account_id))
+        scope = {'protocol': 1, 'node_key': self.node_key, 'assignment_revision': request.assignment_revision}
+        try:
+            runtime._check_node_fence(row)
+            if row['state'] not in ('ready', 'cli_reconcile'):
+                return {**scope, 'binding': None}
+            for role in ('network', 'sender'):
+                container = role_container(runtime, row, role, allow_old_release=True)
+                container.reload()
+                if container.status != 'running':
+                    return {**scope, 'binding': None}
+            binding = _read_json(runtime._sender_config(row))['binding']
+            if (binding.get('account_id') != gateway_id or binding.get('environment_id') != request.environment_id
+                    or binding.get('generation') != row['generation'] or binding.get('release_id') != role_release(runtime, row)):
+                raise ValueError('节点已有发送器归属或代次不一致')
+            network = role_container(runtime, row, 'network', allow_old_release=True)
+            address = str(ipaddress.ip_address(network.attrs['NetworkSettings']['Networks'][runtime.network]['IPAddress']))
+            return {**scope, 'binding': binding, 'sender_address': address}
+        finally:
+            self._release_runtime(runtime)
+
     def _inspect_locked(self, request: NodeInspection) -> dict:
         row=self._inspection_row(request)
         root=self.data/'environments'/request.environment_id
@@ -361,12 +405,10 @@ class NodeExecution:
                 identity_status = '已确认 CLI 本地设备身份' if ':config.userID' in identity['source'] else '已观测 CLI 设备身份'
             except ValueError:
                 identity_status = '节点 CLI 身份待核对'
-            kernels = {}
-            for version in ('2.1.280', '2.1.293'):
-                try:
-                    kernels[version] = native_kernel_status(runtime, row, version)
-                except (OSError, ValueError, TypeError):
-                    kernels[version] = None
+            try:
+                kernel = native_kernel_status(runtime, row)
+            except (OSError, ValueError, TypeError):
+                kernel = None
             connection = self.database()
             try:
                 account = connection.execute('SELECT cc2api_account_id FROM accounts WHERE id=?', (row['account_id'],)).fetchone()
@@ -385,7 +427,7 @@ class NodeExecution:
             return {'protocol': 1, 'node_key': self.node_key, 'assignment_revision': request.assignment_revision,
                 'environment_id': row['environment_id'], 'account_id': row['account_id'], 'generation': row['generation'],
                 'role_status': runtime.role_status(row), 'state': row['state'], 'busy': bool(busy),
-                'identity_status': identity_status, 'native_kernels': kernels, 'native_kernel': kernels['2.1.293'],
+                'identity_status': identity_status, 'native_kernels': {'2.1.293': kernel}, 'native_kernel': kernel,
                 'physical_features': physical_features_summary(row, root / 'runtime/physical-features.json', time.time()),
                 'runtime_release': role_release(runtime, row), 'gateway_account_id': binding, **settings,
                 'cli_versions': sorted(path.parent.name for path in (root / 'cli').glob('*/.ready'))}
@@ -996,7 +1038,11 @@ def execute_operation(executor: NodeExecution, operation: str, raw: bytes) -> di
     if operation not in operations:
         raise ValueError('节点执行操作无效')
     request_type, action = operations[operation]
-    return action(request_type.model_validate(strict_json(raw, 2 * 1024 * 1024)))
+    payload = strict_json(raw, 2 * 1024 * 1024)
+    if operation == 'inspect' and isinstance(payload, dict) and 'transport_gateway_account' in payload:
+        # 回执校验按原模型字段全集比对，V2 查询使用独立输入以保留原凭据协议。
+        request_type = NodeTransportInspection
+    return action(request_type.model_validate(payload))
 
 
 def main() -> None:

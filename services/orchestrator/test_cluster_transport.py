@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import gzip
 import hashlib
+import json
 import os
 import shutil
 import socket
@@ -13,11 +14,14 @@ import threading
 import unittest
 import uuid
 import time
+from base64 import b64encode
+from contextlib import closing
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
 from fastapi import FastAPI, Request
-from httpx import AsyncClient
+from httpx import AsyncClient, ConnectError
 from starlette.responses import Response, StreamingResponse
 from uvicorn import Config, Server
 
@@ -27,6 +31,10 @@ from database_migrations import apply_migrations
 from system_update_gate import DeploymentGate
 from runtime_files import atomic_json
 import test_cluster_ssh as ssh_fixture
+
+
+async def _chunked(payload: bytes):
+    yield payload
 
 
 class ClusterTransportTests(unittest.IsolatedAsyncioTestCase):
@@ -146,6 +154,108 @@ class ClusterTransportTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual('Bearer ' + self.secret, headers['authorization'])
         self.assertNotIn('x-v3-relay-token', headers)
         self.assertNotIn('x-private-hop', headers)
+
+    async def test_tui_control_frames_are_reencoded_by_relay(self) -> None:
+        """真实中继重建分块边界并保留数据。:return: None。"""
+        for action in ('prepare', 'send', 'cancel'):
+            path = f'internal/tui-v2/{action}'
+            route = self.path.replace('internal/send', path)
+            for payload in (b'', b'x'):
+                response = await self.client.post(route, headers=self.headers(), content=_chunked(payload))
+                self.assertEqual(201, response.status_code)
+                received_path, headers, received = self.requests[-1]
+                self.assertEqual(f'tui-v2/{action}', received_path)
+                self.assertEqual('chunked', headers.get('transfer-encoding'))
+                self.assertEqual(payload, received)
+                self.assertEqual('Bearer ' + self.secret, headers['authorization'])
+                self.assertNotIn('x-v3-relay-token', headers)
+            other_method = await self.client.get(route, headers=self.headers())
+            self.assertEqual(404, other_method.status_code)
+        self.assertEqual(6, len(self.requests))
+
+    async def test_original_tui_relay_closes_when_source_is_fenced(self) -> None:
+        """排空只保留同账号的 V2 路由；隔离源后不再转发。:return: None。"""
+        operation = 'a' * 32
+        with closing(self.database()) as connection, connection:
+            connection.execute("UPDATE account_node_assignments SET phase='maintenance' WHERE account_id=1")
+            target = connection.execute("SELECT id FROM cluster_nodes WHERE node_key='local'").fetchone()['id']
+            connection.execute("INSERT INTO node_migrations VALUES(?,1,?,?,'requested',?,0,0)",
+                (operation, self.node_id, target, json.dumps({'last_confirmed_phase': 'requested', 'source_revision': 1})))
+        for action in ('prepare', 'send', 'cancel'):
+            route = self.path.replace('internal/send', f'internal/tui-v2/{action}')
+            self.assertEqual(503, (await self.client.post(route, headers={'authorization': 'Bearer wrong'})).status_code)
+            self.assertEqual(201, (await self.client.post(route, headers=self.headers())).status_code)
+        status = self.path.replace('internal/send', 'internal/status')
+        self.assertEqual(201, (await self.client.get(status, headers=self.headers())).status_code)
+        self.assertEqual(503, (await self.client.post(self.path, headers=self.headers())).status_code)
+        with closing(self.database()) as connection, connection:
+            connection.execute("UPDATE node_migrations SET phase='source_fenced' WHERE operation_id=?", (operation,))
+        self.assertEqual(503, (await self.client.get(status, headers=self.headers())).status_code)
+        for action in ('prepare', 'send', 'cancel'):
+            route = self.path.replace('internal/send', f'internal/tui-v2/{action}')
+            self.assertEqual(503, (await self.client.post(route, headers=self.headers())).status_code)
+        self.assertEqual(4, len(self.requests))
+
+    @unittest.skipUnless(os.environ.get('FLOWER_TUI_RELAY_TEST_SENDER') and shutil.which('socat'),
+                         '需要通过 FLOWER_TUI_RELAY_TEST_SENDER 指定已构建的 sender，并安装 socat')
+    async def test_tui_control_frames_reach_real_sender_through_relay(self) -> None:
+        """经仓库中继和 Unix 套接字验证真实 sender 的空体边界。:return: None。"""
+        with socket.socket() as listener:
+            listener.bind(('127.0.0.1', 0))
+            address = f'127.0.0.1:{listener.getsockname()[1]}'
+        config = self.root / 'tui-sender.json'
+        atomic_json(config, {'binding': {'account_id': 1, 'environment_id': 'e' * 32,
+            'generation': 2, 'endpoint': f'http://{address}', 'secret': self.secret,
+            'release_id': 'synthetic'}, 'proxy_url': '', 'allowed_origin': 'http://127.0.0.1'})
+
+        async def stop(process):
+            if process.returncode is None:
+                process.terminate()
+                await asyncio.wait_for(process.wait(), timeout=5)
+
+        sender = await asyncio.create_subprocess_exec(os.environ['FLOWER_TUI_RELAY_TEST_SENDER'],
+            env={'V3_SENDER_CONFIG': str(config), 'V3_SENDER_LISTEN': address, 'RUST_LOG': 'warn'})
+        self.addAsyncCleanup(stop, sender)
+        async with AsyncClient(trust_env=False, timeout=1) as client:
+            for _ in range(100):
+                if sender.returncode is not None:
+                    self.fail(f'sender 启动退出 {sender.returncode}')
+                try:
+                    response = await client.get(f'http://{address}/internal/status', headers=self.headers())
+                    self.assertEqual(200, response.status_code)
+                    break
+                except ConnectError:
+                    await asyncio.sleep(0.02)
+            else:
+                self.fail('sender 启动超时')
+        endpoint = self.root / 'tui-real-sender.sock'
+        bridge = await asyncio.create_subprocess_exec('socat', f'UNIX-LISTEN:{endpoint},fork', f'TCP:{address}')
+        self.addAsyncCleanup(stop, bridge)
+        for _ in range(100):
+            if endpoint.is_socket():
+                break
+            await asyncio.sleep(0.02)
+        else:
+            self.fail('Unix 转接套接字启动超时')
+        self.registry.register(replace(self.entry, socket_path=endpoint))
+        for action, bad_body in (('send', 'V2 发送只接收原预留信封'),
+                                 ('cancel', 'V2 取消只接收原预留信封')):
+            path = f'internal/tui-v2/{action}'
+            route = self.path.replace('internal/send', path)
+            for payload, expected in ((b'', 'V2 预留身份或正文不匹配'), (b'x', bad_body)):
+                response = await self.client.post(route, headers=self.headers(), content=_chunked(payload))
+                self.assertEqual(400, response.status_code)
+                # 预留信封特意省略。错误类别区分已进入身份校验与正文入口拒绝。
+                self.assertIn(expected, response.json()['error'])
+        # 过期信封可幂等取消，整个用例无需挂载账号持久卷。
+        expired = b64encode(json.dumps({'account_id': 1, 'environment_id': 'e' * 32, 'generation': 2,
+            'principal_id': 1, 'session_id': 'synthetic', 'reservation_id': str(uuid.uuid4()),
+            'deadline_unix_ms': 1, 'continuation_only': False}).encode()).decode()
+        cancel = 'internal/tui-v2/cancel'
+        response = await self.client.post(self.path.replace('internal/send', cancel),
+            headers={**self.headers(), 'x-v3-tui-reservation': expired},
+            content=_chunked(b''))
+        self.assertEqual(204, response.status_code)
 
     async def test_stream_cancel_closes_sender_and_releases_activity(self) -> None:
         """客户端取消真实 SSE 后关闭上游，活动覆盖流生命周期。:return: None。"""

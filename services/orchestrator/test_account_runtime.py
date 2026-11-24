@@ -21,7 +21,8 @@ from docker import APIClient
 from docker.types import Mount
 
 from account_runtime import AccountRuntime, RuntimeBusy, atomic_json, derive_v3_fingerprint, locale_for_timezone
-from account_isolation import ROLE_COLUMNS, role_labels
+from account_isolation import ROLE_COLUMNS, role_labels, tui_host_memory
+from resource_budget import isolated_account_limits
 from system_profile import (COMPUTER_PROFILE_LABEL, COMPUTER_PROFILE_PROBE, DMI_DIRECTORIES,
     SYSTEM_PROFILE_LABEL, SYSTEM_PROFILE_PROBE, generate_computer_profile, generate_system_profile)
 from physical_features import FEATURE_LABELS, physical_features_summary
@@ -420,7 +421,7 @@ class AccountRuntimeTests(unittest.TestCase):
         snapshots, read_error = self.runtime.native_preparation_snapshots()
         self.assertIsNone(read_error)
         self.gateway._request.assert_called_once_with('GET', '/admin/native-preparations', timeout=3)
-        with patch('account_runtime._read_json', return_value={'native': {'binary_path': 'synthetic'}}), \
+        with patch('account_runtime._read_json', return_value={'native': {'binary_path': '/usr/local/bin/ccrb-runtime'}}), \
                 patch.object(self.runtime, 'ensure', side_effect=AssertionError('禁止唤醒')):
             summary = self.runtime.native_preparation_summary(row, account, snapshots)
             self.assertEqual((summary['state'], summary['pid']), ('ready', 123))
@@ -498,7 +499,7 @@ class AccountRuntimeTests(unittest.TestCase):
             ({**current, 'kernel_generation': 'old'}, 'binding_unverified', True),
             ({**current, 'checked_at_ms': int(time.time() * 1000) - 46000}, 'check_expired', True),
         ]
-        with patch('account_runtime._read_json', return_value={'native': {'kernel_generation': 'current'}}), \
+        with patch('account_runtime._read_json', return_value={'native': {'binary_path': '/usr/local/bin/ccrb-runtime', 'kernel_generation': 'current'}}), \
                 patch.object(self.runtime, 'ensure', side_effect=AssertionError('禁止唤醒')):
             for value, reason, checking in cases:
                 with self.subTest(reason=reason, value=value):
@@ -508,31 +509,32 @@ class AccountRuntimeTests(unittest.TestCase):
             summary = self.runtime.native_preparation_summary(row, account, {7: current})
             self.assertEqual((summary['state'], summary['pid'], summary['checking']), ('ready', 123, True))
 
-    def test_native_readiness_versions_validate_independently(self) -> None:
-        """293旧代状态与280同代状态独立投影，过期280证据立即失效。@return None。"""
+    def test_native_readiness_ignores_retired_280_observations(self) -> None:
+        """旧双版快照只能使用 293 的同代数据，即使 280 有可用 PID。@return None。"""
         row = self.runtime._row('synthetic', 1)
         row.update(state='ready', generation=3)
         current = {'source_version': '2.1.280', 'environment_id': row['environment_id'], 'generation': 3,
             'kernel_generation': '280-current', 'state': 'ready', 'checked_at_ms': int(time.time() * 1000),
             'pid': 280, 'idle_workers': 1, 'live_workers': 1}
         snapshot = {**current, 'source_version': '2.1.293', 'generation': 2, 'versions': {'2.1.280': current}}
-        config = {'native': {'kernel_generation': '293-current', 'runtimes': {'2.1.280': {
+        config = {'native': {'binary_path': '/usr/local/bin/ccrb-runtime', 'kernel_generation': '293-current', 'runtimes': {'2.1.280': {
             'binary_path': '/usr/local/bin/ccrb-runtime-280', 'kernel_generation': '280-current'}}}}
         with patch('account_runtime._read_json', return_value=config):
             result = self.runtime.native_preparation_summary(row, {'cc2api_account_id': 7}, {7: snapshot})
             self.assertEqual(result['reason'], 'binding_unverified')
-            self.assertEqual(result['versions']['2.1.280']['pid'], 280)
-            current['checked_at_ms'] -= 46000
+            self.assertNotIn('versions', result)
+            self.assertIsNone(result.get('pid'))
+            snapshot.update(generation=3, kernel_generation='293-current', pid=293)
             result = self.runtime.native_preparation_summary(row, {'cc2api_account_id': 7}, {7: snapshot})
-            self.assertEqual(result['versions']['2.1.280']['reason'], 'check_expired')
-            self.assertIsNone(result['versions']['2.1.280'].get('pid'))
+            self.assertEqual((result['state'], result['pid']), ('ready', 293))
+            self.assertNotIn('versions', result)
 
     def test_native_readiness_preserves_only_known_maintenance_reasons(self) -> None:
         """平台维护与账号维护分别展示，任意原因保持白名单投影。@return None。"""
         row = self.runtime._row('synthetic', 1)
         row.update(state='ready', generation=3)
         account = {'cc2api_account_id': 7}
-        with patch('account_runtime._read_json', return_value={'native': {'kernel_generation': 'current'}}):
+        with patch('account_runtime._read_json', return_value={'native': {'binary_path': '/usr/local/bin/ccrb-runtime', 'kernel_generation': 'current'}}):
             for reason, expected in [('system_maintenance', 'system_maintenance'),
                     ('maintenance', 'maintenance'), ('arbitrary-secret', 'maintenance'), (None, 'maintenance')]:
                 with self.subTest(reason=reason):
@@ -2081,6 +2083,12 @@ class AccountRuntimeTests(unittest.TestCase):
             "upstream_socks5_user": "", "upstream_socks5_pass": ""}
         with patch.object(self.runtime, "_sender_active", return_value=2), patch.object(self.runtime, "_ensure_version", side_effect=ValueError("CLI unavailable")) as installer:
             self.assertEqual(self.runtime.transport(account, "9.9.9"), configuration["binding"])
+            # V2 路由也用本账号的 sender。准备传输时应保留其独立的事件源配置。
+            configuration["tui_v2"] = {"max_reservations": 2}
+            atomic_json(self.runtime._sender_config(row), configuration)
+            self.gateway._request.return_value["request_backend"] = "tui_v2"
+            self.assertEqual(self.runtime.transport(account, "9.9.9"), configuration["binding"])
+            self.assertEqual(json.loads(self.runtime._sender_config(row).read_text()), configuration)
             installer.assert_not_called()
         self.assertEqual(self.runtime._row("synthetic", 1)["state"], "cli_reconcile")
 
@@ -2354,7 +2362,7 @@ class AccountRuntimeTests(unittest.TestCase):
             self.assertEqual(json.loads(path.read_text())['account_id'],8)
 
     def test_stopped_choices_migrate_without_start_and_next_cli_gets_target_layout(self) -> None:
-        """停止时清除历史选择，后续CLI唤醒先补齐双版布局。@return None。"""
+        """停止时清除历史双版选择，后续 CLI 唤醒使用单 293 布局。@return None。"""
         containers = self._isolated_docker()
         labels = self.client.images.get.return_value.attrs['Config']['Labels']
         labels['vibebench.native-runtime'] = '293-raw-1'
@@ -2374,6 +2382,7 @@ class AccountRuntimeTests(unittest.TestCase):
                 container.status = 'exited'
             self.runtime._update(row, state='stopped')
             config = json.loads(self.runtime._sender_config(row).read_text())
+            config['native']['runtimes'] = {'2.1.280': {'binary_path': '/usr/local/bin/ccrb-runtime-280'}}
             config['native'].update(release={'release':'v0.1.0-beta.6','launcher_sha256':'a'*64}, kernel_generation='old')
             atomic_json(self.runtime._sender_config(row), config)
             record = self.runtime._root(row) / 'runtime/native-kernel-upgrade.json'
@@ -2386,11 +2395,11 @@ class AccountRuntimeTests(unittest.TestCase):
             labels['vibebench.native-runtime-versions'] = '2.1.280,2.1.293'
             resumed, _ = self.runtime.ensure(account, prepare_sender=False)
             self.assertEqual(resumed['state'], 'ready')
-            self.assertEqual(self.client.containers.run.call_count, 6)
-            self.assertIn('2.1.280', json.loads(self.runtime._sender_config(resumed).read_text())['native']['runtimes'])
+            self.assertEqual(self.client.containers.run.call_count, 3)
+            self.assertNotIn('runtimes', json.loads(self.runtime._sender_config(resumed).read_text())['native'])
 
-    def test_platform_upgrade_completes_dual_layout_before_warmup_and_first_api(self) -> None:
-        """旧293登记在维护重建时补齐，养号期间首笔293和280保持原代次。@return None。"""
+    def test_platform_upgrade_retires_dual_layout_before_warmup_and_first_api(self) -> None:
+        """历史双版账号在节点升级时归一。两个版本的客户端使用同一已验收的 293。@return None。"""
         self._isolated_docker()
         labels = self.client.images.get.return_value.attrs['Config']['Labels']
         labels['vibebench.native-runtime'] = '293-raw-1'
@@ -2403,23 +2412,26 @@ class AccountRuntimeTests(unittest.TestCase):
             self.assertTrue(request.full_url.endswith('/internal/native/status'))
             row = self.runtime._row('synthetic', 1)
             return io.BytesIO(json.dumps({'environment_id': row['environment_id'], 'generation': row['generation'],
-                'versions': {version: {'available': True, 'version': version} for version in ('2.1.280','2.1.293')}}).encode())
+                'versions': {'2.1.293': {'available': True, 'version': '2.1.293'}}}).encode())
         with patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sync_proxy'), \
                 patch.object(self.runtime, '_sender_active', return_value=0), \
                 patch.object(self.runtime, '_notify_native_preparation'), \
                 patch.dict(os.environ, {'V3_NATIVE_SENDER_MEMORY': '1536m'}):
             original, _ = self.runtime.ensure(account)
-            self.assertNotIn('runtimes', json.loads(self.runtime._sender_config(original).read_text())['native'])
+            config = json.loads(self.runtime._sender_config(original).read_text())
+            config['native']['runtimes'] = {'2.1.280': {'binary_path': '/usr/local/bin/ccrb-runtime-280'}}
+            atomic_json(self.runtime._sender_config(original), config)
             self.runtime._stop_environment(original, remove=True)
             self.runtime._update(original, state='stopped')
-            labels.update({'vibebench.native-runtime-versions': '2.1.280,2.1.293', 'vibebench.native-platform-managed': '1'})
+            labels.update({'vibebench.native-runtime-versions': '2.1.293', 'vibebench.native-platform-managed': '1'})
             with patch('account_runtime.urllib.request.build_opener') as opener:
                 opener.return_value.open.side_effect = verified
                 upgraded, _ = self.runtime.ensure(account, prepare_sender=False)
                 self.assertEqual(upgraded['state'], 'ready')
                 opener.return_value.open.assert_called_once()
             installed = json.loads(self.runtime._sender_config(upgraded).read_text())['native']
-            self.assertEqual(installed['runtimes'], {'2.1.280': {'binary_path': '/usr/local/bin/ccrb-runtime-280'}})
+            self.assertNotIn('runtimes', installed)
+            self.assertEqual(installed['binary_path'], '/usr/local/bin/ccrb-runtime')
             self.assertEqual(installed['memory_mib'], 1536)
             generation, roles = upgraded['generation'], {role: upgraded[column] for role,column in ROLE_COLUMNS.items()}
             with patch.object(self.runtime, 'environment_jobs', return_value=[{'source': 'warmup:synthetic'}]), \
@@ -2660,6 +2672,175 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertNotIn("mac_address", network)
         self.assertEqual(json.loads(row["fingerprint_json"])["mac"],
             network["networking_config"][self.runtime.network]["MacAddress"])
+
+    def test_tui_transport_uses_private_sender_directory_and_bound_account_capacity(self) -> None:
+        """检查 V2 传输目录、绑定前发现和已选账号更新后的预留额度。@return 无。"""
+        self._isolated_docker()
+        self.client.images.get.return_value.attrs['Config']['Labels']['vibebench.tui-sender-protocol'] = '1'
+        account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': 7,
+            'upstream_proxy_scheme': 'socks5', 'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080,
+            'upstream_socks5_user': '', 'upstream_socks5_pass': ''}
+        config = {'auth_type': 'oauth', 'status': 'active', 'proxy_url': 'socks5://192.0.2.2:1080',
+            'request_backend': 'legacy', 'concurrency': 1}
+        self.gateway._request.return_value = config
+        with patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sender_active', return_value=0):
+            row, _ = self.runtime.ensure(account)
+            generation = row['generation']
+            role_options = {call.kwargs['labels']['vibebench.role']: call.kwargs
+                            for call in self.client.containers.run.call_args_list}
+            path = self.runtime._sender_config(row)
+            socket_dir = path.parent / 'tui-v2'
+            self.assertEqual((1001, 1001, 0o700), (socket_dir.stat().st_uid, socket_dir.stat().st_gid,
+                                                  socket_dir.stat().st_mode & 0o777))
+            for role, options in role_options.items():
+                volumes = options.get('volumes', {})
+                if role == 'account-sender':
+                    self.assertEqual(volumes[str(socket_dir)], {'bind': '/run/v3/tui-v2', 'mode': 'rw'})
+                    self.assertEqual(volumes[str(path.parent)], {'bind': '/run/v3', 'mode': 'ro'})
+                else:
+                    self.assertNotIn(str(socket_dir), volumes)
+            before = json.loads(path.read_text())
+            self.assertEqual({'max_reservations': 2}, before['tui_v2'])
+            self.assertIsNone(before['native'])
+            self.assertFalse((socket_dir / 'events.sock').exists())
+            config.update(request_backend='tui_v2', concurrency=3)
+            current, _ = self.runtime.ensure(account)
+            self.assertEqual(generation, current['generation'])
+            after = json.loads(path.read_text())
+            self.assertEqual({'max_reservations': 6}, after['tui_v2'])
+            self.assertEqual(before['binding'], after['binding'])
+            self.assertIsNone(after['native'])
+            config['concurrency'] = 64
+            self.runtime.ensure(account)
+            self.assertEqual({'max_reservations': 64}, json.loads(path.read_text())['tui_v2'])
+
+    def test_bound_tui_host_only_mounts_managed_cli_programs(self) -> None:
+        """新 sender 看到受管 CLI 的原子安装，账号登录和用户项目仍由原角色持有。@return 无。"""
+        self._isolated_docker()
+        self.client.images.get.return_value.attrs['Config']['Labels'].update({
+            'vibebench.tui-sender-protocol': '1', 'vibebench.tui-session-host': '1',
+            'vibebench.native-runtime': '293-raw-1',
+        })
+        account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': 7,
+            'upstream_proxy_scheme': 'socks5', 'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080,
+            'upstream_socks5_user': '', 'upstream_socks5_pass': ''}
+        configuration = {'auth_type': 'oauth', 'status': 'active', 'proxy_url': 'socks5://192.0.2.2:1080',
+                         'request_backend': 'legacy', 'concurrency': 1}
+        self.gateway._request.return_value = configuration
+
+        def latest_sender():
+            return next(item.kwargs for item in reversed(self.client.containers.run.call_args_list)
+                        if item.kwargs['labels']['vibebench.role'] == 'account-sender')
+
+        with (patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sender_active', return_value=0),
+              patch.object(self.runtime, '_ensure_version') as install):
+            row, _ = self.runtime.ensure(account)
+            self.assertNotIn('V3_TUI_SESSION_HOST', latest_sender()['environment'])
+            self.assertEqual(latest_sender()['mem_limit'], 128 * 1024 ** 2)
+            install.assert_not_called()
+            provider = self.runtime._sender_config(row).with_name('tui-local-provider.json')
+            provider.write_text('{"base_url":"http://127.0.0.1:18153","local_bearer":"synthetic-local-client"}')
+            provider.chmod(0o640)
+            os.chown(provider, 0, 1001)
+            before = row['generation']
+            row, _ = self.runtime.ensure(account)
+            self.assertGreater(row['generation'], before)
+            self.assertEqual(install.call_args.args[1], '2.1.293')
+            sender = latest_sender()
+            self.assertEqual(sender['environment']['V3_TUI_SESSION_HOST'], '1')
+            self.assertEqual(sender['environment']['V3_TUI_LOCAL_PROVIDER_CONFIG'], '/run/v3/tui-local-provider.json')
+            self.assertEqual(sender['mem_limit'], 768 * 1024 ** 2)
+            self.assertEqual(sender['memswap_limit'], sender['mem_limit'])
+            self.assertEqual(sender['pids_limit'], 192)
+            self.assertEqual(json.loads(self.runtime._sender_config(row).read_text())['tui_v2'],
+                             {'max_reservations': 2})
+            destinations = {volume['bind']: volume['mode'] for volume in sender['volumes'].values()}
+            self.assertEqual(destinations['/cli'], 'ro')
+            self.assertTrue({'/home/node', '/home/node/projects', '/run/v3/access'}.isdisjoint(destinations))
+            configuration['request_backend'] = 'tui_v2'
+            selected, _ = self.runtime.ensure(account)
+            self.assertEqual(selected['generation'], row['generation'])
+            self.assertIsNone(self.runtime._applied_native_sender(selected))
+            provider.unlink()
+            restored, _ = self.runtime.ensure(account)
+            self.assertGreater(restored['generation'], selected['generation'])
+            self.assertNotIn('V3_TUI_SESSION_HOST', latest_sender()['environment'])
+            self.assertEqual(latest_sender()['mem_limit'], 128 * 1024 ** 2)
+            with (patch.dict(os.environ, {'V3_NATIVE_SENDER_MEMORY': '128m'}),
+                  patch.object(self.runtime, '_notify_native_preparation')):
+                configuration['request_backend'] = 'native293'
+                inactive, _ = self.runtime.ensure(account)
+                self.assertEqual(latest_sender()['mem_limit'], 128 * 1024 ** 2)
+                provider.write_text('{"base_url":"http://127.0.0.1:18153","local_bearer":"synthetic-local-client"}')
+                provider.chmod(0o640)
+                os.chown(provider, 0, 1001)
+                dual, _ = self.runtime.ensure(account)
+                self.assertGreater(dual['generation'], inactive['generation'])
+                self.assertEqual(latest_sender()['mem_limit'], 768 * 1024 ** 2)
+                self.assertEqual(self.runtime._applied_native_sender(dual)['memory_mib'], 128)
+                configuration['request_backend'] = 'tui_v2'
+                selected, _ = self.runtime.ensure(account)
+                self.assertIsNone(self.runtime._applied_native_sender(selected))
+                self.assertEqual(latest_sender()['mem_limit'], 768 * 1024 ** 2)
+
+    def test_managed_oauth_tui_starts_without_local_provider_file(self) -> None:
+        """正常账号角色装配 V2 受管模式且不挂账号登录目录。@return 无。"""
+        self._isolated_docker()
+        self.client.images.get.return_value.attrs['Config']['Labels'].update({
+            'vibebench.tui-sender-protocol': '1',
+            'vibebench.tui-session-host': '1',
+            'vibebench.tui-managed-oauth': '1',
+        })
+        self.gateway._request.return_value = {
+            'auth_type': 'oauth', 'status': 'active', 'proxy_url': 'socks5://192.0.2.2:1080',
+            'request_backend': 'legacy', 'concurrency': 1,
+        }
+        account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': 7,
+            'upstream_proxy_scheme': 'socks5', 'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080,
+            'upstream_socks5_user': '', 'upstream_socks5_pass': ''}
+        with (patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sender_active', return_value=0),
+              patch.object(self.runtime, '_ensure_version') as install):
+            row, _ = self.runtime.ensure(account)
+        sender = next(item.kwargs for item in self.client.containers.run.call_args_list
+                      if item.kwargs['labels']['vibebench.role'] == 'account-sender')
+        config = self.runtime._sender_config(row)
+        self.assertIs(json.loads(config.read_text())['tui_managed_oauth'], True)
+        self.assertFalse(config.with_name('tui-local-provider.json').exists())
+        self.assertEqual(sender['environment']['V3_TUI_SESSION_HOST'], '1')
+        self.assertEqual(sender['environment']['V3_TUI_MANAGED_OAUTH'], '1')
+        self.assertNotIn('V3_TUI_LOCAL_PROVIDER_CONFIG', sender['environment'])
+        destinations = {volume['bind']: volume['mode'] for volume in sender['volumes'].values()}
+        self.assertEqual(destinations['/cli'], 'ro')
+        self.assertNotIn('/home/node', destinations)
+        self.assertEqual(install.call_args.args[1], '2.1.293')
+
+    def test_tui_single_model_slot_borrows_only_from_available_ram(self) -> None:
+        """保留各角色预算及已冻结 sender 上限，只有确定的余量计入额外驻留位。@return 无。"""
+        mib = 1024 ** 2
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            provider = root / 'runtime/sender/tui-local-provider.json'
+            provider.parent.mkdir(parents=True)
+            provider.touch(mode=0o640)
+            os.chown(provider, 0, 1001)
+            transport = {'max_reservations': 2}
+            for total, sender in ((1280, 512), (1536, 768), (1792, 768)):
+                with self.subTest(total=total):
+                    ram = f'{total}m'
+                    for native in (None, {'memory_mib': 128}):
+                        budget = tui_host_memory(root, {'mem': ram}, transport, native)
+                        self.assertEqual(budget, f'{sender}m')
+                        limits = isolated_account_limits(ram, '0', budget)
+                        self.assertEqual(limits['network'], (256 * mib, 256 * mib))
+                        self.assertGreaterEqual(limits['cli'][0], 512 * mib)
+                        self.assertEqual(limits['sender'], (sender * mib, sender * mib))
+                        self.assertEqual(sum(memory for memory, _ in limits.values()), total * mib)
+            self.assertEqual(tui_host_memory(root, {'mem': '4g', 'native_sender_memory': '512m'},
+                                            transport, None), '512m')
+            self.assertEqual(tui_host_memory(root, {'mem': '4g', 'native_sender_memory': '1g'},
+                                            transport, None), '1g')
+            with self.assertRaises(ValueError):
+                tui_host_memory(root, {'mem': '1g'}, transport, None)
 
     def test_scratchpad_mount_and_copy_failure_protect_all_original_roles(self) -> None:
         """新CLI接收专有挂载，转存失败时三个原角色都保留。:return: None。"""

@@ -1,4 +1,4 @@
-"""从固定官方npm来源构建并严格核验CI所需的280／293分发体。"""
+"""从固定官方npm来源构建并严格核验CI所需的293分发体。"""
 import argparse
 import base64
 import hashlib
@@ -14,13 +14,9 @@ import urllib.request
 
 PROJECT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT.parent / 'orchestrator'))
-from native_sender import BYTES, BYTES_280, SHA256, SHA256_280
+from native_sender import BYTES, SHA256
 
 SOURCES = {
-    '2.1.280': {'integrity': 'dJHWFrDSIZ26hdLucnK3ehLmzdzYl3MsPC1RzUctAUaYnZlH5kfAZxnK8qYRAQ89GX3OPrLsnFdt/QnP+0Ck6Q==',
-        'source_sha256': '1e08503dbdf3c2cb0d706d32f3408277388d1c76ef108673e8fe42c1b322925b', 'source_bytes': 233709640,
-        'sha256': SHA256_280, 'bytes': BYTES_280,
-        'image_sha256': '4f70823748fe2a64d4c346877b59b31383d3cbca76bf6f9519dd4d5d8128d8e4', 'image_bytes': 111603784},
     '2.1.293': {'integrity': 'tYTbeVuhqD0TW2WJs90Tq+JaKLLnrX5JuxYTLG3pxf4Vr3QMonqsMLu4hZkgVSfEDPZhneFuDDgULQ3/FZzAIw==',
         'source_sha256': '8968405e26db478af44eabc4635ab5ca557057b702a54460a59c13e1b253e978', 'source_bytes': 252755128,
         'sha256': SHA256, 'bytes': BYTES,
@@ -28,7 +24,7 @@ SOURCES = {
 }
 
 
-def verify(path: Path, source_version: str = '2.1.280') -> None:
+def verify(path: Path, source_version: str = '2.1.293') -> None:
     """校验制品、官方来源、执行映像及当前构建输入。
 
     :param path: 分发体及相邻构建报告路径。
@@ -75,7 +71,7 @@ def main() -> None:
     """准备固定制品，官方程序仅在隔离构建器内执行。@return None。"""
     parser = argparse.ArgumentParser()
     parser.add_argument('--directory', type=Path, required=True)
-    parser.add_argument('--source-version', choices=tuple(SOURCES), default='2.1.280')
+    parser.add_argument('--source-version', choices=tuple(SOURCES), default='2.1.293')
     args = parser.parse_args()
     identity = SOURCES[args.source_version]
     url = f'https://registry.npmjs.org/@anthropic-ai/claude-code-linux-x64/-/claude-code-linux-x64-{args.source_version}.tgz'

@@ -42,6 +42,12 @@ RUN python3 -c "import hashlib,json,os;from pathlib import Path;p=Path('/opt/ccr
     && cc -O2 -Wall -Wextra -Werror -Wl,-z,relro,-z,now /opt/ccrb-tls-observer/launch.c -o /opt/ccrb-tls-observer/launch \
     && chmod -R go-w /opt/ccrb-tls-observer
 
+FROM debian:bookworm-slim AS tui-guard-build
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev libseccomp-dev \
+    && rm -rf /var/lib/apt/lists/*
+COPY images/account/tui_guard.c /src/tui_guard.c
+RUN cc -O2 -Wall -Wextra -Werror -Wl,-z,relro,-z,now /src/tui_guard.c -lseccomp -o /tui-guard
+
 FROM python:3.12-slim-bookworm AS criu-build
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc make patch pkg-config protobuf-compiler protobuf-c-compiler libprotobuf-dev libprotobuf-c-dev \
@@ -150,7 +156,11 @@ RUN case "$(uname -m)" in x86_64) arch=x86_64;; aarch64) arch=arm64;; *) exit 1;
 COPY images/sidecar /sidecar
 COPY images/account/init.py /usr/local/bin/v3-account-init
 COPY images/account/network-context.py /usr/local/bin/v3-network-context
-COPY orchestrator/runtime_files.py orchestrator/runtime_diagnostics.py /usr/local/bin/
+COPY orchestrator/runtime_files.py orchestrator/runtime_diagnostics.py orchestrator/tui_workspace_launch.py /usr/local/bin/
+COPY orchestrator/runtime_files.py orchestrator/tui_workspace_launch.py orchestrator/tui_process.py orchestrator/tui_capacity.py /opt/flower/tui/
+COPY images/account/tui_*.py /opt/flower/tui/
+COPY images/account/tui-mod /opt/flower/tui/tui-mod
+COPY --from=tui-guard-build /tui-guard /opt/flower/tui/tui-guard
 COPY images/account/cli-version.sh /usr/local/bin/v3-cli-version
 COPY images/account/passthrough.py /usr/local/bin/v3-passthrough
 COPY images/account/network-guard.py /usr/local/bin/v3-network-guard
@@ -175,11 +185,8 @@ COPY --from=criu-build /opt/ccrb-criu/ /opt/ccrb-criu/
 # iproute2已有libbpf运行依赖；在镜像内验证真实动态库，避免重复刷新整层系统依赖。
 RUN python3 -c "import ctypes,hashlib,json,subprocess;from pathlib import Path;ctypes.CDLL('libbpf.so.1');p=Path('/opt/ccrb-criu');m=json.loads((p/'profile.json').read_text());assert all(hashlib.sha256((p/n).read_bytes()).hexdigest()==s for n,s in m['files'].items());assert subprocess.check_output([str(p/'criu'),'--version'],text=True).strip()=='Version: 4.2'"
 COPY native-runtime/ccrb-runtime /usr/local/bin/ccrb-runtime
-COPY native-runtime/ccrb-runtime-280 /usr/local/bin/ccrb-runtime-280
 RUN echo '017ec892b9dfbf08bf4cb2e5bf59048cb41a0ecfc21b1ad518751a23a911b9b7  /usr/local/bin/ccrb-runtime' | sha256sum -c - \
     && chmod 755 /usr/local/bin/ccrb-runtime
-RUN echo '186b1e9a77738d11584e5fb9da293634a8a6ab68df146666ce81c16ab596de88  /usr/local/bin/ccrb-runtime-280' | sha256sum -c - \
-    && chmod 755 /usr/local/bin/ccrb-runtime-280
 RUN chmod 700 /usr/local/bin/v3-account-init /usr/local/bin/v3-network-context \
     /usr/local/bin/v3-cli-version /usr/local/bin/v3-passthrough /usr/local/bin/process_metrics.py \
     /usr/local/bin/v3-process-metrics /usr/local/bin/v3-network-guard /sidecar \
@@ -194,6 +201,9 @@ LABEL vibebench.product="v3" vibebench.role="account" vibebench.release=$V3_RELE
     vibebench.agy-tool-continuation-protocol="1" \
     vibebench.agy-generation-seconds="240" \
     vibebench.account-platforms="1" vibebench.agy-auth-source-sha256=$V3_AGY_AUTH_SHA256 \
+    vibebench.tui-sender-protocol="1" \
+    vibebench.tui-session-host="1" \
+    vibebench.tui-managed-oauth="1" \
     vibebench.system-update-protocol="1" vibebench.account-runtime-protocol="1" \
     vibebench.fast-system-update="1" \
     vibebench.credential-ownership-protocol="1" \
@@ -201,7 +211,7 @@ LABEL vibebench.product="v3" vibebench.role="account" vibebench.release=$V3_RELE
     vibebench.cli-install-version="2" \
     vibebench.cli-scratchpad-protocol="1" \
     vibebench.native-runtime="293-raw-1" \
-    vibebench.native-runtime-versions="2.1.280,2.1.293" \
+    vibebench.native-runtime-versions="2.1.293" \
     vibebench.native-platform-managed="1" \
     vibebench.native-tls-observer="1" \
     vibebench.native-criu="1" \

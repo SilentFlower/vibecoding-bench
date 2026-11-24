@@ -443,6 +443,8 @@ class HostDeployment:
         evidence = self._runtime_snapshot(central_only, control_only=True) if control_only else self._runtime_snapshot(central_only)
         if evidence.get('agy_update_blockers'):
             raise ValueError('。'.join(evidence['agy_update_blockers']))
+        if evidence.get('phase') != 'blocked':
+            self._require_v2_tools_complete(self.request('gateway', '/admin/runtime/system-update/status'))
         deadline = time.monotonic() + 5
         while evidence.get('phase') == 'blocked' and evidence.get('ready') is not True:
             # 已排空后的冻结必须使用完整快照；历史程序的只读占锁不能变成缺失角色来源。
@@ -481,6 +483,7 @@ class HostDeployment:
         if runtime.get('agy_update_blockers'):
             raise ValueError('。'.join(runtime['agy_update_blockers']))
         gateway = self.request('gateway', '/admin/runtime/system-update/status')
+        self._require_v2_tools_complete(gateway)
         if any(value.get('phase') != 'blocked' or value.get('epoch') != operation['epoch'] for value in (gateway, runtime)):
             raise ValueError('部署维护接管代次不一致')
         node_removals = [] if rolling else runtime.get('node_removals', [])
@@ -492,6 +495,11 @@ class HostDeployment:
         return {'ready': gateway.get('active') == 0 and runtime.get('ready') is True,
             'blockers': (['网关仍有在途活动'] if gateway.get('active') else []) + runtime.get('blockers', []),
             'environments': runtime['environments']}
+
+    @staticmethod
+    def _require_v2_tools_complete(gateway: dict) -> None:
+        if gateway.get('tui_tool_pending') is True:
+            raise ValueError('请先完成原 V2 工具轮，再更新或回退服务')
 
     def cancel_inference(self, operation: dict) -> None:
         """通知原网关关闭推理并核对接管归属。:param operation: 冻结的更新操作。:return: 无。"""
@@ -1187,8 +1195,10 @@ class HostDeployment:
             operation.setdefault('environment_results', {})[current['environment_id']] = result
             save()
 
-    def stage_local_rollout(self, operation: dict, selected: dict) -> dict:
-        """在释放全局门禁前发布逐环境的旧来源授权。@param operation 已冻结的更新。@param selected 目标组合。@return 公共后台进度。"""
+    def stage_local_rollout(self, operation: dict, selected: dict, *, rebuilt: list[dict] | None = None) -> dict:
+        """发布逐环境的旧来源。@param operation 已冻结的更新。@param selected 目标组合。
+        @param rebuilt 已完成全量换版时的目标实测快照。@return 后台更新进度。
+        """
         original = operation['original']['selection']
         target = selected['selection']
         deployment = self.policy['deployment']
@@ -1196,33 +1206,57 @@ class HostDeployment:
         prior_entries = previous['environments'] if previous else {}
         original_id = self.verify_images(original)['account']['Id']
         target_id = self.verify_images(target)['account']['Id']
-        accounts, entries = {}, {}
+        accounts, entries, stopped_entries, rebuilt_entries = {}, {}, {}, {}
+        observed = {item['environment_id']: item for item in rebuilt} if rebuilt is not None else {}
         for item in operation['before']['environments']:
+            if item.get('node_kind') == 'ssh':
+                continue
             identifier = item['environment_id']
             roles = item.get('roles', {})
-            if item['state'] in ('stopped', 'retired') and not any(role['state'] == 'running' for role in roles.values()):
-                continue
             origin = item.get('origin') or {}
+            if item['state'] in ('stopped', 'retired') and not any(role['state'] == 'running' for role in roles.values()):
+                if (item['state'] == 'stopped' and item.get('platform') != 'antigravity'
+                        and item.get('account_id') is not None and item.get('gateway_account_id') is not None
+                        and origin.get('environment_id') == identifier and origin.get('protocol') == 1
+                        and origin.get('release') == original['account']['release']
+                        and origin.get('reference') == original['account']['reference']
+                        and origin.get('image_id') == original_id):
+                    stopped_entries[identifier] = {key: item[key] for key in
+                        ('account_id', 'gateway_account_id', 'generation')}
+                    stopped_entries[identifier]['origin'] = origin
+                continue
             if (origin.get('release') == target['account']['release'] and origin.get('image_id') == target_id
                     and origin.get('reference') == target['account']['reference']):
                 continue
             entry = {key: item.get(key) for key in ('account_id', 'gateway_account_id', 'generation')}
             entry.update(origin=origin, roles={role: value['id'] for role, value in roles.items()})
-            account = {'environment_id': identifier, 'name': item['name'], 'generation': item['generation'], 'state': 'queued'}
-            accounts[identifier] = account
             valid_origin = (origin.get('release') == original['account']['release']
                             and origin.get('reference') == original['account']['reference']
                             and origin.get('image_id') == original_id) or prior_entries.get(identifier) == entry
-            if (not valid_origin or set(roles) != {'cli', 'sender', 'network'} or origin.get('protocol') != 1
-                    or any(role['image_id'] != origin.get('image_id') for role in roles.values())
-                    or (entry['account_id'] is None and entry['gateway_account_id'] is None)):
+            verified = (valid_origin and set(roles) == {'cli', 'sender', 'network'} and origin.get('protocol') == 1
+                and all(role['image_id'] == origin.get('image_id') for role in roles.values())
+                and (entry['account_id'] is not None or entry['gateway_account_id'] is not None))
+            if rebuilt is not None:
+                actual = observed.get(identifier, {})
+                actual_origin = actual.get('origin') or {}
+                if (verified and entry['account_id'] is not None and entry['gateway_account_id'] is not None
+                        and actual.get('account_id') == entry['account_id']
+                        and actual.get('generation', 0) > entry['generation']
+                        and actual_origin.get('release') == target['account']['release']
+                        and actual_origin.get('image_id') == target_id):
+                    rebuilt_entries[identifier] = entry
+                continue
+            account = {'environment_id': identifier, 'name': item['name'], 'generation': item['generation'], 'state': 'queued'}
+            accounts[identifier] = account
+            if not verified:
                 account.update(state='needs_check', error='旧环境镜像或账号归属待核对', retryable=False)
                 continue
             entries[identifier] = entry
         record = {'schema_version': 1, 'deployment': deployment,
             'operation_id': operation['operation_id'], 'epoch': operation['epoch'],
             'control_release': target['control']['release'], 'account_release': target['account']['release'],
-            'target_image_id': target_id, 'environments': entries}
+            'target_image_id': target_id, 'environments': entries, 'stopped_environments': stopped_entries,
+            'rebuilt_environments': rebuilt_entries}
         atomic_json(rollout_path(self.gate, record['control_release']), record)
         return accounts
 
@@ -1294,6 +1328,8 @@ class HostDeployment:
                 current = next(item for item in evidence['environments'] if item['environment_id'] == original['environment_id'])
                 if current['generation'] != original['generation'] or current.get('roles') != original.get('roles'):
                     raise ValueError('兼容更新意外改变了账号容器或环境代次')
+        elif not restoring and not operation.get('rolling_accounts'):
+            self.stage_local_rollout(operation, selected, rebuilt=evidence['environments'])
 
     def release(self, operation: dict) -> None:
         """只释放本操作持有的维护门禁。

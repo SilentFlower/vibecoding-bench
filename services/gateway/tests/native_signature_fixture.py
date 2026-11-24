@@ -41,7 +41,7 @@ class Handler(BaseHTTPRequestHandler):
                 'secret': 'synthetic-private-secret' * 2, 'release_id': 'native-repair-fixture'})
         elif self.path.endswith('/internal/native/status'):
             self.reply(200, {'raw_input_protocol': 1, 'environment_id': environment, 'generation': 1,
-                'versions': {version: {'available': True} for version in ['2.1.280', '2.1.293']}})
+                'versions': {'2.1.293': {'available': True}}})
         elif self.path == '/observations':
             self.reply(200, self.records)
         elif self.path.startswith('/oauth-release/'):

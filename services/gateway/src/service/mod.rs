@@ -45,6 +45,12 @@ pub(crate) mod stream_error;
 pub mod system_update;
 pub(crate) mod task_proxy_ticket;
 pub mod telemetry;
+pub(crate) mod tui_backend;
+mod tui_native_drain;
+#[cfg(target_os = "linux")]
+mod tui_sender;
+mod tui_sender_response;
+mod tui_tool_history;
 pub mod usage;
 pub mod usage_poller;
 pub mod usage_pricing;

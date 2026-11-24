@@ -433,6 +433,11 @@ print(json.dumps({'paused':valid,'environment':root.exists()}))
         owner = 'node-sync:' + job['job_id'] + ':' + str(account['id'])
         proof = job.setdefault('leases', {}).get(str(account['id']))
         snapshot = self.gateway._request('GET', path)
+        if snapshot.get('tui_pending') is True:
+            if proof and any(all(holder.get(key) == value for key, value in proof.items())
+                             for holder in snapshot.get('holders', [])):
+                self.gateway._request('POST', path, {'operation': 'release', **proof})
+            raise NodeSynchronizationWait('原 V2 工具轮仍需在源节点收口')
         holders = snapshot.get('holders')
         if holders:
             if (proof is None or len(holders) != 1 or any(holders[0].get(key) != proof[key] for key in ('owner', 'generation'))
@@ -448,7 +453,16 @@ print(json.dumps({'paused':valid,'environment':root.exists()}))
         self._save(job)
         if snapshot.get('active') != 0 or snapshot.get('importing') != 0:
             raise NodeSynchronizationWait('节点API排空尚未确认，继续等待')
-        self.gateway._request('POST', path, {'operation': 'claim', **proof})
+        try:
+            self.gateway._request('POST', path, {'operation': 'claim', **proof})
+        except Exception:
+            latest = self.gateway._request('GET', path)
+            if latest.get('tui_pending') is True and any(
+                    all(holder.get(key) == value for key, value in proof.items())
+                    for holder in latest.get('holders', [])):
+                self.gateway._request('POST', path, {'operation': 'release', **proof})
+                raise NodeSynchronizationWait('原 V2 工具轮仍需在源节点收口') from None
+            raise
         stopped, failed = threading.Event(), threading.Event()
 
         def heartbeat():
@@ -534,6 +548,8 @@ print(json.dumps({'paused':valid,'environment':root.exists()}))
                     'phase': 'draining', 'journal': str(journal), 'fences': {}, 'accounts': [], 'late_restore': late_restore,
                     'data_policy': 'in_place',
                     'preparation_before': saved.get('original_preparation') or saved}
+                old_env = dict(value.split('=', 1) for value in control.attrs.get('Config', {}).get('Env', []) if '=' in value)
+                job['old_account_release'] = old_env.get('V3_ACCOUNT_RELEASE') or job['old_release']
                 if maintenance is not None:
                     job.update(platform_operation=maintenance['operation_id'], platform_epoch=maintenance['epoch'])
                 job['backup_epoch'] = uuid.UUID(job['platform_epoch']).hex if job.get('platform_epoch') else job['job_id']
@@ -858,7 +874,8 @@ print(json.dumps({'paused':valid,'environment':root.exists()}))
                 raise NodeSynchronizationWait('节点实际代次或持久执行登记仍需收口')
             if account.get('cc2api_account_id') is not None:
                 lease = self.gateway._request('GET', f'/admin/runtime/accounts/{account["cc2api_account_id"]}/lease')
-                if lease.get('active') or lease.get('waiting') or lease.get('holders') or lease.get('importing'):
+                if (lease.get('active') or lease.get('waiting') or lease.get('holders')
+                        or lease.get('importing') or lease.get('tui_pending') is True):
                     raise NodeSynchronizationWait('节点账号API或租约仍在使用')
         remote = self.service.docker(node_row['id'])
         roles, releases, images = {}, set(), set()

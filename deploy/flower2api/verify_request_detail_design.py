@@ -5,6 +5,37 @@ from verify_environment_ui import ROOT,BASE
 from verify_native_diagnostics_cpu import DiagnosticsCpuFixture,REQUEST
 
 
+async def verify_tui_stages(page, dialog):
+    """验证 V2 详情按来源展示已观测正文和 TLS 缺口。
+    @param page 隔离浏览器页。@param dialog 请求详情。@return 无。
+    """
+    detail = BASE + '/admin/request-diagnostics/' + REQUEST
+    attempt = '44444444-4444-4444-8444-444444444444'
+    row = {'request_id': REQUEST, 'account_id': 1, 'attempt_count': 1, 'outcome': 'success', 'log_mode': 'debug'}
+    observed = {'attempt_id': attempt, 'account_id': 1, 'ordinal': 1, 'status_code': 200,
+                'outcome': 'success', 'context': {'kernel': 'tui_v2'}, 'capture_status': 'queued', 'log_mode': 'debug'}
+    preview = {'headers': [], 'body_truncated': False, 'headers_truncated': False,
+               'original_body_bytes': None, 'original_body_sha256': None}
+    missing = '独立提供方的对外 TLS 写出尚未观测'
+    snapshot = {**preview, 'stage': 'tui_provider_request', 'body': '{"model":"test"}',
+                'ingress': {**preview, 'body': '{"metadata":{"audit_label":"test"}}'},
+                'stages': [{'stage':'ingress', 'status':'complete', 'source':'gateway_http_ingress', 'representation':'http_logical_bytes'},
+                           {'stage':'tui_provider_request', 'status':'complete', 'source':'tui_sender_http', 'representation':'http_request_to_local_provider'},
+                           {'stage':'wire_final', 'status':'unavailable', 'source':'unavailable', 'representation':'unavailable', 'note':missing}]}
+    await page.route(detail, lambda route: route.fulfill(json={'request':row, 'attempts':[observed]}))
+    await page.route(detail+'/captures/'+attempt, lambda route: route.fulfill(json={'state':'saved', 'snapshot':snapshot}))
+    await page.get_by_role('button', name='详情', exact=True).first.click()
+    await dialog.get_by_role('button', name='阶段证据', exact=True).click()
+    stages = dialog.locator('[data-native-stages]')
+    await expect(stages.get_by_role('button', name='Sender 提交给提供方')).to_have_attribute('aria-pressed', 'true')
+    await expect(stages.locator('pre').last).to_contain_text('"model"')
+    await stages.get_by_role('button', name='入口原文').click()
+    await expect(stages.locator('pre').last).to_contain_text('audit_label')
+    await stages.get_by_role('button', name='最终TLS写出').click()
+    await expect(stages.locator('.request-empty-capture')).to_contain_text(missing)
+    await expect(stages.locator('pre')).to_have_count(0)
+
+
 async def main():
     """核对真实组件及字体尺寸，所有请求使用合成证据。@return 无。"""
     fixture=DiagnosticsCpuFixture(ROOT/'apps/web/dist');errors=[];out=ROOT/'.deploy/frontend-sidebar-refresh/request-deep';out.mkdir(parents=True,exist_ok=True)
@@ -19,7 +50,17 @@ async def main():
         for width in [1440,720,390]:
             await page.set_viewport_size({'width':width,'height':1000});assert await dialog.evaluate('e=>e.scrollWidth<=e.clientWidth');assert await page.locator('html').evaluate('e=>e.scrollWidth<=innerWidth');await page.screenshot(animations='disabled',path=str(out/f'raw-{width}.png'))
         await dialog.get_by_role('combobox',name='当前尝试',exact=True).click();await page.get_by_role('option',name='尝试 2',exact=False).click();await dialog.get_by_role('button',name='读取阶段证据',exact=True).click();await expect(stages.get_by_text('历史记录未保存逐字段处理明细。',exact=True)).to_be_visible();await expect(stages.get_by_text('本次未采集独立最终TLS写出',exact=True)).to_be_visible()
-        await page.keyboard.press('Escape');await expect(dialog).to_have_count(0);assert not errors,errors;assert not fixture.unexpected,fixture.unexpected;print(json.dumps({'status':'passed','screens':[1440,720,390],'flows':['概览与链路','性能','采集与动作筛选','原文阶段','历史缺失','HTML转义','关闭']},ensure_ascii=False));await browser.close()
+        await page.keyboard.press('Escape')
+        await expect(dialog).to_have_count(0)
+        await verify_tui_stages(page, dialog)
+        await page.keyboard.press('Escape')
+        await expect(dialog).to_have_count(0)
+        assert not errors, errors
+        assert not fixture.unexpected, fixture.unexpected
+        print(json.dumps({'status': 'passed', 'screens': [1440, 720, 390],
+                          'flows': ['概览与链路', '性能', '采集与动作筛选', '原文阶段', '历史缺失',
+                                    'V2 提供方请求与 TLS 缺口', 'HTML转义', '关闭']}, ensure_ascii=False))
+        await browser.close()
 
 
 if __name__=='__main__':asyncio.run(main())

@@ -3,7 +3,6 @@ import { constants, createReadStream } from 'node:fs';
 import { chmod, copyFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { PROFILE_293 } from '../src/runtime/293/source-profile';
-import { PROFILE_280 } from '../src/runtime/280/source-profile';
 
 const ASSET = 'ccrb-runtime-linux-x64';
 const VERSION = /^v0\.1\.0-beta\.[1-9][0-9]{0,8}$/;
@@ -17,7 +16,7 @@ interface RuntimeRelease {
   release: string;
   platform: 'linux-x64';
   asset: typeof ASSET;
-  source_version: '2.1.280' | '2.1.293';
+  source_version: '2.1.293';
   source_sha256: string;
   launcher_sha256: string;
   launcher_bytes: number;
@@ -55,8 +54,8 @@ async function verifyLauncher(path: string, expected: { sha256: string; bytes: n
 export async function sealRuntimeRelease(release: string, binary: string, keyPath: string, output: string): Promise<RuntimeRelease> {
   if (!VERSION.test(release)) throw new Error('发布标签必须为 v0.1.0-beta.N');
   const build = JSON.parse(await readFile(binary + '.manifest.json', 'utf8'));
-  const profile = [PROFILE_293, PROFILE_280].find(value => build.source?.version === value.version && build.source?.sha256 === value.sha256);
-  if (build?.schema_version !== 1 || !profile) {
+  const profile = PROFILE_293;
+  if (build?.schema_version !== 1 || build.source?.version !== profile.version || build.source?.sha256 !== profile.sha256) {
     throw new Error('构建清单的固定官方来源不匹配');
   }
   const launcher = identity(build.launcher, MAX_LAUNCHER_BYTES);

@@ -42,7 +42,7 @@ request_id 可省略，使用 1–128 位字母、数字、连字符、下划线
 
 ### 本地 Base URL 联调模式
 
-服务端显式启用 `local_base_url` 的实例允许与本次运行时精确匹配的 280／293，以及 `cli`、`sdk-cli`、`claude-vscode` 入站。billing 可以省略 CCH；存在时仍须唯一且有效。该策略只来自启动配置，不能用 HTTP 正文、信封或头部打开。普通启动继续使用上述严格合同。
+服务端显式启用 `local_base_url` 的实例接纳与 2.1.293 运行时匹配的 `cli`、`sdk-cli` 和 `claude-vscode` 原生入站。billing 可以省略 CCH；存在时仍须唯一且有效。该策略只来自启动配置，不能用 HTTP 正文、信封或头部打开。普通启动继续使用上述严格合同。
 
 完全缺少 billing 时，兼容识别还要求唯一原始 `User-Agent` 为同版本的 `claude-cli/<version> (external, cli|sdk-cli|claude-vscode)`（可带 agent-sdk 版本）、system 首段为精确官方 CLI 或 Agent SDK 身份文本，以及完整合法的 `metadata.user_id` JSON 身份。SDK 身份为 `You are a Claude agent, built on Anthropic's Claude Agent SDK.`。UA 只用于接入格式归因，不替代入口鉴权。通过后保留对话内 system、空 content 数组、消息级 output_config 和缓存标记。只携带 UA 的普通 API 继续走普通合同。
 

@@ -12,7 +12,7 @@ use reqwest::redirect::Policy;
 use reqwest::{Client, Error as ReqwestError};
 use serde::Deserialize;
 use serde_json::{Value, json};
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 use tokio::sync::Semaphore;
 use tokio_tungstenite::connect_async;
@@ -22,7 +22,9 @@ use uuid::Uuid;
 
 use crate::error::AppError;
 use crate::handler::router::{AppState, DeletionSelector};
+use crate::model::account::Account;
 use crate::model::proxy::ProxySyncTarget;
+use crate::service::account::{AccountQueue, AccountService};
 use crate::service::runtime_lease::RuntimeLease;
 use crate::service::runtime_transport::{PreparedTransport, TransportBinding};
 use crate::store::proxy_store::ProxyRecord;
@@ -189,6 +191,82 @@ pub(crate) fn publish_agy_ingress(
             tracing::warn!("AGY入站采集不可用");
         }
     });
+}
+
+/// 配置修改期间阻止新推理进入，检查和写库之间不能出现新活动请求。
+pub(crate) struct RuntimeConfigPermit {
+    pub(crate) queue: Arc<AccountQueue>,
+    pub(crate) lease: RuntimeLease,
+}
+
+impl Drop for RuntimeConfigPermit {
+    fn drop(&mut self) {
+        if self
+            .queue
+            .runtime_gate
+            .update(&self.lease.owner, &self.lease.generation, "release")
+            .is_err()
+        {
+            tracing::warn!("v3 configuration lease requires reconciliation");
+        }
+    }
+}
+
+/// 持有原账号配置门禁并核对当前活动。
+/// @param service 账号服务。@param account 当前账号。@param force 强制核对独立网关队列。
+/// @param deletion 原 AGY 删除环境。@return 维护许可，释放时恢复原接单状态。
+pub(crate) async fn account_config_permit(
+    service: &AccountService,
+    account: &Account,
+    force: bool,
+    deletion: Option<&DeletionSelector>,
+) -> Result<Option<RuntimeConfigPermit>, AppError> {
+    if account.is_antigravity() {
+        if service.agy_state(account.id).await?["phase"] != "ready" {
+            return Err(AppError::BadRequest("AGY 原凭据操作待核对".into()));
+        }
+    }
+    if !force
+        && service.scheduler().is_none()
+        && std::env::var("V3_RUNTIME_URL")
+            .unwrap_or_default()
+            .is_empty()
+    {
+        return Ok(None);
+    }
+    let permit = account_route_config_permit(service, account).await?;
+    if !force
+        || !std::env::var("V3_RUNTIME_URL")
+            .unwrap_or_default()
+            .is_empty()
+    {
+        quiesce(account.id, &permit.lease, deletion).await?;
+    }
+    Ok(Some(permit))
+}
+
+/// 对纯转发路由配置取得同一个账号门禁，保留已绑定的 sender。
+/// @param service 账号服务。@param account 当前账号。@return 独占且空闲的配置许可。
+pub(super) async fn account_route_config_permit(
+    service: &AccountService,
+    account: &Account,
+) -> Result<RuntimeConfigPermit, AppError> {
+    let queue = service
+        .get_or_create_queue(account.id, account.concurrency)
+        .await;
+    let lease = queue
+        .runtime_gate
+        .prepare(&format!("gateway-config:{}", Uuid::new_v4()))?;
+    let permit = RuntimeConfigPermit { queue, lease };
+    if permit.queue.runtime_gate.snapshot()["active"]
+        .as_i64()
+        .unwrap_or(0)
+        != 0
+        || permit.queue.waiting_count() != 0
+    {
+        return Err(AppError::BadRequest("account runtime is busy".into()));
+    }
+    Ok(permit)
 }
 
 /// 配置事务持有门禁时收口对应账号实例，阻止已解析的旧请求跨过修改。
@@ -489,18 +567,24 @@ pub async fn native_capture(
     account_id: i64,
     attempt_id: &str,
 ) -> Result<serde_json::Value, AppError> {
-    read_native_capture(account_id, attempt_id, false).await
+    read_native_capture(account_id, attempt_id, false, &["cc_prepared", "ingress_rejected"]).await
 }
 
 /// 按持久平台读取AGY快照。@param account_id 已确认账号。@param attempt_id 已确认尝试。@return 有界快照。
 pub async fn agy_capture(account_id: i64, attempt_id: &str) -> Result<Value, AppError> {
-    read_native_capture(account_id, attempt_id, true).await
+    read_native_capture(account_id, attempt_id, true, &["agy_prepared", "agy_ingress", "agy_egress"]).await
+}
+
+/// 读取与 V2 尝试所属阶段相符的私有快照。@param account_id 原账号。@param attempt_id 原预留。@return 管理详情状态。
+pub async fn tui_capture(account_id: i64, attempt_id: &str) -> Result<Value, AppError> {
+    read_native_capture(account_id, attempt_id, false, &["tui_provider_request"]).await
 }
 
 async fn read_native_capture(
     account_id: i64,
     attempt_id: &str,
     agy: bool,
+    stages: &[&str],
 ) -> Result<Value, AppError> {
     let (base, token, client) = config()?;
     let mut response = client
@@ -545,17 +629,7 @@ async fn read_native_capture(
         .map_err(|_| AppError::ServiceUnavailable("采集文件格式无效".into()))?;
     if snapshot["account_id"] != account_id
         || snapshot["attempt_id"] != attempt_id
-        || !(if agy {
-            matches!(
-                snapshot["stage"].as_str(),
-                Some("agy_prepared" | "agy_ingress" | "agy_egress")
-            )
-        } else {
-            matches!(
-                snapshot["stage"].as_str(),
-                Some("cc_prepared" | "ingress_rejected")
-            )
-        })
+        || snapshot["stage"].as_str().is_none_or(|stage| !stages.contains(&stage))
     {
         return Err(AppError::ServiceUnavailable("采集文件归属无效".into()));
     }

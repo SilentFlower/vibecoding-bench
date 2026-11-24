@@ -86,6 +86,7 @@ fn digest_file(file: &mut File) -> io::Result<String> {
 
 // 能力查询与新进程启动共用配置校验，物理许可负责限制并发容量。
 fn validate_distribution_config(config: &NativeSenderConfig) -> Result<(), AppError> {
+    config.source_version.require_executable()?;
     if config.max_workers == 0
         || !Path::new(&config.binary_path).is_absolute()
         || !Path::new(&config.work_root).is_absolute()
@@ -126,40 +127,22 @@ pub(crate) fn verify_distribution(config: &NativeSenderConfig) -> Result<File, A
 }
 
 fn artifact(config: &NativeSenderConfig) -> Result<ReleaseArtifact, AppError> {
-    match config.source_version {
-        NativeSourceVersion::Cc280 => Ok(ReleaseArtifact {
-            path: PathBuf::from(&config.binary_path),
-            launcher_sha256: "186b1e9a77738d11584e5fb9da293634a8a6ab68df146666ce81c16ab596de88"
-                .into(),
-            launcher_bytes: 27_097_232,
-            image_sha256: "4f70823748fe2a64d4c346877b59b31383d3cbca76bf6f9519dd4d5d8128d8e4".into(),
-            image_bytes: 111_603_784,
-        }),
-        NativeSourceVersion::Cc293 => Ok(ReleaseArtifact {
-            path: PathBuf::from(&config.binary_path),
-            launcher_sha256: LAUNCHER_SHA256.into(),
-            launcher_bytes: 27_392_144,
-            image_sha256: IMAGE_SHA256.into(),
-            image_bytes: IMAGE_BYTES,
-        }),
-    }
-}
-
-/// 同一账号各版共用物理进程容量，弱引用避免延长池的生命周期。
-#[derive(Default)]
-struct SharedCapacity {
-    live: AtomicUsize,
-    pools: Mutex<Vec<Weak<NativePool>>>,
-    identity: Mutex<String>,
-    identity_gate: tokio::sync::Mutex<()>,
+    config.source_version.require_executable()?;
+    Ok(ReleaseArtifact {
+        path: PathBuf::from(&config.binary_path),
+        launcher_sha256: LAUNCHER_SHA256.into(),
+        launcher_bytes: 27_392_144,
+        image_sha256: IMAGE_SHA256.into(),
+        image_bytes: IMAGE_BYTES,
+    })
 }
 
 /// 物理退出后独立归还账号总容量。
-struct PhysicalSlot(Arc<SharedCapacity>);
+struct PhysicalSlot(Arc<AtomicUsize>);
 
 impl Drop for PhysicalSlot {
     fn drop(&mut self) {
-        self.0.live.fetch_sub(1, Ordering::SeqCst);
+        self.0.fetch_sub(1, Ordering::SeqCst);
     }
 }
 
@@ -367,9 +350,7 @@ enum PreparationState {
 
 /// 一个账号 sender 的按需进程池；互斥锁只保护本地所有权变更。
 pub struct NativePool {
-    source_version: NativeSourceVersion,
-    shared: Arc<SharedCapacity>,
-    versions: Mutex<HashMap<NativeSourceVersion, Arc<NativePool>>>,
+    physical_workers: Arc<AtomicUsize>,
     state: Mutex<PoolState>,
     generation: tokio::sync::Mutex<()>,
     image: tokio::sync::Mutex<Option<(String, Arc<File>)>>,
@@ -383,9 +364,7 @@ impl Default for NativePool {
     /// 创建按需池，额外暖进程默认空闲120秒后回收。@return 空池及独立映像缓存。
     fn default() -> Self {
         Self {
-            source_version: NativeSourceVersion::default(),
-            shared: Arc::new(SharedCapacity::default()),
-            versions: Mutex::new(HashMap::new()),
+            physical_workers: Arc::new(AtomicUsize::new(0)),
             state: Mutex::new(PoolState::default()),
             generation: tokio::sync::Mutex::new(()),
             image: tokio::sync::Mutex::new(None),
@@ -1610,157 +1589,15 @@ impl Worker {
 }
 
 impl NativePool {
-    /// 取得本账号对应版本的独立状态，物理容量继续共享。
-    /// @param version 已冻结的请求版本。
-    /// @return 对应版本的池；调用本身不会启动进程。
-    pub(crate) fn for_version(self: &Arc<Self>, version: NativeSourceVersion) -> Arc<Self> {
-        {
-            let mut pools = self.shared.pools.lock().unwrap();
-            pools.retain(|pool| pool.strong_count() > 0);
-            if !pools.iter().any(|pool| pool.ptr_eq(&Arc::downgrade(self))) {
-                pools.push(Arc::downgrade(self));
-            }
-        }
-        if self.source_version == version {
-            return self.clone();
-        }
-        self.versions
-            .lock()
-            .unwrap()
-            .entry(version)
-            .or_insert_with(|| {
-                let pool = Arc::new(Self {
-                    source_version: version,
-                    shared: self.shared.clone(),
-                    idle_timeout: watch::channel(*self.idle_timeout.borrow()).0,
-                    ..Self::default()
-                });
-                self.shared
-                    .pools
-                    .lock()
-                    .unwrap()
-                    .push(Arc::downgrade(&pool));
-                pool
-            })
-            .clone()
-    }
-
     fn try_physical_slot(&self, slots: usize) -> Option<PhysicalSlot> {
-        self.shared
-            .live
+        self.physical_workers
             .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |live| {
                 (live < slots).then(|| live + 1)
             })
             .ok()
-            .map(|_| PhysicalSlot(self.shared.clone()))
+            .map(|_| PhysicalSlot(self.physical_workers.clone()))
     }
 
-    async fn physical_slot(
-        &self,
-        slots: usize,
-        deadline: Instant,
-    ) -> Result<PhysicalSlot, AppError> {
-        let mut cancelling_spare = false;
-        loop {
-            if Instant::now() >= deadline {
-                return Err(unavailable());
-            }
-            if let Some(slot) = self.try_physical_slot(slots) {
-                return Ok(slot);
-            }
-            let pools: Vec<_> = self
-                .shared
-                .pools
-                .lock()
-                .unwrap()
-                .iter()
-                .filter_map(Weak::upgrade)
-                .collect();
-            let mut retired = None;
-            for pool in pools {
-                if pool.source_version != self.source_version {
-                    let mut state = pool.state.lock().unwrap();
-                    retired = state.idle.pop();
-                    if retired.is_none() && state.spare.take().is_some() {
-                        cancelling_spare = true;
-                    }
-                    if retired.is_some() {
-                        break;
-                    }
-                }
-            }
-            let Some(worker) = retired else {
-                if cancelling_spare {
-                    // 取消补位只发出信号，必须等真实退出释放容量后再启动目标版本。
-                    tokio::time::sleep(Duration::from_millis(10)).await;
-                    continue;
-                }
-                return Err(unavailable());
-            };
-            // 优先释放其它版本的空闲进程；活动进程的许可一直保持到真实退出。
-            worker.retire().await;
-        }
-    }
-
-    async fn synchronize_identity(
-        self: &Arc<Self>,
-        config: &SenderConfig,
-        submission: &NativeSubmission,
-    ) -> Result<(), AppError> {
-        let native = config.native.as_ref().ok_or_else(unavailable)?;
-        let key = format!(
-            "{:x}",
-            Sha256::digest(
-                serde_json::to_vec(&(
-                    &config.binding,
-                    &config.proxy_url,
-                    &config.allowed_origin,
-                    &config.native_capture_dir,
-                    &submission.bearer,
-                    &submission.device_id,
-                    &submission.account_uuid,
-                    &submission.organization_uuid,
-                    &submission.email,
-                    submission.concurrency,
-                    native.memory_mib,
-                    native.max_workers,
-                ))
-                .map_err(|_| unavailable())?
-            )
-        );
-        let _gate = self.shared.identity_gate.lock().await;
-        {
-            let mut current = self.shared.identity.lock().unwrap();
-            if *current == key {
-                return Ok(());
-            }
-            *current = key;
-        }
-        let pools: Vec<_> = self
-            .shared
-            .pools
-            .lock()
-            .unwrap()
-            .iter()
-            .filter_map(Weak::upgrade)
-            .collect();
-        let mut retired = Vec::new();
-        for pool in pools {
-            let mut state = pool.state.lock().unwrap();
-            state.key.clear();
-            state.spare.take();
-            state.template.take();
-            state.template_retry_at = None;
-            state.restore_supported = None;
-            state.last_start_source = None;
-            retired.append(&mut state.idle);
-        }
-        // 凭据与环境属于账号公共身份，轮换时统一撤销两版旧代的空闲工作。
-        for worker in retired {
-            worker.retire().await;
-        }
-        Ok(())
-    }
     /// 汇总当前闲置worker的真实TLS槽。@param config 当前绑定配置。@return 安全能力摘要，不创建进程。
     pub(crate) fn tls_status(&self, config: &SenderConfig) -> Value {
         let mut result = json!({"state":"preparing","reason":"CAPTURE_PREPARING",
@@ -1789,18 +1626,10 @@ impl NativePool {
                         || worker.image_sha256
                             == "0404cca64e0e08ffe347379c543bb83dcc4b36d46cea1c1b6c570c8af14ccb56"
                         || worker.image_sha256
-                            == "b5ffd54de383a71681043e554156451e3ce277e67e2a4bf04da815a029caee63"
-                        || worker.image_sha256
                             == "6296aa4f164b8018f6f614915befd347a0dbd73f674ace20534e91947eba4434"
                         || worker.image_sha256
-                            == "4f70823748fe2a64d4c346877b59b31383d3cbca76bf6f9519dd4d5d8128d8e4"
-                        || worker.image_sha256
                             == "564019c9560e960e96875c9663975491534b27c789ea3d23e5c13309ff293c79"
-                        || worker.image_sha256
-                            == "431aede03d82d6d300da7343f0fb04f983cba2fac83474a6e532f721b0d7a61e"
                         || worker.image_sha256 == PREVIOUS_IMAGE_SHA256
-                        || worker.image_sha256
-                            == "2b64ee7d8f0863a37bce90800226bda102387e5cff082f947b2b71e66d9a38e7"
                 );
                 if status == "ready" {
                     break;
@@ -2198,88 +2027,25 @@ impl NativePool {
         true
     }
 
-    /// 在账号各版之间保留最近使用的一个基础暖进程。
-    fn minimum_idle(&self) -> usize {
-        let pools: Vec<_> = self
-            .shared
-            .pools
-            .lock()
-            .unwrap()
-            .iter()
-            .filter_map(Weak::upgrade)
-            .collect();
-        let mut newest = None;
-        for pool in pools {
-            let at = pool
-                .state
-                .lock()
-                .unwrap()
-                .idle
-                .iter()
-                .map(|worker| worker.idle_since)
-                .max();
-            if let Some(at) = at {
-                if newest.is_none_or(|(previous, _)| at > previous) {
-                    newest = Some((at, pool.source_version));
-                }
-            }
-        }
-        usize::from(newest.is_none_or(|(_, version)| version == self.source_version))
-    }
-
-    /// 同步账号各版的空闲期限，并唤醒旧计时器重新计算。
-    /// @param seconds 已验证的回收秒数。
-    /// @return 无返回值；当前业务及映像缓存保持各自生命周期。
+    /// 同步额外暖进程的空闲期限，并唤醒计时器重新计算。
+    /// @param seconds 已验证的回收秒数。@return 无。
     pub(crate) fn set_idle_timeout(self: &Arc<Self>, seconds: u64) {
         let duration = Duration::from_secs(seconds);
-        let mut pools: Vec<_> = self
-            .shared
-            .pools
-            .lock()
-            .unwrap()
-            .iter()
-            .filter_map(Weak::upgrade)
-            .collect();
-        if !pools.iter().any(|pool| Arc::ptr_eq(pool, self)) {
-            pools.push(self.clone());
-        }
-        for pool in pools {
-            pool.idle_timeout.send_if_modified(|current| {
-                if *current == duration {
-                    return false;
-                }
-                *current = duration;
-                true
-            });
-            pool.schedule_local_idle_reap();
-        }
-    }
-
-    /// 新增暖进程后同步各版回收计划，备用保留期限按账号共用。
-    fn schedule_idle_reap(self: &Arc<Self>) {
-        let pools: Vec<_> = self
-            .shared
-            .pools
-            .lock()
-            .unwrap()
-            .iter()
-            .filter_map(Weak::upgrade)
-            .collect();
-        if pools.is_empty() {
-            self.schedule_local_idle_reap();
-        } else {
-            for pool in pools {
-                pool.schedule_local_idle_reap();
+        self.idle_timeout.send_if_modified(|current| {
+            if *current == duration {
+                return false;
             }
-        }
+            *current = duration;
+            true
+        });
+        self.schedule_idle_reap();
     }
 
-    /// 用弱引用任务回收本版过期空闲进程，账号基础暖进程由公共状态决定。
-    fn schedule_local_idle_reap(self: &Arc<Self>) {
-        let minimum = self.minimum_idle();
+    /// 回收额外的过期暖进程，保留一个基础暖进程。
+    fn schedule_idle_reap(self: &Arc<Self>) {
         {
             let mut state = self.state.lock().unwrap();
-            if state.reaper_running || state.idle.len() <= minimum {
+            if state.reaper_running || state.idle.len() <= 1 {
                 return;
             }
             state.reaper_running = true;
@@ -2293,9 +2059,8 @@ impl NativePool {
                     let Some(pool) = weak.upgrade() else {
                         return;
                     };
-                    let minimum = pool.minimum_idle();
                     let mut state = pool.state.lock().unwrap();
-                    if state.idle.len() <= minimum {
+                    if state.idle.len() <= 1 {
                         state.reaper_running = false;
                         return;
                     }
@@ -2318,10 +2083,9 @@ impl NativePool {
                     return;
                 };
                 let mut retired = Vec::new();
-                let minimum = pool.minimum_idle();
                 {
                     let mut state = pool.state.lock().unwrap();
-                    while state.idle.len() > minimum {
+                    while state.idle.len() > 1 {
                         let Some(index) = state
                             .idle
                             .iter()
@@ -2346,7 +2110,6 @@ impl NativePool {
         deadline: Instant,
         business: bool,
     ) -> Result<(String, Worker), AppError> {
-        self.synchronize_identity(config, submission).await?;
         let prepare_spare =
             (business && config.native_adaptive_prewarm && submission.concurrency >= 2)
                 || criu_available(config);
@@ -2417,7 +2180,10 @@ impl NativePool {
             }
             worker.retire().await;
         }
-        let physical = self.physical_slot(slots, deadline).await?;
+        if Instant::now() >= deadline {
+            return Err(unavailable());
+        }
+        let physical = self.try_physical_slot(slots).ok_or_else(unavailable)?;
         let initial_start;
         {
             let mut state = self.state.lock().unwrap();
@@ -2796,43 +2562,19 @@ mod tests {
     use std::fs::FileTimes;
     use std::io::Write;
 
-    /// 两版物理许可共用上限，取消补位须等许可归还。@return 无。
-    #[tokio::test]
-    async fn native_versions_share_physical_capacity_and_cancel_foreign_spare() {
-        let root = Arc::new(NativePool::default());
-        let peer = root.for_version(NativeSourceVersion::Cc280);
-        assert!(Arc::ptr_eq(
-            &root,
-            &root.for_version(NativeSourceVersion::Cc293)
-        ));
-        assert!(Arc::ptr_eq(
-            &peer,
-            &root.for_version(NativeSourceVersion::Cc280)
-        ));
-        let first = root.try_physical_slot(2).unwrap();
-        let second = peer.try_physical_slot(2).unwrap();
-        assert!(root.try_physical_slot(2).is_none());
-        assert!(peer.try_physical_slot(2).is_none());
-        let (cancel, cancelled) = oneshot::channel();
-        let (_done, ready) = watch::channel(());
-        peer.state.lock().unwrap().spare = Some(SparePreparation {
-            ready,
-            _cancel: cancel,
-        });
-        tokio::spawn(async move {
-            let _ = cancelled.await;
-            tokio::time::sleep(Duration::from_millis(20)).await;
-            drop(second);
-        });
-        let replacement = root
-            .physical_slot(2, Instant::now() + Duration::from_secs(1))
-            .await
-            .unwrap();
-        assert_eq!(root.shared.live.load(Ordering::SeqCst), 2);
-        assert!(peer.state.lock().unwrap().spare.is_none());
+    /// 物理容量在进程归还前保持占用。@return 无。
+    #[test]
+    fn native_pool_reuses_capacity_after_physical_exit() {
+        let pool = NativePool::default();
+        let first = pool.try_physical_slot(2).unwrap();
+        let second = pool.try_physical_slot(2).unwrap();
+        assert!(pool.try_physical_slot(2).is_none());
         drop(first);
+        let replacement = pool.try_physical_slot(2).unwrap();
+        assert_eq!(pool.physical_workers.load(Ordering::SeqCst), 2);
+        drop(second);
         drop(replacement);
-        assert_eq!(root.shared.live.load(Ordering::SeqCst), 0);
+        assert_eq!(pool.physical_workers.load(Ordering::SeqCst), 0);
     }
 
     /// 默认阈值、热更新唤醒及延长均保留一个暖进程和共享映像。@return 无。
@@ -2940,19 +2682,17 @@ mod tests {
         }
     }
 
-    /// 策略覆盖已有及后建版本池，更新本身保持零进程启动。@return 无。
+    /// 更新空闲策略时保留执行身份并保持零启动。@return 无。
     #[tokio::test]
-    async fn idle_policy_updates_all_versions_without_replacing_pool_identity() {
+    async fn idle_policy_preserves_pool_identity_without_launching_workers() {
         let pool = Arc::new(NativePool::default());
-        pool.set_idle_timeout(300);
-        let alternate = pool.for_version(NativeSourceVersion::Cc280);
-        assert_eq!(*alternate.idle_timeout.borrow(), Duration::from_secs(300));
-        alternate.state.lock().unwrap().key = "synthetic-280".into();
-        pool.set_idle_timeout(60);
-        assert_eq!(*pool.idle_timeout.borrow(), Duration::from_secs(60));
-        assert_eq!(*alternate.idle_timeout.borrow(), Duration::from_secs(60));
-        assert_eq!(alternate.state.lock().unwrap().key, "synthetic-280");
-        assert_eq!(pool.shared.live.load(Ordering::SeqCst), 0);
+        pool.state.lock().unwrap().key = "synthetic-293".into();
+        for seconds in [300, 60] {
+            pool.set_idle_timeout(seconds);
+            assert_eq!(*pool.idle_timeout.borrow(), Duration::from_secs(seconds));
+            assert_eq!(pool.state.lock().unwrap().key, "synthetic-293");
+            assert_eq!(pool.physical_workers.load(Ordering::SeqCst), 0);
+        }
     }
 
     /// 真实恢复句柄的EOF日志区分管道断开与物理退出，保留外部PID。

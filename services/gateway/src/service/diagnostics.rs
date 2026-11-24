@@ -26,6 +26,7 @@ use crate::service::native_capture;
 use crate::service::request_session::RequestSession;
 use crate::service::rewriter::extract_session_id_from_body;
 use crate::service::system_update::InferenceCutover;
+use crate::service::tui_backend::TUI_V2;
 use crate::service::usage::UsageCapture;
 use crate::service::v3_scheduling::SchedulingRequest;
 use crate::service::version_profile::profile_for_version;
@@ -532,24 +533,48 @@ pub(crate) struct AttemptTrace {
 pub(crate) fn prepare_attempt(account: &Account, body: &[u8]) -> Option<AttemptTrace> {
     CURRENT_TRACE.try_with(|_| ()).ok()?;
     let body: Value = serde_json::from_slice(body).unwrap_or(Value::Null);
-    prepare_observation(account, body)
+    prepare_observation(account, &body, false)
+}
+
+/// 为显式标准化的 V2 回包记录真实发送和正文终态。
+/// @param account 原绑定账号。@param body 交给 sender 的请求已解析结构。
+/// @return 请求诊断作用域内尚未提交的观察器。
+pub(crate) fn prepare_tui_attempt(account: &Account, body: &Value) -> Option<AttemptTrace> {
+    let mut attempt = prepare_observation(account, body, true)?;
+    if let Some(context) = attempt
+        .record
+        .as_mut()
+        .and_then(|record| record.context.as_mut())
+    {
+        context.kernel = Some(TUI_V2.to_owned());
+        // 事件源自报的能力不等于已证明的官方 CLI 版本。
+        context.kernel_version = None;
+    }
+    Some(attempt)
 }
 
 // 观察器只读取明确来源的临时参数，完整业务正文不进入诊断存储。
-fn prepare_observation(account: &Account, body: Value) -> Option<AttemptTrace> {
+fn prepare_observation(
+    account: &Account,
+    body: &Value,
+    prefer_frozen_session: bool,
+) -> Option<AttemptTrace> {
     CURRENT_TRACE
         .try_with(|trace| {
             let state = trace.lock();
             let mut sessions = state.sessions.clone();
-            sessions.upstream_session_hash = extract_session_id_from_body(&body)
-                .map(|value| identity_hash(account.id, "session", &value));
+            // V2 观察器读取原入站结构，实际出站会话来自已冻结的 sender 提交决策。
+            if !prefer_frozen_session || sessions.mapping_action.is_none() {
+                sessions.upstream_session_hash = extract_session_id_from_body(body)
+                    .map(|value| identity_hash(account.id, "session", &value));
+            }
             sessions.previous_message_hash = body
                 .pointer("/thread/previous_message_id")
                 .and_then(Value::as_str)
                 .map(|value| identity_hash(account.id, "message", value));
             let record = AttemptDiagnostic {
                 context: Some(DiagnosticContext {
-                    submitted_model: DiagnosticParameters::from_request(&body).model,
+                    submitted_model: DiagnosticParameters::from_request(body).model,
                     kernel: Some(
                         if account.request_backend == "native" {
                             "cc"
@@ -579,7 +604,7 @@ fn prepare_observation(account: &Account, body: Value) -> Option<AttemptTrace> {
                     .key
                     .into(),
                 profile_selection: state.profile_selection.clone(),
-                parameters: DiagnosticParameters::from_request(&body),
+                parameters: DiagnosticParameters::from_request(body),
                 sessions,
                 started_at: now(),
                 finished_at: None,
@@ -602,7 +627,7 @@ fn prepare_observation(account: &Account, body: Value) -> Option<AttemptTrace> {
             AttemptTrace {
                 trace: trace.clone(),
                 record: Some(record),
-                capture: Some(UsageCapture::observer(&body)),
+                capture: Some(UsageCapture::observer(body)),
                 start: Instant::now(),
                 committed: false,
                 feedback: None,
@@ -660,7 +685,7 @@ pub(crate) fn prepare_native_attempt(
     let context = serde_json::json!({"model":observation.parameters.model,"stream":observation.parameters.stream,
         "metadata":{"user_id":serde_json::json!({"session_id":observation.session_id}).to_string()},
         "thread":{"previous_message_id":observation.previous_message_id}});
-    let mut attempt = prepare_observation(account, context)?;
+    let mut attempt = prepare_observation(account, &context, false)?;
     let record = attempt.record.as_mut()?;
     record.attempt_id = attempt_id.to_owned();
     record.profile_version = observation.source_version.as_str().into();
@@ -690,6 +715,14 @@ fn begin_attempt(account: &Account, body: &[u8]) -> Option<AttemptTrace> {
 }
 
 impl AttemptTrace {
+    /// 将同一 sender 私有预留与已提交尝试关联。@param id 原预留 UUID。@param status 可选采集状态。
+    pub(super) fn tui_capture(&mut self, id: String, status: Option<&str>) {
+        if let Some(record) = &mut self.record {
+            record.attempt_id = id;
+            record.capture_status = status.map(str::to_owned);
+        }
+    }
+
     /// 记录同一次实际提交的冻结定位，保留诊断的旁路语义。
     /// @param location 原已核验发送通道提供的非秘密定位。
     /// @return 无。
@@ -868,7 +901,20 @@ impl AttemptTrace {
             _ => Some("upstream_body".into()),
         };
         record.duration_ms = Some(self.start.elapsed().as_millis().min(u64::MAX as u128) as u64);
-        if let Some(feedback) = self.feedback.take() {
+        // 本机模型的 HTTP 鉴权、限流和同类 SSE 错误属于它自己的凭据。
+        // 即使响应体异常中断，也不能用它给承载 TUI 的订阅账号扣健康分。
+        let provider_rejection = record
+            .context
+            .as_ref()
+            .and_then(|context| context.kernel.as_deref())
+            == Some(TUI_V2)
+            && (matches!(record.status_code, Some(401 | 403 | 429))
+                || record.status_code == Some(200)
+                    && matches!(
+                        record.error_type.as_deref(),
+                        Some("authentication_error" | "permission_error" | "rate_limit_error")
+                    ));
+        if let Some(feedback) = self.feedback.take().filter(|_| !provider_rejection) {
             feedback.finish_observed_attempt(
                 record.account_id,
                 record.status_code,
@@ -925,11 +971,17 @@ impl RequestTraceGuard {
     /// @return 无返回值。
     pub(crate) fn error(&self, error: &AppError) {
         let stage = match error {
-            AppError::AdmissionLimited { .. } | AppError::SchedulingConflict => "admission",
-            AppError::BadRequest(_) | AppError::AgyInput { .. } => "request",
+            AppError::AdmissionLimited { .. }
+            | AppError::SchedulingConflict
+            | AppError::TuiSubagentCapacity => "admission",
+            AppError::BadRequest(_)
+            | AppError::AgyInput { .. }
+            | AppError::TuiInput { .. }
+            | AppError::TuiInputUnsupported
+            | AppError::TuiSubagentAmbiguous => "request",
             AppError::Unauthorized | AppError::PermanentCredential(_) => "credentials",
             AppError::TooManyRequests(_) => "admission",
-            AppError::AgyUpstreamQuota => "upstream_model",
+            AppError::AgyUpstreamQuota | AppError::TuiProviderBackoff { .. } => "upstream_model",
             AppError::AgyControl(_) => "native_control",
             AppError::AgyToolTurnFailed
             | AppError::AgyToolReplayUnavailable
@@ -1086,8 +1138,8 @@ fn identity_hash(account: i64, kind: &str, value: &str) -> String {
 mod tests {
     use super::{
         CURRENT_LOG_MODE, CURRENT_TRACE, RequestTraceGuard, TraceContext, begin_attempt,
-        claude_request_session, error_stage, local_outcome, native_rejection, now,
-        profile_selection, selected_account, session_context,
+        claude_request_session, error_stage, identity_hash, local_outcome, native_rejection, now,
+        prepare_tui_attempt, profile_selection, selected_account, session_context,
     };
     use crate::error::AppError;
     use crate::model::account::Account;
@@ -1617,6 +1669,119 @@ mod tests {
             store.list(DiagnosticQuery::default()).await.unwrap().total,
             2
         );
+    }
+
+    /// 显式标准化的 V2 流已接收的真实用量可见，200 错误帧仍标记失败。@return 无。
+    #[tokio::test]
+    async fn gateway_id_diagnostics_records_stream_error_not_success() {
+        let store = store().await;
+        let trace = TraceContext::new(store.clone());
+        let guard = RequestTraceGuard::new(trace.clone());
+        let wire = br#"data: {"type":"message_start","message":{"id":"msg_synthetic","usage":{"input_tokens":5,"output_tokens":2,"cache_read_input_tokens":3}}}
+
+event: error
+data: {"type":"error","error":{"type":"overloaded_error","message":"synthetic failure"}}
+
+"#;
+        let response = CURRENT_TRACE
+            .scope(trace, async {
+                let resolved = UpstreamSessionPoolResolve {
+                    real_session_id: "source-session".into(),
+                    upstream_session_id: Some("pool-session".into()),
+                    action: UpstreamSessionPoolAction::Mapped,
+                    active_count: 1,
+                    oldest_last_seen_ms: None,
+                    newest_last_seen_ms: None,
+                };
+                session_context(7, Some("source-session"), Some(&resolved));
+                let body = json!({"model":"claude-sonnet-5","stream":true,
+                    "metadata":{"user_id":json!({"session_id":"source-session"}).to_string()}});
+                let mut attempt = prepare_tui_attempt(&account(), &body).unwrap();
+                attempt.commit();
+                let response =
+                    ([("content-type", "text/event-stream")], wire.as_slice()).into_response();
+                attempt.headers(200, response.headers(), Vec::new());
+                guard.wrap(attempt.wrap(response))
+            })
+            .await;
+        let root = response.headers()["x-cc2api-request-id"]
+            .to_str()
+            .unwrap()
+            .to_owned();
+        assert_eq!(
+            to_bytes(response.into_body(), 1024).await.unwrap(),
+            wire.as_slice()
+        );
+        store.flush().await.unwrap();
+        let detail = store.detail(&root).await.unwrap();
+        assert_eq!(detail.request.outcome, "upstream_error");
+        let attempt = &detail.attempts[0];
+        assert_eq!(attempt.outcome, "upstream_error");
+        assert_eq!(attempt.error_type.as_deref(), Some("overloaded_error"));
+        assert_eq!(attempt.tokens.cache_read_tokens, Some(3));
+        assert!(attempt.partial);
+        assert_eq!(
+            attempt.sessions.real_session_hash,
+            Some(identity_hash(7, "session", "source-session"))
+        );
+        assert_eq!(
+            attempt.sessions.upstream_session_hash,
+            Some(identity_hash(7, "session", "pool-session"))
+        );
+        assert_eq!(attempt.sessions.mapping_action.as_deref(), Some("mapped"));
+        let context = attempt.context.as_ref().unwrap();
+        assert_eq!(context.kernel.as_deref(), Some("tui_v2"));
+        assert!(context.kernel_version.is_none());
+    }
+
+    /// V2 独立模型错误仍有尝试记录，宿主订阅的调度健康分只接受可归属的反馈。
+    #[tokio::test]
+    async fn tui_local_auth_and_rate_errors_keep_account_health_on_stream_and_http_failure() {
+        let store = store().await;
+        let scheduler = Arc::new(V3Scheduler::new(Arc::new(SchedulingStore::new(
+            AnyPoolOptions::new()
+                .connect_lazy("sqlite::memory:")
+                .unwrap(),
+        ))));
+        let candidate = SchedulingCandidate {
+            account: account(),
+            active_units: 0,
+            max_units: 8,
+            queued: 0,
+            queued_units: 0,
+            next_send_ms: 0,
+        };
+        for (status, end, kind) in [
+            (401, "body_error", "api_error"),
+            (403, "body_error", "api_error"),
+            (429, "body_error", "rate_limit_error"),
+            (200, "complete", "rate_limit_error"),
+            (200, "complete", "authentication_error"),
+            (200, "complete", "permission_error"),
+            (200, "complete", "overloaded_error"),
+        ] {
+            let trace = TraceContext::new(store.clone());
+            CURRENT_TRACE
+                .scope(trace, async {
+                    let mut attempt =
+                        prepare_tui_attempt(&candidate.account, &json!({"stream":true})).unwrap();
+                    attempt.with_feedback(scheduler.begin(0, None));
+                    attempt.commit();
+                    attempt.headers(status, &HeaderMap::new(), Vec::new());
+                    let event = json!({"type":"error","error":{"type":kind,"message":"fixture"}});
+                    attempt.observe(format!("event: error\ndata: {event}\n\n").as_bytes());
+                    attempt.finish(end);
+                })
+                .await;
+            let health = scheduler
+                .factors(&candidate, &scheduler.config(), now_ms())
+                .health;
+            if kind == "overloaded_error" {
+                assert!(health < 1.0);
+            } else {
+                assert_eq!(health, 1.0, "{status} {kind}");
+            }
+        }
     }
 
     /// 损坏压缩、采样超限和非法 JSON 应报告观察缺口，同时保留原始响应。

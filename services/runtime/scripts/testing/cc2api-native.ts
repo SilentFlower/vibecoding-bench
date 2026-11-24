@@ -210,7 +210,8 @@ try {
   const cacheOnly = process.env.CCRB_TEST_CACHE_POLICY_ONLY === '1';
   const primeOnly = process.env.CCRB_TEST_PRIME_ONLY === '1';
   const thinkingOnly = process.env.CCRB_TEST_THINKING_ONLY === '1';
-  const phases = tlsOnly ? ['native_real_binary'] : benchmarkOnly ? ['native_real_binary'] : (thinkingOnly || primeOnly || cacheOnly || rateLimitOnly || process.env.CCRB_TEST_GATEWAY_ONLY === '1' || process.env.CCRB_TEST_MULTI_VERSION === '1') ? ['native_real_gateway'] : ['native_real_binary', 'native_real_gateway'];
+  const singleRuntime = process.env.CCRB_TEST_SINGLE_RUNTIME === '1';
+  const phases = tlsOnly ? ['native_real_binary'] : benchmarkOnly ? ['native_real_binary'] : (thinkingOnly || primeOnly || cacheOnly || rateLimitOnly || process.env.CCRB_TEST_GATEWAY_ONLY === '1' || singleRuntime) ? ['native_real_gateway'] : ['native_real_binary', 'native_real_gateway'];
   let code = 0;
   for (const phase of phases) {
     const child = Bun.spawn(['cargo', 'test', '--locked', '--lib', phase, '--', '--ignored', '--nocapture'], { cwd: resolve(consumer), env: { ...process.env, CCRB_TEST_BINARY: resolve(binary), CCRB_TEST_CAPTURE_DIR: join(root, 'environment/flows/api/cc-prepared'), CCRB_TEST_CA_FILE: ca, CCRB_TEST_PROXY: proxyUrl, CCRB_TEST_CONTROL: control.url.toString(), CCRB_TEST_SENDER_HOST: senderHost, V3_RUNTIME_URL: control.url.toString(), V3_INTERNAL_TOKEN: 'synthetic-private-management-key'.repeat(2), V3_DEPLOYMENT_ID: 'native-offline', V3_RELEASE: 'native-offline' }, stdout: 'inherit', stderr: 'inherit' });
@@ -221,8 +222,9 @@ try {
     assert.equal(code, 0);
   }
   assert.equal(code, 0);
-  assert.equal(messages.length, (thinkingOnly ? 33 : primeOnly ? 10 : cacheOnly ? 15 : rateLimitOnly ? 4 : process.env.CCRB_TEST_MULTI_VERSION === '1' ? 18 : tlsOnly ? 9 : benchmarkOnly ? 9 : phases.length === 2 ? (process.env.CCRB_TEST_UNLIMITED === '1' ? 25 : 28) : 6));
-  if (!thinkingOnly && !primeOnly && !cacheOnly && !rateLimitOnly && !benchmarkOnly && !tlsOnly && process.env.CCRB_TEST_MULTI_VERSION !== '1') assert.ok(runningBindingReads >= 3, '启动补偿与凭据轮换均重新核对只读运行绑定');
+  assert.equal(messages.length, (thinkingOnly ? 24 : primeOnly ? 10 : cacheOnly ? 12 : rateLimitOnly ? 3 : singleRuntime ? 18 : tlsOnly ? 9 : benchmarkOnly ? 9 : phases.length === 2 ? (process.env.CCRB_TEST_UNLIMITED === '1' ? 25 : 28) : 6));
+  if (singleRuntime) assert.ok(messages.every(message => message.source_version === '2.1.293'), '所有已提交请求均应来自 293 内核');
+  if (!thinkingOnly && !primeOnly && !cacheOnly && !rateLimitOnly && !benchmarkOnly && !tlsOnly && !singleRuntime) assert.ok(runningBindingReads >= 3, '启动补偿与凭据轮换均重新核对只读运行绑定');
   if (phases.length === 2) assert.equal(messages.find(message => message.label === 'rotated')?.bearer, 'Bearer synthetic-bearer-b');
   console.log(JSON.stringify({ messages: messages.length, parallelPeak, processTreePeakRssKiB: peakRssKiB }));
 } finally { upstream.stop(true); control.stop(true); proxy.closeAllConnections(); proxy.close(); socks.close(); await rm(root, { recursive: true, force: true }); }

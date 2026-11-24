@@ -255,6 +255,32 @@ class NodeMigrations:
                 connection.close()
         return self.get(operation_id)
 
+    def cancel_unstarted_preflight(self, operation_id: str, failure: dict) -> bool:
+        """结束还未申请租约的能力预检。@param operation_id 原迁移。@param failure 固定错误。@return 是否已开放原归属。"""
+        with self.store.lock:
+            connection = self.store.database()
+            try:
+                with connection:
+                    connection.execute('BEGIN IMMEDIATE')
+                    row = connection.execute(f'SELECT * FROM {self.migrations} WHERE operation_id=?',
+                        (operation_id,)).fetchone()
+                    if row is None or row['phase'] not in ('requested', 'reconcile'):
+                        return False
+                    record = json.loads(row['record_json'])
+                    if (record['last_confirmed_phase'] != 'requested'
+                            or set(record.get('checkpoints', {})) - {'execution', 'tui_source'}):
+                        return False
+                    changed = connection.execute(f"UPDATE {self.assignments} SET phase='ready' "
+                        "WHERE account_id=? AND node_id=? AND revision=? AND phase IN ('maintenance','reconcile')",
+                        (row['account_id'], row['source_node_id'], record['source_revision']))
+                    if changed.rowcount != 1:
+                        return False
+                    record.update(last_confirmed_phase='cancelled', failure=public_failure(failure))
+                    self._save(connection, operation_id, 'cancelled', record)
+                    return True
+            finally:
+                connection.close()
+
     def checkpoint(self, operation_id: str, key: str, value: dict, *, previous: dict | None = None) -> dict:
         """在跨节点IO前持久冻结尝试或收据，重试沿用相同范围。
 
@@ -264,7 +290,8 @@ class NodeMigrations:
         :param previous: 仅网关租约在原证明CAS匹配时可记录恢复后的新代次。
         :return: 当前记录；已冻结槽位拒绝不同值覆盖。
         """
-        if key not in ('execution', 'gateway_lease', 'archive', 'transfer', 'target', 'cancellation', 'target_revoked', 'source_restored'):
+        if key not in ('execution', 'gateway_lease', 'archive', 'transfer', 'target', 'cancellation', 'target_revoked',
+                        'source_restored', 'tui_source'):
             raise ValueError('迁移检查点类型无效')
         with self.store.lock:
             connection = self.store.database()

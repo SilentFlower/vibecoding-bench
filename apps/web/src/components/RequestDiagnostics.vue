@@ -259,6 +259,9 @@ const currentAttempt = computed(() => attempts.value.find(item => item.attempt_i
 
 /** 按冻结状态判断是否提供私有文件读取。@param attempt 当前尝试。@return 是否可读取。 */
 function canInspect(attempt: DiagnosticAttempt): boolean {
+  if (attempt.context?.kernel === 'tui_v2') {
+    return attempt.log_mode === 'debug' && ['saved', 'queued', 'timeout'].includes(attempt.capture_status ?? '');
+  }
   return ['native280_cc_prepared', 'native293_cc_prepared', 'agy_native'].includes(attempt.profile_selection ?? '') && attempt.log_mode !== 'info'
     && [null, undefined, 'saved', 'queued', 'timeout'].includes(attempt.capture_status);
 }

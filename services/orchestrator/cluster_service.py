@@ -27,6 +27,7 @@ from cluster_nodes import NodeConfiguration, NodeCreate
 from cluster_ssh import NodeSshError, SshNode
 from cluster_store import ClusterStore
 from cluster_deployment import NodeDeployment, NodeImagePreparationError, node_container_name
+from system_update_rollout import read_rollout
 from cluster_synchronization import NodeSynchronization, NodeSynchronizationWait
 from cluster_preparation_files import PreparationFiles, PreparationFileScope
 from cluster_removal import NodeRemoval, NodeRemovalError
@@ -35,7 +36,7 @@ from cluster_migrations import pristine_target_migration
 from cluster_migration_maintenance import paused_migration_record
 from cluster_transfer import NodeArchiveTransfer
 from cluster_profile_reader import profile_reader_source
-from cluster_execution import NodeInspection, NodePreparation, NodeReviewAdmission
+from cluster_execution import NodeInspection, NodePreparation, NodeReviewAdmission, NodeTransportInspection
 from cluster_transport import NodeTransport, NodeTransports
 from runtime_files import atomic_json
 from system_update_gate import NodeImageFetchPaused, UPDATE_GATE
@@ -335,10 +336,11 @@ class ClusterService:
         finally:
             connection.close()
 
-    def admit_local(self, account: dict) -> None:
+    def admit_local(self, account: dict, *, allow_node_drain: bool = False) -> None:
         """在本机执行准入时重新核对人工归属和节点接单状态。
 
         :param account: 当前编排账号或尚未提交的登录草稿。
+        :param allow_node_drain: 只读原工具回执使用的 sender 绑定。
         :return: None，暂停或远程归属返回可顺延的准入拒绝。
         """
         if account.get('id') is None:
@@ -349,7 +351,9 @@ class ClusterService:
                 raise RuntimeBusy('本机节点已暂停接单，请恢复接单后重试')
             return
         assignment = self.store.assignment(account['id'])
-        if not assignment['enabled'] or assignment['phase'] != 'ready':
+        draining = (allow_node_drain and assignment['phase'] in ('maintenance', 'reconcile')
+            and self.store.cc_draining(account['id'], assignment['revision']))
+        if not draining and (not assignment['enabled'] or assignment['phase'] != 'ready'):
             raise RuntimeBusy('账号所属节点已暂停接单或正在维护，请稍后重试')
         if assignment['kind'] != 'local':
             raise RuntimeBusy('账号归属远程节点，请通过所属节点的执行通道操作')
@@ -543,6 +547,137 @@ class ClusterService:
         """
         return self._prepare_remote(account, runtime, gateway, quota_identity, cli_only=False)
 
+    def _remote_transport_endpoint(self, runtime, node_key: str, environment_id: str, revision: int) -> str:
+        base = os.environ.get('V3_RUNTIME_URL', 'http://orchestrator:8000').rstrip('/')
+        deployment_key = hashlib.sha256(runtime.deployment.encode()).hexdigest()[:12]
+        return f"{base}/cluster-transports/v2/{deployment_key}/{node_key}/{environment_id}/{revision}"
+
+    def existing_remote_transport(self, account: dict, runtime) -> dict | None:
+        """投影原已核对中继。@param account 固定绑定账号。@param runtime 权威环境。@return 不唤醒的绑定。"""
+        assignment = self.store.assignment(account['id'])
+        if assignment['kind'] != 'ssh':
+            return None
+        connection = self.store.database()
+        try:
+            row = connection.execute("SELECT environment_id,generation FROM account_environments WHERE account_id=? "
+                "AND state IN ('ready','cli_reconcile')", (account['id'],)).fetchone()
+        finally:
+            connection.close()
+        if row is None:
+            return None
+        entry = self.transports.existing_cc(assignment['node_key'], row['environment_id'],
+            assignment['revision'], row['generation'], account['cc2api_account_id'])
+        if not entry:
+            # 中央重启只丢失中继登记；从原节点读取当前运行绑定并重建同一条隧道。
+            request = NodeTransportInspection(node_key=assignment['node_key'], account_id=account['id'],
+                environment_id=row['environment_id'], assignment_revision=assignment['revision'],
+                version='2.1.293', transport_gateway_account=account['cc2api_account_id'])
+            node = self.connection(assignment['node_id'])
+            peer = node.prepare_environment(node_container_name(runtime.deployment, assignment['node_key']),
+                request.model_dump(exclude_none=True), inspect=True)
+            if (peer.get('protocol') != 1 or peer.get('node_key') != assignment['node_key']
+                    or peer.get('assignment_revision') != assignment['revision']):
+                raise ValueError('远程节点只读绑定回执归属不一致')
+            binding = peer.get('binding')
+            if binding is None:
+                return None
+            if (binding.get('account_id') != account['cc2api_account_id']
+                    or binding.get('environment_id') != row['environment_id'] or binding.get('generation') != row['generation']
+                    or binding.get('release_id') != configured_release(runtime)
+                    or not isinstance(binding.get('secret'), str) or not 32 <= len(binding['secret']) <= 256):
+                raise ValueError('远程运行绑定没有通过原账号和代次核验')
+            socket = node.sender_socket(row['environment_id'], str(ipaddress.ip_address(peer['sender_address'])))
+            with self.store.lock:
+                if self.store.assignment(account['id']) != assignment:
+                    raise ValueError('远程中继恢复期间原节点分配已变化')
+                self.transports.register(NodeTransport(assignment['node_id'], assignment['node_key'], account['id'],
+                    row['environment_id'], assignment['revision'], row['generation'], socket, binding['secret'],
+                    gateway_account_id=binding['account_id'], release_id=binding['release_id']))
+                entry = self.transports.existing_cc(assignment['node_key'], row['environment_id'],
+                    assignment['revision'], row['generation'], account['cc2api_account_id'])
+            if not entry:
+                return None
+        return {'account_id': entry.gateway_account_id, 'environment_id': entry.environment_id,
+                'generation': entry.generation, 'release_id': entry.release_id, 'secret': entry.secret,
+                'endpoint': self._remote_transport_endpoint(runtime, entry.node_key, entry.environment_id,
+                                                           entry.assignment_revision)}
+
+    def tui_transport_predecessors(self, account: dict, runtime, binding: dict) -> list[dict]:
+        """从可信更新或已完成迁移证明派生旧位置。@return 不含秘密的旧绑定坐标。"""
+        current = self.store.assignment(account['id'])
+        if (current['phase'] != 'ready' or not current['enabled']
+                or binding.get('release_id') != configured_release(runtime)):
+            return []
+        environment = binding['environment_id']
+        generation = binding['generation']
+        gateway_id = account['cc2api_account_id']
+        result = []
+
+        def add(node, revision, previous, release):
+            if type(previous) is not int or not 0 < previous < generation or not release:
+                return
+            if node == 'local':
+                key = hashlib.sha256(runtime.deployment.encode()).hexdigest()[:12]
+                endpoints = [f'http://flower2api-{key}-{environment}:8091',
+                             f'http://v3-{key}-account-{environment}:8091']
+            else:
+                endpoints = [self._remote_transport_endpoint(runtime, node, environment, revision)]
+            result.extend({'account_id': gateway_id, 'environment_id': environment,
+                'generation': previous, 'release_id': release, 'endpoint': endpoint} for endpoint in endpoints)
+
+        connection = self.store.database()
+        try:
+            moved = connection.execute("SELECT * FROM node_migrations WHERE account_id=? AND phase='completed' "
+                "ORDER BY updated_at DESC,operation_id DESC LIMIT 1", (account['id'],)).fetchone()
+        finally:
+            connection.close()
+        if moved:
+            record = json.loads(moved['record_json'])
+            execution = record.get('checkpoints', {}).get('execution', {})
+            if (record.get('environment_id') == environment and current['node_id'] == moved['target_node_id']
+                    and record.get('target_revision') == current['revision']
+                    and type(record.get('target_generation')) is int and record['target_generation'] <= generation
+                    and execution.get('gateway_account_id') == gateway_id
+                    and execution.get('target_node_key') == current['node_key']
+                    and execution.get('account_release') == binding['release_id']):
+                add(execution['source_node_key'], record['source_revision'], record['source_generation'],
+                    execution['account_release'])
+
+        if current['kind'] == 'local' and os.environ.get('V3_UPDATE_GATE_DIR'):
+            try:
+                rollout = read_rollout(Path(os.environ['V3_UPDATE_GATE_DIR']), runtime.deployment,
+                    runtime.release_id, configured_release(runtime))
+            except (OSError, ValueError):
+                rollout = None
+            rollout = rollout or {}
+            entry = rollout.get('environments', {}).get(environment)
+            if entry is None:
+                entry = rollout.get('rebuilt_environments', {}).get(environment)
+            if entry is None:
+                entry = rollout.get('stopped_environments', {}).get(environment, {})
+            origin = entry.get('origin', {})
+            if (entry.get('account_id') == account['id'] and entry.get('gateway_account_id') == gateway_id
+                    and origin.get('environment_id') == environment and origin.get('protocol') == 1):
+                add('local', current['revision'], entry.get('generation'), origin.get('release'))
+        elif current['kind'] == 'ssh':
+            try:
+                node = self.store.get(current['node_id'])
+                journal_path = self.connection(current['node_id']).private / 'maintenance/current.json'
+                journal = strict_json(safe_read(journal_path, 8 * 1024 * 1024, private=True), 8 * 1024 * 1024)
+            except (OSError, ValueError):
+                journal = {}
+            if (journal.get('phase') == 'completed' and journal.get('node_key') == current['node_key']
+                    and journal.get('node_id') == current['node_id']
+                    and journal.get('config_sha256') == hashlib.sha256(node['config_json'].encode()).hexdigest()
+                    and journal.get('target_account_release') == binding['release_id']):
+                source = journal.get('fences', {}).get(str(account['id']), {})
+                source_account = next((item['account'] for item in journal.get('accounts', [])
+                    if item.get('account', {}).get('id') == account['id']), {})
+                if (source.get('environment_id') == environment and source.get('assignment_revision') == current['revision']
+                        and source_account.get('cc2api_account_id') == gateway_id):
+                    add(current['node_key'], current['revision'], source.get('generation'), journal.get('old_account_release'))
+        return result
+
     def prepare_remote_cli(self, account: dict, runtime, gateway, quota_identity: str) -> dict:
         """按原绑定准备远程CLI环境，独立账号保留原本地刷新所有权。
 
@@ -645,10 +780,9 @@ class ClusterService:
             return {'environment': actual, 'assignment_revision': assignment['revision'], 'node_key': node_row['node_key']}
         path = node.sender_socket(row['environment_id'], address)
         self.transports.register(NodeTransport(node_row['id'], node_row['node_key'], account['id'], row['environment_id'],
-            assignment['revision'], actual['generation'], path, binding['secret']))
-        endpoint = os.environ.get('V3_RUNTIME_URL', 'http://orchestrator:8000').rstrip('/')
-        deployment_key = hashlib.sha256(runtime.deployment.encode()).hexdigest()[:12]
-        endpoint += f"/cluster-transports/v2/{deployment_key}/{node_row['node_key']}/{row['environment_id']}/{assignment['revision']}"
+            assignment['revision'], actual['generation'], path, binding['secret'],
+            gateway_account_id=binding['account_id'], release_id=binding['release_id']))
+        endpoint = self._remote_transport_endpoint(runtime, node_row['node_key'], row['environment_id'], assignment['revision'])
         for notification in peer.get('native_notifications', []):
             if notification == account['cc2api_account_id']:
                 try:
@@ -693,9 +827,17 @@ class ClusterService:
                 connection.close()
             if account is None or value.get('gateway_account_id') != account['cc2api_account_id']:
                 raise ValueError('节点摘要的实际绑定已变化')
+            # 滚动升级时旧节点仍会报告双版；中央只消费明确属于 293 的观察。
+            kernels = value.get('native_kernels', {})
+            if not isinstance(kernels, dict):
+                raise ValueError('节点内核摘要格式无效')
+            kernel = kernels.get('2.1.293', value.get('native_kernel'))
+            if not isinstance(kernel, dict) or kernel.get('source_version') != '2.1.293':
+                kernel = None
             fields = ('state', 'busy', 'role_status', 'identity_status', 'physical_features',
-                'native_kernel', 'native_kernels', 'cli_versions', 'runtime_release', 'content_capture', 'criu')
+                'cli_versions', 'runtime_release', 'content_capture', 'criu')
             return {**unavailable, **{key: value[key] for key in fields}, 'node_observed': True,
+                'native_kernel': kernel, 'native_kernels': {'2.1.293': kernel},
                 'node_message': '已读取所属节点的实际环境', 'runtime_release_error': None}
         except (ValueError, OSError, DockerException, KeyError, TypeError):
             return unavailable

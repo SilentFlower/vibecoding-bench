@@ -29,9 +29,13 @@ BENCH_SCHEMA_SOURCES = {
     'bench.agy-environments.5': 'orchestrator/agy_environment_schema.py',
     'bench.agy-nodes.6': 'orchestrator/agy_node_schema.py',
 }
+# 专属账号回执库使用独立 user_version，签发时校验定义，中央 Bench 数据库不执行此迁移。
+RECEIPT_SCHEMA_SOURCE = 'orchestrator/tui_tool_receipts_schema.py'
+RECEIPT_SCHEMA_V1_CHECKSUM = '788a8c34215042c6f6ab1a48a32ae37a004bc9d71b062e026d4a67aa68daeaa3'
 GATEWAY_SCHEMA_SOURCES = {
-    'gateway.agy-tool-receipts.11': 'cc2api/src/store/agy_tool_receipts_schema.rs',
     'gateway.usage-history.12': 'cc2api/src/store/usage_history_schema.rs',
+    'gateway.tui-backend.13': 'cc2api/src/store/tui_backend_schema.rs',
+    'gateway.agy-tool-receipts.11': 'cc2api/src/store/agy_tool_receipts_schema.rs',
     'gateway.agy-system-reminder.10': 'cc2api/src/store/agy_system_reminder_schema.rs',
     'gateway.agy-safety.9': 'cc2api/src/store/agy_safety_schema.rs',
     'gateway.agy-media.8': 'cc2api/src/store/agy_media_schema.rs',
@@ -59,6 +63,13 @@ def migration_registries(root: Path) -> dict:
     """读取源码登记并核对每项已知迁移定义。:param root: 冻结源码根。:return: 两库登记。"""
     values = {'bench': load_registry(source_path(root, 'orchestrator/database-migration-registry.json'), 'bench'),
         'gateway': load_registry(source_path(root, 'cc2api/src/store/database-migration-registry.json'), 'gateway')}
+    receipt_schema = source_path(root, RECEIPT_SCHEMA_SOURCE)
+    receipt_store = source_path(root, 'orchestrator/tui_tool_receipts.py')
+    # 历史版本早于账号私有回执库；存在该组件的版本必须具备已登记的独立结构。
+    if receipt_schema.exists() or receipt_schema.is_symlink() or receipt_store.is_file():
+        if (receipt_schema.is_symlink() or not receipt_schema.is_file()
+                or schema_checksum(receipt_schema) != RECEIPT_SCHEMA_V1_CHECKSUM):
+            raise ValueError('账号工具回执库迁移定义与版本登记不符')
     for step in values['bench']['steps']:
         logical = BENCH_SCHEMA_SOURCES.get(step['id'])
         if logical is None:

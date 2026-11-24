@@ -26,7 +26,7 @@ export interface KernelReference { release: string; launcher_sha256: string }
 /** 平台配套内核的只读身份；实际进程沿准备观察展示。 */
 export interface EnvironmentKernel {
   management?: 'platform'; platform_release?: string | null;
-  source_version?: '2.1.280' | '2.1.293';
+  source_version?: '2.1.293';
   state: string; revision: string; current?: KernelReference | null; prepared?: KernelReference | null;
   previous?: KernelReference | null; builtin?: KernelReference | null; error?: string | null; pid?: number;
   image_sha256?: string; warmup?: unknown;
@@ -42,7 +42,7 @@ export const agyToolContinuationLabels: Record<string, string> = {
 export interface NativePreparationSnapshot {
   state: string; reason?: string; checking?: boolean; idle_workers?: number; live_workers?: number;
   pid?: number; checked_at_ms?: number; adaptive_prewarm?: boolean;
-  versions?: Partial<Record<'2.1.280' | '2.1.293', NativePreparationSnapshot | null>>;
+  versions?: Partial<Record<'2.1.293', NativePreparationSnapshot | null>>;
 }
 /** 环境列表的真实公开投影，所有身份继续由服务端解释。 */
 export interface RuntimeEnvironment {
@@ -62,7 +62,7 @@ export interface RuntimeEnvironment {
   reconcile_allowed?: boolean;
   request_backend?: string; content_capture?: EnvironmentFeature | null; criu?: EnvironmentFeature | null;
   native_kernel?: EnvironmentKernel | null;
-  native_kernels?: Partial<Record<'2.1.280' | '2.1.293', EnvironmentKernel | null>>;
+  native_kernels?: Partial<Record<'2.1.293', EnvironmentKernel | null>>;
   native_preparation?: NativePreparationSnapshot | null;
   credential_ownership?: { phase?: string; direction?: string; message?: string } | null;
   physical_features?: { message?: string; observed_at?: number; fields: { key: string; label: string; configured?: string | number | boolean | null; observed?: string | number | boolean | null; status: string }[] };

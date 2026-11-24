@@ -47,6 +47,7 @@ export const tlsStates:Record<string,string> = {not_installed: '需系统更新�
 
 /** 既有运行时状态的中文含义。 */
 export const tlsReasons:Record<string,string> = {OBSERVER_NOT_CONFIGURED: '采集器尚未安装', OBSERVER_STATUS_STALE: '检查结果已过期',
+    EXTERNAL_PROVIDER_TLS_UNOBSERVED: 'V2 提供方的对外 TLS 写出尚未接入采集',
     OBSERVER_STATUS_UNAVAILABLE: '等待实际检查', IMAGE_NOT_ADMITTED: '当前内核尚未准入',
     PROBE_ATTACH_FAILED: '探针附着失败', BPF_LOAD_FAILED: '探针加载失败',
     OBSERVER_FAILED: '采集器已退出', CAPTURE_PREPARING: '后台准备中'};

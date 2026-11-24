@@ -26,7 +26,9 @@ def read_settings(runtime, row: dict, observation: dict | None = None) -> dict:
         raw, configuration = b'', {}
     enabled = capture_enabled(fingerprint)
     actual = configuration.get('native_capture_dir') == '/flows/api/cc-prepared'
-    supported = isinstance(configuration.get('native'), dict)
+    native = isinstance(configuration.get('native'), dict)
+    tui = bool(configuration.get('tui_host_memory') and configuration.get('tui_v2'))
+    supported = native or tui
     binding = configuration.get('binding') if isinstance(configuration.get('binding'), dict) else {}
     owned = (binding.get('account_id') == row.get('gateway_account_id')
         and binding.get('environment_id') == row['environment_id']
@@ -40,7 +42,10 @@ def read_settings(runtime, row: dict, observation: dict | None = None) -> dict:
     installed = type(protocol) is int and protocol == 1
     tls = {'state': 'preparing', 'reason': 'CAPTURE_PREPARING', 'checked_at_ms': None,
         'protocol_version': 1 if installed else None, 'image_admitted': None}
-    if not enabled:
+    if tui and not native:
+        # 纯 V2 的回环观察可以独立开关；外部提供方的 TLS 始终另需来源。
+        tls.update(state='unavailable', reason='EXTERNAL_PROVIDER_TLS_UNOBSERVED')
+    elif not enabled:
         tls.update(state='disabled', reason=None)
     elif not installed:
         tls.update(state='not_installed', reason='OBSERVER_NOT_CONFIGURED')
@@ -99,7 +104,8 @@ def set_settings(runtime, row: dict, account: dict, enabled: bool,
         raise ValueError('请求内核正在维护，请完成后再切换采集')
     if before['enabled'] == enabled:
         return before
-    if enabled and before['tls_observer']['protocol_version'] != 1:
+    if (enabled and before['tls_observer']['protocol_version'] != 1
+            and before['tls_observer']['reason'] != 'EXTERNAL_PROVIDER_TLS_UNOBSERVED'):
         raise ValueError('当前镜像需要先通过系统更新安装原生TLS采集能力')
     return apply_settings(runtime, row, account, enabled, before, read_settings,
         field='native_capture_enabled', label='采集', prefix='capture', audit_name='content-capture-operation.json', lease_gateway=lease_gateway, lease_owner=lease_owner)

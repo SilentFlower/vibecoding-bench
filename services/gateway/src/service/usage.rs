@@ -12,6 +12,7 @@ use uuid::Uuid;
 use crate::model::session_policy_block::classify_policy_refusal;
 use crate::service::response_body_codec::{ResponseBodyDecoder, ResponseDecodeError};
 use crate::service::telemetry::{MessageTelemetryUsage, merge_message_usage};
+use crate::service::tui_tool_history::ResponseTools;
 use crate::service::usage_pricing::calculate_cost;
 use crate::store::usage_store::{UsageRecord, UsageStore};
 
@@ -51,6 +52,7 @@ struct UsageParser {
     observation_error: Option<&'static str>,
     tokens: [Option<u64>; 6],
     first_output_at: Option<Instant>,
+    native_tools: Option<ResponseTools>,
 }
 
 /// 与计费无关的响应观察结果，只保留白名单元信息。
@@ -67,6 +69,49 @@ pub(crate) struct MessageObservation {
 }
 
 impl UsageCapture {
+    /// 建立候选轮次旁路，沿同一解码器观察可信工具。@param stateless 是否核验完整工具声明。@return 观察器。
+    pub(super) fn native_turn(stateless: bool) -> Self {
+        let mut capture = Self::observer(&Value::Null);
+        let parser = capture.decoder.sink_mut().expect("观察器尚未配置");
+        parser.native_tools = Some(ResponseTools::new(stateless));
+        capture
+    }
+
+    /// 增量观察候选响应。@param bytes 原响应字节。@return 工具旁路仍可继续核验。
+    pub(super) fn observe_native(&mut self, bytes: &[u8]) -> bool {
+        self.observe(bytes);
+        self.decoder
+            .sink_mut()
+            .is_some_and(|parser| parser.native_tools.is_some())
+    }
+
+    /// 已完整派发 SSE 终态。@return 是否可以在转交最后一帧前落回执。
+    pub(super) fn native_stopped(&mut self) -> bool {
+        self.decoder
+            .sink_mut()
+            .is_some_and(|parser| parser.saw_end && parser.stop_reason.is_some())
+    }
+
+    /// 结束原生观察。@return 可信终态的工具集合；未知或不完整输出返回空选项。
+    pub(super) fn native_terminal(self) -> Option<(Vec<String>, Option<String>)> {
+        let parser = self.completed_parser(true);
+        if parser.record.partial || parser.error_type.is_some() {
+            return None;
+        }
+        let (tools, declarations) = parser.native_tools?.complete()?;
+        match parser.stop_reason.as_deref() {
+            Some("tool_use") if !tools.is_empty() => Some((tools, declarations)),
+            Some(
+                "end_turn"
+                | "max_tokens"
+                | "stop_sequence"
+                | "refusal"
+                | "model_context_window_exceeded",
+            ) if tools.is_empty() => Some((tools, declarations)),
+            _ => None,
+        }
+    }
+
     /// 为已准备转发的正式 messages 调用建立独立观察器。
     /// @param store 共享统计存储。
     /// @param account_id 实际承载账号。
@@ -247,6 +292,7 @@ impl UsageParser {
             observation_error: None,
             tokens: [None; 6],
             first_output_at: None,
+            native_tools: None,
         }
     }
 
@@ -391,9 +437,17 @@ impl UsageParser {
     fn mark_observation_error(&mut self, reason: &'static str) {
         self.record.partial = true;
         self.observation_error.get_or_insert(reason);
+        {
+            self.native_tools = None;
+        }
     }
 
     fn observe_value(&mut self, value: &Value) {
+        if let Some(tools) = self.native_tools.as_mut()
+            && tools.observe(value).is_none()
+        {
+            self.mark_observation_error("tool_observation_incomplete");
+        }
         if self.policy_reason.is_none() {
             self.policy_reason = classify_policy_refusal(value);
         }
@@ -440,6 +494,9 @@ impl UsageParser {
             }
         }
         if value["type"].as_str() == Some("error") {
+            {
+                self.native_tools = None;
+            }
             self.error_type = Some(
                 match value.pointer("/error/type").and_then(Value::as_str) {
                     Some(
@@ -447,6 +504,7 @@ impl UsageParser {
                         | "authentication_error"
                         | "permission_error"
                         | "not_found_error"
+                        | "request_too_large"
                         | "rate_limit_error"
                         | "api_error"
                         | "overloaded_error"
@@ -555,6 +613,7 @@ impl UsageParser {
             }
         }
         self.record.partial |= !complete
+            || self.error_type.is_some()
             || !self.saw_input
             || !self.saw_output
             || (self.is_sse == Some(true) && !self.saw_end);
@@ -646,6 +705,69 @@ mod tests {
             &json!({"model":"claude-sonnet-5"}),
             Utc::now(),
         )
+    }
+
+    /// 已完成和待拼接声明共用预算，失效后整组丢弃且后续事件不会重新开始收集。
+    #[test]
+    fn native_tool_observation_releases_all_buffers_on_shared_budget_failure() {
+        use crate::service::request_body_codec::REQUEST_BODY_LIMIT;
+
+        let mut capture = UsageCapture::native_turn(true);
+        let parser = capture.decoder.sink_mut().unwrap();
+        let piece = "a".repeat(REQUEST_BODY_LIMIT / 32);
+        for index in 0..4 {
+            parser.observe_value(&json!({"type":"content_block_start","index":index,
+                "content_block":{"type":"tool_use","id":format!("toolu_{index}"),"name":"Read","input":{}}}));
+        }
+        for index in 0..4 {
+            parser.observe_value(&json!({"type":"content_block_delta","index":index,
+                "delta":{"type":"input_json_delta","partial_json":"{\"path\":\""}}));
+        }
+        for index in 0..3 {
+            let data = json!({"type":"content_block_delta","index":index,
+                "delta":{"type":"input_json_delta","partial_json":piece}});
+            for _ in 0..8 {
+                parser.observe_value(&data);
+            }
+        }
+        parser.observe_value(&json!({"type":"content_block_delta","index":0,
+            "delta":{"type":"input_json_delta","partial_json":"\"}"}}));
+        parser.observe_value(&json!({"type":"content_block_stop","index":0}));
+        assert!(parser.native_tools.is_some());
+        let data = json!({"type":"content_block_delta","index":3,
+            "delta":{"type":"input_json_delta","partial_json":piece}});
+        for _ in 0..8 {
+            parser.observe_value(&data);
+        }
+        assert!(parser.native_tools.is_none());
+        assert_eq!(
+            parser.observation_error,
+            Some("tool_observation_incomplete")
+        );
+        parser.observe_value(&json!({"type":"content_block_start","index":5,
+            "content_block":{"type":"tool_use","id":"toolu_after","name":"Read","input":{}}}));
+        assert!(parser.native_tools.is_none());
+        assert!(capture.native_terminal().is_none());
+    }
+
+    /// 畸形参数、SSE 观察错误及上游错误立即舍弃已收集的工具。
+    #[test]
+    fn native_tool_observation_releases_buffers_on_malformed_or_failed_stream() {
+        for invalid in [
+            "data: {broken}\n\n",
+            "data: {\"type\":\"error\",\"error\":{\"type\":\"api_error\"}}\n\n",
+            concat!(
+                "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\"}}\n\n",
+                "data: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+            ),
+        ] {
+            let mut capture = UsageCapture::native_turn(true);
+            capture.observe(b"data: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_test\",\"name\":\"Read\",\"input\":{}}}\n\n");
+            assert!(capture.decoder.sink_mut().unwrap().native_tools.is_some());
+            capture.observe(invalid.as_bytes());
+            assert!(capture.decoder.sink_mut().unwrap().native_tools.is_none());
+            assert!(capture.native_terminal().is_none());
+        }
     }
 
     /// 首输出只识别有效内容，元数据、心跳、空块和签名都不能提前记点。

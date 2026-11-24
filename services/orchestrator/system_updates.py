@@ -215,6 +215,12 @@ def _rollout_environment(runtime, row: dict, account: dict | None) -> dict:
                         item['roles'][role] = {'id': container.id, 'image_id': container.attrs['Image'], 'state': container.status}
                 if item['roles']:
                     item['origin'] = image_origin(runtime, row)
+                elif row['state'] == 'stopped' and not agy and item['gateway_account_id'] is not None and row['generation'] > 0:
+                    # 休眠账号不需要后台启动，原镜像证明仍可供首个获准请求核对。
+                    try:
+                        item['origin'] = image_origin(runtime, row)
+                    except FileNotFoundError:
+                        pass
             finally:
                 guard.release()
         else:
@@ -343,6 +349,7 @@ def runtime_snapshot(runtime, central_only: bool = False, control_only: bool = F
                     if record and (record.get('phase') != 'ready' or record.get('refresh_pending') or record.get('gateway_refresh_pending')):
                         reasons.append('凭据交接或刷新结果尚未确认')
                 if account and account.get('cc2api_account_id'):
+                    item['gateway_account_id'] = account['cc2api_account_id']
                     lease = runtime.gateway._request('GET', f'/admin/runtime/accounts/{int(account["cc2api_account_id"])}/lease')
                     paused = paused_migration_lease(runtime.database, row, lease)
                     if paused is not None:
@@ -354,7 +361,7 @@ def runtime_snapshot(runtime, central_only: bool = False, control_only: bool = F
                                 'generation': row['generation'], 'assignment_revision': record['source_revision']}.items()):
                             paused = None
                     if (lease.get('active') or lease.get('waiting') or lease.get('lease') or lease.get('holders')
-                            or lease.get('importing')) and paused is None:
+                            or lease.get('importing') or lease.get('tui_pending') is True) and paused is None:
                         reasons.append('账号 API 或运行租约尚未收口')
                 roles, image_ids = {}, set()
                 for role, column in ROLE_COLUMNS.items():
@@ -383,6 +390,11 @@ def runtime_snapshot(runtime, central_only: bool = False, control_only: bool = F
                 if not roles and row['state'] not in ('stopped', 'retired'):
                     reasons.append('环境缺少已确认的停止状态')
                 item.update(roles=roles, origin=image_origin(runtime, row) if roles else None)
+                if not roles and row['state'] == 'stopped' and not agy and item.get('gateway_account_id') and row['generation'] > 0:
+                    try:
+                        item['origin'] = image_origin(runtime, row)
+                    except FileNotFoundError:
+                        pass
         except Exception:
             # 公开响应保留未知事实，不转发包含私有路径或凭据的底层异常。
             reasons.append('环境排空证据尚未完整核验')
@@ -529,7 +541,7 @@ def _rollout_lease(runtime, gateway_id: int | None, owner: str):
     # 环境锁保证只有本次尝试能收回同一维护所有者。进程重启后租约会进入对账。
     if previous:
         gateway._request('POST', path, {'operation': 'release', 'owner': owner, 'generation': previous['generation']})
-    if snapshot.get('waiting'):
+    if snapshot.get('waiting') or snapshot.get('tui_pending') is True:
         raise AccountRolloutWaiting()
     proof = gateway._request('POST', path, {'operation': 'prepare', 'owner': owner}).get('lease')
     if not proof or proof['owner'] != owner or not proof['exclusive']:

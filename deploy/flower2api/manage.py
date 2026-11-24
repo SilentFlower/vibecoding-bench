@@ -528,7 +528,6 @@ def build(release: str, manifest_path: Path, *, prebuilt: bool = True) -> None:
         version_file.parent.mkdir()
         version_file.write_text(json.dumps({'version': platform_version}) + '\n')
         native_runtime = stage_asset(snapshot / "native-runtime/ccrb-runtime")
-        native_runtime['runtimes'] = {'2.1.280': stage_asset(snapshot / 'native-runtime/ccrb-runtime-280', version='2.1.280')}
         agy_auth = stage_auth_asset(snapshot / 'agy-auth')
         restore_upstream_checkout_bytes(snapshot)
         digest = hashlib.sha256()

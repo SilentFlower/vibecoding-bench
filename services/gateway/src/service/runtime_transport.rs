@@ -1,13 +1,14 @@
 //! v3 账号容器传输边界：复用原 HTTP/TLS 发送规则，不负责协议改写或重试。
 
+use std::collections::BTreeMap;
 use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::io::{Error as IoError, Write};
 use std::iter::once;
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 use std::sync::Arc;
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::net::TcpListener;
@@ -19,8 +20,11 @@ use uuid::Uuid;
 
 use axum::Json;
 use axum::Router;
+#[cfg(target_os = "linux")]
+use axum::body::to_bytes;
 use axum::body::{Body, Bytes};
 use axum::extract::{DefaultBodyLimit, Request, State};
+use axum::http::header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE, RETRY_AFTER, USER_AGENT};
 use axum::http::{HeaderMap, HeaderValue, Method};
 use axum::middleware::{Next, from_fn_with_state};
 use axum::response::{IntoResponse, Response};
@@ -28,9 +32,10 @@ use axum::routing::{get, post};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use futures_util::StreamExt;
-use futures_util::stream::unfold;
+use futures_util::stream::{empty, once as stream_once, unfold};
+use regex::Regex;
 use reqwest::redirect::Policy;
-use reqwest::{Client, StatusCode};
+use reqwest::{Body as RequestBody, Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -38,6 +43,8 @@ use subtle::ConstantTimeEq;
 
 use crate::error::AppError;
 use crate::model::account::Account;
+#[cfg(feature = "tui-v2-candidate")]
+use crate::model::account::AccountAuthType;
 use crate::model::request_diagnostics::{ExecutionLocation, RequestLogMode};
 use crate::service::agy_contract::{
     AGY_REQUEST_SECONDS, AgyAccessSnapshot, AgyModelId, AgyOperation, AgySenderConfig,
@@ -52,13 +59,65 @@ use crate::service::native_contract::{
     NativeSourceVersion,
 };
 use crate::service::native_runtime::{NativePool, NativeSenderConfig, NativeSubmission};
+use crate::service::rewriter::{CacheControlTtlRewrite, MessageCacheControlRewrite};
 use crate::service::runtime_background::{BACKGROUND_HEADER, BackgroundPurpose};
+#[cfg(target_os = "linux")]
+use crate::service::tui_sender::TuiSender;
+use crate::service::tui_sender_response;
 use crate::tlsfp::{
     TlsProfileId, get_background_request_client_for_profile, get_request_client_for_profile,
 };
 
 const AGY_TOOL_INPUT_REJECTION: &str = "x-flower2api-agy-input-rejection";
 const AGY_TOOL_FINALIZATION_FAILED: &str = "x-flower2api-agy-finalization-failed";
+pub(super) const TUI_V2_STATUS_PROTOCOL: u8 = 1;
+// 仅由已绑定 sender 的私有 HTTP 回包转递。公开响应白名单不会交付此头。
+pub(super) const TUI_GATEWAY_ID_HEADER: &str = "x-v3-tui-message-id-mode";
+pub(super) const TUI_CAPTURE: &str = "x-v3-tui-http-capture";
+pub(super) const TUI_UPSTREAM_SESSION: &str = "x-v3-tui-upstream-session";
+pub(super) const TUI_MANAGED_OAUTH: &str = "x-v3-tui-managed-oauth";
+const TUI_ACCOUNT_MODEL: &str = "x-v3-tui-account-model";
+pub(super) const TUI_ERROR_SOURCE: &str = "x-v3-tui-error-source";
+pub(super) const TUI_JSON_PROJECTION_V1: &str = "gateway-json-v1";
+pub(super) const TUI_SSE_PROJECTION_HEADER: &str = "x-v3-tui-sse-projection";
+pub(super) const TUI_SSE_PROJECTION_V1: &str = "gateway-sse-v1";
+
+/// 限制私有 V2 帧的 Bearer 令牌格式。@param token 账号凭据。@return 是否可安全编码。
+pub(super) fn valid_tui_account_token(token: &str) -> bool {
+    !token.is_empty()
+        && token.len() <= 2048
+        && token
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"-._~+/=".contains(&byte))
+}
+
+/// 生成仅供已协商的 sender 使用的凭据头。@param token 账号 AT。@return 标记为敏感的私有头。
+pub(super) fn tui_account_token_header(token: &str) -> Result<HeaderValue, AppError> {
+    let invalid = || AppError::ServiceUnavailable("V2 账号凭据格式无效".into());
+    if !valid_tui_account_token(token) {
+        return Err(invalid());
+    }
+    let mut header = HeaderValue::from_str(token).map_err(|_| invalid())?;
+    header.set_sensitive(true);
+    Ok(header)
+}
+
+/// 核对已鉴权私有链路的 JSON 委托版本。@param headers 私有头。
+/// @return 双方已协商的单值标记是否存在。
+pub(super) fn tui_delegates_json(headers: &HeaderMap) -> bool {
+    tui_projection_marker(headers, TUI_GATEWAY_ID_HEADER, TUI_JSON_PROJECTION_V1)
+}
+
+/// 核对私有协商标记，重复或未知值不构成委托。
+/// @param headers 私有头。@param name 头名。@param expected 协商版本。@return 是否明确选择该版本。
+pub(super) fn tui_projection_marker(headers: &HeaderMap, name: &str, expected: &str) -> bool {
+    let mut values = headers.get_all(name).iter();
+    values.next().is_some_and(|value| value == expected) && values.next().is_none()
+}
+
+/// 内部响应模式，供公开路由采用正文终态记账。
+#[derive(Clone)]
+pub(super) struct TuiGatewayIds;
 
 const META_HEADER: &str = "x-v3-request";
 const ERROR_HEADER: &str = "x-v3-transport-error";
@@ -98,6 +157,18 @@ struct RuntimeBinding {
     agy_tool_continuation_protocol: u32,
     #[serde(default)]
     agy_generation_seconds: u64,
+    #[serde(default)]
+    tui_predecessors: Vec<TuiBindingProof>,
+}
+
+/// 编排器核对过的源位置，仅用于比较原绑定，不能访问源发送器。
+#[derive(Deserialize)]
+struct TuiBindingProof {
+    account_id: i64,
+    environment_id: String,
+    generation: u64,
+    endpoint: String,
+    release_id: String,
 }
 
 /// 请求元信息与原始 body 分开传输，避免重新序列化改变协议字节。
@@ -137,35 +208,55 @@ pub struct SenderConfig {
     pub quota_identity: String,
 }
 
-/// 从受信安装表冻结单版执行配置，历史配置仅提供293。
-fn native_version_config(
-    config: &SenderConfig,
-    version: NativeSourceVersion,
-) -> Result<SenderConfig, AppError> {
-    let mut selected = config.clone();
-    let native = selected
-        .native
-        .as_mut()
-        .ok_or_else(|| AppError::ServiceUnavailable("未配置原生运行时".into()))?;
-    if let Some(runtime) = native.runtimes.get(&version) {
-        native.binary_path = runtime.binary_path.clone();
-        native.release = runtime.release.clone();
-        native.kernel_generation = runtime.kernel_generation.clone();
-    } else if native.source_version != version {
-        return Err(AppError::ServiceUnavailable(format!(
-            "原生运行时 {} 尚未安装",
-            version.as_str()
-        )));
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum TuiV2Unavailable {
+    NotConfigured,
+    NotRunning,
+    BindingUnverified,
+    MessagesToolAndUsageEventsUnavailable,
+    ReadinessUnverified,
+}
+
+impl TuiV2Unavailable {
+    fn into_error(self) -> AppError {
+        AppError::ServiceUnavailable(
+            match self {
+                Self::NotConfigured | Self::NotRunning => "V2 没有已配置并运行的账号发送器",
+                Self::BindingUnverified => "V2 账号发送器绑定未通过校验",
+                Self::MessagesToolAndUsageEventsUnavailable => {
+                    "V2 缺少官方交互终端的完整 Messages 工具和用量事件源"
+                }
+                Self::ReadinessUnverified => "V2 账号发送器就绪状态待核对",
+            }
+            .into(),
+        )
     }
-    native.source_version = version;
-    native.runtimes.clear();
-    if version == NativeSourceVersion::Cc280 {
-        native.work_root = Path::new(&native.work_root)
-            .join("280")
-            .to_string_lossy()
-            .into_owned();
-    }
-    Ok(selected)
+}
+
+fn tui_binding_present(binding: &TransportBinding) -> bool {
+    binding.account_id > 0
+        && binding.environment_id.len() == 32
+        && binding
+            .environment_id
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit())
+        && binding.generation > 0
+        && !binding.release_id.is_empty()
+}
+
+fn tui_v2_sender_status(config: &SenderConfig) -> Value {
+    let binding = &config.binding;
+    let reason = if !tui_binding_present(binding) {
+        TuiV2Unavailable::BindingUnverified
+    } else if config.agy.is_some() {
+        TuiV2Unavailable::NotConfigured
+    } else {
+        TuiV2Unavailable::MessagesToolAndUsageEventsUnavailable
+    };
+    // MessageDisplay 提供已完成的文本行。V2 就绪还需要完整的 Messages 工具和用量事件。
+    json!({"protocol": TUI_V2_STATUS_PROTOCOL, "ready": false, "idle": null,
+        "reason": reason, "account_id": binding.account_id, "release_id": binding.release_id})
 }
 
 fn record_headers(
@@ -254,7 +345,7 @@ pub async fn send_direct(
 async fn send_with_client(
     client: &Client,
     prepared: &PreparedRequest,
-    body: Vec<u8>,
+    body: impl Into<RequestBody>,
 ) -> Result<reqwest::Response, AppError> {
     let method = Method::from_bytes(prepared.method.as_bytes())
         .map_err(|_| AppError::BadRequest("invalid upstream method".into()))?;
@@ -269,7 +360,14 @@ async fn send_with_client(
         );
     }
     for (name, value) in &prepared.headers {
-        request = request.header(name, value);
+        if name.eq_ignore_ascii_case("authorization") {
+            let mut authorization = HeaderValue::from_str(value)
+                .map_err(|_| AppError::BadRequest("上游凭据格式无效".into()))?;
+            authorization.set_sensitive(true);
+            request = request.header(name, authorization);
+        } else {
+            request = request.header(name, value);
+        }
     }
     request
         .body(body)
@@ -284,9 +382,18 @@ pub struct PreparedTransport {
     route: PreparedRoute,
     tool_continuation_mode: AgyToolContinuationMode,
     long_agy_generation: bool,
+    tui_predecessors: Vec<TuiBindingProof>,
 }
 
 impl PreparedTransport {
+    /// 取得实际 V1 传输的轮次归属。@param account 已选定账号。@return 校验后的运行位置键。
+    pub(super) fn tui_native_binding(&self, account: &Account) -> String {
+        match &self.route {
+            PreparedRoute::V3 { binding, .. } => tui_binding_key(binding, tui_fixture(account)),
+            PreparedRoute::Direct(_) => "native:direct".into(),
+        }
+    }
+
     /// 读取发送器和已选内核共同支持的生成预算。@return 原生生成时长。
     pub(super) fn agy_generation_budget(&self) -> Duration {
         Duration::from_millis(if self.long_agy_generation {
@@ -317,6 +424,7 @@ impl PreparedTransport {
             route: PreparedRoute::V3 { client, binding },
             tool_continuation_mode: AgyToolContinuationMode::Claim,
             long_agy_generation: false,
+            tui_predecessors: Vec::new(),
         })
     }
 
@@ -625,6 +733,7 @@ pub async fn prepare(
             route: PreparedRoute::Direct(account.proxy_url.clone()),
             tool_continuation_mode: AgyToolContinuationMode::Claim,
             long_agy_generation: false,
+            tui_predecessors: Vec::new(),
         });
     }
     let secret = std::env::var("V3_INTERNAL_TOKEN").map_err(|_| {
@@ -654,6 +763,1041 @@ pub async fn prepare(
     .await
 }
 
+const TUI_CANDIDATE_RELEASE: &str = "fixture-tui-v2-candidate";
+
+/// 检查是否配置了可信编排登记。@return 是否可读取账号运行绑定。
+pub fn tui_runtime_configured() -> bool {
+    std::env::var("V3_RUNTIME_URL").is_ok_and(|value| !value.is_empty())
+}
+
+/// 检查账号是否属于 Claude 的已配置运行环境。@param account 已授权账号。@return 是否进入切换管控。
+pub(crate) fn tui_scope(account: &Account) -> bool {
+    account.is_claude_code()
+        && if configured_account_release() == TUI_CANDIDATE_RELEASE {
+            tui_fixture(account)
+        } else {
+            tui_runtime_configured()
+        }
+}
+
+/// 区分显式隔离夹具与正常账号 sender。@param account 已授权账号。@return 是否使用回环夹具。
+pub(super) fn tui_fixture(account: &Account) -> bool {
+    #[cfg(feature = "tui-v2-candidate")]
+    {
+        tui_candidate_scope(account)
+    }
+    #[cfg(not(feature = "tui-v2-candidate"))]
+    {
+        let _ = account;
+        false
+    }
+}
+
+/// 候选入口只接受显式回环验证运行时及合成账号。@param account 当前账号。@return 是否在候选范围。
+#[cfg(feature = "tui-v2-candidate")]
+fn tui_candidate_scope(account: &Account) -> bool {
+    account.is_claude_code()
+        && account.auth_type == AccountAuthType::SetupToken
+        && account.setup_token.starts_with("fixture-")
+        && tui_candidate_configured()
+}
+
+/// 核对显式候选标识与固定回环登记地址。@return 配置是否进入候选范围。
+#[cfg(feature = "tui-v2-candidate")]
+fn tui_candidate_configured() -> bool {
+    configured_account_release() == TUI_CANDIDATE_RELEASE
+        && std::env::var("V3_RUNTIME_URL")
+            .ok()
+            .and_then(|value| reqwest::Url::parse(&value).ok())
+            .is_some_and(|url| {
+                url.scheme() == "http"
+                    && url.host_str() == Some("127.0.0.1")
+                    && url.username().is_empty()
+                    && url.password().is_none()
+                    && url.path() == "/"
+                    && url.query().is_none()
+                    && url.fragment().is_none()
+            })
+}
+
+/// sender 预留所需的受信账号、主体、原会话与截止时间。
+#[derive(Serialize)]
+struct TuiReservationIdentity<'a> {
+    account_id: i64,
+    environment_id: &'a str,
+    generation: u64,
+    principal_id: i64,
+    session_id: &'a str,
+    reservation_id: String,
+    deadline_unix_ms: u64,
+    continuation_only: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    agent_hint: Option<&'a str>,
+}
+
+#[cfg(feature = "tui-v2-candidate")]
+fn tui_candidate_client(binding: &TransportBinding) -> Result<Client, AppError> {
+    let endpoint = reqwest::Url::parse(&binding.endpoint)
+        .map_err(|_| AppError::ServiceUnavailable("候选 sender 地址无效".into()))?;
+    let host = endpoint
+        .host_str()
+        .filter(|_| {
+            endpoint.scheme() == "http" && endpoint.path() == "/" && endpoint.port() == Some(8091)
+        })
+        .filter(|_| binding.release_id == TUI_CANDIDATE_RELEASE)
+        .ok_or_else(|| AppError::ServiceUnavailable("候选 sender 绑定不符".into()))?;
+    // 登记仍使用真实 v3 合同，候选数据通道固定解析到当前命名空间的回环。
+    Client::builder()
+        .no_proxy()
+        .http1_only()
+        .redirect(Policy::none())
+        .resolve(host, std::net::SocketAddr::from(([127, 0, 0, 1], 8091)))
+        .build()
+        .map_err(|_| AppError::ServiceUnavailable("候选 sender 通道不可用".into()))
+}
+
+async fn tui_status(
+    client: &Client,
+    binding: &TransportBinding,
+    fixture: bool,
+) -> Result<bool, TuiV2Unavailable> {
+    let response = client
+        .get(format!(
+            "{}/internal/status",
+            binding.endpoint.trim_end_matches('/')
+        ))
+        .bearer_auth(&binding.secret)
+        .timeout(Duration::from_secs(2))
+        .send()
+        .await
+        .map_err(|_| TuiV2Unavailable::ReadinessUnverified)?;
+    match response.status() {
+        StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
+            return Err(TuiV2Unavailable::BindingUnverified);
+        }
+        StatusCode::SERVICE_UNAVAILABLE => return Err(TuiV2Unavailable::NotConfigured),
+        StatusCode::OK => {}
+        _ => return Err(TuiV2Unavailable::ReadinessUnverified),
+    }
+    let status = response
+        .json()
+        .await
+        .map_err(|_| TuiV2Unavailable::ReadinessUnverified)?;
+    tui_status_snapshot(binding, &status, fixture)
+}
+
+fn tui_status_snapshot(
+    binding: &TransportBinding,
+    status: &Value,
+    fixture: bool,
+) -> Result<bool, TuiV2Unavailable> {
+    let tui = &status["tui_v2"];
+    if tui["protocol"] != TUI_V2_STATUS_PROTOCOL {
+        return Err(TuiV2Unavailable::ReadinessUnverified);
+    }
+    if status["environment_id"] != binding.environment_id
+        || status["generation"] != binding.generation
+        || (!fixture
+            && (tui["account_id"] != binding.account_id || tui["release_id"] != binding.release_id))
+    {
+        return Err(TuiV2Unavailable::BindingUnverified);
+    }
+    if tui["ready"] == false {
+        return Err(serde_json::from_value(tui["reason"].clone())
+            .unwrap_or(TuiV2Unavailable::ReadinessUnverified));
+    }
+    if tui["ready"] != true || (!fixture && tui["event_source"] != "local_unix") {
+        return Err(TuiV2Unavailable::ReadinessUnverified);
+    }
+    let idle = tui["idle"]
+        .as_bool()
+        .ok_or(TuiV2Unavailable::ReadinessUnverified)?;
+    if fixture {
+        return Ok(idle);
+    }
+    let active = status["active"]
+        .as_u64()
+        .ok_or(TuiV2Unavailable::ReadinessUnverified)?;
+    Ok(idle && active == 0)
+}
+
+async fn tui_transport(
+    account: &Account,
+    wake_wait: Option<Duration>,
+) -> Result<(Client, TransportBinding, bool, Vec<String>), TuiV2Unavailable> {
+    if !tui_scope(account) {
+        return Err(TuiV2Unavailable::NotConfigured);
+    }
+    let fixture = tui_fixture(account);
+    let transport = if let Some(wait) = wake_wait {
+        prepare(account, wait).await.map(Some)
+    } else {
+        prepare_existing(account).await
+    }
+    .map_err(|_| TuiV2Unavailable::BindingUnverified)?;
+    let Some(PreparedTransport {
+        route: PreparedRoute::V3 { client, binding },
+        tui_predecessors,
+        ..
+    }) = transport
+    else {
+        return Err(TuiV2Unavailable::NotRunning);
+    };
+    if !tui_binding_present(&binding) || (!fixture && binding.release_id == TUI_CANDIDATE_RELEASE) {
+        return Err(TuiV2Unavailable::BindingUnverified);
+    }
+    #[cfg(feature = "tui-v2-candidate")]
+    let client = if fixture {
+        tui_candidate_client(&binding).map_err(|_| TuiV2Unavailable::BindingUnverified)?
+    } else {
+        client
+    };
+    let predecessors = if fixture {
+        Vec::new()
+    } else {
+        tui_predecessor_keys(&binding, tui_predecessors)
+    };
+    Ok((client, binding, fixture, predecessors))
+}
+
+async fn probe_tui_account(
+    account: &Account,
+    budget: Duration,
+) -> Result<TuiBindingStatus, TuiV2Unavailable> {
+    timeout(budget, async {
+        let (client, binding, fixture, predecessors) = tui_transport(account, None).await?;
+        let idle = tui_status(&client, &binding, fixture).await?;
+        Ok(TuiBindingStatus {
+            key: tui_sender_key(&binding, fixture),
+            idle,
+            predecessors,
+        })
+    })
+    .await
+    .map_err(|_| TuiV2Unavailable::ReadinessUnverified)?
+}
+
+/// 只探测已经登记的账号 sender。@param account 已授权账号。@return 可核验的绑定和空闲状态。
+pub(crate) async fn tui_account_status(account: &Account) -> Result<(String, bool), AppError> {
+    probe_tui_account(account, Duration::from_secs(2))
+        .await
+        .map(|status| (status.key, status.idle))
+        .map_err(TuiV2Unavailable::into_error)
+}
+
+/// 当前真实发送器及经控制端授权的前驱。无需启动或重绑定账号。
+#[derive(Debug)]
+pub(super) struct TuiBindingStatus {
+    pub(super) key: String,
+    pub(super) idle: bool,
+    predecessors: Vec<String>,
+}
+
+impl TuiBindingStatus {
+    /// 判断原绑定已获准推进。@param registered 原绑定。@return 本次证据覆盖原登记。
+    pub(super) fn can_advance(&self, registered: &str) -> bool {
+        tui_same_binding(registered, &self.key)
+            || tui_later_generation(registered, &self.key)
+            || self
+                .predecessors
+                .iter()
+                .any(|key| tui_same_binding(registered, key))
+    }
+}
+
+/// 只读查询可用于变更的同账号绑定证明。@param account 账号。@return 当前状态与前驱。
+pub(super) async fn tui_transition_status(account: &Account) -> Result<TuiBindingStatus, AppError> {
+    probe_tui_account(account, Duration::from_secs(2))
+        .await
+        .map_err(TuiV2Unavailable::into_error)
+}
+
+/// 保存切换时按需唤醒同一账号，以实际 sender 状态核对绑定。
+/// @param account 本次选择的账号。@return 同账号就绪状态。
+pub(super) async fn tui_switch_status(account: &Account) -> Result<TuiBindingStatus, AppError> {
+    // 保存可以等待远端只读检查完成，列表和详情仍沿用短预算。
+    match probe_tui_account(account, Duration::from_secs(12)).await {
+        Err(TuiV2Unavailable::NotRunning) if !tui_fixture(account) => {
+            // 查询结果为空只允许按需准备，提交切换仍需核对实际 sender 和原轮归属。
+            let sender = ready_tui_sender(
+                account,
+                Instant::now() + Duration::from_millis(REQUEST_BUDGET_MS),
+                true,
+            )
+            .await?;
+            Ok(TuiBindingStatus {
+                key: sender.key,
+                idle: sender.idle,
+                predecessors: sender.predecessors,
+            })
+        }
+        result => result.map_err(TuiV2Unavailable::into_error),
+    }
+}
+
+fn reject_tui(account: i64, reason: TuiV2Unavailable) -> AppError {
+    tracing::warn!(
+        layer = "tui_v2",
+        account_id = account,
+        ?reason,
+        "发送前拒绝 V2 请求"
+    );
+    reason.into_error()
+}
+
+/// 诊断未由管理动作绑定的 V2 账号。@param account 已授权账号。@return 发送前的不可用原因。
+pub(super) async fn tui_unbound(account: &Account) -> AppError {
+    let reason = probe_tui_account(account, Duration::from_secs(2))
+        .await
+        .err()
+        .unwrap_or(TuiV2Unavailable::BindingUnverified);
+    reject_tui(account.id, reason)
+}
+
+fn tui_binding_key(binding: &TransportBinding, fixture: bool) -> String {
+    if fixture {
+        return format!("{}:{}", binding.environment_id, binding.generation);
+    }
+    // 固定代次、发行和节点分配；私有 bearer 仅留在传输边界。
+    format!(
+        "v1:{:x}",
+        Sha256::digest(
+            serde_json::to_vec(&(
+                binding.account_id,
+                &binding.environment_id,
+                binding.generation,
+                &binding.release_id,
+                &binding.endpoint,
+            ))
+            .expect("纯绑定字段可编码")
+        )
+    )
+}
+
+fn tui_sender_key(binding: &TransportBinding, fixture: bool) -> String {
+    let exact = tui_binding_key(binding, fixture);
+    if fixture {
+        return exact;
+    }
+    let digest = exact.strip_prefix("v1:").expect("正式传输绑定带摘要");
+    // 远端路径含节点身份和分配修订。本机使用已核验的账号 sender 端点。
+    let location = Sha256::digest(
+        serde_json::to_vec(&(
+            binding.account_id,
+            &binding.environment_id,
+            &binding.release_id,
+            &binding.endpoint,
+        ))
+        .expect("纯绑定字段可编码"),
+    );
+    format!(
+        "v3:{}:{}:{location:x}:{digest}",
+        binding.environment_id, binding.generation
+    )
+}
+
+fn tui_sender_key_parts(key: &str) -> Option<(&str, u64, &str, &str)> {
+    let mut parts = key.strip_prefix("v3:")?.splitn(4, ':');
+    Some((
+        parts.next()?,
+        parts.next()?.parse().ok()?,
+        parts.next()?,
+        parts.next()?,
+    ))
+}
+
+fn tui_predecessor_keys(current: &TransportBinding, proofs: Vec<TuiBindingProof>) -> Vec<String> {
+    proofs
+        .into_iter()
+        .take(4)
+        .filter_map(|proof| {
+            if proof.account_id != current.account_id
+                || proof.environment_id != current.environment_id
+                || proof.generation == 0
+                || proof.generation >= current.generation
+                || proof.endpoint.is_empty()
+                || proof.release_id.is_empty()
+            {
+                return None;
+            }
+            Some(tui_sender_key(
+                &TransportBinding {
+                    account_id: proof.account_id,
+                    environment_id: proof.environment_id,
+                    generation: proof.generation,
+                    endpoint: proof.endpoint,
+                    release_id: proof.release_id,
+                    secret: String::new(),
+                },
+                false,
+            ))
+        })
+        .collect()
+}
+
+/// 确认实际与已登记的完整 sender 绑定相同。@param registered 已保存的键。@param actual 实际键。@return 是否同代同绑定。
+pub(super) fn tui_same_binding(registered: &str, actual: &str) -> bool {
+    if registered == actual {
+        return true;
+    }
+    let Some((environment, generation, _, exact)) = tui_sender_key_parts(actual) else {
+        return false;
+    };
+    registered.strip_prefix("v1:") == Some(exact)
+        || registered == format!("v2:{environment}:{generation}:{exact}")
+}
+
+/// 校验账号、环境、发行和节点分配相同且代次严格前进。
+/// @param registered 原登记键。@param actual 由当前受信登记生成的键。@return 是否仅推进代次。
+pub(super) fn tui_later_generation(registered: &str, actual: &str) -> bool {
+    let Some((environment, generation, location, _)) = tui_sender_key_parts(registered) else {
+        return false;
+    };
+    tui_sender_key_parts(actual).is_some_and(|(current, next, binding, _)| {
+        environment == current && generation < next && location == binding
+    })
+}
+
+/// 已核验能力的当前 sender。后续准备直接复用同一已认证传输。
+pub(super) struct TuiReadySender {
+    client: Client,
+    binding: TransportBinding,
+    pub(super) key: String,
+    pub(super) idle: bool,
+    predecessors: Vec<String>,
+}
+
+impl TuiReadySender {
+    /// 核对当前受信传输是否允许推进原登记。@param registered 旧键。@return 有已授权前驱时为真。
+    pub(super) fn can_advance(&self, registered: &str) -> bool {
+        tui_later_generation(registered, &self.key)
+            || self
+                .predecessors
+                .iter()
+                .any(|key| tui_same_binding(registered, key))
+    }
+    /// 报告真实 sender 与账号原绑定之间的冲突。@return 提交前的不可用错误。
+    pub(super) fn binding_unavailable(&self) -> AppError {
+        reject_tui(self.binding.account_id, TuiV2Unavailable::BindingUnverified)
+    }
+}
+
+/// 解析账号登记并核验 sender 的实际能力。@param account 已授权账号。
+/// @param deadline 请求的单调时钟截止。@param wake 是否允许沿编排合同唤醒。@return 原传输及其就绪证明。
+pub(super) async fn ready_tui_sender(
+    account: &Account,
+    deadline: Instant,
+    wake: bool,
+) -> Result<TuiReadySender, AppError> {
+    let budget = deadline
+        .checked_duration_since(Instant::now())
+        .ok_or(AppError::AdmissionLimited { retry_after: 1 })?;
+    let (client, binding, fixture, idle, predecessors) = timeout(budget, async {
+        let (client, binding, fixture, predecessors) =
+            tui_transport(account, wake.then_some(budget)).await?;
+        let idle = tui_status(&client, &binding, fixture).await?;
+        Ok((client, binding, fixture, idle, predecessors))
+    })
+    .await
+    .map_err(|_| AppError::AdmissionLimited { retry_after: 1 })?
+    .map_err(|reason| reject_tui(account.id, reason))?;
+    let key = tui_sender_key(&binding, fixture);
+    Ok(TuiReadySender {
+        client,
+        binding,
+        key,
+        idle,
+        predecessors,
+    })
+}
+
+/// 预留随本次 Gateway 请求持有，发出提交请求前可通知 sender 取消。
+pub(super) struct TuiReservation {
+    client: Client,
+    binding: TransportBinding,
+    identity_header: String,
+    pub(super) attempt_id: String,
+    pub(super) capture_state: Option<&'static str>,
+    capture: Option<Bytes>,
+    submission_started: bool,
+    input_policy: bool,
+    session_mapping: bool,
+    upstream_session: Option<String>,
+    pub(super) managed_oauth: bool,
+    pub(super) continuation: bool,
+}
+
+impl TuiReservation {
+    /// 查询原来源是否确认出站会话映射协议。@return 是否支持本轮映射。
+    pub(super) fn supports_session_mapping(&self) -> bool {
+        self.session_mapping
+    }
+
+    /// 设置只在单次提交时传递的账号池结果。@param session 已解析的上游 UUID。
+    pub(super) fn set_upstream_session(&mut self, session: &str) {
+        debug_assert!(self.session_mapping);
+        self.upstream_session = Some(session.to_owned());
+    }
+
+    /// 验证会改变隐私或字段准入的请求已由配套源完成准备。@param body 已解析入站。
+    /// @return 旧源处理的普通文本可继续；受影响的请求在模型提交前返回升级提示。
+    pub(super) fn verify_input_policy(&self, body: &Value) -> Result<(), AppError> {
+        if self.input_policy || legacy_tui_input_compatible(body) {
+            return Ok(());
+        }
+        Err(AppError::ServiceUnavailable(
+            "当前 V2 sender 或事件源缺少输入校验能力，请升级账号内核".into(),
+        ))
+    }
+
+    fn request(&self, action: &str) -> reqwest::RequestBuilder {
+        self.client
+            .post(format!(
+                "{}/internal/tui-v2/{action}",
+                self.binding.endpoint.trim_end_matches('/')
+            ))
+            .bearer_auth(&self.binding.secret)
+            .header("x-v3-tui-reservation", &self.identity_header)
+    }
+
+    /// 只为已协商并启用采集的账号生成本轮入站观察。@param headers 原始入站头。@param raw 解码实体。@param parsed 正文对象。
+    pub(super) fn observe_ingress(&mut self, headers: &HeaderMap, raw: &[u8], parsed: &Value) {
+        if self.capture_state == Some("available") {
+            self.capture = super::native_capture::TuiCaptureInput::encode(headers, raw, parsed);
+            self.capture_state = Some(if self.capture.is_some() {
+                "queued"
+            } else {
+                "dropped"
+            });
+        }
+    }
+
+    /// 使用已准备的单次预留发出实际请求。@param timeout 回包头期限。@return 原 sender 响应。
+    #[cfg(test)]
+    pub(super) async fn submit(
+        self,
+        ttfb_timeout: Duration,
+    ) -> Result<reqwest::Response, AppError> {
+        self.submit_with_account_token(ttfb_timeout, None).await
+    }
+
+    /// 提交原预留，仅向确认过凭据协议的账号 sender 传递 AT。
+    /// @param ttfb_timeout 回包头期限。@param account_token 本轮账号 AT。@return 原 sender 响应。
+    pub(super) async fn submit_with_account_token(
+        mut self,
+        ttfb_timeout: Duration,
+        account_token: Option<HeaderValue>,
+    ) -> Result<reqwest::Response, AppError> {
+        if self.managed_oauth != account_token.is_some() {
+            return Err(AppError::ServiceUnavailable("V2 账号凭据协议未确认".into()));
+        }
+        // 发出请求后，断连或超时也可能已有 sender 接管。交由 sender 收尾，避免误取消原轮。
+        self.submission_started = true;
+        let unknown = || AppError::BadGateway("V2 请求提交状态未知".into());
+        // 即使附带受信采集元数据，提交仍使用不可重放的流。
+        let request = self
+            .request("send")
+            .header(TUI_GATEWAY_ID_HEADER, TUI_JSON_PROJECTION_V1)
+            .header(TUI_SSE_PROJECTION_HEADER, TUI_SSE_PROJECTION_V1);
+        let request = if let Some(token) = account_token {
+            request.header(TUI_MANAGED_OAUTH, token)
+        } else {
+            request
+        };
+        let request = if let Some(session) = &self.upstream_session {
+            request.header(TUI_UPSTREAM_SESSION, session)
+        } else {
+            request
+        };
+        let request = if let Some(bytes) = self.capture.take() {
+            request
+                .header(TUI_CAPTURE, "1")
+                .body(reqwest::Body::wrap_stream(futures_util::stream::once(
+                    async move { Ok::<_, IoError>(bytes) },
+                )))
+        } else {
+            request.body(reqwest::Body::wrap_stream(empty::<Result<Bytes, IoError>>()))
+        };
+        timeout(ttfb_timeout, request.send())
+            .await
+            .map_err(|_| unknown())?
+            .map_err(|_| unknown())
+    }
+}
+
+impl Drop for TuiReservation {
+    fn drop(&mut self) {
+        if !self.submission_started
+            && let Ok(runtime) = tokio::runtime::Handle::try_current()
+        {
+            let request = self.request("cancel").timeout(Duration::from_secs(2));
+            // 原 sender 按同一预留 ID 幂等取消，并保留自己的有界过期机制。
+            runtime.spawn(async move {
+                let _ = request.send().await;
+            });
+        }
+    }
+}
+
+/// 只采信一份非负十进制秒数，日期已经由实际 HTTP 接收端在收到限流时换算。
+fn tui_retry_seconds(headers: &HeaderMap) -> Option<u64> {
+    let mut values = headers.get_all(RETRY_AFTER).iter();
+    let raw = values.next()?.to_str().ok()?;
+    if values.next().is_some() || !raw.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    raw.parse().ok()
+}
+
+/// 在 sender 回包头到达之后投影已委托的原始响应，按原始事件判断会话拒答。
+/// @param response 绑定且已鉴权的 sender HTTP 响应。@param account_id 正式账号。@return 公开 Messages 响应。
+pub(super) async fn tui_public_response(
+    response: reqwest::Response,
+    account_id: Option<i64>,
+) -> Result<Response, AppError> {
+    let headers = response.headers();
+    let retry_after = (response.status() == StatusCode::TOO_MANY_REQUESTS
+        && (tui_projection_marker(headers, TUI_ERROR_SOURCE, "local_provider_http")
+            || tui_projection_marker(headers, TUI_ERROR_SOURCE, "managed_oauth_http")
+            || tui_projection_marker(headers, TUI_ERROR_SOURCE, "local_provider_backoff")))
+    .then(|| tui_retry_seconds(headers))
+    .flatten()
+    .map(HeaderValue::from);
+    let delegated = if tui_delegates_json(headers) {
+        Some("application/json")
+    } else if tui_projection_marker(headers, TUI_GATEWAY_ID_HEADER, TUI_SSE_PROJECTION_V1) {
+        Some("text/event-stream")
+    } else {
+        None
+    };
+    if let Some(content_type) = delegated {
+        if !response
+            .headers()
+            .get(CONTENT_TYPE)
+            .is_some_and(|value| value == content_type)
+            || response.headers().contains_key(CONTENT_ENCODING)
+        {
+            return Err(AppError::BadGateway(
+                "V2 sender 的委托响应头无效".into(),
+            ));
+        }
+        // 私有控制面故障与模型策略拒绝都可能返回 403，仅模型给出的错误触发封禁。
+        let policy_account = account_id.filter(|_| {
+            response.status().is_success()
+                || tui_projection_marker(headers, TUI_ERROR_SOURCE, "local_provider_http")
+                || tui_projection_marker(headers, TUI_ERROR_SOURCE, "local_provider_event")
+                || tui_projection_marker(headers, TUI_ERROR_SOURCE, "managed_oauth_http")
+        });
+        // 内部首响应期限已经结束。正文沿 sender 的分块空闲期限和正常化大小预算读取。
+        let mut public = tui_sender_response::project_observed(
+            response.status(),
+            content_type,
+            Body::from_stream(response.bytes_stream()),
+            policy_account,
+        )
+        .await?;
+        public.extensions_mut().insert(TuiGatewayIds);
+        if public.status() == StatusCode::TOO_MANY_REQUESTS
+            && let Some(value) = retry_after
+        {
+            public.headers_mut().insert(RETRY_AFTER, value);
+        }
+        return Ok(public);
+    }
+    let mut public = Response::builder().status(response.status());
+    if let Some(value) = retry_after {
+        public = public.header(RETRY_AFTER, value);
+    }
+    if response
+        .headers()
+        .get(TUI_GATEWAY_ID_HEADER)
+        .is_some_and(|value| value == "gateway")
+    {
+        public = public.extension(TuiGatewayIds);
+    }
+    for name in [CONTENT_TYPE, CONTENT_ENCODING] {
+        if let Some(value) = response.headers().get(&name) {
+            public = public.header(name, value);
+        }
+    }
+    public
+        .body(Body::from_stream(response.bytes_stream()))
+        .map_err(|_| AppError::BadGateway("V2 sender 响应头无效".into()))
+}
+
+/// 同一公开请求的原文和解析线索；身份、路由与认证始终由预留绑定独立校验。
+pub(super) struct TuiMessagesInput<'a> {
+    pub body: &'a Bytes,
+    pub headers: &'a HeaderMap,
+    pub native_cc: bool,
+    pub body_policy: TuiBodyPolicy,
+}
+
+/// 仅在已鉴权的预留链路传递本轮生效的系统设置。
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct TuiBodyPolicy {
+    sub2api: bool,
+    ttl: CacheControlTtlRewrite,
+    adaptive: bool,
+}
+
+impl TuiBodyPolicy {
+    /// 冻结账号源的策略。@param layout 管理员断点策略。@param ttl 断点时长。
+    /// @param adaptive 当前模型和顶层 thinking 是否命中兼容设置。@return 仅限本轮的决策。
+    pub(super) fn new(
+        layout: MessageCacheControlRewrite,
+        ttl: CacheControlTtlRewrite,
+        adaptive: bool,
+    ) -> Self {
+        Self {
+            sub2api: layout == MessageCacheControlRewrite::Sub2api,
+            ttl,
+            adaptive,
+        }
+    }
+}
+
+pub(super) const TUI_BODY_POLICY: &str = "x-v3-tui-body-policy";
+pub(super) const TUI_INPUT_POLICY: &str = "x-v3-tui-input-policy";
+pub(super) const TUI_INPUT_FORMAT: &str = "x-v3-tui-input-format";
+const TUI_PREPARE_REASON: &str = "x-v3-tui-prepare-reason";
+
+/// 将受信 V2 准备错误还原为和 V1 一致的状态及错误码。
+/// @param reason 源端固定错误码。@return 匹配的公开错误，未知来源值不可披露。
+pub(super) fn tui_input_rejection(reason: &str) -> Option<AppError> {
+    use StatusCode as S;
+    const REASONS: &[(&str, S, &str)] = &[
+        ("invalid_model", S::BAD_REQUEST, "model 必须为非空字符串"),
+        ("invalid_messages", S::BAD_REQUEST, "messages 必须为非空数组"),
+        ("invalid_message", S::BAD_REQUEST, "消息角色无效"),
+        ("invalid_content", S::BAD_REQUEST, "消息 content 必须为文本或内容块数组"),
+        ("invalid_system", S::BAD_REQUEST, "system 必须为文本或文本块数组"),
+        ("invalid_tools", S::BAD_REQUEST, "tools 必须为对象数组"),
+        ("invalid_max_tokens", S::BAD_REQUEST, "max_tokens 必须为有限数值"),
+        ("invalid_temperature", S::BAD_REQUEST, "temperature 必须为有限数值"),
+        ("invalid_stream", S::BAD_REQUEST, "stream 必须为布尔值"),
+        (
+            "invalid_context_management",
+            S::BAD_REQUEST,
+            "context_management 参数结构不合法",
+        ),
+        (
+            "invalid_metadata",
+            S::BAD_REQUEST,
+            "metadata 必须含合法的会话信息",
+        ),
+        (
+            "context_conflict",
+            S::BAD_REQUEST,
+            "metadata 会话与已登记的会话不一致",
+        ),
+        ("invalid_parameter", S::BAD_REQUEST, "消息参数结构不合法"),
+        (
+            "unsupported_parameter",
+            S::UNPROCESSABLE_ENTITY,
+            "当前接口不支持该业务字段或策略",
+        ),
+        (
+            "invalid_native_request",
+            S::UNPROCESSABLE_ENTITY,
+            "原生 CC 正文格式不合法",
+        ),
+    ];
+    REASONS
+        .iter()
+        .find(|(code, _, _)| *code == reason)
+        .map(|&(code, status, message)| AppError::TuiInput {
+            code,
+            status,
+            message,
+        })
+}
+
+/// 旧源仅放行已知不会在新合同中删除字段或改变准入的基本 Messages 形状。
+fn legacy_tui_input_compatible(body: &Value) -> bool {
+    body.as_object().is_some_and(|obj| {
+        obj.keys().all(|k| {
+            matches!(
+                k.as_str(),
+                "model"
+                    | "messages"
+                    | "max_tokens"
+                    | "stream"
+                    | "tools"
+                    | "tool_choice"
+                    | "thinking"
+                    | "temperature"
+                    | "system"
+                    | "output_config"
+            )
+        })
+    }) && body["messages"].as_array().is_some_and(|rows| {
+        rows.iter().all(|row| {
+            row.as_object()
+                .is_some_and(|obj| obj.keys().all(|k| matches!(k.as_str(), "role" | "content")))
+        })
+    }) && !body.get("system").is_some_and(|system| {
+        let marked = |s: &str| s.trim_start().starts_with("x-anthropic-billing-header:");
+        system.as_str().is_some_and(marked)
+            || system.as_array().is_some_and(|blocks| {
+                blocks.iter().any(|block| {
+                    block["text"].as_str().is_some_and(marked)
+                        || !block.as_object().is_some_and(|fields| {
+                            fields
+                                .keys()
+                                .all(|key| matches!(key.as_str(), "type" | "text"))
+                        })
+                })
+            })
+    })
+}
+
+/// 无 billing 的原生格式还须匹配固定 CLI 版本和入口，宽泛客户端分类仅用于工具归属。
+/// @param headers 原始入口头。@return 已验证的私有来源线索。
+fn tui_cli_format(headers: &HeaderMap) -> Option<&'static str> {
+    static CLI: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"^claude-cli/2\.1\.(280|293) \(external, (?:cli|sdk-cli|claude-vscode)(?:, agent-sdk/[0-9A-Za-z.+-]+)?\)$")
+            .expect("固定 CLI 来源表达式")
+    });
+    let mut values = headers.get_all(USER_AGENT).iter();
+    let ua = values.next()?.to_str().ok()?;
+    if values.next().is_some() {
+        return None;
+    }
+    Some(if &CLI.captures(ua)?[1] == "293" {
+        "claude_code"
+    } else {
+        "claude_code_280"
+    })
+}
+
+fn tui_agent_hint<'a>(input: &TuiMessagesInput<'a>) -> Result<Option<&'a str>, AppError> {
+    if !input.native_cc {
+        return Ok(None);
+    }
+    let mut hints = input.headers.get_all("x-claude-code-agent-id").iter();
+    let Some(value) = hints.next() else {
+        return Ok(None);
+    };
+    let invalid = || AppError::BadRequest("V2 客户端代理标识无效".into());
+    let value = value.to_str().map_err(|_| invalid())?;
+    if hints.next().is_some() || !super::request_session::valid_id(value) {
+        return Err(invalid());
+    }
+    Ok(Some(value))
+}
+
+/// 在取得 HTTP 槽前，让受信 sender 准备原轮或保留新进程。
+/// @param sender 同次核验且已按账号登记的传输。@param principal_id 真实入口令牌 ID。
+/// @param session_id 已解析的显式会话。@param input 同轮入站正文与协议选项。@param deadline 原请求截止。
+/// @param continuation_only 是否只接纳已登记的原轮。@return 绑定原 sender、主体与正文的单次预留。
+pub(super) async fn prepare_tui(
+    sender: TuiReadySender,
+    principal_id: i64,
+    session_id: &str,
+    input: TuiMessagesInput<'_>,
+    deadline: Instant,
+    continuation_only: bool,
+) -> Result<TuiReservation, AppError> {
+    let limited = || AppError::AdmissionLimited { retry_after: 1 };
+    let remaining = || {
+        deadline
+            .checked_duration_since(Instant::now())
+            .ok_or_else(limited)
+    };
+    let TuiReadySender {
+        client, binding, ..
+    } = sender;
+    let agent_hint = tui_agent_hint(&input)?;
+    if agent_hint.is_some()
+        && session_id.starts_with(super::tui_tool_history::SERVER_SESSION_PREFIX)
+    {
+        return Err(AppError::BadRequest(
+            "V2 子代理需要已登记的客户端会话".into(),
+        ));
+    }
+    let identity = TuiReservationIdentity {
+        account_id: binding.account_id,
+        environment_id: &binding.environment_id,
+        generation: binding.generation,
+        principal_id,
+        session_id,
+        reservation_id: Uuid::new_v4().to_string(),
+        deadline_unix_ms: now_ms().saturating_add(remaining()?.as_millis() as u64),
+        continuation_only,
+        agent_hint,
+    };
+    let identity_header = STANDARD.encode(
+        serde_json::to_vec(&identity)
+            .map_err(|_| AppError::Internal("V2 预留身份编码失败".into()))?,
+    );
+    let attempt_id = identity.reservation_id.clone();
+    let mut reservation = TuiReservation {
+        client,
+        binding,
+        identity_header,
+        attempt_id,
+        capture_state: None,
+        capture: None,
+        input_policy: false,
+        session_mapping: false,
+        upstream_session: None,
+        managed_oauth: false,
+        submission_started: false,
+        continuation: false,
+    };
+    let mut prepare = reservation.request("prepare");
+    let observe = super::diagnostics::current_log_mode() == RequestLogMode::Debug;
+    if observe {
+        prepare = prepare.header(TUI_CAPTURE, "1");
+    }
+    let apply_policy = input.body_policy != TuiBodyPolicy::default();
+    if apply_policy {
+        prepare = prepare.header(
+            TUI_BODY_POLICY,
+            serde_json::to_string(&input.body_policy)
+                .map_err(|_| AppError::Internal("V2 本轮正文设置无法编码".into()))?,
+        );
+    }
+    if input.native_cc
+        && let Some(format) = tui_cli_format(input.headers)
+    {
+        prepare = prepare.header(TUI_INPUT_FORMAT, format);
+    }
+    for (name, value) in tui_model_headers(input.headers)? {
+        prepare = prepare.header(name, value);
+    }
+    let response = prepare
+        .body(input.body.clone())
+        .timeout(remaining()?)
+        .send()
+        .await
+        .map_err(|error| {
+            if error.is_timeout() {
+                limited()
+            } else {
+                AppError::ServiceUnavailable("V2 sender 准备通道不可用".into())
+            }
+        })?;
+    if let Some(error @ AppError::TuiInput { status, .. }) = response
+        .headers()
+        .get(TUI_PREPARE_REASON)
+        .and_then(|value| value.to_str().ok())
+        .and_then(tui_input_rejection)
+        && response.status() == status
+    {
+        return Err(error);
+    }
+    match response.status() {
+        StatusCode::NO_CONTENT => {
+            reservation.managed_oauth =
+                tui_projection_marker(response.headers(), TUI_MANAGED_OAUTH, "1");
+            reservation.input_policy = tui_projection_marker(response.headers(), TUI_INPUT_POLICY, "1");
+            reservation.session_mapping =
+                tui_projection_marker(response.headers(), TUI_UPSTREAM_SESSION, "1");
+            if observe {
+                reservation.capture_state = match response
+                    .headers()
+                    .get(TUI_CAPTURE)
+                    .map(HeaderValue::as_bytes)
+                {
+                    Some(b"1") => Some("available"),
+                    Some(b"disabled") => Some("disabled"),
+                    _ => None,
+                };
+            }
+            if apply_policy
+                && response
+                    .headers()
+                    .get(TUI_BODY_POLICY)
+                    .is_none_or(|v| v != "1")
+            {
+                return Err(AppError::ServiceUnavailable(
+                    "V2 sender 未确认本轮正文设置".into(),
+                ));
+            }
+            match response
+                .headers()
+                .get("x-v3-tui-handoff-kind")
+                .map(HeaderValue::as_bytes)
+            {
+                Some(b"continuation") => reservation.continuation = true,
+                Some(b"new") if !continuation_only => {}
+                _ => {
+                    return Err(AppError::ServiceUnavailable(
+                        "V2 sender 未确认预留类别".into(),
+                    ));
+                }
+            }
+            Ok(reservation)
+        }
+        StatusCode::TOO_MANY_REQUESTS
+            if response
+                .headers()
+                .get(TUI_PREPARE_REASON)
+                .is_some_and(|value| value == "local_provider_backoff") =>
+        {
+            match tui_retry_seconds(response.headers()) {
+                Some(retry_after) => Err(AppError::TuiProviderBackoff { retry_after }),
+                None => Err(AppError::BadGateway(
+                    "V2 sender 的提供方退避期限无效".into(),
+                )),
+            }
+        }
+        StatusCode::TOO_MANY_REQUESTS => Err(limited()),
+        StatusCode::UNPROCESSABLE_ENTITY
+            if response
+                .headers()
+                .get(TUI_PREPARE_REASON)
+                .is_some_and(|value| value == "subagent_capacity") =>
+        {
+            Err(AppError::TuiSubagentCapacity)
+        }
+        StatusCode::UNPROCESSABLE_ENTITY => Err(AppError::TuiInputUnsupported),
+        StatusCode::BAD_REQUEST
+            if response
+                .headers()
+                .get(TUI_PREPARE_REASON)
+                .is_some_and(|value| value == "subagent_ambiguous") =>
+        {
+            Err(AppError::TuiSubagentAmbiguous)
+        }
+        StatusCode::BAD_REQUEST | StatusCode::FORBIDDEN | StatusCode::CONFLICT => {
+            Err(AppError::BadRequest("V2 sender 拒绝请求归属".into()))
+        }
+        _ => Err(AppError::ServiceUnavailable("V2 sender 未准备就绪".into())),
+    }
+}
+
+/// 取本轮显式选择的 Messages 协议选项，重复的 beta 按行顺序合并。
+/// @param headers 已通过 HTTP 层检查的请求头。@return 可转送给独立模型的功能声明。
+pub(super) fn tui_model_headers(
+    headers: &HeaderMap,
+) -> Result<BTreeMap<&'static str, String>, AppError> {
+    let mut options: BTreeMap<_, String> = BTreeMap::new();
+    for name in ["anthropic-version", "anthropic-beta"] {
+        for raw in headers.get_all(name) {
+            let value = raw
+                .to_str()
+                .map_err(|_| AppError::BadRequest("Messages 协议头格式无效".into()))?;
+            let value = value.trim().replace('\t', " ");
+            match options.get_mut(name) {
+                None => {
+                    options.insert(name, value);
+                }
+                Some(previous) if name == "anthropic-beta" => {
+                    previous.push(',');
+                    previous.push_str(&value);
+                }
+                Some(previous) if *previous == value => {}
+                Some(_) => return Err(AppError::BadRequest("Messages 协议版本声明冲突".into())),
+            }
+        }
+    }
+    Ok(options)
+}
+
 /// 只解析已经运行的账号环境，后台准备不会唤醒休眠环境。
 /// @param account 当前账号快照。
 /// @return 已验证绑定；环境停止或未配置 V3 时为空。
@@ -676,7 +1820,7 @@ pub(crate) async fn prepare_existing(
         .connect_timeout(Duration::from_secs(5))
         .build()
         .map_err(|_| AppError::ServiceUnavailable("v3 bridge unavailable".into()))?;
-    let binding: Option<TransportBinding> = client
+    let wire: Option<RuntimeBinding> = client
         .get(format!(
             "{}/internal/v3/transport/{}?wake=false",
             base.trim_end_matches('/'),
@@ -692,7 +1836,12 @@ pub(crate) async fn prepare_existing(
         .json()
         .await
         .map_err(|_| AppError::ServiceUnavailable("运行绑定无效".into()))?;
-    let Some(binding) = binding else {
+    let Some(RuntimeBinding {
+        binding,
+        tui_predecessors,
+        ..
+    }) = wire
+    else {
         return Ok(None);
     };
     validate_binding(
@@ -707,6 +1856,7 @@ pub(crate) async fn prepare_existing(
         route: PreparedRoute::V3 { client, binding },
         tool_continuation_mode: AgyToolContinuationMode::Claim,
         long_agy_generation: false,
+        tui_predecessors,
     }))
 }
 
@@ -761,6 +1911,7 @@ async fn prepare_from_runtime(
         agy_tool_continuation_mode,
         agy_tool_continuation_protocol,
         agy_generation_seconds,
+        tui_predecessors,
     } = response
         .json()
         .await
@@ -779,6 +1930,7 @@ async fn prepare_from_runtime(
         route: PreparedRoute::V3 { client, binding },
         tool_continuation_mode: agy_tool_continuation_mode,
         long_agy_generation: agy_generation_seconds == AGY_REQUEST_SECONDS as u64,
+        tui_predecessors,
     })
 }
 
@@ -862,16 +2014,6 @@ impl PreparedTransport {
         }
     }
 
-    /// 使用已绑定环境准备一个原生进程，不提交模型作业。
-    /// @param preparation 网关冻结的账号身份与准备标识。
-    /// @return 真实握手后的准备状态。
-    pub(crate) async fn prepare_native(
-        &self,
-        preparation: NativePreparation,
-    ) -> Result<NativePreparationStatus, AppError> {
-        self.prepare_native_target(preparation).await
-    }
-
     /// 只读取已绑定 sender 的当前身份就绪状态。
     /// @param identity 当前权威账号身份，绑定由此 transport 冻结。
     /// @return 新鲜安全状态；不支持或检查失败时明确报错。
@@ -879,6 +2021,7 @@ impl PreparedTransport {
         &self,
         mut identity: NativePreparation,
     ) -> Result<NativeReadinessStatus, AppError> {
+        identity.source_version.require_executable()?;
         let PreparedRoute::V3 { client, binding } = &self.route else {
             return Err(AppError::ServiceUnavailable(
                 "原生检查需要 V3 sender".into(),
@@ -903,7 +2046,8 @@ impl PreparedTransport {
             .json()
             .await
             .map_err(|_| AppError::ServiceUnavailable("原生检查回执无效".into()))?;
-        if status.account_id != self.account_id
+        if status.source_version != identity.source_version
+            || status.account_id != self.account_id
             || status.environment_id != binding.environment_id
             || status.generation != binding.generation
             || !matches!(
@@ -917,10 +2061,14 @@ impl PreparedTransport {
         Ok(status)
     }
 
-    async fn prepare_native_target(
+    /// 使用已绑定环境准备一个原生进程，不提交模型作业。
+    /// @param preparation 网关冻结的账号身份与准备标识。
+    /// @return 真实握手后的准备状态。
+    pub(crate) async fn prepare_native(
         &self,
         mut preparation: NativePreparation,
     ) -> Result<NativePreparationStatus, AppError> {
+        preparation.source_version.require_executable()?;
         let PreparedRoute::V3 { client, binding } = &self.route else {
             return Err(AppError::ServiceUnavailable(
                 "原生准备需要 V3 sender".into(),
@@ -996,17 +2144,6 @@ impl PreparedTransport {
     /// 在发送准入之前校验账号原生能力，准备失败不记录模型提交。
     /// @return 已验证原始输入协议和环境代次，或明确准备错误。
     pub async fn native_ready(&self) -> Result<(), AppError> {
-        self.native_ready_for_version(NativeSourceVersion::Cc293)
-            .await
-    }
-
-    /// 检查冻结目标版本的原始输入能力与环境代次。
-    /// @param version 本次请求的官方源版本。
-    /// @return 目标版本可用或明确准备错误。
-    pub async fn native_ready_for_version(
-        &self,
-        version: NativeSourceVersion,
-    ) -> Result<(), AppError> {
         let PreparedRoute::V3 { client, binding } = &self.route else {
             return Err(AppError::ServiceUnavailable(
                 "原生方式需要 V3 账号 sender".into(),
@@ -1036,13 +2173,18 @@ impl PreparedTransport {
                 "原生 sender 能力或代次不匹配".into(),
             ));
         }
-        if (version != NativeSourceVersion::Cc293 || capability.get("versions").is_some())
-            && capability["versions"][version.as_str()]["available"] != true
-        {
-            return Err(AppError::ServiceUnavailable(format!(
-                "原生运行时 {} 尚未就绪",
-                version.as_str()
-            )));
+        let version = NativeSourceVersion::Cc293.as_str();
+        let available = match capability.get("versions") {
+            Some(versions) => versions[version]["available"] == true,
+            // 旧的单版 sender 可以省略版本。显式声明的内核仍须匹配。
+            None => capability
+                .get("version")
+                .is_none_or(|declared| declared == version),
+        };
+        if !available {
+            return Err(AppError::ServiceUnavailable(
+                "原生运行时 2.1.293 尚未就绪".into(),
+            ));
         }
         Ok(())
     }
@@ -1056,6 +2198,7 @@ impl PreparedTransport {
         mut submission: NativeSubmission,
         ttfb_timeout: Duration,
     ) -> Result<reqwest::Response, AppError> {
+        submission.source_version.require_executable()?;
         let PreparedRoute::V3 { client, binding } = self.route else {
             return Err(AppError::ServiceUnavailable(
                 "原生方式需要 V3 账号 sender".into(),
@@ -1409,6 +2552,8 @@ struct SenderState {
     active: Arc<AtomicU64>,
     evidence_error: Arc<AtomicBool>,
     evidence_lock: Arc<Mutex<()>>,
+    #[cfg(target_os = "linux")]
+    tui: Arc<TuiSender>,
 }
 
 struct ActiveRequest(Arc<AtomicU64>);
@@ -1421,10 +2566,23 @@ impl Drop for ActiveRequest {
 
 /// 读取账号角色当前冻结的私有发送配置。@param path 私有路径。@return 已校验配置。
 pub(super) fn read_config(path: &str) -> Result<SenderConfig, AppError> {
+    Ok(read_sender_document(path)?.config)
+}
+
+#[derive(Deserialize)]
+struct SenderDocument {
+    #[serde(flatten)]
+    config: SenderConfig,
+    #[cfg(target_os = "linux")]
+    tui_v2: Option<Value>,
+}
+
+fn read_sender_document(path: &str) -> Result<SenderDocument, AppError> {
     let bytes = std::fs::read(path)
         .map_err(|_| AppError::ServiceUnavailable("sender configuration unavailable".into()))?;
-    let mut config: SenderConfig = serde_json::from_slice(&bytes)
+    let mut document: SenderDocument = serde_json::from_slice(&bytes)
         .map_err(|_| AppError::ServiceUnavailable("invalid sender configuration".into()))?;
+    let config = &mut document.config;
     if let Some(agy) = &config.agy {
         agy.validate()?;
         if config.native.is_some() {
@@ -1437,12 +2595,14 @@ pub(super) fn read_config(path: &str) -> Result<SenderConfig, AppError> {
         // 历史字段兼容解码，执行身份统一由本平台固定清单决定。
         native.release = None;
         native.kernel_generation = None;
-        for runtime in native.runtimes.values_mut() {
-            runtime.release = None;
-            runtime.kernel_generation = None;
+        // 老安装表可把 293 单独登记，剩余条目均为退役内核。280 单版根路径保留原身份，按不可用处理。
+        if let Some(runtime) = native.runtimes.remove(&NativeSourceVersion::Cc293) {
+            native.binary_path = runtime.binary_path;
+            native.source_version = NativeSourceVersion::Cc293;
         }
+        native.runtimes.clear();
     }
-    Ok(config)
+    Ok(document)
 }
 
 fn authenticate(headers: &HeaderMap, config: &SenderConfig) -> Result<(), AppError> {
@@ -1549,7 +2709,10 @@ fn validate_request_budget(
     )
 }
 
-fn request_budget(
+/// 核对绑定、UUID 和原截止。@param binding 当前账号证明。@param account_id 请求账号。
+/// @param environment_id 环境。@param generation 原代次。@param request_id 请求 UUID。
+/// @param deadline_ms 请求截止。@param wall_now_ms 当前墙钟。@param budget_ms 协议上限。@return 剩余预算。
+pub(super) fn request_budget(
     binding: &TransportBinding,
     account_id: i64,
     environment_id: &str,
@@ -1611,15 +2774,163 @@ async fn status(
     State(state): State<SenderState>,
     headers: HeaderMap,
 ) -> Result<Json<Value>, AppError> {
-    let config = read_config(&state.config_path)?;
-    authenticate(&headers, &config)?;
-    Ok(Json(
-        serde_json::json!({"active": state.active.load(Ordering::SeqCst).max(state.agy_pool.active().await),
+    let document = read_sender_document(&state.config_path)?;
+    let config = &document.config;
+    authenticate(&headers, config)?;
+    let tui_v2 = tui_v2_sender_status(config);
+    let active = state
+        .active
+        .load(Ordering::SeqCst)
+        .max(state.agy_pool.active().await);
+    #[cfg(target_os = "linux")]
+    let (tui_v2, active) = {
+        let mut status = tui_v2;
+        let mut tui_active = state.tui.active();
+        if status["reason"] == json!(TuiV2Unavailable::MessagesToolAndUsageEventsUnavailable)
+            && let Some(configuration) = document.tui_v2.as_ref()
+        {
+            match state.tui.status(&config.binding, Some(configuration)).await {
+                Some(idle) => {
+                    status["ready"] = json!(true);
+                    status["idle"] = json!(idle);
+                    status["event_source"] = json!("local_unix");
+                    status.as_object_mut().unwrap().remove("reason");
+                    tui_active = state.tui.active().max(u64::from(!idle));
+                }
+                None => status["reason"] = json!(TuiV2Unavailable::ReadinessUnverified),
+            }
+        }
+        (status, active + tui_active)
+    };
+    Ok(Json(serde_json::json!({"active": active,
         "environment_id": config.binding.environment_id, "generation": config.binding.generation,
+        "tui_v2": tui_v2,
         "evidence_ok": !state.evidence_error.load(Ordering::SeqCst),
         "agy_capture_available": config.agy.is_some() && config.native_capture_dir.is_some(),
-        "agy":if config.agy.is_some() {Some(state.agy_pool.status(&config).await)} else {None}}),
-    ))
+        "agy":if config.agy.is_some() {Some(state.agy_pool.status(config).await)} else {None}})))
+}
+
+#[cfg(target_os = "linux")]
+fn tui_document(state: &SenderState, headers: &HeaderMap) -> Result<SenderDocument, AppError> {
+    let document = read_sender_document(&state.config_path)?;
+    authenticate(headers, &document.config)?;
+    if headers.get_all("authorization").iter().count() != 1 || document.config.agy.is_some() {
+        return Err(AppError::Unauthorized);
+    }
+    if !tui_binding_present(&document.config.binding) {
+        return Err(AppError::ServiceUnavailable(
+            "V2 账号发送器绑定未通过校验".into(),
+        ));
+    }
+    Ok(document)
+}
+
+#[cfg(target_os = "linux")]
+async fn tui_prepare(
+    State(state): State<SenderState>,
+    request: Request,
+) -> Result<Response, AppError> {
+    let document = tui_document(&state, request.headers())?;
+    let prepared = state
+        .tui
+        .prepare(&document.config.binding, document.tui_v2.as_ref(), request)
+        .await;
+    match prepared {
+        Err(
+            error @ (AppError::TuiInput { .. }
+            | AppError::TuiSubagentCapacity
+            | AppError::TuiSubagentAmbiguous
+            | AppError::TuiProviderBackoff { .. }),
+        ) => {
+            let reason = match error {
+                AppError::TuiInput { code, .. } => code,
+                AppError::TuiSubagentCapacity => "subagent_capacity",
+                AppError::TuiProviderBackoff { .. } => "local_provider_backoff",
+                _ => "subagent_ambiguous",
+            };
+            let mut reply = error.into_response();
+            reply
+                .headers_mut()
+                .insert(TUI_PREPARE_REASON, HeaderValue::from_static(reason));
+            Ok(reply)
+        }
+        Ok(mut reply)
+            if document.config.native_capture_dir.is_none()
+                && reply.headers().contains_key(TUI_CAPTURE) =>
+        {
+            reply
+                .headers_mut()
+                .insert(TUI_CAPTURE, HeaderValue::from_static("disabled"));
+            Ok(reply)
+        }
+        other => other,
+    }
+}
+
+#[cfg(target_os = "linux")]
+async fn tui_control_request(request: Request, rejection: &str) -> Result<HeaderMap, AppError> {
+    let (parts, body) = request.into_parts();
+    // 认证中间件已核验账号。空分块流须读到结束，任何数据字节都拒绝。
+    if !matches!(
+        timeout(Duration::from_secs(2), to_bytes(body, 0)).await,
+        Ok(Ok(_))
+    ) {
+        return Err(AppError::BadRequest(rejection.into()));
+    }
+    Ok(parts.headers)
+}
+
+#[cfg(target_os = "linux")]
+async fn tui_send(
+    State(state): State<SenderState>,
+    request: Request,
+) -> Result<Response, AppError> {
+    let (headers, observation) = if tui_projection_marker(request.headers(), TUI_CAPTURE, "1") {
+        // 采集信封由绑定的网关生成，先鉴权再读取有界正文；取消与旧版发送仍只接受空流。
+        let document = tui_document(&state, request.headers())?;
+        let deadline = TuiSender::capture_deadline(&document.config.binding, request.headers())?;
+        let (parts, body) = request.into_parts();
+        let value = timeout_at(
+            deadline,
+            to_bytes(body, super::native_capture::SNAPSHOT_LIMIT),
+        )
+        .await
+        .ok()
+        .and_then(Result::ok)
+        .and_then(|v| serde_json::from_slice(&v).ok())
+        .ok_or_else(|| AppError::BadRequest("V2 采集信封无效".into()))?;
+        (parts.headers, Some(value))
+    } else {
+        (
+            tui_control_request(request, "V2 发送只接收原预留信封").await?,
+            None,
+        )
+    };
+    // 读完结束符后重读配置，避免把在途的旧信封交给新代。
+    let document = tui_document(&state, &headers)?;
+    state
+        .tui
+        .send(
+            &document.config.binding,
+            document.tui_v2.as_ref(),
+            &headers,
+            document
+                .config
+                .native_capture_dir
+                .map(std::path::PathBuf::from)
+                .zip(observation),
+        )
+        .await
+}
+
+#[cfg(target_os = "linux")]
+async fn tui_cancel(
+    State(state): State<SenderState>,
+    request: Request,
+) -> Result<StatusCode, AppError> {
+    let headers = tui_control_request(request, "V2 取消只接收原预留信封").await?;
+    let document = tui_document(&state, &headers)?;
+    state.tui.cancel(&document.config.binding, &headers).await
 }
 
 async fn forward(State(state): State<SenderState>, headers: HeaderMap, body: Bytes) -> Response {
@@ -1643,8 +2954,9 @@ async fn forward(State(state): State<SenderState>, headers: HeaderMap, body: Byt
             let bytes = STANDARD
                 .decode(meta)
                 .map_err(|_| AppError::BadRequest("invalid runtime request".into()))?;
-            let prepared: PreparedRequest = serde_json::from_slice(&bytes)
+            let mut prepared: PreparedRequest = serde_json::from_slice(&bytes)
                 .map_err(|_| AppError::BadRequest("invalid runtime request".into()))?;
+            let tui_account_model = headers.contains_key(TUI_ACCOUNT_MODEL);
             let purpose = headers
                 .get(BACKGROUND_HEADER)
                 .map(|value| {
@@ -1660,12 +2972,38 @@ async fn forward(State(state): State<SenderState>, headers: HeaderMap, body: Byt
             if let Some(purpose) = purpose {
                 config.allowed_origin = purpose.validate(&prepared.method, &prepared.target_url)?;
             }
+            if tui_account_model {
+                if !tui_projection_marker(&headers, TUI_ACCOUNT_MODEL, "1")
+                    || purpose.is_some()
+                    || prepared.method != "POST"
+                    || prepared.target_url != "https://api.anthropic.com/v1/messages"
+                    || config.proxy_url.trim().is_empty()
+                    || prepared
+                        .headers
+                        .iter()
+                        .any(|(name, _)| name.eq_ignore_ascii_case(CONTENT_LENGTH.as_str()))
+                {
+                    return Err(AppError::BadRequest("V2 账号模型发送的目的或协议无效".into()));
+                }
+                prepared
+                    .headers
+                    .push((CONTENT_LENGTH.as_str().into(), body.len().to_string()));
+            }
             let deadline = validate_request(&prepared, &config)?;
             state.active.fetch_add(1, Ordering::SeqCst);
             let guard = ActiveRequest(state.active.clone());
             submitted = true;
             let upstream = timeout_at(deadline, async {
-                if purpose.is_some() {
+                if tui_account_model {
+                    // 固定目标和一次性正文同时防止重定向或客户端重放已认领的模型请求。
+                    let client = get_background_request_client_for_profile(
+                        &config.proxy_url,
+                        prepared.tls_profile,
+                    )
+                    .map_err(|_| AppError::BadGateway("V2 账号模型客户端不可用".into()))?;
+                    let stream = stream_once(async move { Ok::<_, IoError>(body) });
+                    send_with_client(&client, &prepared, RequestBody::wrap_stream(stream)).await
+                } else if purpose.is_some() {
                     let client = get_background_request_client_for_profile(
                         &config.proxy_url,
                         prepared.tls_profile,
@@ -1728,33 +3066,17 @@ async fn native_status(
 ) -> Result<Json<Value>, AppError> {
     let config = read_config(&state.config_path)?;
     authenticate(&headers, &config)?;
-    config
+    let native = config
         .native
         .as_ref()
         .ok_or_else(|| AppError::ServiceUnavailable("未配置原生运行时".into()))?;
     if state.evidence_error.load(Ordering::SeqCst) {
         return Err(AppError::ServiceUnavailable("账号证据写入异常".into()));
     }
-    let mut versions = serde_json::Map::new();
-    for version in [NativeSourceVersion::Cc280, NativeSourceVersion::Cc293] {
-        let available = native_version_config(&config, version)
-            .and_then(|selected| {
-                state.native_pool.for_version(version).verify(
-                    selected
-                        .native
-                        .as_ref()
-                        .ok_or_else(|| AppError::ServiceUnavailable("未配置原生运行时".into()))?,
-                )
-            })
-            .is_ok();
-        versions.insert(
-            version.as_str().into(),
-            serde_json::json!({"available":available,"version":version.as_str()}),
-        );
-    }
+    let available = state.native_pool.verify(native).is_ok();
     Ok(Json(
         serde_json::json!({"raw_input_protocol":1,"version":"2.1.293","environment_id":config.binding.environment_id,"generation":config.binding.generation,
-            "versions":versions,
+            "versions":{"2.1.293":{"available":available,"version":"2.1.293"}},
             "release":config.native.as_ref().and_then(|native| native.release.as_ref()),
             "tls_observer":state.native_pool.tls_status(&config)}),
     ))
@@ -1784,10 +3106,10 @@ async fn native_readiness(
     headers: HeaderMap,
     Json(preparation): Json<NativePreparation>,
 ) -> Result<Json<NativeReadinessStatus>, AppError> {
-    let original_config = read_config(&state.config_path)?;
-    authenticate(&headers, &original_config)?;
-    let config = native_version_config(&original_config, preparation.source_version)?;
-    let pool = state.native_pool.for_version(preparation.source_version);
+    let config = read_config(&state.config_path)?;
+    authenticate(&headers, &config)?;
+    preparation.source_version.require_executable()?;
+    let pool = &state.native_pool;
     if state.evidence_error.load(Ordering::SeqCst) {
         return Err(AppError::ServiceUnavailable("账号证据写入异常".into()));
     }
@@ -1797,7 +3119,7 @@ async fn native_readiness(
         .await
         .map_err(|_| AppError::ServiceUnavailable("原生检查超时".into()))??;
     if serde_json::to_vec(&read_config(&state.config_path)?).ok()
-        != serde_json::to_vec(&original_config).ok()
+        != serde_json::to_vec(&config).ok()
     {
         return Err(AppError::ServiceUnavailable(
             "原生检查期间环境配置已变化".into(),
@@ -1837,10 +3159,10 @@ async fn prepare_sender(
     headers: &HeaderMap,
     preparation: NativePreparation,
 ) -> Result<Json<NativePreparationStatus>, AppError> {
-    let original_config = read_config(&state.config_path)?;
-    authenticate(headers, &original_config)?;
-    let config = native_version_config(&original_config, preparation.source_version)?;
-    let pool = state.native_pool.for_version(preparation.source_version);
+    let config = read_config(&state.config_path)?;
+    authenticate(headers, &config)?;
+    preparation.source_version.require_executable()?;
+    let pool = &state.native_pool;
     if state.evidence_error.load(Ordering::SeqCst) {
         return Err(AppError::ServiceUnavailable("账号证据写入异常".into()));
     }
@@ -1855,7 +3177,7 @@ async fn prepare_sender(
     let deadline = validate_request(&identity.request, &config)?;
     let status = pool.prepare(config.clone(), identity, deadline).await?;
     let current = read_config(&state.config_path)?;
-    if serde_json::to_vec(&current).ok() != serde_json::to_vec(&original_config).ok() {
+    if serde_json::to_vec(&current).ok() != serde_json::to_vec(&config).ok() {
         return Err(AppError::ServiceUnavailable(
             "原生准备期间环境配置已变化".into(),
         ));
@@ -1912,11 +3234,8 @@ async fn native_prepare_cancel(
     {
         return Err(AppError::BadRequest("准备取消归属不匹配".into()));
     }
-    if !state
-        .native_pool
-        .for_version(control.source_version)
-        .cancel_preparation(&control)
-    {
+    control.source_version.require_executable()?;
+    if !state.native_pool.cancel_preparation(&control) {
         return Err(AppError::ServiceUnavailable("原生准备撤销登记已满".into()));
     }
     Ok(Json(serde_json::json!({"cancelled":true})))
@@ -2196,10 +3515,10 @@ async fn native_forward(
     let mut submitted = false;
     let operation = async {
         let transition = state.native_transition.clone().read_owned().await;
-        let original_config = read_config(&state.config_path)?;
-        authenticate(&headers, &original_config)?;
-        let config = native_version_config(&original_config, submission.source_version)?;
-        let pool = state.native_pool.for_version(submission.source_version);
+        let config = read_config(&state.config_path)?;
+        authenticate(&headers, &config)?;
+        submission.source_version.require_executable()?;
+        let pool = &state.native_pool;
         let deadline = validate_request(&submission.request, &config)?;
         let target = reqwest::Url::parse(&submission.request.target_url)
             .map_err(|_| AppError::BadRequest("原生目标无效".into()))?;
@@ -2313,6 +3632,8 @@ fn sender_components(config_path: String) -> (Router, Arc<AgyPool>) {
         active: Arc::new(AtomicU64::new(0)),
         evidence_error: Arc::new(AtomicBool::new(false)),
         evidence_lock: Arc::new(Mutex::new(())),
+        #[cfg(target_os = "linux")]
+        tui: Arc::new(TuiSender::default()),
     };
     let router = Router::new()
         .route("/internal/send", post(forward))
@@ -2330,7 +3651,13 @@ fn sender_components(config_path: String) -> (Router, Arc<AgyPool>) {
             "/internal/native/prepare/cancel",
             post(native_prepare_cancel),
         )
-        .route("/internal/native/messages", post(native_forward))
+        .route("/internal/native/messages", post(native_forward));
+    #[cfg(target_os = "linux")]
+    let router = router
+        .route("/internal/tui-v2/prepare", post(tui_prepare))
+        .route("/internal/tui-v2/send", post(tui_send))
+        .route("/internal/tui-v2/cancel", post(tui_cancel));
+    let router = router
         .route_layer(from_fn_with_state(state.clone(), authenticate_sender_post))
         .route("/internal/native/status", get(native_status))
         .route("/internal/status", get(status))
@@ -2353,6 +3680,441 @@ mod tests {
     use std::path::PathBuf;
     use std::process::{Child, Command, Stdio};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    #[test]
+    fn tui_transition_requires_exact_trusted_predecessor() {
+        let binding =
+            |account_id, environment_id: &str, generation, release: &str, endpoint: &str| {
+                TransportBinding {
+                    account_id,
+                    environment_id: environment_id.into(),
+                    generation,
+                    release_id: release.into(),
+                    endpoint: endpoint.into(),
+                    secret: String::new(),
+                }
+            };
+        let environment = "a".repeat(32);
+        let local = "http://flower2api-local:8091";
+        let remote = "http://orchestrator:8000/cluster-transports/v2/synthetic";
+        let old = binding(17, &environment, 1, "old-release", local);
+        let old_key = tui_sender_key(&old, false);
+        for (release, endpoint) in [
+            ("new-release", local),
+            ("old-release", remote),
+            ("old-release", local),
+        ] {
+            let current = binding(17, &environment, 2, release, endpoint);
+            let proof = |account_id, environment_id: &str, generation| TuiBindingProof {
+                account_id,
+                environment_id: environment_id.into(),
+                generation,
+                release_id: old.release_id.clone(),
+                endpoint: old.endpoint.clone(),
+            };
+            let mut state = TuiBindingStatus {
+                key: tui_sender_key(&current, false),
+                idle: true,
+                predecessors: tui_predecessor_keys(
+                    &current,
+                    vec![
+                        proof(18, &environment, 1),
+                        proof(17, &"b".repeat(32), 1),
+                        proof(17, &environment, 2),
+                    ],
+                ),
+            };
+            assert!(state.predecessors.is_empty());
+            assert_eq!(
+                state.can_advance(&old_key),
+                release == "old-release" && endpoint == local
+            );
+            state.predecessors = tui_predecessor_keys(&current, vec![proof(17, &environment, 1)]);
+            assert!(state.can_advance(&old_key));
+            let unrelated = binding(17, &environment, 1, "other-release", local);
+            assert!(!state.can_advance(&tui_sender_key(&unrelated, false)));
+        }
+    }
+
+    /// 已鉴权状态还须核对代次与发行，心跳及候选就绪不可充当正式诊断。@return 无。
+    #[test]
+    fn tui_v2_status_confirms_binding_without_inventing_readiness() {
+        let config: SenderConfig = serde_json::from_value(json!({
+            "binding": {"account_id": 17, "environment_id": "c".repeat(32), "generation": 2,
+                "endpoint": "http://localhost:8091", "secret": "synthetic-transport-secret".repeat(2),
+                "release_id": "local-test"},
+            "proxy_url": "", "allowed_origin": "https://api.anthropic.com"
+        }))
+        .unwrap();
+        let binding = &config.binding;
+        let mut status = json!({"active": 0, "environment_id": binding.environment_id,
+            "generation": binding.generation});
+        assert_eq!(
+            tui_status_snapshot(binding, &status, false),
+            Err(TuiV2Unavailable::ReadinessUnverified)
+        );
+        status["tui_v2"] = tui_v2_sender_status(&config);
+        assert_eq!(
+            tui_status_snapshot(binding, &status, false),
+            Err(TuiV2Unavailable::MessagesToolAndUsageEventsUnavailable)
+        );
+        status["tui_v2"]["release_id"] = json!("wrong-release");
+        assert_eq!(
+            tui_status_snapshot(binding, &status, false),
+            Err(TuiV2Unavailable::BindingUnverified)
+        );
+        status["tui_v2"] = json!({"protocol": 1, "ready": true, "idle": true});
+        assert_eq!(
+            tui_status_snapshot(binding, &status, false),
+            Err(TuiV2Unavailable::BindingUnverified)
+        );
+        status["tui_v2"]["account_id"] = json!(binding.account_id);
+        status["tui_v2"]["release_id"] = json!(binding.release_id);
+        assert_eq!(
+            tui_status_snapshot(binding, &status, false),
+            Err(TuiV2Unavailable::ReadinessUnverified)
+        );
+        status["tui_v2"]["event_source"] = json!("local_unix");
+        assert_eq!(tui_status_snapshot(binding, &status, false), Ok(true));
+        status["active"] = json!(1);
+        assert_eq!(tui_status_snapshot(binding, &status, false), Ok(false));
+        status["generation"] = json!(binding.generation + 1);
+        assert_eq!(
+            tui_status_snapshot(binding, &status, false),
+            Err(TuiV2Unavailable::BindingUnverified)
+        );
+    }
+
+    /// 覆盖同一已登记位置换代、节点分配变化、发行变化与历史摘要。
+    #[test]
+    fn tui_sender_generation_keeps_registered_account_environment_node_and_release() {
+        let environment_id = "a".repeat(32);
+        let node = "b".repeat(32);
+        let endpoint = format!(
+            "http://runtime.test/cluster-transports/v2/0123456789ab/{node}/{environment_id}/3"
+        );
+        let original = TransportBinding {
+            account_id: 7,
+            environment_id,
+            generation: 8,
+            endpoint,
+            secret: "synthetic-secret".into(),
+            release_id: "synthetic-release".into(),
+        };
+        let mut replacement = original.clone();
+        replacement.generation += 1;
+        replacement.secret = "rotated-internal-secret".into();
+        let registered = tui_sender_key(&original, false);
+        let current = tui_sender_key(&replacement, false);
+        assert!(tui_same_binding(&registered, &registered));
+        assert!(!tui_same_binding(&registered, &current));
+        assert!(tui_later_generation(&registered, &current));
+        assert!(!tui_later_generation(&registered, &registered));
+        assert!(!tui_later_generation(&current, &registered));
+        for changed in [
+            TransportBinding {
+                account_id: 8,
+                ..replacement.clone()
+            },
+            TransportBinding {
+                environment_id: "c".repeat(32),
+                ..replacement.clone()
+            },
+            TransportBinding {
+                endpoint: replacement
+                    .endpoint
+                    .replacen("runtime.test", "other-runtime.test", 1),
+                ..replacement.clone()
+            },
+            TransportBinding {
+                endpoint: replacement.endpoint.replace(&node, &"d".repeat(32)),
+                ..replacement.clone()
+            },
+            TransportBinding {
+                endpoint: format!("{}/4", replacement.endpoint.rsplit_once('/').unwrap().0),
+                ..replacement.clone()
+            },
+            TransportBinding {
+                release_id: "different-release".into(),
+                ..replacement.clone()
+            },
+        ] {
+            assert!(!tui_later_generation(
+                &registered,
+                &tui_sender_key(&changed, false)
+            ));
+        }
+        let legacy = tui_binding_key(&original, false);
+        let legacy_v2 = format!(
+            "v2:{}:{}:{}",
+            original.environment_id,
+            original.generation,
+            legacy.strip_prefix("v1:").unwrap(),
+        );
+        for stored in [legacy, legacy_v2] {
+            assert!(tui_same_binding(&stored, &registered));
+            assert!(!tui_same_binding(&stored, &current));
+            assert!(!tui_later_generation(&stored, &current));
+        }
+        let fixture = tui_sender_key(&original, true);
+        assert!(tui_same_binding(&fixture, &fixture));
+        assert!(!tui_later_generation(&fixture, &current));
+    }
+
+    /// 公开 V2 错误保持 sender 原状态和字节，提交超时之后也不调用取消。
+    #[tokio::test]
+    async fn tui_reservation_sends_once_and_only_cancels_before_submission() {
+        use axum::body::to_bytes;
+        use futures_util::stream::once;
+        use tokio::sync::{Notify, mpsc};
+        use tokio::time::sleep_until;
+
+        let (observations, mut events) = mpsc::unbounded_channel();
+        let app = Router::new().route(
+            "/internal/tui-v2/cancel",
+            post(move |headers: HeaderMap| {
+                let observations = observations.clone();
+                async move {
+                    observations
+                        .send(("cancel", headers["x-v3-tui-reservation"].clone()))
+                        .unwrap();
+                    StatusCode::NO_CONTENT
+                }
+            }),
+        );
+        let (sends, mut sent) = mpsc::unbounded_channel();
+        let release_body = Arc::new(Notify::new());
+        let sender_barrier = release_body.clone();
+        let app = app.route(
+            "/internal/tui-v2/send",
+            post(move |headers: HeaderMap| {
+                let sends = sends.clone();
+                let sender_barrier = sender_barrier.clone();
+                async move {
+                    assert!(tui_delegates_json(&headers));
+                    let reservation = headers["x-v3-tui-reservation"].to_str().unwrap().to_owned();
+                    sends.send(reservation.clone()).unwrap();
+                    if reservation == "delegated" {
+                        let body = Body::from_stream(once(async move {
+                            sender_barrier.notified().await;
+                            Ok::<_, IoError>(Bytes::from_static(br#"{"id":"msg_upstream","type":"message","content":[],"usage":{"cache_read_input_tokens":4210}}"#))
+                        }));
+                        return ([(CONTENT_TYPE.as_str(), "application/json"), (TUI_GATEWAY_ID_HEADER, TUI_JSON_PROJECTION_V1)], body).into_response();
+                    }
+                    if reservation == "unknown" {
+                        tokio::time::sleep(Duration::from_secs(1)).await;
+                    }
+                    if reservation == "delegated429" {
+                        return (
+                            StatusCode::TOO_MANY_REQUESTS,
+                            [(CONTENT_TYPE.as_str(), "application/json"), (TUI_GATEWAY_ID_HEADER, TUI_JSON_PROJECTION_V1),
+                             (TUI_ERROR_SOURCE, "local_provider_http"), (RETRY_AFTER.as_str(), "0")],
+                            r#"{"type":"error","error":{"type":"rate_limit_error","message":"busy"}}"#,
+                        ).into_response();
+                    }
+                    let status =
+                        StatusCode::from_bytes(reservation.as_bytes()).unwrap_or(StatusCode::OK);
+                    let mut response =
+                        (status, [(CONTENT_TYPE, "application/json")], "原始错误字节")
+                            .into_response();
+                    response.headers_mut().insert(TUI_ERROR_SOURCE, HeaderValue::from_static("local_provider_http"));
+                    response.headers_mut().insert(RETRY_AFTER, HeaderValue::from_static("57"));
+                    if reservation == "projected" {
+                        response
+                            .headers_mut()
+                            .insert(TUI_GATEWAY_ID_HEADER, HeaderValue::from_static("gateway"));
+                    }
+                    response
+                }
+            }),
+        );
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let reservation = |id: &str| TuiReservation {
+            client: Client::builder()
+                .no_proxy()
+                .redirect(Policy::none())
+                .build()
+                .unwrap(),
+            binding: TransportBinding {
+                account_id: 1,
+                environment_id: "synthetic".into(),
+                generation: 1,
+                endpoint: endpoint.clone(),
+                secret: "synthetic-private".into(),
+                release_id: "synthetic".into(),
+            },
+            identity_header: id.into(),
+            attempt_id: id.into(),
+            capture_state: None,
+            capture: None,
+            input_policy: false,
+            session_mapping: false,
+            upstream_session: None,
+            managed_oauth: false,
+            submission_started: false,
+            continuation: false,
+        };
+        drop(reservation("before-send"));
+        let (action, identity) = timeout(Duration::from_secs(2), events.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            (action, identity.to_str().unwrap()),
+            ("cancel", "before-send")
+        );
+        for status in [401, 403, 429] {
+            let id = status.to_string();
+            let response = reservation(&id)
+                .submit(Duration::from_secs(2))
+                .await
+                .unwrap();
+            let public = tui_public_response(response, None).await.unwrap();
+            assert_eq!(public.status().as_u16(), status);
+            assert_eq!(
+                public.headers().get(RETRY_AFTER).map(HeaderValue::as_bytes),
+                (status == 429).then_some(b"57".as_slice())
+            );
+            assert!(!public.headers().contains_key(TUI_ERROR_SOURCE));
+            assert_eq!(
+                to_bytes(public.into_body(), 1024).await.unwrap(),
+                "原始错误字节"
+            );
+            assert_eq!(sent.recv().await.unwrap(), id);
+        }
+        let response = reservation("delegated429")
+            .submit(Duration::from_secs(2))
+            .await
+            .unwrap();
+        let public = tui_public_response(response, None).await.unwrap();
+        assert_eq!(public.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(public.headers()[RETRY_AFTER], "0");
+        assert!(!public.headers().contains_key(TUI_ERROR_SOURCE));
+        assert_eq!(sent.recv().await.unwrap(), "delegated429");
+        let projected = reservation("projected")
+            .submit(Duration::from_secs(2))
+            .await
+            .unwrap();
+        let public = tui_public_response(projected, None).await.unwrap();
+        assert!(public.extensions().get::<TuiGatewayIds>().is_some());
+        assert!(!public.headers().contains_key(TUI_GATEWAY_ID_HEADER));
+        assert_eq!(sent.recv().await.unwrap(), "projected");
+
+        let budget = Duration::from_secs(2);
+        let expiry = Instant::now() + budget;
+        let delegated = reservation("delegated").submit(budget).await.unwrap();
+        assert!(Instant::now() < expiry);
+        assert!(tui_delegates_json(delegated.headers()));
+        let (public, ()) = tokio::join!(tui_public_response(delegated, None), async {
+            sleep_until(expiry + Duration::from_millis(100)).await;
+            assert!(Instant::now() > expiry);
+            release_body.notify_one();
+        });
+        let public = public.unwrap();
+        assert_eq!(public.status(), StatusCode::OK);
+        assert!(public.extensions().get::<TuiGatewayIds>().is_some());
+        assert!(!public.headers().contains_key(TUI_GATEWAY_ID_HEADER));
+        let body: Value =
+            serde_json::from_slice(&to_bytes(public.into_body(), 1024).await.unwrap()).unwrap();
+        assert!(
+            Uuid::parse_str(body["id"].as_str().unwrap().strip_prefix("msg_").unwrap()).is_ok()
+        );
+        assert_eq!(body["usage"]["cache_read_input_tokens"], 4210);
+        assert_eq!(sent.recv().await.unwrap(), "delegated");
+        let failed = reservation("unknown")
+            .submit(Duration::from_millis(500))
+            .await;
+        assert!(matches!(failed, Err(AppError::BadGateway(_))));
+        assert_eq!(sent.recv().await.unwrap(), "unknown");
+        assert!(
+            timeout(Duration::from_millis(100), events.recv())
+                .await
+                .is_err()
+        );
+        assert!(sent.try_recv().is_err());
+        server.abort();
+    }
+
+    /// 真实 sender 路由接受空分块信封，并在记录提交或取消前拒绝附带的数据。
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn tui_sender_control_routes_accept_empty_chunked_requests() {
+        use futures_util::stream::iter;
+        use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+        use tokio::net::TcpStream;
+
+        let config_path = std::env::temp_dir().join(format!("tui-control-{}.json", Uuid::new_v4()));
+        let secret = "synthetic-tui-control-sender-secret";
+        let config = json!({
+            "binding": {
+                "account_id": 7, "environment_id": "a".repeat(32), "generation": 5,
+                "endpoint": "http://localhost:8091", "secret": secret, "release_id": "synthetic",
+            },
+            "proxy_url": "", "allowed_origin": "https://api.anthropic.com",
+        });
+        fs::write(&config_path, config.to_string()).unwrap();
+        let app = sender_router(config_path.to_str().unwrap().into());
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let origin = format!("http://{address}");
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let client = Client::builder().no_proxy().http1_only().build().unwrap();
+
+        for (action, message) in [
+            ("send", "V2 发送只接收原预留信封"),
+            ("cancel", "V2 取消只接收原预留信封"),
+        ] {
+            let request = || {
+                client
+                    .post(format!("{origin}/internal/tui-v2/{action}"))
+                    .bearer_auth(secret)
+                    .timeout(Duration::from_secs(3))
+            };
+            let empty = request()
+                .body(reqwest::Body::wrap_stream(empty::<Result<Bytes, IoError>>()))
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(empty.status(), StatusCode::BAD_REQUEST);
+            assert!(
+                empty
+                    .text()
+                    .await
+                    .unwrap()
+                    .contains("V2 预留身份或正文不匹配")
+            );
+            let nonempty = request()
+                .body(reqwest::Body::wrap_stream(iter([Ok::<_, IoError>(
+                    Bytes::from_static(b"x"),
+                )])))
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(nonempty.status(), StatusCode::BAD_REQUEST);
+            assert!(nonempty.text().await.unwrap().contains(message));
+
+            // 不发送分块结束符也必须在读取预算内返回，避免半开的控制请求占住 sender。
+            let mut stalled = BufReader::new(TcpStream::connect(address).await.unwrap());
+            let headers = format!(
+                "POST /internal/tui-v2/{action} HTTP/1.1\r\nHost: {address}\r\nAuthorization: Bearer {secret}\r\nTransfer-Encoding: chunked\r\n\r\n"
+            );
+            stalled
+                .get_mut()
+                .write_all(headers.as_bytes())
+                .await
+                .unwrap();
+            let mut head = String::new();
+            timeout(Duration::from_secs(4), stalled.read_line(&mut head))
+                .await
+                .unwrap()
+                .unwrap();
+            assert!(head.starts_with("HTTP/1.1 400"), "{head}");
+        }
+        server.abort();
+        fs::remove_file(config_path).unwrap();
+    }
 
     /// 精确AGY动作通过共享准入，跨平台路径和不同上游继续拒绝。@return 无。
     #[test]
@@ -2403,15 +4165,10 @@ mod tests {
         let native = config.native.as_ref().unwrap();
         assert!(native.release.is_none());
         assert!(native.kernel_generation.is_none());
-        let old_version = &native.runtimes[&NativeSourceVersion::Cc280];
-        assert!(old_version.release.is_none());
-        assert!(old_version.kernel_generation.is_none());
+        assert!(native.runtimes.is_empty());
         assert_eq!(native.max_workers, 6);
-        let selected = native_version_config(&config, NativeSourceVersion::Cc280).unwrap();
-        assert_eq!(
-            selected.native.unwrap().binary_path,
-            "/usr/local/bin/ccrb-runtime-280"
-        );
+        assert_eq!(native.source_version, NativeSourceVersion::Cc293);
+        assert_eq!(native.binary_path, "/usr/local/bin/ccrb-runtime");
         fs::remove_file(path).unwrap();
     }
 
@@ -2511,6 +4268,7 @@ mod tests {
         let transport = PreparedTransport {
             tool_continuation_mode: AgyToolContinuationMode::Claim,
             long_agy_generation: false,
+            tui_predecessors: Vec::new(),
             account_id: 7,
             route: PreparedRoute::V3 {
                 client: Client::new(),
@@ -2574,6 +4332,7 @@ mod tests {
         let transport = PreparedTransport {
             tool_continuation_mode: AgyToolContinuationMode::Claim,
             long_agy_generation: false,
+            tui_predecessors: Vec::new(),
             account_id: 7,
             route: PreparedRoute::V3 {
                 client: Client::new(),
@@ -2608,6 +4367,7 @@ mod tests {
         let transport = PreparedTransport {
             tool_continuation_mode: AgyToolContinuationMode::Claim,
             long_agy_generation: false,
+            tui_predecessors: Vec::new(),
             account_id: 7,
             route: PreparedRoute::V3 {
                 client: Client::new(),
@@ -2622,39 +4382,167 @@ mod tests {
         let _ = old.await;
     }
 
-    /// 双版按安装表选择并保留真实额度，旧单版继续限定已安装版本。@return 无。
+    /// 老 sender 的单版默认和双版报告均须能定位 293。显式的 280 单版报告不能通过。
+    #[tokio::test]
+    async fn native_ready_requires_293_in_legacy_or_versioned_capabilities() {
+        let app = Router::new().route(
+            "/:case/internal/native/status",
+            get(
+                |axum::extract::Path(case): axum::extract::Path<String>| async move {
+                    let mut reply =
+                        json!({"raw_input_protocol":1,"environment_id":"synthetic","generation":1});
+                    match case.as_str() {
+                        "legacy-default" => {}
+                        "legacy-293" => reply["version"] = json!("2.1.293"),
+                        "legacy-280" => reply["version"] = json!("2.1.280"),
+                        "dual" => {
+                            reply["versions"] =
+                                json!({"2.1.280":{"available":true},"2.1.293":{"available":true}})
+                        }
+                        "missing-293" => reply["versions"] = json!({"2.1.280":{"available":true}}),
+                        _ => unreachable!(),
+                    }
+                    Json(reply)
+                },
+            ),
+        );
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let origin = format!("http://{}", listener.local_addr().unwrap());
+        let server = tokio::spawn(axum::serve(listener, app).into_future());
+        for (case, ready) in [
+            ("legacy-default", true),
+            ("legacy-293", true),
+            ("legacy-280", false),
+            ("dual", true),
+            ("missing-293", false),
+        ] {
+            let transport = PreparedTransport {
+                tool_continuation_mode: AgyToolContinuationMode::Claim,
+                long_agy_generation: false,
+                tui_predecessors: Vec::new(),
+                account_id: 7,
+                route: PreparedRoute::V3 {
+                    client: Client::builder().no_proxy().build().unwrap(),
+                    binding: TransportBinding {
+                        environment_id: "synthetic".into(),
+                        generation: 1,
+                        account_id: 7,
+                        endpoint: format!("{origin}/{case}"),
+                        secret: "fixture".into(),
+                        release_id: "fixture".into(),
+                    },
+                },
+            };
+            assert_eq!(transport.native_ready().await.is_ok(), ready, "{case}");
+        }
+        server.abort();
+    }
+
+    /// 鉴权后的每个原生入口拒绝显式 280，历史双版配置只公布 293 能力。
+    #[tokio::test]
+    async fn native_sender_rejects_retired_version_before_any_execution() {
+        let directory = temp_dir().join(format!("retired-worker-{}", Uuid::new_v4()));
+        fs::create_dir(&directory).unwrap();
+        let path = directory.join("sender.json");
+        let work = directory.join("workers");
+        let secret = "synthetic-retired-private-service-secret";
+        fs::write(&path, json!({
+            "binding":{"account_id":7,"environment_id":"synthetic","generation":1,
+                "endpoint":"http://localhost:8091","secret":secret,"release_id":"synthetic"},
+            "proxy_url":"","allowed_origin":"https://api.anthropic.com",
+            "native":{"binary_path":"/missing-293","work_root":work,"memory_mib":0,"max_workers":8,
+                "runtimes":{"2.1.280":{"binary_path":"/retired-280"}}}
+        }).to_string()).unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let origin = format!("http://{}/internal/native", listener.local_addr().unwrap());
+        let server = tokio::spawn(
+            axum::serve(listener, sender_router(path.to_string_lossy().into_owned())).into_future(),
+        );
+        let client = Client::builder().no_proxy().build().unwrap();
+        let status: Value = client
+            .get(format!("{origin}/status"))
+            .bearer_auth(secret)
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        assert_eq!(
+            status["versions"],
+            json!({"2.1.293":{"available":false,"version":"2.1.293"}})
+        );
+        let id = Uuid::new_v4().to_string();
+        let deadline = now_ms() + 30_000;
+        let control = json!({"source_version":"2.1.280","account_id":7,"environment_id":"synthetic",
+            "generation":1,"preparation_id":id});
+        let mut prepare = control.clone();
+        prepare.as_object_mut().unwrap().extend(
+            json!({"deadline_unix_ms":deadline,
+            "bearer":"synthetic-bearer","device_id":"a".repeat(64),"email":"test@example.invalid",
+            "concurrency":4})
+            .as_object()
+            .unwrap()
+            .clone(),
+        );
+        let submission = serde_json::to_value(preparation_identity(
+            serde_json::from_value(prepare.clone()).unwrap(),
+            &read_config(path.to_str().unwrap()).unwrap(),
+        ))
+        .unwrap();
+        for (route, body) in [
+            ("prepare", &prepare),
+            ("readiness", &prepare),
+            ("prepare/cancel", &control),
+            ("messages", &submission),
+        ] {
+            let reply = client
+                .post(format!("{origin}/{route}"))
+                .bearer_auth(secret)
+                .json(body)
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(reply.status(), StatusCode::BAD_REQUEST, "{route}");
+            if route == "messages" {
+                assert_eq!(reply.headers()[ERROR_HEADER], "before-send");
+            }
+            assert!(reply.text().await.unwrap().contains("2.1.293"), "{route}");
+        }
+        assert!(!work.exists());
+        server.abort();
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// 旧账号从历史版本表取回 293 路径和原额度，缺少 293 时明确拒绝执行。
     #[test]
-    fn native_version_selection_preserves_finite_budget_and_installation_boundary() {
-        let mut config: SenderConfig = serde_json::from_value(json!({
-            "native":{"binary_path":"/usr/local/bin/ccrb-runtime","work_root":"/native",
-                "memory_mib":128,"max_workers":8,
-                "runtimes":{"2.1.280":{"binary_path":"/usr/local/bin/ccrb-runtime-280"}}},
+    fn legacy_native_installations_admit_only_the_registered_293_runtime() {
+        let path = temp_dir().join(format!("legacy-sender-{}.json", Uuid::new_v4()));
+        let mut document = json!({
+            "native":{"source_version":"2.1.280","binary_path":"/usr/local/bin/ccrb-runtime-280",
+                "work_root":"/native","memory_mib":128,"max_workers":8},
             "binding":{"account_id":7,"environment_id":"synthetic","generation":1,
                 "endpoint":"http://localhost:8091","secret":"synthetic","release_id":"synthetic"},
             "proxy_url":"","allowed_origin":"https://api.anthropic.com"
-        }))
-        .unwrap();
-        for memory_mib in [0, 128, 1535] {
-            config.native.as_mut().unwrap().memory_mib = memory_mib;
-            for version in [NativeSourceVersion::Cc280, NativeSourceVersion::Cc293] {
-                let selected = native_version_config(&config, version).unwrap();
-                let native = selected.native.unwrap();
-                assert_eq!(native.source_version, version);
-                assert_eq!((native.memory_mib, native.max_workers), (memory_mib, 8));
-                assert!(native.runtimes.is_empty());
-                assert_eq!(
-                    (native.binary_path.as_str(), native.work_root.as_str()),
-                    if version == NativeSourceVersion::Cc280 {
-                        ("/usr/local/bin/ccrb-runtime-280", "/native/280")
-                    } else {
-                        ("/usr/local/bin/ccrb-runtime", "/native")
-                    }
-                );
-            }
-        }
-        config.native.as_mut().unwrap().runtimes.clear();
-        assert!(native_version_config(&config, NativeSourceVersion::Cc293).is_ok());
-        assert!(native_version_config(&config, NativeSourceVersion::Cc280).is_err());
+        });
+        fs::write(&path, document.to_string()).unwrap();
+        let retired = read_config(path.to_str().unwrap()).unwrap().native.unwrap();
+        assert_eq!(retired.source_version, NativeSourceVersion::Cc280);
+        assert!(retired.verify().is_err());
+        document["native"]["runtimes"] = json!({
+            "2.1.280":{"binary_path":"/unused-old-worker"},
+            "2.1.293":{"binary_path":"/registered-293"}
+        });
+        fs::write(&path, document.to_string()).unwrap();
+        let native = read_config(path.to_str().unwrap()).unwrap().native.unwrap();
+        assert_eq!(native.source_version, NativeSourceVersion::Cc293);
+        assert_eq!(
+            (native.binary_path.as_str(), native.work_root.as_str()),
+            ("/registered-293", "/native")
+        );
+        assert!(native.runtimes.is_empty());
+        assert_eq!((native.memory_mib, native.max_workers), (128, 8));
+        fs::remove_file(path).unwrap();
     }
 
     #[tokio::test]
@@ -2810,6 +4698,7 @@ mod tests {
         let mut transport = PreparedTransport {
             tool_continuation_mode: AgyToolContinuationMode::Claim,
             long_agy_generation: false,
+            tui_predecessors: Vec::new(),
             account_id: 7,
             route: PreparedRoute::V3 {
                 client: Client::new(),
@@ -2841,6 +4730,7 @@ mod tests {
             PreparedTransport {
                 tool_continuation_mode: AgyToolContinuationMode::Claim,
                 long_agy_generation: false,
+                tui_predecessors: Vec::new(),
                 account_id: 7,
                 route: PreparedRoute::Direct(String::new())
             }
@@ -3425,5 +5315,152 @@ mod tests {
                 .all(|pair| pair[1].submitted_at_ms - pair[0].submitted_at_ms >= 195)
         );
         server.abort();
+    }
+
+    /// 源端能力缺失时拒绝生效的策略。关闭策略时向老 sender 交付原文并丢弃客户端冒充的私有头。
+    #[tokio::test]
+    async fn tui_body_policy_requires_ack_and_ignores_ingress_private_header() {
+        use tokio::sync::mpsc;
+
+        let (seen, mut requests) = mpsc::unbounded_channel();
+        let app = Router::new().route(
+            "/internal/tui-v2/prepare",
+            post(move |headers: HeaderMap, body: Bytes| {
+                let seen = seen.clone();
+                async move {
+                    seen.send((headers.get(TUI_BODY_POLICY).cloned(), body))
+                        .unwrap();
+                    (StatusCode::NO_CONTENT, [("x-v3-tui-handoff-kind", "new")])
+                }
+            }),
+        );
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let body = Bytes::from_static(br#"{ "model":"m", "messages":[] }"#);
+        let mut headers = HeaderMap::new();
+        headers.insert(TUI_BODY_POLICY, HeaderValue::from_static("client"));
+        let enabled = TuiBodyPolicy::new(
+            MessageCacheControlRewrite::Sub2api,
+            CacheControlTtlRewrite::OneHour,
+            true,
+        );
+        for body_policy in [TuiBodyPolicy::default(), enabled] {
+            let binding = TransportBinding {
+                account_id: 3,
+                environment_id: "env".into(),
+                generation: 1,
+                endpoint: endpoint.clone(),
+                secret: "fixture".into(),
+                release_id: "test".into(),
+            };
+            let sender = TuiReadySender {
+                client: Client::builder().no_proxy().build().unwrap(),
+                key: tui_sender_key(&binding, true),
+                binding,
+                idle: true,
+                predecessors: Vec::new(),
+            };
+            let input = TuiMessagesInput {
+                body: &body,
+                headers: &headers,
+                native_cc: false,
+                body_policy,
+            };
+            let result = prepare_tui(
+                sender,
+                1,
+                "test-session",
+                input,
+                Instant::now() + Duration::from_secs(2),
+                false,
+            )
+            .await;
+            let (option, original) = requests.recv().await.unwrap();
+            assert_eq!(original, body);
+            if body_policy == enabled {
+                assert_eq!(
+                    serde_json::from_slice::<TuiBodyPolicy>(option.unwrap().as_bytes()).unwrap(),
+                    enabled
+                );
+                assert!(matches!(result, Err(AppError::ServiceUnavailable(_))));
+            } else {
+                assert!(option.is_none());
+                let old = result.unwrap();
+                let base = json!({"model":"m","messages":[{"role":"user","content":"x"}]});
+                old.verify_input_policy(&base).unwrap();
+                for (field, value) in [("metadata", json!({"private":123})), ("context_management", json!({})),
+                    ("mcp_servers", json!([])), ("top_p", json!(0.9))] {
+                    let mut changed = base.clone();
+                    changed[field] = value;
+                    assert!(matches!(old.verify_input_policy(&changed), Err(AppError::ServiceUnavailable(_))));
+                }
+                let mut extra = base.clone();
+                extra["messages"][0]["custom"] = json!(true);
+                assert!(old.verify_input_policy(&extra).is_err());
+            }
+        }
+        server.abort();
+    }
+
+    /// 无 billing 的原生输入只接收 V1 已认识的单个 UA；重复声明仍按普通 API 校验。
+    #[test]
+    fn tui_cli_format_requires_one_recognized_version_and_entry() {
+        for (ua, expected) in [
+            ("claude-cli/2.1.293 (external, cli)", Some("claude_code")),
+            (
+                "claude-cli/2.1.293 (external, sdk-cli, agent-sdk/0.2.1)",
+                Some("claude_code"),
+            ),
+            (
+                "claude-cli/2.1.280 (external, claude-vscode)",
+                Some("claude_code_280"),
+            ),
+            ("claude-cli/2.1.293 (external, anything)", None),
+        ] {
+            let mut headers = HeaderMap::new();
+            headers.append(USER_AGENT, ua.parse().unwrap());
+            assert_eq!(tui_cli_format(&headers), expected);
+            headers.append(USER_AGENT, ua.parse().unwrap());
+            assert_eq!(tui_cli_format(&headers), None);
+        }
+    }
+
+    /// 普通 API 自报头保持无权，官方形状的重复标识明确拒绝。
+    #[test]
+    fn tui_agent_hint_is_a_single_native_ingress_hint() {
+        let mut headers = HeaderMap::new();
+        let body = Bytes::new();
+        headers.append("x-claude-code-agent-id", "agent-a".parse().unwrap());
+        assert_eq!(
+            tui_agent_hint(&TuiMessagesInput {
+                body: &body,
+                headers: &headers,
+                native_cc: true,
+                body_policy: TuiBodyPolicy::default(),
+            })
+            .unwrap(),
+            Some("agent-a")
+        );
+        assert_eq!(
+            tui_agent_hint(&TuiMessagesInput {
+                body: &body,
+                headers: &headers,
+                native_cc: false,
+                body_policy: TuiBodyPolicy::default(),
+            })
+            .unwrap(),
+            None
+        );
+        headers.append("x-claude-code-agent-id", "agent-b".parse().unwrap());
+        assert!(
+            tui_agent_hint(&TuiMessagesInput {
+                body: &body,
+                headers: &headers,
+                native_cc: true,
+                body_policy: TuiBodyPolicy::default(),
+            })
+            .is_err()
+        );
     }
 }

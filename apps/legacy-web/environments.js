@@ -309,7 +309,6 @@ function renderNativePreparation(row) {
     <div class="env-card-head"><h4>原生准备</h4><span class="env-badge env-${tone}">${escapeHTML(label)}</span></div>
     <div class="env-resources"><div><span>293 空闲热进程</span><strong>${escapeHTML(value.idle_workers ?? '未观测')}</strong></div><div><span>293 实际进程数</span><strong>${escapeHTML(value.live_workers ?? '未观测')}</strong></div><div><span>空闲 PID</span><strong>${escapeHTML(value.pid ?? '未观测')}</strong></div></div>
     <p class="env-muted">最近检查：${escapeHTML(checked)}</p>
-    ${value.versions ? '<div class="env-resources">' + Object.entries(value.versions).filter(([version]) => ['2.1.280', '2.1.293'].includes(version)).map(([version, item]) => `<div><span>${escapeHTML(version)} 运行时</span><strong>${escapeHTML(labels[item?.state] || '状态待核对')}</strong></div>`).join('') + '</div>' : ''}
     ${value.checking === true ? '<p class="env-muted">后台正在检查。页面每20秒自动读取检查结果。</p>' : ''}
     ${typeof value.adaptive_prewarm === 'boolean' ? `<p class="env-muted">并发备用：${value.adaptive_prewarm ? '已启用第二进程补位' : '未启用，保留一个常驻热进程'}。超出已就绪热容量时按需扩容。</p>` : ''}
     ${value.reason ? `<p class="env-notice">${escapeHTML(reasons[value.reason] || '状态待核对')}</p>` : ''}
@@ -385,20 +384,10 @@ async function applyEnvironmentCriu(button) {
  * @return {string} 内核管理面板。
  */
 function renderNativeKernel(row) {
-  if (row.native_kernels) return ['2.1.280', '2.1.293'].map(version => renderNativeKernelVersion(row, version, row.native_kernels[version])).join('');
-  return renderNativeKernelVersion(row, '2.1.293', row.native_kernel);
-}
-
-/** 渲染单版内核只读信息，进程观察按源版本归属。
- * @param {object} row 当前环境。
- * @param {string} sourceVersion 固定280或293。
- * @param {object|null} kernel 对应版本状态。
- * @return {string} 安全转义的管理面板。
- */
-function renderNativeKernelVersion(row, sourceVersion, kernel) {
-  if (!kernel) return `<section class="env-kernel env-kernel-unavailable"><h4>请求内核 · ${escapeHTML(sourceVersion)}</h4><p>安装信息未提供，等待环境准备。</p></section>`;
-  const observation = row.native_preparation?.versions?.[sourceVersion]
-    || (sourceVersion === '2.1.293' ? row.native_preparation : null);
+  const sourceVersion = '2.1.293';
+  const kernel = row.native_kernels?.[sourceVersion] ?? row.native_kernel;
+  if (!kernel) return `<section class="env-kernel env-kernel-unavailable"><h4>请求内核 · ${sourceVersion}</h4><p>安装信息未提供，等待环境准备。</p></section>`;
+  const observation = row.native_preparation?.versions?.[sourceVersion] ?? row.native_preparation;
   const states = {ready:'暖进程就绪',busy:'暖进程使用中',preparing:'准备中',unprepared:'等待按需准备',
     sleeping:'环境休眠',maintenance:'环境维护中',failed:'准备失败',disabled:'原生方式已关闭',unknown:'运行状态待核对'};
   return `<section class="env-kernel"><div class="env-section-head"><h4>请求内核 · ${escapeHTML(sourceVersion)}</h4><span class="env-tag">随平台版本交付</span></div>

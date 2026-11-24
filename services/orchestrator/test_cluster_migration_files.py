@@ -5,6 +5,7 @@ import shutil
 import json
 import tempfile
 import unittest
+import os
 from pathlib import Path
 
 from cli_scratchpad import SCRATCHPAD_RUNTIME, SCRATCHPAD_STORE
@@ -69,6 +70,42 @@ class MigrationFileTests(unittest.TestCase):
         self.target.restore(request)
         self.assertFalse((stage/'environment/runtime/owner-transition.json').exists())
         self.assertTrue(marker.exists())
+
+    def test_v2_durable_workspace_and_transcript_are_moved_without_host_secrets(self) -> None:
+        """同环境工作和回放数据保持字节，发送配置及派生文件保留在源。:return: None。"""
+        session = 'fa00fa00-fa00-4a00-8a00-fa00fa00fa00'
+        project = '-native-tui-workspaces-' + 'a' * 64
+        workspace = 'runtime/native/tui-workspaces/'
+        home = f'runtime/native/tui-sessions/{session}/home/'
+        keep = [
+            workspace + 'f' * 64 + '.json', workspace + 'a' * 64 + '/notes.txt',
+            home + f'.claude/projects/{project}/{session}.jsonl', 'runtime/native/tui-v2-submissions.json',
+        ]
+        drop = [workspace + '.binding.pending', home + '.claude/.credentials.json',
+            home + '.claude/.claude.json', home + 'tmp/session.sock',
+            'runtime/native/tui-provider-backoff/previous', 'runtime/native/tui-v2-submissions.lock',
+            'runtime/native/worker-profile/settings.json', 'runtime/sender/tui-local-provider.json']
+        for index, path in enumerate(keep + drop):
+            atomic_json(self.environment / path, {'synthetic': index})
+        descriptor = self.source.export(self.environment, self.identity, '6' * 32)
+        request = self.request.model_copy(update={'transfer_id': '7' * 32, 'archive': descriptor})
+        self.target.stage(request)
+        stage = self.stage.parent / request.transfer_id
+        bundle = self.source_data / 'node-migrations' / self.identity.operation_id / 'exports' / ('6' * 32 + '.tar')
+        shutil.copyfile(bundle, stage/'environment.tar')
+        (stage/'environment.tar').chmod(0o600)
+        self.assertEqual('verified', self.target.restore(request)['phase'])
+        for path in keep:
+            self.assertEqual((self.environment/path).read_bytes(), (stage/'environment'/path).read_bytes())
+        for path in drop:
+            self.assertFalse((stage/'environment'/path).exists())
+            self.assertTrue((self.environment/path).exists())
+
+        secret = self.source_data/'unrelated-secret'
+        secret.write_text('synthetic')
+        os.link(secret, self.environment / workspace / ('a' * 64) / 'linked')
+        with self.assertRaisesRegex(ValueError, '硬链接'):
+            self.source.export(self.environment, self.identity, '8' * 32)
 
     def test_partial_upload_is_preserved_and_requires_new_transfer(self) -> None:
         """未知的部分上传不被后续stage覆盖，原字节保留供核对。:return: None。"""

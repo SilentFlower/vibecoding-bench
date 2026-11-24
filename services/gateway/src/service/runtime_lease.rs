@@ -222,6 +222,27 @@ impl RuntimeGate {
     /// @param timeout 最长等待时长。
     /// @return 成功返回 true 并增加 API 活动计数，超时返回 false。
     pub async fn enter(&self, timeout: Duration) -> bool {
+        self.enter_api(timeout, None).await
+    }
+
+    /// V2 已归属的工具回执允许在原节点迁移排空期进入原账号槽位。
+    /// @param timeout 最长等待时长。@param continuation 由网关核验并经原 sender 确认的原轮。
+    /// @return 原账号实际活动准入结果。
+    pub(super) async fn enter_tui(&self, timeout: Duration, continuation: bool) -> bool {
+        self.enter_api(timeout, Some(continuation)).await
+    }
+
+    /// 新 V2 轮在节点排空时不可唤醒环境。@return 节点迁移当前持有排他租约。
+    pub(super) fn node_migration_draining(&self) -> bool {
+        self.state
+            .lock()
+            .unwrap()
+            .lease
+            .as_ref()
+            .is_some_and(|lease| lease.exclusive && node_migration_owner(&lease.owner))
+    }
+
+    async fn enter_api(&self, timeout: Duration, tui: Option<bool>) -> bool {
         tokio::time::timeout(timeout, async {
             loop {
                 let changed = self.changed.notified();
@@ -229,16 +250,30 @@ impl RuntimeGate {
                 changed.as_mut().enable();
                 {
                     let state = self.state.lock().unwrap();
-                    if state.lease.as_ref().is_none_or(|lease| !lease.exclusive) {
+                    let exclusive = state.lease.as_ref().filter(|lease| lease.exclusive);
+                    if exclusive.is_none()
+                        || (tui == Some(true)
+                            && exclusive.is_some_and(|lease| {
+                                node_migration_owner(&lease.owner)
+                                    && lease.phase == "draining"
+                                    && lease.expires_at > now()
+                            }))
+                    {
                         self.active.fetch_add(1, Ordering::SeqCst);
-                        return;
+                        return true;
+                    }
+                    if tui.is_some()
+                        && exclusive.is_some_and(|lease| node_migration_owner(&lease.owner))
+                    {
+                        // 迁移中不要让等待的新轮占着普通槽位挡住原工具续轮。
+                        return false;
                     }
                 }
                 changed.await;
             }
         })
         .await
-        .is_ok()
+        .unwrap_or(false)
     }
 
     /// 等待排他维护关闭门禁，让后台准备先取消。
@@ -461,9 +496,49 @@ impl RuntimeGate {
     }
 }
 
+/// 检查固定的节点迁移持有者范围。@param owner 网关原持有者。@return 是有效迁移标识时为真。
+pub(crate) fn node_migration_owner(owner: &str) -> bool {
+    owner
+        .strip_prefix("node-migration:")
+        .is_some_and(|operation| {
+            operation.len() == 32
+                && operation
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn node_migration_keeps_only_existing_tui_continuations() {
+        let active = Arc::new(AtomicI64::new(0));
+        let gate = RuntimeGate::new(active.clone());
+        let lease = gate
+            .prepare(&format!("node-migration:{}", "a".repeat(32)))
+            .unwrap();
+        let wait = Duration::from_millis(25);
+        assert!(!gate.enter_tui(wait, false).await);
+        assert!(gate.enter_tui(wait, true).await);
+        assert_eq!(active.load(Ordering::SeqCst), 1);
+        assert!(
+            gate.update(&lease.owner, &lease.generation, "claim")
+                .is_err()
+        );
+        active.fetch_sub(1, Ordering::SeqCst);
+        gate.update(&lease.owner, &lease.generation, "claim")
+            .unwrap();
+        assert!(!gate.enter_tui(wait, true).await);
+        gate.update(&lease.owner, &lease.generation, "release")
+            .unwrap();
+        let other = gate.prepare("login:unrelated").unwrap();
+        assert!(!gate.enter_tui(wait, true).await);
+        gate.update(&other.owner, &other.generation, "release")
+            .unwrap();
+        assert!(gate.enter_tui(wait, false).await);
+    }
 
     #[tokio::test]
     async fn two_cli_holders_share_capacity_and_release_only_their_own_slot() {

@@ -1,29 +1,44 @@
-use crate::service::version_profile::tls_profile_for_account;
-use crate::tlsfp::configured_default_tls_profile;
+use axum::http::HeaderMap;
+use bytes::Bytes;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use chrono::{DateTime, Local, NaiveDate, Timelike, Utc};
 use serde_json::Value;
-use tokio::time::{sleep, timeout};
+use tokio::time::{Instant as TokioInstant, sleep, timeout, timeout_at};
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
+use crate::error::AppError;
 use crate::model::account::{Account, AccountAuthType, AccountStatus};
-use crate::model::identity::device_profile;
 use crate::model::request_diagnostics::RequestLogMode;
-use crate::service::account::{AccountService, RateLimitDecision, UsageObservationKind};
-use crate::service::gateway::{extract_passive_usage, extract_rejected_passive_usage_windows};
+use crate::service::account::{
+    AccountSelectionContext, AccountService, RateLimitDecision, UsageObservationKind,
+    account_fable_weekly_usage_limit_reached, account_usage_limit_reached,
+};
+use crate::service::gateway::{
+    extract_passive_usage, extract_rejected_passive_usage_windows,
+    parse_fable_weekly_usage_limit_percent, request_slot_units, response_content_codings,
+};
 use crate::service::native_contract::{NativeSourceVersion, NativeSubmission};
 use crate::service::rewriter::{
     CacheControlTtlRewrite, ClientType, EnvPassthrough, MessageCacheControlRewrite, Rewriter,
     ordered_anthropic_headers,
 };
-use crate::service::runtime_transport::{self, PreparedRequest};
+use crate::service::runtime_transport::{self, PreparedRequest, TuiBodyPolicy, TuiMessagesInput};
 use crate::service::system_update;
+use crate::service::tui_backend::{self, TUI_V2, TuiRequestRoute};
+use crate::service::tui_tool_history::SERVER_SESSION_PREFIX;
+use crate::service::usage::UsageCapture;
+use crate::service::v3_scheduling::RequestPhase;
+use crate::service::version_profile::tls_profile_for_account;
 use crate::store::prime_log_store::{PrimeLogEntry, PrimeLogStore};
-use crate::store::settings_store::{DEFAULT_MESSAGE_BODY_ORDER_FINGERPRINT_ENABLED, SettingsStore};
+use crate::store::settings_store::{
+    DEFAULT_FABLE_STICKY_QUOTA_FALLBACK_ENABLED, DEFAULT_FABLE_WEEKLY_USAGE_LIMIT_PERCENT,
+    DEFAULT_MESSAGE_BODY_ORDER_FINGERPRINT_ENABLED, SettingsStore,
+};
+use crate::tlsfp::configured_default_tls_profile;
 
 /// 上游 `/v1/messages` 地址,与 gateway.rs 的 UPSTREAM_BASE 保持一致。
 const UPSTREAM_URL: &str = "https://api.anthropic.com/v1/messages?beta=true";
@@ -47,6 +62,9 @@ const TRIGGER_MINUTE: u32 = 10;
 
 /// 错误信息截断字符数。按字符而非字节截,避免多字节字符跨边界导致 panic。
 const ERROR_SNIPPET_CHARS: usize = 200;
+
+// 私有会话采用公共入口拒绝的前缀。这一主体仅用于经过账号认证的后台预留。
+const TUI_PRIME_PRINCIPAL: i64 = i64::MAX;
 
 /// 预热解析出的有效配置。
 struct PrimeConfig {
@@ -76,7 +94,8 @@ struct PrimeOutcome {
 /// 期的账号逐一发送一次 Haiku `/v1/messages` 请求,借此主动启动 Anthropic 侧的 5h 速率
 /// 限制窗口,让窗口重置点落在下午用户高峰之前或之中。
 ///
-/// OAuth 账号首次收到 401 时会刷新凭据并原账号重试一次，其他失败不重试。每次调用
+/// 旧路径的 OAuth 账号首次收到 401 时会刷新凭据并原账号重试一次。V2 只使用原账号的
+/// 受信事件源，拒绝只记录这次预热结果。每次调用
 /// （含成功/失败/跳过）都会写入 `prime_logs` 表,供设置页展示。最终 401 / 429 / 403 会联动
 /// `AccountService` 的状态处理,和主链路行为保持一致,防止预热探测到坏账号却让真实流量
 /// 继续选中它。
@@ -172,10 +191,7 @@ impl PrimePollerService {
             }
         };
 
-        let enabled = all
-            .get("peak_prime_enabled")
-            .map(|s| s == "true")
-            .unwrap_or(true);
+        let enabled = peak_prime_enabled(&all);
         let hours_raw = all
             .get("peak_prime_hours")
             .cloned()
@@ -442,6 +458,7 @@ impl PrimePollerService {
         model: &str,
         message_body_order_fingerprint_enabled: bool,
     ) -> PrimeOutcome {
+        let mut cutover = system_update::InferenceCutover::subscribe();
         let _update_activity = match system_update::admission() {
             Ok(activity) => activity,
             Err(_) => {
@@ -457,6 +474,35 @@ impl PrimePollerService {
             }
         };
         let started = Instant::now();
+        let deadline = TokioInstant::now() + PRIME_TTFB_TIMEOUT;
+        // 使用实际生效的后端，并让路由读锁覆盖预热，等待中的切换继续由原门禁管理。
+        let route = timeout_at(
+            deadline,
+            tui_backend::request_route(&self.account_svc, account.clone()),
+        );
+        let (account, route) = match route.await {
+            Ok(Ok(route)) => route,
+            Ok(Err(error)) => return Self::v2_outcome(started, Err(error)),
+            Err(_) => {
+                return Self::v2_outcome(
+                    started,
+                    Err(AppError::AdmissionLimited { retry_after: 1 }),
+                );
+            }
+        };
+        if account.request_backend == TUI_V2 {
+            let result = match route {
+                Some(route) => tokio::select! {
+                    biased;
+                    _ = cutover.cancelled() => Err(AppError::ServiceUnavailable("平台维护取消 V2 预热".into())),
+                    result = self.prime_v2(&account, &route, model, deadline) => result,
+                },
+                None => Err(AppError::ServiceUnavailable("V2 预热路由未登记".into())),
+            };
+            self.account_svc.notify_tui_response_retired(account.id);
+            return Self::v2_outcome(started, result);
+        }
+        let account = &account;
         let _credential_activity = match self.account_svc.upstream_activity(account.id).await {
             Ok(permit) => permit,
             Err(_) => {
@@ -521,15 +567,7 @@ impl PrimePollerService {
         // 构造最小请求体,其余字段交给 rewriter 补全,保证与真实 Claude Code 流量对齐:
         // - metadata.user_id 由 rewriter 注入 {device_id, account_uuid, session_id} JSON 字符串
         // - system prompt、tools、stream=true、去除 temperature 等由 rewriter 统一规范化
-        let minimal_body = serde_json::json!({
-            "model": model,
-            "messages": [{
-                "role": "user",
-                "content": [{ "type": "text", "text": "hi" }]
-            }],
-            "max_tokens": 512,
-            "stream": true
-        });
+        let minimal_body = prime_messages(model);
         let minimal_bytes = match serde_json::to_vec(&minimal_body) {
             Ok(b) => b,
             Err(e) => {
@@ -761,13 +799,8 @@ impl PrimePollerService {
                 let transport = runtime_transport::prepare(account, PRIME_TTFB_TIMEOUT)
                     .await
                     .map_err(|_| "原生运行环境准备不可用".to_string())?;
-                let source_version = if device_profile(account).env.version == "2.1.280" {
-                    NativeSourceVersion::Cc280
-                } else {
-                    NativeSourceVersion::Cc293
-                };
                 transport
-                    .native_ready_for_version(source_version)
+                    .native_ready()
                     .await
                     .map_err(|_| "原生运行时能力不可用".to_string())?;
                 let bearer = headers
@@ -785,7 +818,7 @@ impl PrimePollerService {
                     .unwrap_or(&self.upstream_url)
                     .to_string();
                 let submission = NativeSubmission {
-                    source_version,
+                    source_version: NativeSourceVersion::Cc293,
                     cache_ttl_rewrite: None,
                     message_cache_policy: None,
                     ingress_capture: None,
@@ -849,6 +882,208 @@ impl PrimePollerService {
             })
     }
 
+    /// 只对本次调度的账号准备和提交一个 V2 回环轮次。
+    /// @param account 生效账号。@param route 同轮路由快照。@param model 管理员配置的模型。
+    /// @param deadline 峰值预热从路由解析开始的首响应期限。
+    /// @return 完整 SSE 终态或可写入原预热日志的失败。
+    async fn prime_v2(
+        &self,
+        account: &Account,
+        route: &TuiRequestRoute,
+        model: &str,
+        deadline: TokioInstant,
+    ) -> Result<(), AppError> {
+        if runtime_transport::tui_fixture(account) {
+            return Err(AppError::ServiceUnavailable(
+                "V2 峰值预热需要已登记的正式账号发送器".into(),
+            ));
+        }
+        let scheduler = self
+            .account_svc
+            .scheduler()
+            .ok_or_else(|| AppError::ServiceUnavailable("V2 预热需要 v3 调度".into()))?;
+        // 后台任务没有可绑定的客户端会话；发送许可仍计入该账号的正常 RPM。
+        let request = scheduler.begin(0, None);
+        let deadline = request.deadline().min(deadline);
+        let timeout_error = || AppError::AdmissionLimited { retry_after: 1 };
+        let body = prime_messages(model);
+        let mut observer = UsageCapture::observer(&body);
+        let prepared_run = timeout_at(deadline, async {
+            let settings = self.settings_store.get_all().await?;
+            if !peak_prime_enabled(&settings) {
+                return Err(AppError::ServiceUnavailable("峰值预热已关闭".into()));
+            }
+            let selection = AccountSelectionContext {
+                usage_limits_enabled: true,
+                fable_quota_fallback_enabled: settings
+                    .get("fable_sticky_quota_fallback_enabled")
+                    .map(String::as_str)
+                    .unwrap_or(DEFAULT_FABLE_STICKY_QUOTA_FALLBACK_ENABLED)
+                    .trim()
+                    == "true",
+                fable_weekly_usage_limit_percent: parse_fable_weekly_usage_limit_percent(
+                    settings
+                        .get("fable_weekly_usage_limit_percent")
+                        .map(String::as_str)
+                        .unwrap_or(DEFAULT_FABLE_WEEKLY_USAGE_LIMIT_PERCENT),
+                ),
+                request_model: Some(model.to_owned()),
+            };
+            let slot_units = request_slot_units("/v1/messages", &body);
+            let account = self
+                .account_svc
+                .select_v3_account(&request, &[], &[account.id], &selection, slot_units)
+                .await?
+                .account;
+            let work = self.account_svc.work_controls.admit(account.id).await?;
+            let activity = self.account_svc.upstream_activity(account.id).await?;
+            request.phase(RequestPhase::Backoff);
+            self.account_svc
+                .wait_transient_rate_limit_backoff(&account)
+                .await;
+            request.phase(RequestPhase::Preparing);
+            if route.binding.is_empty() {
+                return Err(runtime_transport::tui_unbound(&account).await);
+            }
+            let wake = route
+                .may_wake_v2(&self.account_svc, &account, false)
+                .await?;
+            let sender = runtime_transport::ready_tui_sender(&account, deadline, wake).await?;
+            let (binding, _, _) = route
+                .begin_v2(&self.account_svc, &account, None, &body, &sender, false)
+                .await?;
+            let session = format!("{SERVER_SESSION_PREFIX}prime-{}", Uuid::new_v4());
+            let bytes = Bytes::from(
+                serde_json::to_vec(&body)
+                    .map_err(|_| AppError::Internal("V2 预热请求编码失败".into()))?,
+            );
+            let prepared = runtime_transport::prepare_tui(
+                sender,
+                TUI_PRIME_PRINCIPAL,
+                &session,
+                TuiMessagesInput {
+                    body: &bytes,
+                    headers: &HeaderMap::new(),
+                    native_cc: false,
+                    body_policy: TuiBodyPolicy::default(),
+                },
+                deadline,
+                false,
+            )
+            .await?;
+            if prepared.continuation {
+                return Err(AppError::ServiceUnavailable("V2 预热预留类别错误".into()));
+            }
+
+            request.phase(RequestPhase::WaitingConcurrency);
+            let queue = self
+                .account_svc
+                .get_or_create_queue(account.id, account.concurrency)
+                .await;
+            let slot = queue
+                .acquire(
+                    deadline.saturating_duration_since(TokioInstant::now()),
+                    slot_units,
+                )
+                .await
+                .map_err(|_| timeout_error())?
+                .with_scheduling_request(request.clone())
+                .with_work_admission(work);
+            // 等待物理进程或发送队列期间，账号可能新增冷却或耗尽窗口。
+            let current = self.account_svc.get_account(account.id).await?;
+            if !current.is_schedulable()
+                || account_usage_limit_reached(&current)
+                || (selection.is_fable_quota_fallback_active()
+                    && account_fable_weekly_usage_limit_reached(
+                        &current,
+                        selection.fable_weekly_usage_limit_percent,
+                    ))
+            {
+                return Err(AppError::TooManyRequests(
+                    "V2 预热账号达到用量控制线或不再可调度".into(),
+                ));
+            }
+            let work = self.account_svc.work_controls.snapshot(account.id).await?;
+            if !work.api_accepting || !work.work_enabled {
+                return Err(AppError::ServiceUnavailable("该账号已关闭 API 接单".into()));
+            }
+            let account_token = if prepared.managed_oauth {
+                let (bearer, _resolution) = self
+                    .account_svc
+                    .resolve_tui_upstream_token(account.id, false)
+                    .await?;
+                Some(runtime_transport::tui_account_token_header(&bearer)?)
+            } else {
+                None
+            };
+            let send = request.admit(&account).await?;
+            let config = route
+                .allow_submit(&self.account_svc, account.id, &binding, false)
+                .await?;
+            if !peak_prime_enabled(&self.settings_store.get_all().await?) {
+                return Err(AppError::ServiceUnavailable("V2 峰值预热已取消".into()));
+            }
+            Ok::<_, AppError>((prepared, account_token, slot, activity, send, config))
+        })
+        .await
+        .map_err(|_| timeout_error())??;
+        let (prepared, account_token, _slot, _activity, send, config) = prepared_run;
+        let remaining = deadline
+            .checked_duration_since(TokioInstant::now())
+            .filter(|duration| !duration.is_zero())
+            .ok_or_else(timeout_error)?;
+        send.submitted();
+        drop(config);
+        // 发送开始后由 sender 持有单次预留。私有首包超时仍保留提交状态未知。
+        let mut response = prepared
+            .submit_with_account_token(remaining, account_token)
+            .await?;
+
+        let status = response.status();
+        if !status.is_success() {
+            return Err(AppError::BadGateway(format!(
+                "V2 模型源 HTTP {}",
+                status.as_u16()
+            )));
+        }
+        observer.configure_codings(&response_content_codings(response.headers()));
+        timeout(PRIME_DRAIN_TIMEOUT, async {
+            while let Some(bytes) = response
+                .chunk()
+                .await
+                .map_err(|_| AppError::BadGateway("V2 预热响应中断".into()))?
+            {
+                observer.observe(&bytes);
+            }
+            let observed = observer.observation(true);
+            if observed.partial || observed.error_type.is_some() || observed.policy_reason.is_some()
+            {
+                return Err(AppError::BadGateway(
+                    "V2 预热未成功完成 Messages 响应".into(),
+                ));
+            }
+            Ok(())
+        })
+        .await
+        .map_err(|_| AppError::BadGateway("V2 预热响应读取超时".into()))?
+    }
+
+    /// 隔离本机源的结果与旧 OAuth 联动字段。@param started 起点。@param result 终态。
+    /// @return 原预热记录所需的数据。
+    fn v2_outcome(started: Instant, result: Result<(), AppError>) -> PrimeOutcome {
+        PrimeOutcome {
+            success: result.is_ok(),
+            error_message: result.err().map_or_else(String::new, |error| {
+                truncate_chars(&error.to_string(), ERROR_SNIPPET_CHARS)
+            }),
+            duration_ms: started.elapsed().as_millis() as i64,
+            passive_usage: None,
+            usage_observation_kind: UsageObservationKind::Allowed,
+            status: None,
+            failed_access_token: None,
+        }
+    }
+
     /// 驱动隔离原生回环中的完整预热轮次。
     /// @param hour 合成触发小时。
     /// @param model 本轮预热模型。
@@ -857,6 +1092,26 @@ impl PrimePollerService {
     pub(crate) async fn test_run_round(&self, hour: u32, model: &str) {
         self.run_round(hour, model, true).await;
     }
+}
+
+/// 按峰值调度的既有语义解析总开关。@param settings 同次读取的设置。@return 峰值任务已启用。
+fn peak_prime_enabled(settings: &HashMap<String, String>) -> bool {
+    settings
+        .get("peak_prime_enabled")
+        .is_none_or(|value| value == "true")
+}
+
+/// 生成既有预热的普通 Messages 输入。@param model 峰值设置选择的模型。@return 预热正文。
+fn prime_messages(model: &str) -> Value {
+    serde_json::json!({
+        "model": model,
+        "messages": [{
+            "role": "user",
+            "content": [{ "type": "text", "text": "hi" }]
+        }],
+        "max_tokens": 512,
+        "stream": true
+    })
 }
 
 /// 按字符截断字符串,避免直接字节切片在多字节字符上 panic。
@@ -874,6 +1129,7 @@ mod tests {
         AccountStatus, BillingMode, DEFAULT_ALLOW_1M_MODELS, DEFAULT_UPSTREAM_SESSION_POOL_SIZE,
         DEFAULT_UPSTREAM_SESSION_REFRESH_POLICY, DEFAULT_UPSTREAM_SESSION_TTL_MINUTES,
     };
+    use crate::service::runtime_transport::TUI_BODY_POLICY;
     use crate::store::account_store::AccountStore;
     use crate::store::memory::MemoryStore;
     use axum::extract::State;
@@ -884,6 +1140,28 @@ mod tests {
     use serde_json::json;
     use sqlx::AnyPool;
     use std::sync::atomic::{AtomicUsize, Ordering};
+
+    /// 核对存量值和缺省配置。@return V1、V2 读取同一设置语义。
+    #[test]
+    fn prime_setting_preserves_existing_values_and_default() {
+        assert!(peak_prime_enabled(&HashMap::new()));
+        for (value, expected) in [("true", true), ("false", false), ("", false)] {
+            let settings = HashMap::from([("peak_prime_enabled".into(), value.into())]);
+            assert_eq!(peak_prime_enabled(&settings), expected);
+        }
+    }
+
+    /// 读取私有路径计数。@param client 回环客户端。@param base 夹具地址。@return prepare、send、cancel 数。
+    async fn prime_fixture_counts(client: &reqwest::Client, base: &str) -> [usize; 3] {
+        client
+            .get(format!("{base}/counts"))
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap()
+    }
 
     async fn setup_prime_poller() -> (PrimePollerService, Arc<AccountService>) {
         setup_prime_poller_with_urls(
@@ -897,6 +1175,14 @@ mod tests {
         upstream_url: String,
         oauth_token_url: String,
     ) -> (PrimePollerService, Arc<AccountService>) {
+        setup_poller(upstream_url, oauth_token_url, false).await
+    }
+
+    async fn setup_poller(
+        upstream_url: String,
+        oauth_token_url: String,
+        v3: bool,
+    ) -> (PrimePollerService, Arc<AccountService>) {
         sqlx::any::install_default_drivers();
         let tmp =
             std::env::temp_dir().join(format!("ccgw_prime_poller_{}.db", rand::random::<u64>()));
@@ -908,12 +1194,22 @@ mod tests {
 
         let account_store = Arc::new(AccountStore::new(pool.clone(), "sqlite".into()));
         let settings_store = Arc::new(SettingsStore::new(pool.clone()));
-        let account_svc = Arc::new(AccountService::new_with_oauth_token_url(
+        let mut account_svc = AccountService::new_with_oauth_token_url(
             account_store,
             Arc::new(MemoryStore::new()),
             settings_store.clone(),
             oauth_token_url,
-        ));
+        );
+        if v3 {
+            use crate::service::v3_scheduling::V3Scheduler;
+            use crate::store::scheduling_store::SchedulingStore;
+            let scheduler = Arc::new(V3Scheduler::new(Arc::new(SchedulingStore::new(
+                pool.clone(),
+            ))));
+            scheduler.reload(&settings_store).await.unwrap();
+            account_svc = account_svc.with_scheduler(scheduler);
+        }
+        let account_svc = Arc::new(account_svc);
         let mut service = PrimePollerService::new(
             account_svc.clone(),
             settings_store,
@@ -922,6 +1218,354 @@ mod tests {
         );
         service.upstream_url = upstream_url;
         (service, account_svc)
+    }
+
+    /// 真实后台调度、数据库、入站账号核验和 HTTP 预留的回环测试。
+    /// @return 暂存于独立进程的传输环境和普通测试进程隔离。
+    #[tokio::test]
+    async fn prime_v2_fixed_account_admission_and_reservation_lifecycle() {
+        use axum::extract::{Path, Request};
+        use axum::http::StatusCode;
+        use axum::routing::{any, get};
+        use base64::{Engine, engine::general_purpose::STANDARD};
+        use sha2::{Digest, Sha256};
+        use tokio::net::TcpListener;
+
+        const TEST: &str = "service::prime_poller::tests::prime_v2_fixed_account_admission_and_reservation_lifecycle";
+        const RELEASE: &str = "local-test-prime";
+        const DEPLOYMENT: &str = "local-test-prime-deployment";
+        const ENV_ID: &str = "0123456789abcdef0123456789abcdef";
+        const NODE_ID: &str = "ffffffffffffffffffffffffffffffff";
+        const CONTROL: &str = "local-test-control-not-a-secret";
+        const SENDER: &str = "local-test-sender-not-a-secret-12345";
+        const MODEL: &str = "claude-haiku-4-5-20251001";
+        if let Ok(base) = std::env::var("FLOWER_PRIME_TEST_RELAY") {
+            assert!(base.starts_with("http://127.0.0.1:"));
+            let (service, accounts) = setup_poller(
+                format!("{base}/legacy"),
+                format!("{base}/legacy/oauth"),
+                true,
+            )
+            .await;
+            let mut account = oauth_account("prime-v2@example.test");
+            account.concurrency = 1;
+            account.rpm_limit = 0;
+            accounts.create_account(&mut account).await.unwrap();
+            let (binding, idle) = runtime_transport::tui_account_status(&account)
+                .await
+                .unwrap();
+            assert!(idle);
+            let before = accounts.tui_backend(account.id).await.unwrap();
+            accounts
+                .update_tui_backend(account.id, &before, TUI_V2, "", &binding)
+                .await
+                .unwrap();
+            let service = Arc::new(service);
+
+            // 保留库已初始化的旧开关，并用普通请求的缓存设置对照预热原文。
+            assert_eq!(
+                service
+                    .settings_store
+                    .get_value("peak_prime_enabled", "false")
+                    .await
+                    .unwrap(),
+                "true",
+            );
+            service
+                .settings_store
+                .upsert_many(&HashMap::from([
+                    ("peak_prime_hours".into(), "4".into()),
+                    ("peak_prime_model".into(), MODEL.into()),
+                    ("message_cache_control_rewrite".into(), "sub2api".into()),
+                    ("cache_control_ttl_rewrite".into(), "1h".into()),
+                ]))
+                .await
+                .unwrap();
+            let now = Local::now().with_hour(4).unwrap().with_minute(10).unwrap();
+            let mut fired = None;
+            service.check_at(now, &mut fired).await;
+            service.check_at(now, &mut fired).await;
+            let logs = service.log_store.list_recent(10).await.unwrap();
+            assert_eq!(logs.len(), 1);
+            assert!(logs[0].success, "{}", logs[0].error_message);
+            assert_eq!(
+                (logs[0].account_id, logs[0].model.as_str()),
+                (account.id, MODEL)
+            );
+            let client = reqwest::Client::builder().no_proxy().build().unwrap();
+            let update_peak = |enabled: bool| {
+                let service = service.clone();
+                async move {
+                    service
+                        .settings_store
+                        .upsert_many(&HashMap::from([(
+                            "peak_prime_enabled".into(),
+                            enabled.to_string(),
+                        )]))
+                        .await
+                        .unwrap();
+                }
+            };
+            update_peak(false).await;
+            let mut disabled_scan = None;
+            service.check_at(now, &mut disabled_scan).await;
+            assert!(disabled_scan.is_none());
+            assert_eq!(service.log_store.list_recent(10).await.unwrap().len(), 1);
+            assert_eq!(prime_fixture_counts(&client, &base).await, [1, 1, 0]);
+
+            update_peak(true).await;
+            let queue = accounts
+                .get_or_create_queue(account.id, account.concurrency)
+                .await;
+            let held_slot = queue.acquire(Duration::from_secs(1), 2).await.unwrap();
+            let queued = tokio::spawn({
+                let service = service.clone();
+                let account = account.clone();
+                async move { service.prime_one(&account, MODEL, true).await }
+            });
+            timeout(Duration::from_secs(10), async {
+                while accounts.get_account_capacity_info(&account).await.queued == 0 {
+                    sleep(Duration::from_millis(20)).await;
+                }
+            })
+            .await
+            .expect("等待准备成功后进入普通槽位队列");
+            assert_eq!(prime_fixture_counts(&client, &base).await, [2, 1, 0]);
+            update_peak(false).await;
+            drop(held_slot);
+            let outcome = queued.await.unwrap();
+            assert!(!outcome.success);
+            assert!(
+                outcome.error_message.contains("预热已取消"),
+                "{}",
+                outcome.error_message
+            );
+            timeout(Duration::from_secs(5), async {
+                while prime_fixture_counts(&client, &base).await != [2, 1, 1] {
+                    sleep(Duration::from_millis(20)).await;
+                }
+            })
+            .await
+            .expect("关闭后取消原预留且没有第二次发送");
+            // 外部隔离验收可用发行 sender 和容器内 TUI 执行同一生产任务。
+            if std::env::var_os("FLOWER_PRIME_TEST_ACTUAL_SENDER").is_some() {
+                return;
+            }
+            update_peak(true).await;
+
+            use crate::service::account_work::AccountWorkUpdate;
+            for accepting in [false, true] {
+                accounts
+                    .work_controls
+                    .update(
+                        account.id,
+                        AccountWorkUpdate {
+                            api_accepting: Some(accepting),
+                            work_enabled: None,
+                            expected_revision: None,
+                        },
+                    )
+                    .await
+                    .unwrap();
+                if !accepting {
+                    let outcome = service.prime_one(&account, MODEL, true).await;
+                    assert!(!outcome.success);
+                }
+            }
+            let mut quota_account = accounts.get_account(account.id).await.unwrap();
+            quota_account.five_hour_usage_limit_percent = 50;
+            accounts
+                .update_account_usage_limits(&quota_account)
+                .await
+                .unwrap();
+            accounts.update_passive_usage(account.id, json!({
+                "five_hour": { "utilization": 80.0, "resets_at": (Utc::now() + chrono::Duration::hours(1)).to_rfc3339() }
+            }), UsageObservationKind::Allowed).await.unwrap();
+            let outcome = service.prime_one(&account, MODEL, true).await;
+            assert!(!outcome.success);
+            assert!(
+                outcome.error_message.contains("用量上限"),
+                "{}",
+                outcome.error_message
+            );
+            quota_account.five_hour_usage_limit_percent = 0;
+            accounts
+                .update_account_usage_limits(&quota_account)
+                .await
+                .unwrap();
+
+            for (mode, reason) in [
+                ("401", "HTTP 401"),
+                ("429", "HTTP 429"),
+                ("incomplete", "未成功完成"),
+                ("unready", "事件源"),
+                ("wrong_binding", "绑定"),
+            ] {
+                client
+                    .post(format!("{base}/mode/{mode}"))
+                    .send()
+                    .await
+                    .unwrap()
+                    .error_for_status()
+                    .unwrap();
+                let outcome = service.prime_one(&account, MODEL, true).await;
+                assert!(!outcome.success);
+                assert!(
+                    outcome.error_message.contains(reason),
+                    "{mode}: {}",
+                    outcome.error_message
+                );
+                assert!(outcome.status.is_none());
+                let stored = accounts.get_account(account.id).await.unwrap();
+                assert_eq!(stored.status, AccountStatus::Active);
+                assert_eq!(stored.access_token, account.access_token);
+            }
+            client.post(format!("{base}/mode/ok")).send().await.unwrap();
+            let queue = accounts
+                .get_or_create_queue(account.id, account.concurrency)
+                .await;
+            let slot = queue.acquire(Duration::from_secs(1), 2).await.unwrap();
+            let polling = tokio::spawn({
+                let service = service.clone();
+                async move { service.prime_one(&account, MODEL, true).await }
+            });
+            timeout(Duration::from_secs(5), async {
+                loop {
+                    let counts = prime_fixture_counts(&client, &base).await;
+                    if counts[0] == 6 {
+                        assert_eq!(counts, [6, 4, 1], "槽位未归还时不得执行预热");
+                        break;
+                    }
+                    sleep(Duration::from_millis(20)).await;
+                }
+            })
+            .await
+            .expect("等待真实 prepare 回执");
+            polling.abort();
+            assert!(matches!(polling.await, Err(error) if error.is_cancelled()));
+            drop(slot);
+            timeout(Duration::from_secs(5), async {
+                while prime_fixture_counts(&client, &base).await != [6, 4, 2] {
+                    sleep(Duration::from_millis(20)).await;
+                }
+            })
+            .await
+            .expect("任务取消后原预留必须归还");
+            return;
+        }
+
+        #[derive(Clone)]
+        struct Relay {
+            endpoint: String,
+            state: Arc<tokio::sync::Mutex<(String, Vec<(String, String)>)>>,
+        }
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let deploy = format!("{:x}", Sha256::digest(DEPLOYMENT.as_bytes()));
+        let relay_path = format!(
+            "/cluster-transports/v2/{}/{NODE_ID}/{ENV_ID}/1",
+            &deploy[..12]
+        );
+        let relay = Relay {
+            endpoint: format!("{base}{relay_path}"),
+            state: Default::default(),
+        };
+        let app = Router::new()
+            .route("/internal/v3/transport/:id", get(|State(relay): State<Relay>, Path(id): Path<i64>, headers: HeaderMap| async move {
+                assert_eq!(headers["authorization"], format!("Bearer {CONTROL}"));
+                assert_eq!(id, 1);
+                Json(json!({"account_id": id, "environment_id": ENV_ID, "generation": 1,
+                    "release_id": RELEASE, "endpoint": relay.endpoint, "secret": SENDER}))
+            }))
+            .route(&format!("{relay_path}/internal/*action"), any(|State(relay): State<Relay>, Path(action): Path<String>, req: Request| async move {
+                assert_eq!(req.headers()["authorization"], format!("Bearer {SENDER}"));
+                assert_eq!(req.headers()["x-v3-relay-token"], CONTROL);
+                let mut state = relay.state.lock().await;
+                if action == "status" {
+                    return Json(json!({
+                        "environment_id": ENV_ID, "generation": if state.0 == "wrong_binding" { 2 } else { 1 }, "active":0,
+                        "tui_v2":{"account_id":1,"release_id":RELEASE,"protocol":1,"ready":state.0 != "unready",
+                            "event_source":"local_unix","idle":true,"reason":"messages_tool_and_usage_events_unavailable"}
+                    })).into_response();
+                }
+                let encoded = req.headers()["x-v3-tui-reservation"].as_bytes();
+                let identity: Value = serde_json::from_slice(&STANDARD.decode(encoded).unwrap()).unwrap();
+                assert_eq!((identity["account_id"].as_i64(), identity["principal_id"].as_i64()), (Some(1), Some(TUI_PRIME_PRINCIPAL)));
+                assert!(identity["session_id"].as_str().unwrap().starts_with(SERVER_SESSION_PREFIX));
+                assert_eq!(identity["continuation_only"], false);
+                let id = identity["reservation_id"].as_str().unwrap().to_owned();
+                assert!(!req.headers().contains_key(TUI_BODY_POLICY));
+                let body = axum::body::to_bytes(req.into_body(), 4096).await.unwrap();
+                if action == "tui-v2/prepare" {
+                    assert_eq!(serde_json::from_slice::<Value>(&body).unwrap(), prime_messages(MODEL));
+                    state.1.push(("prepare".into(), id));
+                    return (StatusCode::NO_CONTENT, [("x-v3-tui-handoff-kind", "new")]).into_response();
+                }
+                assert!(body.is_empty());
+                assert!(state.1.iter().any(|item| item == &("prepare".into(), id.clone())));
+                if action == "tui-v2/cancel" {
+                    state.1.push(("cancel".into(), id));
+                    return StatusCode::NO_CONTENT.into_response();
+                }
+                assert_eq!(action, "tui-v2/send");
+                assert!(!state.1.iter().any(|item| item == &("send".into(), id.clone())));
+                state.1.push(("send".into(), id));
+                if let Ok(status) = state.0.parse::<u16>() {
+                    return StatusCode::from_u16(status).unwrap().into_response();
+                }
+                let start = "data: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_prime\",\"usage\":{\"input_tokens\":2}}}\n\n";
+                let stop = "data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":1}}\n\ndata: {\"type\":\"message_stop\"}\n\n";
+                let sse = if state.0 == "incomplete" { start.to_owned() } else { format!("{start}{stop}") };
+                ([("content-type", "text/event-stream")], sse).into_response()
+            }))
+            .route("/mode/:mode", post(|State(relay): State<Relay>, Path(mode): Path<String>| async move {
+                relay.state.lock().await.0 = mode;
+                StatusCode::NO_CONTENT
+            }))
+            .route("/counts", get(|State(relay): State<Relay>| async move {
+                let state = relay.state.lock().await;
+                Json(["prepare", "send", "cancel"].map(|action| state.1.iter().filter(|event| event.0 == action).count()))
+            }))
+            .route("/legacy/*path", any(|| async { panic!("V2 预热不得使用旧路径"); #[allow(unreachable_code)] StatusCode::BAD_GATEWAY }))
+            .with_state(relay.clone());
+        let server = tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+        let child = tokio::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", TEST, "--nocapture"])
+            .env_clear()
+            .env("FLOWER_PRIME_TEST_RELAY", &base)
+            .env("V3_RUNTIME_URL", &base)
+            .env("V3_INTERNAL_TOKEN", CONTROL)
+            .env("V3_DEPLOYMENT_ID", DEPLOYMENT)
+            .env("V3_RELEASE", RELEASE)
+            .kill_on_drop(true)
+            .status()
+            .await
+            .unwrap();
+        assert!(child.success());
+        timeout(Duration::from_secs(3), async {
+            loop {
+                let state = relay.state.lock().await;
+                if state.1.last().is_some_and(|(kind, id)| {
+                    kind == "cancel"
+                        && state.1.len() == 12
+                        && state
+                            .1
+                            .iter()
+                            .rev()
+                            .find(|event| event.0 == "prepare")
+                            .is_some_and(|event| event.1 == *id)
+                }) {
+                    break;
+                }
+                drop(state);
+                sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .expect("提交前取消应落到原预留");
+        server.abort();
     }
 
     #[derive(Clone)]

@@ -16,6 +16,10 @@ _REASONS = {
     'component_version': ('目标节点运行组件正在同步', '等待后台同步完成后继续原迁移'),
     'node_configuration': ('迁移节点的数据位置或主机身份已变化', '恢复原节点位置或核对原操作后继续迁移'),
     'runtime_preparation': ('目标容器或运行组件准备失败', '检查节点Docker状态、镜像和资源后继续原迁移'),
+    'tui_source_unknown': ('源账号已选 V2，实际事件源模式待核对', '核对原 sender 的账号绑定和事件源装配'),
+    'tui_formal_unavailable': ('目标缺少此账号可核验就绪的 V2 正式事件源',
+        '核对目标发行和同账号事件源，或取消迁移恢复源节点'),
+    'tui_local_unavailable': ('目标缺少此环境可核验的 V2 本机提供方能力', '在目标核对原独立本机提供方模式的配置和 sender 能力'),
 }
 _STAGES = {'draining', 'fence', 'export', 'transfer', 'verify-import', 'prepare-import',
     'commit', 'activate-import', 'revoke-import', 'restore-source', 'context', 'preflight'}

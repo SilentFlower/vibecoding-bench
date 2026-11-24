@@ -1,4 +1,4 @@
-"""固定双版制品的缓存准入及输入漂移回归。"""
+"""固定293制品的缓存准入及输入漂移回归。"""
 import hashlib
 import importlib.util
 import json
@@ -26,22 +26,23 @@ class PrepareRuntimeTests(unittest.TestCase):
         gateway = read('services/gateway/src/service/native_runtime.rs')
         docker = read('images/v3/Dockerfile')
         action = read('.github/actions/flower2api-native-runtime/action.yml')
-        for version, launcher, image, image_bytes in compact[:2]:
-            with self.subTest(version=version):
-                identity = prepare.SOURCES[version]
-                self.assertEqual((launcher, image, int(image_bytes)),
-                    (identity['sha256'], identity['image_sha256'], identity['image_bytes']))
-                executable = 'ccrb-runtime-280' if version == '2.1.280' else 'ccrb-runtime'
-                self.assertIn(f"'{launcher}  /usr/local/bin/{executable}' | sha256sum -c -", docker)
-                self.assertIn(f"native{version.split('.')[-1]}-linux-x64-{launcher}-", action)
-                self.assertIn(f'"{launcher}"', gateway)
-                self.assertIn(f'"{image}"', gateway)
-                self.assertIn(f"{identity['bytes']:_}", gateway)
-                self.assertIn(f"{identity['image_bytes']:_}", gateway)
-                for name in ('services/runtime/native/tls-observer/observer.py', 'images/v3/tls-observer/observer.py'):
-                    self.assertIn(f"'{image}':", read(name))
-        self.assertEqual([entry[0] for entry in compact[:2]], ['2.1.293', '2.1.280'])
-        current = prepare.SOURCES['2.1.293']
+        self.assertEqual(set(prepare.SOURCES), {'2.1.293'})
+        self.assertEqual({entry[0] for entry in compact}, {'2.1.293'})
+        version, launcher, image, image_bytes = compact[0]
+        current = prepare.SOURCES[version]
+        self.assertEqual((launcher, image, int(image_bytes)),
+            (current['sha256'], current['image_sha256'], current['image_bytes']))
+        self.assertIn(f"'{launcher}  /usr/local/bin/ccrb-runtime' | sha256sum -c -", docker)
+        self.assertIn(f"native293-linux-x64-{launcher}-", action)
+        self.assertNotIn('ccrb-runtime-280', docker)
+        self.assertNotIn('V3_NATIVE_RUNTIME_280_ASSET', action)
+        self.assertIn('vibebench.native-runtime-versions="2.1.293"', docker)
+        self.assertIn(f'"{launcher}"', gateway)
+        self.assertIn(f'"{image}"', gateway)
+        self.assertIn(f"{current['bytes']:_}", gateway)
+        self.assertIn(f"{current['image_bytes']:_}", gateway)
+        for name in ('services/runtime/native/tls-observer/observer.py', 'images/v3/tls-observer/observer.py'):
+            self.assertIn(f"'{image}':", read(name))
         self.assertIn(f'"{current["image_sha256"]}"', read('services/gateway/src/service/native_criu.rs'))
         for name in ('services/runtime/scripts/criu/package.py', 'images/v3/criu/package.py'):
             content = read(name)

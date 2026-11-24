@@ -59,6 +59,17 @@ class ContentCaptureTests(unittest.TestCase):
             return dict(self.row), None
         self.runtime.ensure = Mock(side_effect=ensure)
 
+    def test_pure_tui_toggles_provider_capture_without_tls_observer(self):
+        """纯 V2 独立开关回环阶段，保留最终 TLS 来源缺失状态。@return 无。"""
+        self.config.update(native=None, tui_v2={'max_reservations': 2}, tui_host_memory='768m',
+                           native_tls_observer_protocol=None)
+        atomic_json(self.path, self.config)
+        before = read_settings(self.runtime, self.row)
+        self.assertTrue(before['supported'] and before['applied'])
+        self.assertEqual(before['tls_observer']['reason'], 'EXTERNAL_PROVIDER_TLS_UNOBSERVED')
+        self.assertTrue(self.apply(True)['enabled'])
+        self.assertFalse(self.apply(False)['enabled'])
+
     def apply(self, enabled):
         """提交当前冻结版本。@param enabled 目标状态。@return 实际回执。"""
         before = read_settings(self.runtime, self.row)

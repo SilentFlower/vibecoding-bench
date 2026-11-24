@@ -17,10 +17,11 @@ from cluster_store import ClusterStore
 from system_update_gate import UPDATE_GATE
 
 
+_TUI_METHODS = {'internal/tui-v2/prepare': 'POST', 'internal/tui-v2/send': 'POST', 'internal/tui-v2/cancel': 'POST'}
 _METHODS = {'internal/send': 'POST', 'internal/native/status': 'GET', 'internal/native/prepare': 'POST',
     'internal/native/readiness': 'POST', 'internal/native/idle-policy': 'POST',
     'internal/native/prepare-switch': 'POST', 'internal/native/prepare/cancel': 'POST',
-    'internal/native/messages': 'POST', 'internal/status': 'GET'}
+    'internal/native/messages': 'POST', 'internal/status': 'GET', **_TUI_METHODS}
 _AGY_METHODS = {'internal/agy/prepare': 'POST', 'internal/agy/generate': 'POST',
     'internal/agy/tools': 'POST', 'internal/agy/cancel': 'POST', 'internal/agy/warm': 'POST', 'internal/status': 'GET'}
 _HOP_HEADERS = {b'connection', b'keep-alive', b'proxy-authenticate', b'proxy-authorization',
@@ -64,6 +65,8 @@ class NodeTransport:
     socket_path: Path
     secret: str = field(repr=False)
     agy: bool = False
+    gateway_account_id: int | None = None
+    release_id: str | None = None
 
 
 class NodeTransports:
@@ -94,13 +97,14 @@ class NodeTransports:
                 raise ValueError('节点发送器回执已过期')
             self.entries[key] = entry
 
-    def authorize(self, node_key: str, environment_id: str, revision: int, authorization: str) -> NodeTransport:
+    def authorize(self, node_key: str, environment_id: str, revision: int, authorization: str, *, path: str = '') -> NodeTransport:
         """按当前权威归属与私有认证核对通道。
 
         :param node_key: URL 中的节点身份。
         :param environment_id: URL 中的环境身份。
         :param revision: 分配版本。
         :param authorization: 原 sender 认证头。
+        :param path: 本次经白名单核对的内部操作。
         :return: 可用于本次转发的冻结通道。
         """
         with self.lock:
@@ -108,7 +112,12 @@ class NodeTransports:
         if entry is None or not secrets.compare_digest(authorization, 'Bearer ' + entry.secret):
             raise ValueError('节点传输认证或运行绑定无效')
         assignment = self.store.agy_assignment(entry.account_id) if entry.agy else self.store.assignment(entry.account_id)
-        draining = entry.agy and assignment['phase'] != 'ready' and self.store.agy_draining(entry.account_id, revision)
+        if entry.agy:
+            draining = assignment['phase'] != 'ready' and self.store.agy_draining(entry.account_id, revision)
+        else:
+            draining = (assignment['phase'] in ('maintenance', 'reconcile')
+                and (path in _TUI_METHODS or path == 'internal/status')
+                and self.store.cc_draining(entry.account_id, revision))
         if (assignment['node_id'] != entry.node_id or assignment['node_key'] != node_key
                 or assignment['revision'] != revision
                 or not draining and (assignment['phase'] != 'ready' or not assignment['enabled'])):
@@ -128,7 +137,17 @@ class NodeTransports:
             connection.close()
         return entry
 
-    def acquire(self, node_key: str, environment_id: str, revision: int, authorization: str) -> NodeTransport:
+    def existing_cc(self, node_key: str, environment_id: str, revision: int, generation: int, gateway_id: int) -> NodeTransport | None:
+        """只取当前受信 CC 绑定。@param gateway_id 固定网关账号。@return 已登记 sender 或空。"""
+        with self.store.lock:
+            with self.lock:
+                entry = self.entries.get((node_key, environment_id, revision))
+            if (entry is None or entry.agy or entry.gateway_account_id != gateway_id
+                    or entry.generation != generation or not entry.release_id):
+                return None
+            return self.authorize(node_key, environment_id, revision, 'Bearer ' + entry.secret, path='internal/status')
+
+    def acquire(self, node_key: str, environment_id: str, revision: int, authorization: str, *, path: str = '') -> NodeTransport:
         """与迁移关闭准入共用短锁，原子核对绑定并计入实际流。
 
         :param node_key: 冻结节点。
@@ -138,7 +157,7 @@ class NodeTransports:
         :return: 已登记活动的冻结通道，调用方必须用end释放。
         """
         with self.store.lock:
-            entry = self.authorize(node_key, environment_id, revision, authorization)
+            entry = self.authorize(node_key, environment_id, revision, authorization, path=path)
             with self.lock:
                 self.active[entry.node_id] = self.active.get(entry.node_id, 0) + 1
                 key = entry.agy, entry.account_id
@@ -201,7 +220,7 @@ def node_transport_router(registry) -> APIRouter:
         try:
             activity = UPDATE_GATE.reserve('node-stream:' + environment_id)
             acquisition = asyncio.create_task(asyncio.to_thread(transports.acquire, node_key, environment_id,
-                revision, request.headers.get('authorization', '')))
+                revision, request.headers.get('authorization', ''), path=path))
             entry = await asyncio.shield(acquisition)
         except asyncio.CancelledError:
             # 线程内的短事务不会随协程取消；等待其结果后收口，防止留下永久活动计数。

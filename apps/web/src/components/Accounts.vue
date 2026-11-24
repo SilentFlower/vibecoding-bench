@@ -8,7 +8,7 @@ import ProxyPicker from './ProxyPicker.vue';
 import ExecutionNodeBadge from './runtime/ExecutionNodeBadge.vue';
 import PlatformBadge from './PlatformBadge.vue';
 import { nodeApi, type AccountNodeAssignment, type AccountNodeSummary } from './runtime/nodeApi';
-import { api, type ProxyRoute, type Account, type OAuthExchangeResult, type UsageWindow, type RuntimeEnvironmentSummary, type OverallWorkStatus } from '../api';
+import { api, type ProxyRoute, type Account, type RequestBackend, type OAuthExchangeResult, type UsageWindow, type RuntimeEnvironmentSummary, type OverallWorkStatus } from '../api';
 import AgyAccountUsage from './AgyAccountUsage.vue';
 import UsageWindowStats from './UsageWindowStats.vue';
 import SchedulingDetails from './SchedulingDetails.vue';
@@ -266,6 +266,7 @@ const deleteTargetId = ref<number | null>(null);
 const editing = ref<Account | null>(null);
 let editorGeneration = 0;
 const savingAccount = ref(false);
+const backendSaveIssue = ref<{ otherSaved: boolean; detail: string } | null>(null);
 /** 表单数据 */
 const form = ref({
   platform: 'claude_code',
@@ -282,7 +283,7 @@ const form = ref({
   expires_at: '',
   proxy_url: '',
   billing_mode: 'strip',
-  request_backend: 'legacy' as 'legacy' | 'native293',
+  request_backend: 'legacy' as RequestBackend,
   account_uuid: '',
   organization_uuid: '',
   subscription_type: '',
@@ -542,6 +543,7 @@ onUnmounted(() => {
 /** 打开新建账号弹窗 */
 function openCreate() {
   editorGeneration++;
+  backendSaveIssue.value = null;
   proxyChoice.value = undefined;
   editing.value = null;
   form.value = {
@@ -559,7 +561,7 @@ function openCreate() {
     expires_at: '',
     proxy_url: '',
     billing_mode: 'strip',
-    request_backend: 'legacy' as 'legacy' | 'native293',
+    request_backend: 'legacy' as RequestBackend,
     account_uuid: '',
     organization_uuid: '',
     subscription_type: '',
@@ -590,6 +592,7 @@ function openCreate() {
  */
 function openEdit(a: Account) {
   editorGeneration++;
+  backendSaveIssue.value = null;
   proxyChoice.value = undefined;
   editing.value = a;
   form.value = {
@@ -607,7 +610,7 @@ function openEdit(a: Account) {
     expires_at: a.expires_at ? String(a.expires_at) : '',
     proxy_url: a.proxy_url,
     billing_mode: a.billing_mode || 'strip',
-    request_backend: a.request_backend ?? 'legacy',
+    request_backend: a.request_backend_pending ?? a.request_backend ?? 'legacy',
     account_uuid: a.account_uuid || '',
     organization_uuid: a.organization_uuid || '',
     subscription_type: a.subscription_type || '',
@@ -631,6 +634,82 @@ function openEdit(a: Account) {
   workspaceTab.value = 'configuration';
   resetNumberDrafts();
   showForm.value = true;
+}
+
+const backendOptions = computed(() => {
+  const options = [
+    { value: 'native293', label: '原生运行时 V1', description: 'Claude Code 2.1.293', disabled: false },
+    { value: 'legacy', label: '原有转发', description: '现有转发通道', disabled: false },
+  ];
+  const account = editing.value;
+  if (account && (account.request_backend_revision !== undefined || account.tui_v2_available
+    || account.request_backend === 'tui_v2' || account.request_backend_pending === 'tui_v2')) {
+    const description = account.tui_v2_available ? 'Claude Code 2.1.293' : '保存时核对账号环境';
+    options.unshift({ value: 'tui_v2', label: '交互运行时 V2', description, disabled: false });
+  }
+  return options;
+});
+
+/** 显示账号实际使用的转发方式。@param backend 持久值。@return 中文标签。 */
+function backendName(backend?: RequestBackend): string {
+  if (backend === 'tui_v2') return '交互运行时 V2';
+  if (backend === 'native293') return '原生运行时 V1';
+  return '原有转发';
+}
+
+/** 重新读取账号的生效值、等待目标和修订。@param keepDraft 保留待重试的选择。@return 是否已同步。 */
+async function reloadBackend(keepDraft = backendSaveIssue.value !== null): Promise<boolean> {
+  const current = editing.value;
+  if (!current) return false;
+  const generation = editorGeneration;
+  try {
+    const fresh = await api.accountById(current.id);
+    if (generation !== editorGeneration) return false;
+    editing.value = fresh;
+    const selected = fresh.request_backend_pending ?? fresh.request_backend ?? 'legacy';
+    if (!keepDraft) form.value.request_backend = selected;
+    editBaseline.value.request_backend = selected;
+    return true;
+  } catch (error) {
+    if (generation === editorGeneration) toast((error as Error).message || '刷新转发状态失败');
+    return false;
+  }
+}
+
+const credentialDrafts = ['setup_token', 'access_token', 'refresh_token'] as const;
+
+/** 普通 PUT 确认成功后推进已提交字段的基线，并清理已确认的凭据草稿。
+ * @param saved 后端保存结果。@param sent 本次提交字段。@param submitted 发出时的表单快照。
+ * @param selectedProxy 发出时选择的代理。@return 无。
+ */
+function acceptSavedSettings(
+  saved: Account,
+  sent: Record<string, unknown>,
+  submitted: typeof form.value,
+  selectedProxy: ProxyRoute | null | undefined,
+): void {
+  for (const key of Object.keys(sent) as (keyof typeof submitted)[]) {
+    if (Object.hasOwn(submitted, key) && !credentialDrafts.some(field => field === key)) {
+      editBaseline.value[key] = submitted[key];
+    }
+  }
+  for (const key of credentialDrafts) {
+    if (!Object.hasOwn(sent, key)) continue;
+    editBaseline.value[key] = '';
+    if (form.value[key] === submitted[key]) form.value[key] = '';
+  }
+
+  const current = { ...editing.value, ...saved };
+  if (Object.hasOwn(sent, 'proxy_id')) {
+    editBaseline.value.proxy_url = saved.proxy_url;
+    if (form.value.proxy_url === submitted.proxy_url) form.value.proxy_url = saved.proxy_url;
+    if (proxyChoice.value === selectedProxy) proxyChoice.value = undefined;
+    current.proxy_id = selectedProxy?.id;
+    current.proxy_name = selectedProxy?.name;
+  }
+  editing.value = current;
+  const index = accounts.value.findIndex(account => account.id === saved.id);
+  if (index >= 0) accounts.value[index] = { ...accounts.value[index], ...current };
 }
 
 /**
@@ -669,21 +748,51 @@ async function save() {
     if (form.value.upstream_session_ttl_minutes < 5 || form.value.upstream_session_ttl_minutes > 1440) {
       throw new Error('上游 session TTL 必须为 5-1440 分钟');
     }
-    if (editing.value) {
+    const account = editing.value;
+    if (account) {
       if (form.value.auth_type === 'setup_token'
         && !form.value.setup_token.trim()
-        && editing.value.auth_type !== 'setup_token') {
+        && account.auth_type !== 'setup_token') {
         throw new Error('切换到 Setup Token 模式时必须填写 Setup Token');
       }
       if (form.value.auth_type === 'oauth'
         && !form.value.refresh_token.trim()
-        && editing.value.auth_type !== 'oauth') {
+        && account.auth_type !== 'oauth') {
         throw new Error('切换到 OAuth 模式时必须填写 Refresh Token');
       }
-      const updates = accountUpdateDelta(form.value, editBaseline.value);
+      const submitted = { ...form.value };
+      const selectedProxy = proxyChoice.value;
+      const updates = accountUpdateDelta(submitted, editBaseline.value);
       applyProxyChoice(updates);
       if (isAgyForm.value) for (const key of Object.keys(updates)) if (!agyFormKeys.includes(key)) delete updates[key];
-      await api.updateAccount(editing.value.id, updates);
+      const backend = updates.request_backend as RequestBackend | undefined;
+      const revision = account.request_backend_revision;
+      const candidateChange = backend === 'tui_v2' || account.request_backend === 'tui_v2'
+        || account.request_backend_pending != null || (revision ?? 0) > 0;
+      if (backend && revision !== undefined && candidateChange) {
+        delete updates.request_backend;
+        let otherSaved = backendSaveIssue.value?.otherSaved ?? false;
+        if (Object.keys(updates).length) {
+          const saved = await api.updateAccount(account.id, updates);
+          if (generation !== editorGeneration) return;
+          acceptSavedSettings(saved, updates, submitted, selectedProxy);
+          otherSaved = true;
+        }
+        try {
+          await api.updateAccount(account.id, { request_backend: backend, request_backend_revision: revision });
+        } catch (error) {
+          if (generation !== editorGeneration) return;
+          const reason = (error as Error).message;
+          backendSaveIssue.value = { otherSaved, detail: ['转发方式保存未确认。', reason].filter(Boolean).join(' ') };
+          const refreshed = await reloadBackend(true);
+          if (refreshed && generation === editorGeneration && editBaseline.value.request_backend === backend) {
+            backendSaveIssue.value = { otherSaved, detail: '已核对转发方式，当前状态符合所选目标。' };
+          }
+          return;
+        }
+      } else if (Object.keys(updates).length) {
+        await api.updateAccount(account.id, updates);
+      }
     } else {
       if (form.value.auth_type === 'setup_token' && !form.value.setup_token.trim()) {
         throw new Error('Setup Token 不能为空');
@@ -1279,6 +1388,7 @@ async function recoverAgy(id:number): Promise<void> {
 function applyOAuthResult() {
   editorGeneration++;
   if (oauthTarget.value) { showOAuthFlow.value = false; return; }
+  backendSaveIssue.value = null;
   proxyChoice.value = oauthSessionProxy.value;
   const r = oauthResult.value;
   if (!r) return;
@@ -1300,7 +1410,7 @@ function applyOAuthResult() {
     expires_at: (!isSetupToken && r.expires_at) ? String(r.expires_at * 1000) : '',
     proxy_url: '',
     billing_mode: 'strip',
-    request_backend: 'legacy' as 'legacy' | 'native293',
+    request_backend: 'legacy' as RequestBackend,
     account_uuid: r.account_uuid || '',
     organization_uuid: r.organization_uuid || '',
     subscription_type: '',
@@ -1440,7 +1550,7 @@ async function copyText(text: string) {
           <NoticeStrip v-if="a.v3_scheduling_error" tone="warning" class="account-strip-text">{{ a.v3_scheduling_error }}，调度观测待更新。</NoticeStrip>
           <p v-if="a.credential_ownership" class="account-note" role="status">{{ a.credential_ownership.phase === 'ready' ? (a.credential_ownership.owner === 'local' ? '本地管理凭据 · 网关已暂停' : '网关管理凭据') : (a.credential_ownership.phase === 'reauth' ? '重新授权中 · 上游活动暂停' : '凭据交接待确认 · 请在账号环境页对账') }}</p>
           <EntityBlock v-if="!a.platform || a.platform === 'claude_code' || a.platform === 'antigravity'" class="account-routing">
-            <div><span>转发方式</span><strong><template v-if="a.platform === 'antigravity'">原生运行时 <small v-if="agyVersion(a)">Antigravity {{ agyVersion(a) }}</small></template><template v-else-if="a.request_backend === 'native293'">原生运行时 <small>280 / 293 自动匹配</small></template><template v-else>原有转发</template></strong></div>
+            <div><span>转发方式</span><strong><template v-if="a.platform === 'antigravity'">原生运行时 <small v-if="agyVersion(a)">Antigravity {{ agyVersion(a) }}</small></template><template v-else-if="a.request_backend === 'native293'">原生运行时 <small>Claude Code 2.1.293</small></template><template v-else>{{ backendName(a.request_backend) }}</template></strong></div>
             <button type="button" @click="openScheduling(a)">
               <span>调度优先级</span><strong>{{ a.priority }}<ArrowRight :size="14" /></strong>
               <Badge :variant="a.v3_scheduling ? 'default' : 'secondary'" class="account-score">{{ activeSchedulingScore(a) }}</Badge>
@@ -1539,7 +1649,24 @@ async function copyText(text: string) {
       <form id="account-editor-form" v-show="workspaceTab === 'configuration'" @submit.prevent="save" class="account-editor-form">
         <div class="account-editor-scroll complete-account-form">
           <section class="account-form-section"><h3>基础配置</h3><div class="account-edit-grid three"><ChoiceSelect :model-value="form.platform" @update:model-value="selectAccountPlatform" label="账号平台" :disabled="!!editing || savingAccount" :options="platformOptions" /><label class="approved-field"><span>备注名（选填）</span><Input v-model="form.name"  /></label><label class="approved-field"><span>邮箱</span><Input v-model="form.email" type="email" :readonly="!!editing && isAgyForm" required /></label></div>
-            <div v-if="!isAgyForm" class="forwarding-field"><span class="fui-label">转发方式</span><RadioCardGroup :model-value="form.request_backend" class="forwarding-options" name="request_backend" label="转发方式" :options="[{value:'native293',label:'原生运行时',description:'280 / 293 自动匹配'},{value:'legacy',label:'原有转发',description:'现有转发通道'}]" @update:model-value="value => form.request_backend = value === 'native293' ? 'native293' : 'legacy'" /><p class="form-help">请在账号空闲时切换转发方式。</p></div>
+            <div v-if="!isAgyForm" class="forwarding-field">
+              <span class="fui-label">转发方式</span>
+              <RadioCardGroup :model-value="form.request_backend" class="forwarding-options" name="request_backend" label="转发方式"
+                :options="backendOptions" @update:model-value="value => form.request_backend = value as RequestBackend" />
+              <template v-if="editing?.request_backend_revision !== undefined">
+                <p class="form-help">当前生效 {{ backendName(editing.request_backend) }}</p>
+                <p v-if="editing.request_backend_pending" class="form-help">
+                  等待切换到 {{ backendName(editing.request_backend_pending) }}。
+                  {{ editing.request_backend_wait_reason === 'runtime_unconfirmed' ? '运行环境状态待确认。' : '原轮排空并经后台核对后生效。' }}
+                  选择当前生效方式并保存即可撤销等待。
+                </p>
+                <Button type="button" variant="outline" :disabled="savingAccount" @click="reloadBackend()">刷新转发状态</Button>
+              </template>
+              <p v-else class="form-help">请在账号空闲时切换转发方式。</p>
+              <NoticeStrip v-if="backendSaveIssue" tone="warning" role="alert">
+                <AlertCircle /><span><strong v-if="backendSaveIssue.otherSaved">其他设置已保存。 </strong>{{ backendSaveIssue.detail }}</span>
+              </NoticeStrip>
+            </div>
             <ProxyPicker v-model="proxyChoice" :current-label="editingProxyLabel" /></section>
           <section v-if="!isAgyForm" class="account-form-section"><h3>用量与调度</h3><div class="account-edit-grid three"><NumberInput v-model="numberDrafts.concurrency" label="并发上限" :min="1" required /><NumberInput v-model="numberDrafts.rpm_limit" label="RPM 上限" :min="0" required /><NumberInput v-model="numberDrafts.priority" label="调度优先级" :min="1" required /></div><div class="account-edit-grid"><NumberInput v-model="numberDrafts.five_hour_usage_limit_percent" label="5 小时用量上限（%）" :min="0" :max="100" required /><NumberInput v-model="numberDrafts.seven_day_usage_limit_percent" label="7 天用量上限（%）" :min="0" :max="100" required /></div><p class="form-help">RPM 和用量上限填 0 表示不限。达到任一用量上限后停止分配新消息，窗口重置后恢复。未知用量保持可用，单次或并发请求可能越线。</p></section>
           <section v-if="!isAgyForm" class="account-form-section"><h3>请求与模型</h3><div class="account-edit-grid"><ChoiceSelect v-model="form.billing_mode" label="Billing 模式" :options="[{value:'strip',label:'清除（Strip）'},{value:'rewrite',label:'重写（Rewrite）'}]" /><label class="approved-field"><span>允许 1M 上下文的模型</span><Input v-model="form.allow_1m_models"  /></label></div><div class="model-presets"><span>模型预设</span><Button type="button" size="sm" variant="secondary" @click="form.allow_1m_models = 'opus'">仅 Opus</Button><Button type="button" size="sm" variant="secondary" @click="form.allow_1m_models = DEFAULT_ALLOW_1M_MODELS">Opus + Sonnet 5</Button><Button type="button" size="sm" variant="secondary" @click="form.allow_1m_models = ''">全部关闭</Button></div><p class="form-help">模型以逗号分隔，按子串匹配。留空关闭 1M 上下文。Sonnet 5 使用完整名称以区分 Sonnet 4.6。</p>
@@ -1591,7 +1718,7 @@ async function copyText(text: string) {
               <div class="account-detail-row"><span>{{ '智能偏好 ' + (detailAccount.v3_scheduling.factors.score * 100).toFixed(1) + '（高优）' }}</span><Button variant="outline" size="sm" @click="changeWorkspaceTab('scheduling')">调度详情</Button></div>
             </EntityBlock>
             <NoticeStrip v-else-if="detailAccount.v3_scheduling_error" tone="warning" class="account-strip-text">{{ detailAccount.v3_scheduling_error }}，不代表零负载。<template #end><button type="button" class="account-strip-link" @click="changeWorkspaceTab('scheduling')">查看详情</button></template></NoticeStrip>
-            <p class="account-note">转发方式：{{ detailAccount.request_backend === 'native293' ? '原生运行时（280 / 293 自动匹配）' : '原有转发' }}</p>
+            <p class="account-note">转发方式：{{ detailAccount.request_backend === 'native293' ? '原生运行时（Claude Code 2.1.293）' : backendName(detailAccount.request_backend) }}</p>
             <dl class="account-detail-metrics three">
               <div><dt>优先级</dt><dd>{{ detailAccount.priority }}</dd></div>
               <div><dt>Billing</dt><dd :class="detailAccount.billing_mode === 'rewrite' ? 'is-warning' : ''">{{ detailAccount.billing_mode === 'rewrite' ? '重写' : '清除' }}</dd></div>

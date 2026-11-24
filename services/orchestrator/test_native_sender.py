@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from native_sender import NativePreparationBlocked, sender_config, installed_versions, native_resource_layout, stage_asset
+from native_sender import NativePreparationBlocked, sender_config, installed_versions, native_resource_layout, registered_293, stage_asset
 from native_criu_policy import restore_policy
 from resource_budget import account_limits, memory_bytes, isolated_account_limits, scenario_account_limits, serial_review_limits
 
@@ -18,6 +18,8 @@ class NativeSenderTests(unittest.TestCase):
             root = Path(directory)
             with self.assertRaisesRegex(ValueError, '本仓库准备293'):
                 stage_asset(root / 'output')
+            with self.assertRaisesRegex(ValueError, '未知原生运行时源版本'):
+                stage_asset(root / 'output', version='2.1.280')
             source = root / 'input'
             source.write_bytes(b'corrupted synthetic launcher')
             with self.assertRaisesRegex(ValueError, '身份不匹配'):
@@ -25,22 +27,32 @@ class NativeSenderTests(unittest.TestCase):
             self.assertFalse((root / 'output').exists())
         self.assertEqual(installed_versions({'vibebench.native-runtime-versions':'2.1.293'}), ('2.1.293',))
 
-    def test_dual_version_budget_and_resource_identity(self):
-        """两版低额度配置保留共享六槽及发行切换资源身份。@return None。"""
+    def test_historical_labels_provision_only_293_with_the_same_budget(self):
+        """旧双版标签仅安装 293，保留原物理容量，并识别历史配置差异。@return None。"""
         self.assertEqual(installed_versions({}), ('2.1.293',))
         versions = installed_versions({'vibebench.native-runtime-versions': '2.1.280,2.1.293'})
-        with self.assertRaises(ValueError):
-            installed_versions({'vibebench.native-runtime-versions': '2.1.280'})
+        self.assertEqual(versions, ('2.1.293',))
+        for invalid in ('', '2.1.280', '2.1.293,2.1.280', 'unknown'):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                installed_versions({'vibebench.native-runtime-versions': invalid})
         account = {'request_backend': 'native293', 'concurrency': 3}
         for budget, expected in [('128m', 128), ('1535m', 1535), ('1536m', 1536)]:
             config = sender_config(account, '4g', budget=budget, versions=versions)
             self.assertEqual(config['memory_mib'], expected)
             self.assertEqual(config['max_workers'], 6)
-        self.assertEqual(config['max_workers'], 6)
-        self.assertEqual(config['runtimes']['2.1.280']['binary_path'], '/usr/local/bin/ccrb-runtime-280')
+        self.assertNotIn('runtimes', config)
+        config['runtimes'] = {'2.1.280': {'binary_path': '/usr/local/bin/ccrb-runtime-280'}}
         before = native_resource_layout(config)
         config['runtimes']['2.1.280'].update(release={'release': 'synthetic', 'launcher_sha256': 'a'*64}, kernel_generation='new')
         self.assertEqual(native_resource_layout(config), before)
+
+    def test_registered_293_never_borrows_the_280_root_generation(self):
+        """历史 280 根下的独立 293 登记单独读取，缺失时保持不可用。@return 无。"""
+        root = {'source_version': '2.1.280', 'binary_path': '/usr/local/bin/ccrb-runtime-280', 'kernel_generation': 'old'}
+        self.assertIsNone(registered_293(root))
+        current = {'binary_path': '/usr/local/bin/ccrb-runtime'}
+        self.assertEqual(registered_293({**root, 'runtimes': {'2.1.293': current}}), current)
+        self.assertIsNone(registered_293({**current, 'runtimes': {'2.1.293': root}}))
 
     def test_criu_accounts_for_each_restored_code_image(self):
         """显式恢复开关覆盖每进程独立代码映像预算。@return 无。"""

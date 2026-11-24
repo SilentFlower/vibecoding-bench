@@ -182,9 +182,12 @@ class MigrationLease:
             active = snapshot.get('active')
             if type(active) is not int or active < 0:
                 raise ValueError('迁移实际API活动计数无效')
+            pending = snapshot.get('tui_pending', False)
+            if type(pending) is not bool:
+                raise ValueError('迁移 V2 原工具轮状态无效')
             streams = (self.transports.account_streams(self.account_id, agy=True) if self.ledger.agy
                 else self.transports.account_streams(self.account_id))
-            if active == 0 and streams == 0:
+            if active == 0 and streams == 0 and not pending:
                 self._update('claim')
                 return True
             if deadline is not None and time.monotonic() >= deadline:

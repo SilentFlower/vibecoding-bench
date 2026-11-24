@@ -12,18 +12,10 @@ KERNEL = {
     '.text': '413d169839d53a8d479b7b2002d7a0b8ff8681a57dc53d13beda5ee96022125a',
     '.data': '00366dc1835ad0f8cf830623a4d7eaf04c6c2f2596d6c9f2fe35bdc8c75ced28',
 }
-KERNEL_280 = {
-    '.rodata': 'fb0f5da1cfc7d38c88d11629960aaa33cda9b2825f2057036b1a22d5f174b9cd',
-    '.bun_builtins': 'dc1c0f79e1bc820fe8e32afe8202e3db6e35911fc706abda9b2fdfb1686fb10c',
-    '.text': '7a6b7c125b9726e933ae2d47e6efbdfa7076046b721fb2ceadefa55553fbe4b1',
-    '.data': 'af461210735340393a386c3080edc0bf810d699252438f12eddc3c68c51671bf',
-}
 
 
 def fixed_kernel(version):
     """解析已登记的固定内核。@param version 源版本。@return 原生节摘要。"""
-    if version == '2.1.280':
-        return KERNEL_280
     if version == '2.1.293':
         return KERNEL
     raise ValueError('未知固定源版本')
@@ -91,7 +83,7 @@ def extract(source, destination, expected, version='2.1.293'):
     if hashlib.sha256(raw).hexdigest() != expected:
         raise ValueError('官方源程序校验不匹配')
     kernel_sections(raw, version)
-    section_bytes, module_count, entry_index = (144806548, 2196, 5) if version == '2.1.280' else (163574530, 2511, 6)
+    section_bytes, module_count, entry_index = (163574530, 2511, 6)
     section = checked(raw, *sections(raw)['.bun'])
     if len(section) != section_bytes or section[-16:] != b'\n---- Bun! ----\n' or struct.unpack_from('<Q', section)[0] != len(section) - 8:
         raise ValueError('未知 Bun 应用容器布局')
@@ -145,14 +137,14 @@ def prune(source, destination, report, version='2.1.293'):
     """
     raw = source.read_bytes()
     hashes = kernel_sections(raw, version)
-    header, base, dictionary = (1523104, 1523248, 13634256) if version == '2.1.280' else (1524704, 1524848, 13635856)
+    header, base, dictionary = (1524704, 1524848, 13635856)
     if raw[header + 2:header + 4] != b'\xda\x27' or raw[header + 12:header + 16] != b'CmnD' or struct.unpack_from('<I', raw, base)[0] != 3990:
         raise ValueError('ICU 固定目录布局不匹配')
     if hashlib.sha256(checked(raw, dictionary, 131072)).hexdigest() != 'ab8658c8ab8d5eb92f17b7c6625d2b39e19bf27e1752dafe5852522118ff1d01' or struct.unpack_from('<I', raw, dictionary + 131072)[0] != 131072:
         raise ValueError('ICU 共享字典不匹配')
     entries = [struct.unpack_from('<II', raw, base + 4 + i * 8) for i in range(3990)]
     first_data = base + entries[0][1]
-    if first_data != (1645504 if version == '2.1.280' else 1647104):
+    if first_data != 1647104:
         raise ValueError('ICU 数据起点不匹配')
     output = bytearray(raw)
     kept, removed, previous = [], [], ''

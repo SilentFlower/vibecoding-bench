@@ -55,11 +55,11 @@ class PlatformKernelTests(unittest.TestCase):
 
     def test_completed_choices_migrate_both_versions_and_are_old_platform_readable(self):
         """两份选择原子收口为内置，重复迁移保持字节一致。@return None。"""
-        for version in kernel.VERSIONS:
+        for version in kernel.HISTORICAL_VERSIONS:
             self.save(version=version, preparing_release='v0.1.0-beta.7', prepared={'release': 'candidate'})
         kernel.migrate_records(self.root, 7)
-        before = [kernel._record(self.root, version).read_bytes() for version in kernel.VERSIONS]
-        for version in kernel.VERSIONS:
+        before = [kernel._record(self.root, version).read_bytes() for version in kernel.HISTORICAL_VERSIONS]
+        for version in kernel.HISTORICAL_VERSIONS:
             value = kernel._load(self.root, version)
             self.assertEqual(value['state'], 'restored')
             self.assertIsNone(value['current'])
@@ -69,7 +69,7 @@ class PlatformKernelTests(unittest.TestCase):
             self.assertIsNone(value['preparing_release'])
             self.assertEqual(value['migrated_from']['current'], self.config['native']['release'])
         kernel.migrate_records(self.root, 7)
-        self.assertEqual(before, [kernel._record(self.root, version).read_bytes() for version in kernel.VERSIONS])
+        self.assertEqual(before, [kernel._record(self.root, version).read_bytes() for version in kernel.HISTORICAL_VERSIONS])
         self.assertFalse(kernel.pending_upgrade(self.root, include_preparing=True))
 
     def test_old_platform_can_change_previously_migrated_record_and_next_upgrade_normalizes_it(self):
@@ -104,7 +104,7 @@ class PlatformKernelTests(unittest.TestCase):
 
     def test_binding_archive_preserves_both_records_and_admits_new_owner(self):
         """旧绑定终态归档后，新账号通过同一归属校验；原审计保留。@return None。"""
-        originals = {version: self.save(version=version) for version in kernel.VERSIONS}
+        originals = {version: self.save(version=version) for version in kernel.HISTORICAL_VERSIONS}
         kernel.archive_binding_records(self.root, 7)
         kernel.validate_records(self.root, 8)
         kernel.archive_binding_records(self.root, 7)
@@ -143,11 +143,11 @@ class PlatformKernelTests(unittest.TestCase):
 
     def test_retired_preparing_marker_is_audited_and_real_maintenance_stays_blocked(self):
         """旧下载标记退出门禁，真实未完成操作和迁移日志继续保护。@return None。"""
-        for version in kernel.VERSIONS:
+        for version in kernel.HISTORICAL_VERSIONS:
             self.save(version=version, preparing_release='v0.1.0-beta.7')
         self.assertFalse(kernel.pending_upgrade(self.root, include_preparing=True))
         self.assertFalse(kernel.recover_interrupted(self.root))
-        for version in kernel.VERSIONS:
+        for version in kernel.HISTORICAL_VERSIONS:
             record = kernel._load(self.root, version)
             self.assertIsNone(record['preparing_release'])
             self.assertEqual(record['cancelled_preparing_release'], 'v0.1.0-beta.7')
@@ -178,7 +178,7 @@ class PlatformKernelTests(unittest.TestCase):
             """模拟发送器实际就绪回执。@return 环境结果。"""
             self.assertFalse(prepare_sender)
             self.assertIsNone(kernel._load(self.root)['current'])
-            self.assertIn('2.1.280', json.loads((self.root / 'runtime/sender.json').read_text())['native']['runtimes'])
+            self.assertNotIn('runtimes', json.loads((self.root / 'runtime/sender.json').read_text())['native'])
             self.assertTrue(native_migration)
             events.append('ready')
             return self.row, None
@@ -308,13 +308,11 @@ class PlatformKernelTests(unittest.TestCase):
         self.runtime._stop_environment.assert_not_called()
 
     def test_builtin_layout_target_versions_preserve_frozen_resources(self):
-        """同一旧配置支持双版升级和历史单版回退。@return None。"""
-        original = self.config['native']
-        dual = builtin_config(original, kernel.VERSIONS)
-        self.assertEqual({k: dual[k] for k in ('memory_mib','max_workers','work_root')},
+        """双版历史账号归一到 293 后保留预算，重复迁移得到相同配置。@return None。"""
+        original = {**self.config['native'], 'runtimes': {'2.1.280': {'binary_path': '/usr/local/bin/ccrb-runtime-280'}}}
+        single = builtin_config(original, ('2.1.293',))
+        self.assertEqual({k: single[k] for k in ('memory_mib','max_workers','work_root')},
             {k: original[k] for k in ('memory_mib','max_workers','work_root')})
-        self.assertNotIn('release', dual)
-        self.assertIn('2.1.280', dual['runtimes'])
-        single = builtin_config(dual, ('2.1.293',))
+        self.assertNotIn('release', single)
         self.assertNotIn('runtimes', single)
         self.assertEqual(builtin_config(single, ('2.1.293',)), single)

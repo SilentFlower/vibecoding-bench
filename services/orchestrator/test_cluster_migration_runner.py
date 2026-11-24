@@ -15,6 +15,7 @@ from cluster_execution import NodePreparation
 from cluster_migration_files import ImportStage, MigrationFiles
 from cluster_migration_io import MigrationIO, MigrationUploadIncomplete
 from cluster_migration_lease import MigrationLease
+from cluster_migration_errors import MigrationFailure
 from cluster_migration_runner import MigrationCoordinator, MigrationStart
 from cluster_transport import NodeTransports
 from runtime_files import atomic_json
@@ -28,9 +29,12 @@ class _Gateway:
         """建立空闲网关状态。:return: None。"""
         self.holders, self.requests, self.counter = [], [], 0
         self.fail_heartbeat = False
+        self.request_backend = 'native293'
 
     def _request(self, method, path, payload=None):
         self.requests.append((method, path, payload))
+        if path.endswith('/config'):
+            return {'request_backend': self.request_backend}
         if method == 'POST':
             operation = payload['operation']
             if operation == 'prepare':
@@ -152,6 +156,74 @@ class MigrationCoordinatorTests(unittest.TestCase):
                 'account_id': identity['account_id'], 'environment_id': identity['environment_id'],
                 'revision': payload['target_revision'], 'phase': 'revoked'}
         raise AssertionError('测试收到未定义节点动作')
+
+    def test_formal_tui_uses_only_account_scoped_readiness_for_migration(self) -> None:
+        """以正式事件源替身跑完整协调，目标 sender 就绪后才提交原归属。@return 无。"""
+        self.gateway.request_backend = 'tui_v2'
+        probe = Mock(side_effect=[{'mode': 'formal'}, {'supported': True}, {'mode': 'formal'},
+            {'supported': True}, {'ready': True}])
+        with patch.object(self.coordinator, '_tui_source_probe', probe):
+            requested = self.coordinator.begin(1, self.request)
+            self.assertEqual('formal', requested['record']['checkpoints']['execution']['tui_source_mode'])
+            result = self.coordinator.run(self.operation)
+        self.assertEqual('completed', result['phase'])
+        self.assertEqual(['source', 'target', 'source', 'target', 'prepared'],
+            [call.kwargs['action'] for call in probe.call_args_list])
+        self.assertEqual(('formal', 7, 5), tuple(probe.call_args.kwargs[key]
+            for key in ('mode', 'gateway_account_id', 'generation')))
+
+    def test_source_stays_ready_when_tui_target_is_missing_or_disappears(self) -> None:
+        """关接单前拒绝缺能力的目标，迟到故障只取消尚未申请租约的操作。@return 无。"""
+        self.gateway.request_backend = 'tui_v2'
+        for mode, reason in (('formal', 'tui_formal_unavailable'), ('local_provider', 'tui_local_unavailable')):
+            with self.subTest(mode=mode), patch.object(self.coordinator, '_tui_source_probe',
+                    side_effect=[{'mode': mode}, {'supported': False}]), self.assertRaises(MigrationFailure) as caught:
+                self.coordinator.begin(1, self.request)
+            self.assertEqual(reason, caught.exception.code)
+            self.assertEqual('ready', self.store.assignment(1)['phase'])
+        actions = [{'mode': 'formal'}, {'supported': True}, {'mode': 'formal'}, {'supported': False}]
+        with patch.object(self.coordinator, '_tui_source_probe', side_effect=actions):
+            self.coordinator.begin(1, self.request)
+            with self.assertRaises(MigrationFailure):
+                self.coordinator.run(self.operation)
+        self.assertEqual('ready', self.store.assignment(1)['phase'])
+        aborted = self.coordinator.ledger.get(self.operation)
+        self.assertEqual('cancelled', aborted['phase'])
+        self.assertEqual('tui_formal_unavailable', aborted['record']['failure']['code'])
+        self.assertEqual([], self.commands)
+        self.assertFalse(any(method == 'POST' for method, _, _ in self.gateway.requests))
+
+    def test_formal_tui_requires_sender_ready_before_ownership_commit_and_on_retry(self) -> None:
+        """即使已完成目标落盘，正式源状态仍在归属提交之前复核。@return 无。"""
+        self.gateway.request_backend = 'tui_v2'
+        probe = Mock(side_effect=[{'mode': 'formal'}, {'supported': True}, {'mode': 'formal'}, {'supported': True},
+            {'ready': False}, {'ready': True}])
+        with patch.object(self.coordinator, '_tui_source_probe', probe):
+            self.coordinator.begin(1, self.request)
+            with self.assertRaisesRegex(MigrationFailure, '正式事件源'):
+                self.coordinator.run(self.operation)
+            unresolved = self.coordinator.ledger.get(self.operation)
+            self.assertEqual('verified', unresolved['record']['last_confirmed_phase'])
+            self.assertNotEqual(self.fixture.target, self.store.assignment(1)['node_id'])
+            self.assertNotIn('activate-import', [operation for _, operation, _ in self.commands])
+            self.assertEqual('completed', self.coordinator.run(self.operation)['phase'])
+        self.assertEqual(1, [operation for _, operation, _ in self.commands].count('prepare-import'))
+
+    def test_formal_tui_unavailable_can_revoke_target_and_reopen_source(self) -> None:
+        """就绪验收失败仍可沿原取消路径取得双端收据。@return 无。"""
+        self.gateway.request_backend = 'tui_v2'
+        original = self.store.assignment(1)
+        observations = [{'mode': 'formal'}, {'supported': True}, {'mode': 'formal'},
+            {'supported': True}, {'ready': False}]
+        with patch.object(self.coordinator, '_tui_source_probe', side_effect=observations):
+            self.coordinator.begin(1, self.request)
+            with self.assertRaisesRegex(MigrationFailure, '正式事件源'):
+                self.coordinator.run(self.operation)
+            self.assertEqual('cancelled', self.coordinator.cancel(self.operation)['phase'])
+        self.assertEqual(original, self.store.assignment(1))
+        self.assertEqual(['revoke-import', 'restore-source'], [action for _, action, _ in self.commands[-2:]])
+        self.assertNotIn('activate-import', [action for _, action, _ in self.commands])
+        self.assertEqual([], self.gateway.holders)
 
     def test_complete_migration_keeps_maintenance_until_activation_and_releases_lease(self) -> None:
         """实际中央事务按完整阶段推进，释放排他租约后开放新分配。:return: None。"""

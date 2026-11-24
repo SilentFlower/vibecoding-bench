@@ -7,6 +7,8 @@ from pathlib import Path
 
 
 TOKEN_FIELDS = ('input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens')
+MAX_SOURCE_BYTES = 64 * 1024 * 1024
+MAX_SOURCE_LINE_BYTES = 8 * 1024 * 1024
 
 
 def observed_model(directory: Path, response: dict, session_id: str) -> str:
@@ -27,8 +29,8 @@ def observed_model(directory: Path, response: dict, session_id: str) -> str:
         raise ValueError('实际模型证据位置不合法')
     with path.open('rb') as stream:
         stream.seek(offset)
-        raw=stream.readline(8*1024*1024+1)
-    if not raw.endswith(b'\n') or len(raw)>8*1024*1024:
+        raw=stream.readline(MAX_SOURCE_LINE_BYTES+1)
+    if not raw.endswith(b'\n') or len(raw)>MAX_SOURCE_LINE_BYTES:
         raise ValueError('实际模型证据缺失或超限')
     record=json.loads(raw)
     if not isinstance(record,dict) or not isinstance(record.get('message'),dict):
@@ -42,7 +44,24 @@ def observed_model(directory: Path, response: dict, session_id: str) -> str:
     return model
 
 
-def _merge_response(previous: dict, current: dict) -> dict:
+def response_usage(message: dict) -> dict:
+    """提取单个原生响应的用量字段。
+
+    :param message: 原生 assistant 消息。
+    :return: 非负整数用量，缺失或无效的值保持 None。
+    """
+    usage = message.get('usage')
+    return {field: usage.get(field) if isinstance(usage, dict) and type(usage.get(field)) is int
+            and usage[field] >= 0 else None for field in TOKEN_FIELDS}
+
+
+def merge_response_usage(previous: dict, current: dict) -> dict:
+    """合并同一模型响应的累计用量快照。
+
+    :param previous: 已观察到的原生响应快照。
+    :param current: 同一响应额外记录的快照。
+    :return: 每个字段的最大已知值，缺失值不补零。
+    """
     return {field:max(value for value in (previous[field],current[field]) if value is not None)
         if previous[field] is not None or current[field] is not None else None for field in TOKEN_FIELDS}
 
@@ -64,13 +83,13 @@ def source_usage(directory: Path, start: dict | None, end: dict | None, session_
     try:
         path = directory / name
         if (type(offset) is not int or type(limit) is not int or not 0 <= offset <= limit
-                or path.is_symlink() or not path.is_file() or path.stat().st_size < limit or limit - offset > 64 * 1024 * 1024):
+                or path.is_symlink() or not path.is_file() or path.stat().st_size < limit or limit - offset > MAX_SOURCE_BYTES):
             return {'responses': {}, 'complete': False}
         with path.open('rb') as stream:
             stream.seek(offset)
             while stream.tell() < limit:
                 position = stream.tell()
-                line = stream.readline(min(8 * 1024 * 1024, limit - position) + 1)
+                line = stream.readline(min(MAX_SOURCE_LINE_BYTES, limit - position) + 1)
                 if stream.tell() > limit or not line.endswith(b'\n'):
                     return {'responses': {}, 'complete': False}
                 record = json.loads(line)
@@ -82,11 +101,9 @@ def source_usage(directory: Path, start: dict | None, end: dict | None, session_
                 key = message.get('id') or record.get('requestId')
                 if not isinstance(key, str) or not key:
                     return {'responses': {}, 'complete': False}
-                usage = message.get('usage')
-                value = {field: usage.get(field) if isinstance(usage, dict) and type(usage.get(field)) is int
-                    and usage[field] >= 0 else None for field in TOKEN_FIELDS}
+                value = response_usage(message)
                 identity = session_id + ':' + key
-                responses[identity] = _merge_response(responses[identity],value) if identity in responses else value
+                responses[identity] = merge_response_usage(responses[identity],value) if identity in responses else value
         return {'responses': responses, 'complete': bool(responses) or limit==offset}
     except (OSError, ValueError, TypeError, KeyError, AttributeError):
         return {'responses': {}, 'complete': False}
@@ -101,7 +118,7 @@ def aggregate_usage(sources: list[dict]) -> dict:
     responses = {}
     for source in sources:
         for key, value in source['responses'].items():
-            responses[key] = _merge_response(responses[key],value) if key in responses else value
+            responses[key] = merge_response_usage(responses[key],value) if key in responses else value
     result = {}
     known_fields = {}
     for field in TOKEN_FIELDS:

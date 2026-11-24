@@ -29,7 +29,7 @@ from urllib.error import HTTPError
 from urllib.parse import quote, unquote, urlsplit
 
 from docker.errors import DockerException, NotFound
-from account_isolation import ISOLATION_VERSION, ROLE_COLUMNS, ROLE_LABELS, create_environment, role_container
+from account_isolation import ISOLATION_VERSION, ROLE_COLUMNS, ROLE_LABELS, create_environment, role_container, tui_host_memory, tui_reservations
 from account_update_identity import compatible_account_origin, configured_release, image_origin, role_release
 from capture_artifacts import capture_context_json
 from run_artifacts import ordinary_run_alias
@@ -41,7 +41,7 @@ from project_runtime_policy import ProjectRuntimeError, check_python_runtime
 from resource_budget import account_limits, default_account_memory, isolated_account_limits
 from native_kernel_upgrade import archive_binding_records, migrate_records, migration_context, pending_upgrade, recover_interrupted, reconcile_legacy, validate_records
 from native_criu_policy import restore_policy
-from native_sender import builtin_config, installed_versions, native_resource_layout, prewarm_account_id, sender_config
+from native_sender import builtin_config, installed_versions, native_resource_layout, prewarm_account_id, registered_293, sender_config
 from native_capture import cleanup_captures
 from agy_runtime.capture import cleanup_environment_steps as cleanup_agy_capture_steps
 from native_capture_policy import capture_enabled
@@ -628,18 +628,19 @@ class AccountRuntime:
             raise ValueError("账号发送器布局缺失，请先对账")
         native = configuration.get("native")
         if native is None:
-            if fingerprint.get("native_sender_memory"):
+            if fingerprint.get("native_sender_memory") != configuration.get("tui_host_memory"):
                 raise ValueError("账号发送器布局与冻结预算不符，请先对账")
             return None
         if (not isinstance(native, dict) or type(native.get("memory_mib")) is not int
                 or native["memory_mib"] < 0 or type(native.get("max_workers")) is not int
-                or native["max_workers"] <= 0 or native.get("binary_path") != "/usr/local/bin/ccrb-runtime"
+                or native["max_workers"] <= 0 or registered_293(native) is None
                 or native.get("work_root") != "/native"):
             raise ValueError("账号原生发送器配置无效，请先对账")
         budget = "unlimited" if native["memory_mib"] == 0 else str(native["memory_mib"]) + "m"
-        if fingerprint.get("native_sender_memory") != budget:
+        host_budget = configuration.get('tui_host_memory') or budget
+        if fingerprint.get("native_sender_memory") != host_budget:
             raise ValueError("账号原生发送器与冻结预算不符，请先对账")
-        isolated_account_limits(fingerprint["mem"], fingerprint.get("swap", "0"), budget)
+        isolated_account_limits(fingerprint["mem"], fingerprint.get("swap", "0"), host_budget)
         # 内核选择继续由原生命周期处理，CLI 不将其误判为资源布局变化。
         return native_resource_layout(native)
 
@@ -874,7 +875,16 @@ class AccountRuntime:
                 if prepare_sender else builtin_config(self._applied_native_sender(row), installed_versions(image_labels)))
             if startup_prewarm and (not native or self.stopping.is_set() or row["state"] not in ("ready", "stopped")):
                 raise RuntimeBusy("账号环境当前不接受预启动")
-            account = {**account, "native_sender": native, "native_migration": native_migration}
+            supports_tui = image_labels.get('vibebench.tui-sender-protocol') == '1'
+            tui_transport = tui_reservations(gateway_configuration) if supports_tui else None
+            supports_managed_tui = image_labels.get('vibebench.tui-managed-oauth') == '1'
+            tui_budget = (tui_host_memory(root, fingerprint, tui_transport, native, managed_oauth=supports_managed_tui)
+                          if image_labels.get('vibebench.tui-session-host') == '1' and account.get('cc2api_account_id') else None)
+            tui_managed_oauth = bool(tui_budget and supports_managed_tui
+                                    and not (root / 'runtime/sender/tui-local-provider.json').is_file())
+            account = {**account, "native_sender": native, "native_migration": native_migration,
+                       'tui_transport': tui_transport, 'tui_host_memory': tui_budget,
+                       'tui_managed_oauth': tui_managed_oauth}
             if native and image_labels.get("vibebench.native-runtime") != "293-raw-1":
                 raise ValueError("账号镜像缺少固定 293 原生能力")
             configuration = None
@@ -911,8 +921,10 @@ class AccountRuntime:
                         actual_native = native_resource_layout(actual_native)
                     restore = restore_policy(native, fingerprint, image_labels.get('vibebench.native-criu') == '1')
                     if (prepare_sender or not any(current.status == 'running' for current in containers.values())) and (actual_native != native
+                            or configuration.get('tui_host_memory') != tui_budget
+                            or bool(configuration.get('tui_managed_oauth')) != tui_managed_oauth
                             or bool(configuration.get('native_criu_enabled')) != restore['eligible']
-                            or configuration.get("native_capture_dir") != ("/flows/api/cc-prepared" if native and capture_enabled(fingerprint) else None)):
+                            or configuration.get("native_capture_dir") != ("/flows/api/cc-prepared" if (native or tui_budget) and capture_enabled(fingerprint) else None)):
                         if startup_prewarm:
                             raise RuntimeBusy("后台预启动跳过需要重建的账号环境")
                         if pending_upgrade(root) or self.environment_jobs(row["environment_id"]) or self._running_sender_active(row):
@@ -956,7 +968,9 @@ class AccountRuntime:
                     elif containers["cli"].status != "running":
                         self._update(row, state="cli_reconcile")
                 if not any(present):
-                    if native:
+                    if tui_budget:
+                        fingerprint['native_sender_memory'] = tui_budget
+                    elif native:
                         fingerprint["native_sender_memory"] = "unlimited" if native["memory_mib"] == 0 else str(native["memory_mib"]) + "m"
                     else:
                         fingerprint.pop("native_sender_memory", None)
@@ -996,10 +1010,21 @@ class AccountRuntime:
                 if row["state"] != "cli_reconcile":
                     self._update(row, state="ready")
                 adaptive = bool(native and account.get("cc2api_account_id") == self.native_prewarm_account_id)
-                if prepare_sender and configuration.get("native_adaptive_prewarm", False) != adaptive:
-                    configuration["native_adaptive_prewarm"] = adaptive
+                update_adaptive = configuration.get("native_adaptive_prewarm", False) != adaptive
+                update_tui = supports_tui and configuration.get('tui_v2') != tui_transport
+                if prepare_sender and (update_adaptive or update_tui):
+                    if update_adaptive:
+                        configuration["native_adaptive_prewarm"] = adaptive
+                    if update_tui:
+                        if tui_transport is None:
+                            configuration.pop('tui_v2', None)
+                        else:
+                            configuration['tui_v2'] = tui_transport
                     self._write_sender_config(row, configuration)
-        # 版本缓存准备不持有环境生命周期锁，API 不等待 CLI 安装。
+        # 只有具备运行额度且已装配同容器 TUI 时，才首次安装其固定版本。
+        if tui_budget and not (root / 'cli/2.1.293/.ready').is_file() and version != '2.1.293':
+            self._ensure_version(container, '2.1.293')
+        # 版本缓存准备不持有环境生命周期锁。
         if version is not None:
             self.check_system_profile(row, container)
             self._ensure_version(container, version)
@@ -1024,52 +1049,23 @@ class AccountRuntime:
         except (ValueError, OSError, RuntimeError):
             return {}, 'read_failed'
 
-    def native_preparation_summary(self, row: dict, account: dict | None, snapshots: dict[int, dict], read_error: str | None = None,
-                                   source_version: str = '2.1.293') -> dict | None:
+    def native_preparation_summary(self, row: dict, account: dict | None, snapshots: dict[int, dict], read_error: str | None = None) -> dict | None:
         """将巡检快照投影到当前环境，秘密和旧代次证据不进入页面。
 
         :param row: 当前环境记录
         :param account: bench 账号和网关绑定
         :param snapshots: 本次批量读取的网关快照
         :param read_error: 本次请求的受控读取错误。
-        :param source_version: 投影的官方源版本；历史入口为293。
         :return: 原生安全状态；legacy 或草稿为空。
         """
         if not account or not account.get('cc2api_account_id'):
             return None
-        if source_version not in ('2.1.280', '2.1.293'):
-            raise ValueError('未知原生准备版本')
-        original = snapshots.get(account['cc2api_account_id'], {})
-        if source_version == '2.1.293' and isinstance(original.get('versions'), dict):
-            # 各版独立核验代次和时效，根293失败也保留280的真实观察值。
-            base = {key: value for key, value in original.items() if key != 'versions'}
-            result = self.native_preparation_summary(row, account, {account['cc2api_account_id']: base}, read_error)
-            if result is None:
-                return None
-            return {**result, 'versions': {'2.1.293': dict(result), '2.1.280': self.native_preparation_summary(
-                row, account, snapshots, read_error, '2.1.280')}}
         try:
             configuration = _read_json(self._sender_config(row))
             if not isinstance(configuration, dict):
                 return {'state': 'unknown', 'reason': 'capability_unknown'}
             native = configuration.get('native')
-            if source_version == '2.1.293' and isinstance(native, dict):
-                selected = native.get('runtimes', {}).get(source_version)
-                if isinstance(selected, dict):
-                    configuration = {**configuration, 'native': {**native, 'release': None, 'kernel_generation': None, **selected}}
-            if source_version == '2.1.280':
-                native = configuration.get('native')
-                selected = native.get('runtimes', {}).get(source_version) if isinstance(native, dict) else None
-                if not isinstance(selected, dict):
-                    return {'state': 'unknown', 'reason': 'runtime_not_installed'}
-                configuration = {**configuration, 'native': {**native, 'release': None, 'kernel_generation': None, **selected}}
-                original = snapshots.get(account['cc2api_account_id'], {})
-                versions = original.get('versions')
-                selected_snapshot = versions.get(source_version) if isinstance(versions, dict) else None
-                if not isinstance(selected_snapshot, dict) or selected_snapshot.get('source_version') != source_version:
-                    return {'state': 'unknown', 'reason': 'runtime_unavailable'}
-                snapshots = {account['cc2api_account_id']: selected_snapshot}
-            if not configuration.get('native'):
+            if not native:
                 value = snapshots.get(account['cc2api_account_id'], {})
                 if value.get('request_backend') != 'native293':
                     return None
@@ -1081,6 +1077,9 @@ class AccountRuntime:
                     'reason': reason if reason in allowed else 'backend_pending',
                     'checking': value.get('checking') is True}
 
+            native = registered_293(native)
+            if native is None:
+                return {'state': 'unknown', 'reason': 'runtime_not_installed'}
         except (OSError, ValueError, TypeError):
             return {'state': 'unknown', 'reason': 'capability_unknown'}
         failure = snapshots.get(account['cc2api_account_id'], {})
@@ -1094,13 +1093,12 @@ class AccountRuntime:
         if account['cc2api_account_id'] not in snapshots:
             return {'state': 'unknown', 'reason': 'snapshot_missing'}
         value = snapshots.get(account['cc2api_account_id'], {})
-        if value.get('source_version', '2.1.293') != source_version:
+        if value.get('source_version', '2.1.293') != '2.1.293':
             return {'state': 'unknown', 'reason': 'binding_unverified'}
         state = value.get('state')
         if state in ('sleeping', 'disabled', 'maintenance'):
             reason = 'system_maintenance' if state == 'maintenance' and value.get('reason') == 'system_maintenance' else state
             return {'state': state, 'reason': reason}
-        native = configuration.get('native')
         checking = value.get('checking') is True
         # 首轮检查尚未得到身份；仅提供进度，不能把旧进程投影到当前环境。
         if (not value.get('environment_id') or type(value.get('generation')) is not int
@@ -1153,15 +1151,17 @@ class AccountRuntime:
                 if self._native_notified.get(int(account_id)) == key:
                     self._native_notified.pop(int(account_id), None)
 
-    def existing_transport(self, account: dict, *, rollout_only: bool = False) -> dict | None:
+    def existing_transport(self, account: dict, *, rollout_only: bool = False, placement_check=None) -> dict | None:
         """只读取当前运行绑定，保持休眠和停止环境的生命周期。
 
         :param account: 唯一绑定的 bench 账号
         :param rollout_only: 只采用宿主授权且正在运行的旧发送器。
+        :param placement_check: 中央只读入口核对迁移排空中的原分配。
         :return: 已运行环境的受限绑定；停止或休眠时为空
         """
-        if self.placement:
-            self.placement(account)
+        placement = placement_check or self.placement
+        if placement:
+            placement(account)
         connection = self.database()
         try:
             stored = connection.execute("SELECT * FROM account_environments WHERE account_id=?", (account["id"],)).fetchone()
@@ -1171,6 +1171,8 @@ class AccountRuntime:
             return None
         row = dict(stored)
         with self.environment_lock(row["environment_id"]):
+            if placement_check:
+                placement_check(account)
             self._check_node_fence(row)
             if row["state"] not in ("ready", "cli_reconcile") or row.get("isolation_version") != ISOLATION_VERSION:
                 return None
@@ -1267,9 +1269,12 @@ class AccountRuntime:
             row.update(self._row(row['name'], row['account_id']))
         fingerprint['mem'] = 'unlimited'
         try:
-            if native:
+            if native or fingerprint.get('native_sender_memory'):
                 configuration = _read_json(self._sender_config(row))
-                configuration['native']['memory_mib'] = 0
+                if native:
+                    configuration['native']['memory_mib'] = 0
+                if configuration.get('tui_host_memory'):
+                    configuration['tui_host_memory'] = 'unlimited'
                 self._write_sender_config(row, configuration)
                 fingerprint['native_sender_memory'] = 'unlimited'
             self._update(row, fingerprint_json=json.dumps(fingerprint))
@@ -3745,7 +3750,7 @@ class AccountRuntime:
             config = _read_json(path)
             native = config.get('native')
             if isinstance(native, dict):
-                config['native'] = native_resource_layout(native)
+                config['native'] = builtin_config(native, ('2.1.293',))
                 if config['native'] != native:
                     self._write_sender_config(row, config)
 

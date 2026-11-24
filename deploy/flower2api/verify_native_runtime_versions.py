@@ -1,4 +1,4 @@
-"""用真实浏览器验证平台内置双版内核只读展示。"""
+"""用真实浏览器验证单版内核在新旧环境回执中的只读展示。"""
 import asyncio
 import copy
 import json
@@ -52,18 +52,18 @@ async def run(gateway=None, output=None):
         workspace = page.locator('.runtime-environment-dialog')
         await expect(workspace).to_contain_text('随 flower2api 版本统一交付')
         await expect(workspace).to_contain_text('内置内核版本')
-        await expect(workspace).to_contain_text('bbbbbbbbbbbb')
+        await expect(workspace).not_to_contain_text('bbbbbbbbbbbb')
         await expect(workspace).to_contain_text('aaaaaaaaaaaa')
         await expect(workspace).not_to_contain_text('v0.1.0-beta.7')
         await expect(workspace).not_to_contain_text('builtin-2.1.280')
         await expect(workspace).not_to_contain_text('准备候选')
         await workspace.locator('.environment-kernel .runtime-technical summary').first.click()
-        await expect(workspace.locator('.environment-kernel .runtime-technical code').first).to_have_text('b' * 64)
+        await expect(workspace.locator('.environment-kernel .runtime-technical code').first).to_have_text('a' * 64)
         await expect(workspace).to_contain_text('Claude Code 2.1.293')
         for label in ('检查更新', '选择版本', '激活候选', '回滚内核', '恢复对账'):
             await expect(workspace.get_by_role('button', name=label, exact=True)).to_have_count(0)
         cc280 = workspace.get_by_role('region', name='Claude Code 2.1.280 内核')
-        await expect(cc280).to_contain_text('运行状态待核对')
+        await expect(cc280).to_have_count(0)
         for theme in ('light', 'dark'):
             await page.evaluate("value=>document.documentElement.classList.toggle('dark',value==='dark')", theme)
             for width in (1280, 390):
@@ -79,15 +79,24 @@ async def run(gateway=None, output=None):
         await page.locator('[data-env-open="kernel"]').first.click()
         legacy = page.locator('#environment-workspace')
         await expect(legacy).to_contain_text('随平台版本交付')
-        await expect(legacy).to_contain_text('Claude Code 2.1.280（平台内置）')
-        await expect(legacy).to_contain_text('bbbbbbbbbbbb')
+        await expect(legacy).to_contain_text('Claude Code 2.1.293（平台内置）')
+        await expect(legacy).not_to_contain_text('2.1.280')
+        await expect(legacy).to_contain_text('aaaaaaaaaaaa')
+        await expect(legacy).not_to_contain_text('bbbbbbbbbbbb')
         await expect(legacy).not_to_contain_text('v0.1.0-beta.7')
         await expect(legacy).not_to_contain_text('builtin-2.1.280')
         await expect(legacy.locator('[data-kernel-action], [data-kernel-check]')).to_have_count(0)
+        for backend in ('tui_v2', 'legacy', 'native293', None):
+            fixture.rows[0]['request_backend'] = backend
+            await page.goto(BASE + '/environments')
+            await page.locator('.environment-rich').first.get_by_role('button', name='请求内核', exact=True).click()
+            await expect(workspace.get_by_role('region', name='Claude Code 2.1.293 内核')).to_be_visible()
+            await expect(workspace.get_by_text('此环境当前使用交互运行时 V2。', exact=True)).to_have_count(int(backend == 'tui_v2'))
+            await expect(workspace.get_by_text('此环境当前使用基础转发方式。', exact=True)).to_have_count(int(backend == 'legacy'))
         assert not fixture.kernel_requests, fixture.kernel_requests
         assert not errors, errors
         await browser.close()
-    return {'passed': True, 'checks': ['平台内置版本与制品摘要', '独立操作退役零请求', '实际观察保持未知', '独立兼容入口只读', '明暗390/1280px'], 'errors': errors}
+    return {'passed': True, 'checks': ['平台内置版本与制品摘要', '独立操作退役零请求', '旧双版回执只展示 293', '独立兼容入口只读', '已生效的后端与未知状态文案', '明暗390/1280px'], 'errors': errors}
 
 
 if __name__ == '__main__':

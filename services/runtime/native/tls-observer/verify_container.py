@@ -13,7 +13,7 @@ def main() -> None:
     parser.add_argument('--image', required=True)
     parser.add_argument('--binary', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--source-version', choices=('2.1.280', '2.1.293'), default='2.1.293')
+    parser.add_argument('--source-version', choices=('2.1.293',), default='2.1.293')
     parser.add_argument('--image-sha256', default='af4cea9e21aa959c5e39c389173ba30ebb19b354b67acfe99164946450e9776d')
     parser.add_argument('--observer-source', type=Path)
     args = parser.parse_args()

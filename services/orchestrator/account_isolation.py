@@ -3,7 +3,9 @@ import ipaddress
 import json
 import os
 import secrets
+import re
 import socket
+import stat
 import time
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
@@ -17,7 +19,8 @@ from cli_scratchpad import SCRATCHPAD_STORE, prepare_scratchpad_mount, restore_c
 from native_kernel_upgrade import migrate_records
 from native_capture_policy import capture_enabled
 from native_criu_policy import restore_policy
-from resource_budget import isolated_account_limits, scenario_account_limits, sender_pid_limit
+from resource_budget import account_limits, isolated_account_limits, memory_bytes, scenario_account_limits, sender_pid_limit
+from runtime_files import atomic_json, directory_fd
 from system_profile import (COMPUTER_PROFILE_LABEL, COMPUTER_PROFILE_VERSION, SYSTEM_PROFILE_DIRECTORY,
     SYSTEM_PROFILE_LABEL, SYSTEM_PROFILE_VERSION)
 
@@ -74,6 +77,104 @@ def _directory(path: Path, uid: int = 0, gid: int = 0, mode: int = 0o700) -> Non
     path.chmod(mode)
 
 
+def tui_reservations(configuration: dict) -> dict | None:
+    """计算已绑定账号的传输预留上限。@param configuration 网关的账号配置。@return 私有配置或空值。"""
+    concurrency = configuration.get('concurrency')
+    if type(concurrency) is not int or concurrency < 1:
+        return None
+    # 活跃响应和等候发送的预留均计数。每个 HTTP 槽允许再准备一轮，协议最多支持 64 项。
+    return {'max_reservations': min(64, 2 * concurrency)}
+
+
+def tui_host_memory(root: Path, fingerprint: dict, transport: dict | None, native: dict | None,
+                    *, managed_oauth: bool = False) -> str | None:
+    """核对部署者对本账号的本机 V2 授权并选择物理空间。@param root 账号根。@param fingerprint 冻结总预算。
+    @param transport 当前预留配置。@param native 可并存的 V1 配置。
+    @param managed_oauth 是否具备正式账号凭据模式。@return sender 的实际预算或关闭。
+    """
+    if not transport:
+        return None
+    provider = root / 'runtime/sender/tui-local-provider.json'
+    try:
+        entry = provider.lstat()
+    except FileNotFoundError:
+        data = root.parent.parent
+        config = tui_node_provider(data, root.name)
+        if config is None and not managed_oauth:
+            return None
+        entry = None
+        if config is not None:
+            provider.parent.mkdir(parents=True, exist_ok=True)
+            atomic_json(provider, config)
+            os.chown(provider, 0, 1001, follow_symlinks=False)
+            provider.chmod(0o640)
+            entry = provider.lstat()
+    if entry is not None and not (stat.S_ISREG(entry.st_mode) and entry.st_nlink == 1 and entry.st_uid == 0
+            and entry.st_gid == 1001 and stat.S_IMODE(entry.st_mode) in (0o440, 0o640)):
+        raise ValueError('本机交互提供方配置必须由部署者所有且仅允许 sender 读取')
+    if fingerprint['mem'] == 'unlimited':
+        return 'unlimited'
+    total, _ = account_limits(fingerprint['mem'])
+    # 网络保留 256 MiB、CLI 保留 512 MiB。sender 的固定开销及每个 TUI 各规划 256 MiB。
+    available_blocks = (total // (256 * 1024 ** 2)) - 3
+    # 只有等待 Agent 的原轮能借一个额外驻留位，账号模型并发维持原值。
+    blocks = min(available_blocks, 2 + transport['max_reservations'] // 2)
+    if blocks < 2 and entry is None:
+        # 已有 V1 配额可继续运行。V2 只有在账号剩余额度可启动交互进程时就绪。
+        return None
+    if native:
+        # 切换后 sender 仍可沿用原有角色额度，V1 内核的独立配置保持生效。
+        native_mib = native['memory_mib']
+        target = max(native_mib, blocks * 256) if blocks >= 2 else native_mib
+        return f'{target}m'
+    previous = fingerprint.get('native_sender_memory')
+    if previous and memory_bytes(previous) >= 512 * 1024 ** 2:
+        return previous
+    if blocks < 2:
+        raise ValueError('账号内存不足以同时容纳原版交互进程、固定 CLI 和网络角色')
+    return f'{blocks * 256}m'
+
+
+def tui_node_provider(data: Path, environment_id: str) -> dict | None:
+    """读取目标节点独立配置。@param data 私有数据根。@param environment_id 原环境。@return 本机提供方配置或空。"""
+    if not re.fullmatch(r'[a-f0-9]{32}', environment_id):
+        return None
+    try:
+        directory = directory_fd(data / 'tui-local-providers')
+    except FileNotFoundError:
+        return None
+    try:
+        status = os.fstat(directory)
+        if status.st_uid != 0 or stat.S_IMODE(status.st_mode) != 0o700:
+            raise ValueError('节点 V2 提供方目录权限无效')
+        try:
+            fd = os.open(environment_id + '.json', os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
+        except FileNotFoundError:
+            return None
+        with os.fdopen(fd, 'rb') as stream:
+            status = os.fstat(stream.fileno())
+            if not stat.S_ISREG(status.st_mode) or status.st_nlink != 1 or status.st_uid != 0 or stat.S_IMODE(status.st_mode) != 0o600:
+                raise ValueError('节点 V2 提供方配置归属无效')
+            raw = stream.read(4097)
+            if len(raw) > 4096:
+                raise ValueError('节点 V2 提供方配置大小无效')
+            value = json.loads(raw)
+        if not isinstance(value, dict) or set(value) != {'base_url', 'local_bearer'}:
+            raise ValueError('节点 V2 提供方格式无效')
+        if not isinstance(value['base_url'], str):
+            raise ValueError('节点 V2 提供方地址无效')
+        target = urlsplit(value['base_url'])
+        bearer = value['local_bearer']
+        if (target.scheme != 'http' or not target.hostname or not ipaddress.ip_address(target.hostname).is_loopback
+                or target.username is not None or target.password is not None or target.path not in ('', '/')
+                or target.query or target.fragment or not target.port or not isinstance(bearer, str)
+                or not bearer or any(not 33 <= ord(char) <= 126 for char in bearer)):
+            raise ValueError('节点 V2 提供方必须是带独立口令的本机回环地址')
+        return value
+    finally:
+        os.close(directory)
+
+
 def create_environment(runtime, row: dict, account: dict, name: str, write_json) -> None:
     """按网络就绪、业务启动的顺序创建三个角色，逐个登记以便中断恢复。
 
@@ -93,8 +194,10 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
     if native:
         migrate_records(root, int(account.get('cc2api_account_id') or 0), reconciled=account.get('native_migration') is True)
     execution = agy or native
-    limits = isolated_account_limits(fingerprint['mem'], fingerprint.get('swap', '0'),
-        ('unlimited' if execution['memory_mib'] == 0 else str(execution['memory_mib']) + 'm') if execution else None)
+    tui_budget = account.get('tui_host_memory')
+    execution_budget = (('unlimited' if execution['memory_mib'] == 0 else str(execution['memory_mib']) + 'm')
+                        if execution else None)
+    limits = isolated_account_limits(fingerprint['mem'], fingerprint.get('swap', '0'), tui_budget or execution_budget)
     layout_path = root / 'runtime/project-review-layout.json'
     review_layout = json.loads(layout_path.read_text()) if layout_path.is_file() else None
     if review_layout:
@@ -149,13 +252,19 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
     userinfo = parsed.netloc.rsplit('@', 1)[0] + '@' if '@' in parsed.netloc else ''
     resolved_proxy = urlunsplit((parsed.scheme, f'{userinfo}{address}:{parsed.port}', parsed.path, parsed.query, ''))
     image_labels = runtime.client.images.get(runtime.image).attrs['Config'].get('Labels') or {}
+    tui_socket = not agy and image_labels.get('vibebench.tui-sender-protocol') == '1'
+    if tui_socket:
+        _directory(paths['sender'] / 'tui-v2', 1001, 1001, 0o700)
     observer_protocol = 1 if native and image_labels.get('vibebench.native-tls-observer') == '1' else None
     restore_label = 'vibebench.agy-criu' if agy else 'vibebench.native-criu'
     restore_installed = image_labels.get(restore_label) == '1'
     restore = restore_policy(execution, fingerprint, restore_installed)
     sender_file = paths['sender'] / 'sender.json'
     write_json(sender_file, {'binding': binding, 'proxy_url': resolved_proxy, 'proxy_source': proxy,
-        'native': native, 'agy': agy, 'native_capture_dir': ('/flows/api/agy-prepared' if agy else '/flows/api/cc-prepared') if execution and capture_enabled(fingerprint) else None,
+        **({'tui_v2': account['tui_transport']} if tui_socket and account.get('tui_transport') else {}),
+        **({'tui_host_memory': tui_budget} if tui_budget else {}),
+        **({'tui_managed_oauth': True} if account.get('tui_managed_oauth') else {}),
+        'native': native, 'agy': agy, 'native_capture_dir': ('/flows/api/agy-prepared' if agy else '/flows/api/cc-prepared') if (execution or tui_budget) and capture_enabled(fingerprint) else None,
         'native_tls_observer_protocol': observer_protocol,
         'native_criu_enabled': restore['eligible'], 'native_criu_reason': restore['reason'],
         'native_criu_protocol': 1 if execution and restore_installed else None,
@@ -178,6 +287,11 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
     def launch(role, **options):
         memory, total = limits[role]
         role_pids = sender_pid_limit(execution['max_workers'], agy=bool(agy)) if role == 'sender' and execution else 512 if role == 'cli' else 128
+        if role == 'sender' and tui_budget:
+            physical = max(1, account['tui_transport']['max_reservations'] // 2)
+            if memory:
+                physical = min(physical + 1, max(0, memory // (256 * 1024 ** 2) - 1))
+            role_pids = max(role_pids, sender_pid_limit(physical))
         options.update(name=name if role == 'network' else name + '-' + role,
             labels=role_labels(runtime, row, role), detach=True, auto_remove=False, read_only=True,
             mem_limit=memory, memswap_limit=total, nano_cpus=default_cpus[role],
@@ -259,7 +373,19 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
         runtime.check_system_profile(row, cli)
         _directory(root / 'runtime/native', 1001, 1001, 0o700)
         sender_mounts = mounts([*common_files, ('runtime/sender', '/run/v3', 'ro'), ('flows/api', '/flows/api', 'rw'), ('runtime/native', '/native', 'rw')])
+        if tui_socket:
+            # 只将事件 socket 子目录挂成可写，配置与绑定仍由控制端发布。
+            sender_mounts[str(host_root / 'runtime/sender/tui-v2')] = {'bind': '/run/v3/tui-v2', 'mode': 'rw'}
         sender_env = {'V3_SENDER_CONFIG': '/run/v3/sender.json', 'TOKIO_WORKER_THREADS': '2'}
+        if tui_budget:
+            # 安装器原子替换版本子目录，挂其父级才能在运行中看到已验收的新 inode。
+            # sender 不挂 CLI HOME、项目卷或登录凭据目录；运行准备由原生会话单独核对。
+            sender_mounts[str(host_root / 'cli')] = {'bind': '/cli', 'mode': 'ro'}
+            sender_env['V3_TUI_SESSION_HOST'] = '1'
+            if account.get('tui_managed_oauth'):
+                sender_env['V3_TUI_MANAGED_OAUTH'] = '1'
+            else:
+                sender_env['V3_TUI_LOCAL_PROVIDER_CONFIG'] = '/run/v3/tui-local-provider.json'
         sender_env['CCRB_CRIU_REASON'] = restore['reason'] or ''
         verification = root / 'runtime/verification-ca.der'
         if verification.is_file():

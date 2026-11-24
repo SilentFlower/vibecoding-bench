@@ -153,6 +153,9 @@ async fn main() {
         account_service = account_service.with_scheduler(scheduler);
     }
     let account_svc = Arc::new(account_service);
+    if service::runtime_transport::tui_runtime_configured() {
+        account_svc.start_tui_backend_reconciliation();
+    }
     // 启动时为全部选号入口加载同一智能配置
     account_svc
         .reload_scheduling_config()

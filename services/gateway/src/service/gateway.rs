@@ -81,6 +81,9 @@ use crate::service::telemetry::{
     MessageTelemetryContext, MessageTelemetryResult, MessageTelemetryUsage, TelemetryService,
     merge_message_usage,
 };
+use crate::service::tui_backend::{self, LEGACY_BINDING, TUI_V2, TuiRequestRoute};
+use crate::service::tui_native_drain::{NativeTurn, active_agent_account, continuation_account};
+use crate::service::tui_tool_history::{self, SERVER_SESSION_PREFIX};
 use crate::service::usage::UsageCapture;
 use crate::service::v3_scheduling::{RequestPhase, SchedulingRequest};
 use crate::service::version_profile::{
@@ -972,12 +975,14 @@ impl GatewayService {
     /// @param account 当前账号。
     /// @param request 冻结的请求期限和状态租约。
     /// @param slot_units 请求的加权单位。
+    /// @param tui 当前 V2 请求是否为已绑定原回执，其他路径留空。
     /// @return 随流存活的许可或明确本地 429。
     async fn acquire_v3_admission(
         &self,
         account: &Account,
         request: &SchedulingRequest,
         slot_units: u32,
+        tui: Option<bool>,
     ) -> Result<GatewayAccountAdmission, GatewayAdmissionError> {
         let started = std::time::Instant::now();
         let work_admission = self
@@ -995,13 +1000,14 @@ impl GatewayService {
         .await
         .map_err(GatewayAdmissionError::Rpm)?;
         let timeout = request.remaining().map_err(GatewayAdmissionError::Rpm)?;
-        let permit = queue
-            .acquire(timeout, slot_units)
-            .await
-            .map_err(|error| match error {
-                QueueWaitError::Closed => GatewayAdmissionError::Queue(error),
-                _ => GatewayAdmissionError::Rpm(AppError::AdmissionLimited { retry_after: 1 }),
-            })?;
+        let permit = match tui {
+            Some(continuation) => queue.acquire_tui(timeout, slot_units, continuation).await,
+            None => queue.acquire(timeout, slot_units).await,
+        }
+        .map_err(|error| match error {
+            QueueWaitError::Closed => GatewayAdmissionError::Queue(error),
+            _ => GatewayAdmissionError::Rpm(AppError::AdmissionLimited { retry_after: 1 }),
+        })?;
         request.phase(RequestPhase::Preparing);
         Ok(GatewayAccountAdmission {
             permit: permit
@@ -2108,6 +2114,9 @@ impl GatewayService {
         let cutover: Option<InferenceCutover> = req.extensions().get().cloned();
 
         let mut native_header_map = req.headers().clone();
+        let tui_ingress_headers = (path == "/v1/messages"
+            && diagnostics::current_log_mode() == RequestLogMode::Debug)
+            .then(|| native_header_map.clone());
         // 提取 header
         let mut headers = extract_headers(req.headers());
         let ua = headers
@@ -2337,6 +2346,52 @@ impl GatewayService {
         } else {
             (vec![], vec![])
         };
+        let original_session = session.as_ref().and_then(RequestSession::original);
+        let tool_owner = if method == "POST"
+            && path == "/v1/messages"
+            && runtime_transport::tui_runtime_configured()
+            && let Some(principal) = api_token
+        {
+            continuation_account(
+                self.account_svc.tui_database(),
+                (principal.id, original_session),
+                &body_map,
+            )
+            .await?
+        } else {
+            None
+        };
+        let agent_account = if method == "POST"
+            && path == "/v1/messages"
+            && client_type == ClientType::ClaudeCode
+            && runtime_transport::tui_runtime_configured()
+            && let (Some(principal), Some(session)) = (api_token, original_session)
+            && let Some(hint) = native_header_map
+                .get("x-claude-code-agent-id")
+                .and_then(|value| value.to_str().ok())
+        {
+            active_agent_account(self.account_svc.tui_database(), principal.id, session, hint)
+                .await?
+        } else {
+            None
+        };
+        if agent_account.is_some() && tool_owner.is_some() && agent_account != tool_owner {
+            return Err(AppError::BadRequest(
+                "V2 子代理和工具结果的原账号不符".into(),
+            ));
+        }
+        let allowed_ids = if let Some(owner) = tool_owner.or(agent_account) {
+            if blocked_ids.contains(&owner)
+                || (!allowed_ids.is_empty() && !allowed_ids.contains(&owner))
+            {
+                return Err(AppError::BadRequest(
+                    "工具结果的原账号已超出入口授权范围".into(),
+                ));
+            }
+            vec![owner]
+        } else {
+            allowed_ids
+        };
         let request_model = body_map
             .get("model")
             .and_then(|model| model.as_str())
@@ -2353,6 +2408,7 @@ impl GatewayService {
 
         // 每个请求只冻结一次；保留原始 body_map/body_bytes，换号和重试复用相同清理正文。
         let native_message_cache = *self.message_cache_control_rewrite.read().await;
+        let tui_cache_ttl = *self.cache_control_ttl_rewrite.read().await;
         let native_disabled_thinking = self.disabled_thinking_rewrite.read().await.clone();
         let message_top_field_filter_enabled = *self.message_top_field_filter_enabled.read().await;
         let filtered_message_body =
@@ -2547,10 +2603,282 @@ impl GatewayService {
 
             let slot_units = request_slot_units(&path, &body_map);
 
+            let (account, tui_route) = if method == "POST" && path == "/v1/messages" {
+                tui_backend::request_route(&self.account_svc, account).await?
+            } else {
+                (account, None)
+            };
+            if tool_owner.is_some() && tui_route.is_none() {
+                return Err(AppError::BadRequest("工具结果的原执行路径已退场".into()));
+            }
+            if agent_account.is_some() && account.request_backend != TUI_V2 {
+                return Err(AppError::BadRequest("V2 子代理的原执行路径已退场".into()));
+            }
+
+            if method == "POST" && path == "/v1/messages" && account.request_backend == TUI_V2 {
+                let route = tui_route
+                    .as_ref()
+                    .ok_or_else(|| AppError::ServiceUnavailable("V2 路由未就绪".into()))?;
+                let principal = api_token.ok_or(AppError::Unauthorized)?;
+                let request = scheduling_request
+                    .as_ref()
+                    .ok_or_else(|| AppError::ServiceUnavailable("V2 入口需要 v3 准入".into()))?;
+                if let Some(response) = session_policy_block::check_current().await? {
+                    return Ok(response);
+                }
+                if route.binding.is_empty() {
+                    diagnostics::error_stage("tui_v2_readiness");
+                    return Err(runtime_transport::tui_unbound(&account).await);
+                }
+                if original_session.is_some_and(|value| value.starts_with(SERVER_SESSION_PREFIX)) {
+                    return Err(AppError::BadRequest("V2 服务端会话不可由客户端声明".into()));
+                }
+                let fixture = runtime_transport::tui_fixture(&account);
+                let owner = (original_session.is_none() || !fixture)
+                    .then_some((principal.id, original_session));
+                let returning_tool = tui_tool_history::has_result(&body_map);
+                if owner.is_some() && returning_tool && tool_owner != Some(account.id) {
+                    return Err(AppError::BadRequest(
+                        "未找到可接续的工具轮，请用原入口令牌和会话提交原工具组。若原轮已结束，请发起新一轮".into(),
+                    ));
+                }
+                request.phase(RequestPhase::Preparing);
+                let wake = route
+                    .may_wake_v2(&self.account_svc, &account, returning_tool)
+                    .await?;
+                let sender =
+                    runtime_transport::ready_tui_sender(&account, request.deadline(), wake).await?;
+                let (binding, mut turn, draining) = route
+                    .begin_v2(
+                        &self.account_svc,
+                        &account,
+                        owner,
+                        &body_map,
+                        &sender,
+                        returning_tool,
+                    )
+                    .await?;
+                let assigned_session = turn
+                    .as_ref()
+                    .and_then(NativeTurn::stateless_session)
+                    .map(|session_id| format!("{SERVER_SESSION_PREFIX}{session_id}"));
+                let sender_session = original_session
+                    .or(assigned_session.as_deref())
+                    .ok_or_else(|| AppError::Internal("V2 会话登记缺失".into()))?;
+                let owned_tool_group = turn.as_ref().is_some_and(NativeTurn::owns_continuation);
+                let mut prepared = runtime_transport::prepare_tui(
+                    sender,
+                    principal.id,
+                    sender_session,
+                    runtime_transport::TuiMessagesInput {
+                        body: &body_bytes,
+                        headers: &native_header_map,
+                        native_cc: client_type == ClientType::ClaudeCode,
+                        body_policy: runtime_transport::TuiBodyPolicy::new(
+                            native_message_cache,
+                            tui_cache_ttl,
+                            native_disabled_thinking.should_rewrite(&body_map),
+                        ),
+                    },
+                    request.deadline(),
+                    draining || owned_tool_group,
+                )
+                .await?;
+                prepared.verify_input_policy(&body_map)?;
+                if let Some(headers) = &tui_ingress_headers {
+                    prepared.observe_ingress(headers, &body_bytes, &body_map);
+                }
+                if turn.is_some() && owned_tool_group != prepared.continuation {
+                    return Err(AppError::ServiceUnavailable(
+                        "V2 sender 工具归属与登记不符".into(),
+                    ));
+                }
+
+                // 先准备物理进程或原轮身份，两类请求仍经过相同普通并发和发送准入。
+                let admission = self
+                    .acquire_v3_admission(&account, request, slot_units, Some(owned_tool_group))
+                    .await
+                    .map_err(|error| match error {
+                        GatewayAdmissionError::Queue(_) => {
+                            AppError::AdmissionLimited { retry_after: 1 }
+                        }
+                        GatewayAdmissionError::Rpm(error) => error,
+                    })?;
+                let original_tool = owned_tool_group && prepared.continuation;
+                let (account_token, activity) = if prepared.managed_oauth {
+                    let (bearer, activity) = await_preparation(
+                        Some(request),
+                        self.account_svc
+                            .resolve_tui_upstream_token(account.id, original_tool),
+                    )
+                    .await??;
+                    (
+                        Some(runtime_transport::tui_account_token_header(&bearer)?),
+                        activity,
+                    )
+                } else {
+                    (
+                        None,
+                        self.account_svc
+                            .upstream_tui_activity(account.id, original_tool)
+                            .await?,
+                    )
+                };
+                let mut guard =
+                    SlotReleaseGuard::new(admission.permit.with_credential_activity(activity));
+                let send_permit = request.admit(&account).await?;
+                if let Some(response) = session_policy_block::check_current().await? {
+                    return Ok(response);
+                }
+                let mut rewrite = UpstreamSessionRewrite::default();
+                if account.upstream_session_pool_enabled
+                    && account.upstream_session_pool_size > 0
+                    && client_type == ClientType::ClaudeCode
+                    && prepared.supports_session_mapping()
+                    && let Some(real_session) = native_session_candidate(
+                        native_header_map.get_all("x-claude-code-session-id").iter(),
+                        |value| value.to_str().ok(),
+                        &body_map,
+                    )
+                    && Some(real_session.as_str()) == original_session
+                {
+                    // 池只接触已获准提交的原生会话。原预留和工具归属始终使用入站值。
+                    rewrite = await_preparation(
+                        Some(request),
+                        self.build_upstream_session_rewrite(
+                            &account,
+                            &path,
+                            &body_map,
+                            client_type,
+                            Some(&real_session),
+                        ),
+                    )
+                    .await?;
+                    if let Some(target) = rewrite
+                        .message
+                        .as_ref()
+                        .and_then(|resolved| resolved.upstream_session_id.as_deref())
+                    {
+                        if native_session_uuid(target) {
+                            prepared.set_upstream_session(target);
+                        } else {
+                            warn!(
+                                "V2 会话池映射失败开放: account={} reason=invalid_target",
+                                account.id
+                            );
+                            rewrite.message = None;
+                        }
+                    }
+                }
+                diagnostics::session_context(account.id, original_session, rewrite.message.as_ref());
+                let configuration = route
+                    .allow_submit(
+                        &self.account_svc,
+                        account.id,
+                        &binding,
+                        prepared.continuation,
+                    )
+                    .await?;
+                let ttfb_timeout = request.remaining()?.min(UPSTREAM_TTFB_TIMEOUT);
+                let started = std::time::Instant::now();
+                let usage_started_at = Utc::now();
+                send_permit.submitted();
+                if let Some(turn) = &turn {
+                    turn.mark_submitted();
+                }
+                drop(configuration);
+                // 提交等待仅覆盖私有 HTTP 头。委托的 JSON 在收到头以后聚合。
+                let attempt_id = prepared.attempt_id.clone();
+                let capture_state = prepared.capture_state;
+                let response = prepared
+                    .submit_with_account_token(ttfb_timeout, account_token)
+                    .await?;
+                let capture_state = if capture_state == Some("queued") {
+                    match response
+                        .headers()
+                        .get(runtime_transport::TUI_CAPTURE)
+                        .map(HeaderValue::as_bytes)
+                    {
+                        Some(b"queued") => Some("queued"),
+                        Some(b"disabled") => Some("disabled"),
+                        _ => Some("dropped"),
+                    }
+                } else {
+                    capture_state
+                };
+                // 本轮结果可能已被模型接纳，V2 的授权错误随响应交付原请求和原工具轮。
+                let mut response =
+                    runtime_transport::tui_public_response(response, (!fixture).then_some(account.id)).await?;
+                let projected = !fixture
+                    && response
+                        .extensions_mut()
+                        .remove::<runtime_transport::TuiGatewayIds>()
+                        .is_some();
+                let codings = response_content_codings(response.headers());
+                if projected {
+                    // HTTP 200 只代表已打开 SSE。账本和调度反馈必须等到正文终态。
+                    if let Some(mut attempt) = diagnostics::prepare_tui_attempt(&account, &body_map)
+                    {
+                        attempt.tui_capture(attempt_id, capture_state);
+                        attempt.with_feedback(request.clone());
+                        attempt.commit_native(started);
+                        attempt.headers(
+                            response.status().as_u16(),
+                            response.headers(),
+                            codings.clone(),
+                        );
+                        response = attempt.wrap(response);
+                    } else if !response.status().is_success() {
+                        request.response_headers(account.id, response.status().as_u16());
+                    }
+                } else {
+                    request.response_headers(account.id, response.status().as_u16());
+                }
+                if response.status().is_client_error()
+                    && let Some(turn) = turn.as_mut()
+                    && let Err(error) = turn.retire_v2_rejection().await
+                {
+                    warn!(account_id = account.id, %error, "V2 拒绝响应的轮次状态待核对");
+                }
+                let status = response.status().as_u16();
+                let usage = response.status().is_success().then(|| {
+                    UsageCapture::new(
+                        self.usage_store.clone(),
+                        account.id,
+                        &body_map,
+                        usage_started_at,
+                    )
+                });
+                let response = match turn {
+                    Some(turn) => turn.observe_response(response, &codings),
+                    None => response,
+                };
+                let (parts, body) = response.into_parts();
+                let guarded = SlotGuardBody::new(
+                    body,
+                    guard.defuse(),
+                    req_start,
+                    account.name.clone(),
+                    self.rewriter.clone(),
+                    None,
+                    codings,
+                    None,
+                    None,
+                    self.telemetry_svc.clone(),
+                    account.clone(),
+                    status,
+                    started.elapsed().as_millis() as u64,
+                    None,
+                )
+                .with_usage_capture(usage)
+                .with_tui_retirement(Some(self.account_svc.clone()));
+                return Ok(Response::from_parts(parts, Body::new(guarded)));
+            }
+
             // 先获得并发槽位，再做 RPM admission：排队中的请求还没有准备发往上游，
             // 不能提前占用当前分钟 RPM。若 RPM 饱和导致换号，返回前会释放本账号槽位。
             let admission_result = if let Some(request) = scheduling_request.as_ref() {
-                self.acquire_v3_admission(&account, request, slot_units)
+                self.acquire_v3_admission(&account, request, slot_units, None)
                     .await
             } else {
                 self.acquire_account_admission(
@@ -2606,12 +2934,11 @@ impl GatewayService {
                 SlotReleaseGuard::new(admission.permit.with_credential_activity(activity));
             if account.request_backend == "native293" && method == "POST" && path == "/v1/messages"
             {
-                let request_account = account_for_request_profile(&account, request_profile);
-                let source_version = if device_profile(&request_account).env.version == "2.1.280" {
-                    NativeSourceVersion::Cc280
-                } else {
-                    NativeSourceVersion::Cc293
-                };
+                let native_route = tui_route
+                    .as_ref()
+                    .zip(api_token)
+                    .map(|(route, principal)| (route, (principal.id, original_session)));
+                let mut native_turn = None;
                 // HTTP 头按 Latin-1 字节串交给统一白名单，合法 obs-text 也能先被过滤。
                 let native_headers: Vec<(String, String)> = native_header_map
                     .iter()
@@ -2627,7 +2954,6 @@ impl GatewayService {
                 let response = match self
                     .forward_native_messages(
                         &account,
-                        source_version,
                         &native_headers,
                         &body_bytes,
                         &body_map,
@@ -2639,6 +2965,8 @@ impl GatewayService {
                         native_message_cache,
                         &native_disabled_thinking,
                         &mut native_oauth_retry_used,
+                        native_route,
+                        &mut native_turn,
                     )
                     .await
                 {
@@ -2646,7 +2974,15 @@ impl GatewayService {
                     Err(AppError::SchedulingConflict) => continue,
                     Err(error) => return Err(error),
                 };
-                if response.status() == StatusCode::TOO_MANY_REQUESTS {
+                if response.status().is_client_error() || response.status().is_server_error() {
+                    if let Some(turn) = native_turn.as_ref() {
+                        turn.retire_v1_error().await?;
+                    }
+                }
+                let may_retry_account = !native_turn
+                    .as_ref()
+                    .is_some_and(NativeTurn::owns_continuation);
+                if response.status() == StatusCode::TOO_MANY_REQUESTS && may_retry_account {
                     if let Some(response) = self
                         .prepare_rate_limit_retry(
                             response,
@@ -2673,6 +3009,10 @@ impl GatewayService {
                     )
                 });
                 let codings = response_content_codings(response.headers());
+                let response = match native_turn {
+                    Some(turn) => turn.observe_response(response, &codings),
+                    None => response,
+                };
                 let (parts, body) = response.into_parts();
                 let guarded = SlotGuardBody::new(
                     body,
@@ -2691,6 +3031,8 @@ impl GatewayService {
                     None,
                 )
                 .with_usage_capture(usage);
+                let guarded = guarded
+                    .with_tui_retirement(tui_route.as_ref().map(|_| self.account_svc.clone()));
                 return Ok(Response::from_parts(parts, Body::new(guarded)));
             }
             let request_account = account_for_request_profile(&account, request_profile);
@@ -3013,6 +3355,24 @@ impl GatewayService {
                     .await;
             }
 
+            let legacy_turn = if !runtime_transport::tui_fixture(&account)
+                && let Some((route, principal)) = tui_route.as_ref().zip(api_token)
+            {
+                Some(
+                    route
+                        .begin_v1(
+                            &self.account_svc,
+                            &account,
+                            (principal.id, original_session),
+                            "legacy",
+                            &body_map,
+                            LEGACY_BINDING.into(),
+                        )
+                        .await?,
+                )
+            } else {
+                None
+            };
             // 转发到上游
             let usage_started_at = Utc::now();
             let t_upstream = std::time::Instant::now();
@@ -3057,7 +3417,11 @@ impl GatewayService {
                     return Err(e);
                 }
             };
+            if let Some(turn) = legacy_turn.as_ref() {
+                turn.mark_submitted();
+            }
             if resp.status() == StatusCode::UNAUTHORIZED
+                && tool_owner.is_none()
                 && let Some(failed_access_token) = upstream_token.as_deref()
             {
                 match await_preparation(
@@ -3100,6 +3464,9 @@ impl GatewayService {
                                 "gateway",
                             )
                             .await?;
+                            if let Some(turn) = legacy_turn.as_ref() {
+                                turn.retire_v1_error().await?;
+                            }
                             auth_failure_excluded = true;
                             exclude_ids.push(account.id);
                             drop(slot_guard);
@@ -3109,6 +3476,9 @@ impl GatewayService {
                     None => {
                         diagnostics::error_stage("auth_recovery");
                         diagnostics::retry_reason("credentials_rejected");
+                        if let Some(turn) = legacy_turn.as_ref() {
+                            turn.retire_v1_error().await?;
+                        }
                         auth_failure_excluded = true;
                         exclude_ids.push(account.id);
                         drop(slot_guard);
@@ -3116,7 +3486,7 @@ impl GatewayService {
                     }
                 }
             }
-            let (resp, signature_retry_stage) = self
+            let (mut resp, signature_retry_stage) = self
                 .maybe_retry_signature_error(
                     &method.to_string(),
                     &path,
@@ -3144,8 +3514,13 @@ impl GatewayService {
                 resp.status().as_u16()
             );
 
-            // 非 429：将响应体包装为 SlotGuardBody，流结束时归还槽位
-            if resp.status() != StatusCode::TOO_MANY_REQUESTS {
+            if resp.status().is_client_error() || resp.status().is_server_error() {
+                if let Some(turn) = legacy_turn.as_ref() {
+                    turn.retire_v1_error().await?;
+                }
+            }
+            // 已定位原工具轮的 429 保持原账号，其他请求沿用既有重试。
+            if resp.status() != StatusCode::TOO_MANY_REQUESTS || tool_owner.is_some() {
                 let mut usage_capture = (path == "/v1/messages" && resp.status().is_success())
                     .then(|| {
                         UsageCapture::new(
@@ -3157,6 +3532,10 @@ impl GatewayService {
                     });
                 if let Some(lookup) = non_stream_probe_cache_lookup {
                     if resp.status().is_success() && signature_retry_stage.is_none() {
+                        if let Some(turn) = legacy_turn {
+                            let codings = response_content_codings(resp.headers());
+                            resp = turn.observe_response(resp, &codings);
+                        }
                         let (parts, body_bytes) = buffer_response_body(resp).await?;
                         if let Some(mut capture) = usage_capture.take() {
                             capture.observe_encoded(
@@ -3199,6 +3578,9 @@ impl GatewayService {
                 };
                 let permit = slot_guard.defuse();
                 let content_codings = response_content_codings(resp.headers());
+                if let Some(turn) = legacy_turn {
+                    resp = turn.observe_response(resp, &content_codings);
+                }
                 let (parts, body) = resp.into_parts();
                 let guarded_body = Body::new(
                     SlotGuardBody::new(
@@ -3217,7 +3599,8 @@ impl GatewayService {
                         telemetry_ttft_ms,
                         telemetry_error_kind.clone(),
                     )
-                    .with_usage_capture(usage_capture),
+                    .with_usage_capture(usage_capture)
+                    .with_tui_retirement(tui_route.as_ref().map(|_| self.account_svc.clone())),
                 );
                 return Ok(Response::from_parts(parts, guarded_body));
             }
@@ -3961,7 +4344,6 @@ impl GatewayService {
 
     /// 原生消息仅对明确签名400同账号降级一次，已确认历史在后续发送前降级。
     /// @param account 已选定账号，重试保持归属。
-    /// @param source_version 本请求冻结的原生版本。
     /// @param headers 原始调用方头。
     /// @param body 原始HTTP逻辑正文，用于入站证据。
     /// @param body_map 原始消息历史。
@@ -3977,7 +4359,6 @@ impl GatewayService {
     async fn forward_native_messages(
         &self,
         account: &Account,
-        source_version: NativeSourceVersion,
         headers: &[(String, String)],
         body: &[u8],
         body_map: &JsonValue,
@@ -3989,6 +4370,8 @@ impl GatewayService {
         message_cache: MessageCacheControlRewrite,
         disabled_thinking: &DisabledThinkingRewrite,
         oauth_retry_used: &mut bool,
+        native_route: Option<(&TuiRequestRoute, (i64, Option<&str>))>,
+        native_turn: &mut Option<NativeTurn>,
     ) -> Result<Response, AppError> {
         let deadline = scheduling
             .map(SchedulingRequest::deadline)
@@ -4012,7 +4395,6 @@ impl GatewayService {
         let (response, rejected_oauth) = self
             .forward_native_messages_once(
                 account,
-                source_version,
                 headers,
                 body,
                 body_map,
@@ -4025,6 +4407,8 @@ impl GatewayService {
                 message_cache,
                 disabled_thinking,
                 None,
+                native_route,
+                native_turn,
             )
             .await?;
         if let Some(first) = rejected_oauth
@@ -4062,7 +4446,6 @@ impl GatewayService {
                 deadline,
                 self.forward_native_messages_once(
                     account,
-                    source_version,
                     headers,
                     body,
                     body_map,
@@ -4075,6 +4458,8 @@ impl GatewayService {
                     message_cache,
                     disabled_thinking,
                     Some(replay),
+                    native_route,
+                    native_turn,
                 ),
             )
             .await;
@@ -4112,7 +4497,6 @@ impl GatewayService {
             deadline,
             self.forward_native_messages_once(
                 account,
-                source_version,
                 headers,
                 body,
                 body_map,
@@ -4125,6 +4509,8 @@ impl GatewayService {
                 message_cache,
                 disabled_thinking,
                 None,
+                native_route,
+                native_turn,
             ),
         )
         .await
@@ -4155,7 +4541,6 @@ impl GatewayService {
     async fn forward_native_messages_once(
         &self,
         account: &Account,
-        source_version: NativeSourceVersion,
         headers: &[(String, String)],
         body: &[u8],
         ingress_body_map: &JsonValue,
@@ -4168,6 +4553,8 @@ impl GatewayService {
         message_cache: MessageCacheControlRewrite,
         disabled_thinking: &DisabledThinkingRewrite,
         mut oauth_retry: Option<NativeOAuthRetry<'_>>,
+        native_route: Option<(&TuiRequestRoute, (i64, Option<&str>))>,
+        native_turn: &mut Option<NativeTurn>,
     ) -> Result<(Response, Option<RejectedNativeOAuthAttempt>), AppError> {
         validate_native_account_features(account, headers, body_map)?;
         let log_mode = diagnostics::current_log_mode();
@@ -4245,12 +4632,33 @@ impl GatewayService {
         )
         .await?
         .inspect_err(|_| diagnostics::error_stage("runtime_prepare"))?;
-        await_preparation(
-            scheduling,
-            transport.native_ready_for_version(source_version),
-        )
-        .await?
-        .inspect_err(|_| diagnostics::error_stage("native_prepare"))?;
+        let execution_location = transport.execution_location();
+        if let Some((route, owner)) = native_route {
+            let binding = transport.tui_native_binding(account);
+            if let Some(turn) = native_turn.as_ref() {
+                if binding != turn.binding {
+                    return Err(AppError::ServiceUnavailable(
+                        "原生工具轮环境代次待核对".into(),
+                    ));
+                }
+            } else {
+                *native_turn = Some(
+                    route
+                        .begin_v1(
+                            &self.account_svc,
+                            account,
+                            owner,
+                            NativeSourceVersion::Cc293.as_str(),
+                            ingress_body_map,
+                            binding,
+                        )
+                        .await?,
+                );
+            }
+        }
+        await_preparation(scheduling, transport.native_ready())
+            .await?
+            .inspect_err(|_| diagnostics::error_stage("native_prepare"))?;
         if extract_session_id_from_body(body_map).is_none()
             && !headers
                 .iter()
@@ -4261,6 +4669,12 @@ impl GatewayService {
             let mut bytes = [0; 16];
             bytes.copy_from_slice(&digest[..16]);
             context["sessionId"] = serde_json::json!(Uuid::from_bytes(bytes).to_string());
+            if runtime_transport::tui_fixture(account)
+                && let Some(server_session) =
+                    native_turn.as_ref().and_then(NativeTurn::stateless_session)
+            {
+                context["sessionId"] = serde_json::json!(server_session);
+            }
         }
         let id = Uuid::new_v4().to_string();
         let mut input = serde_json::json!({"schema_version":1,"request_id":id,"headers":headers,"context":context});
@@ -4272,7 +4686,7 @@ impl GatewayService {
             *self.cache_control_ttl_rewrite.read().await
         };
         let submission = NativeSubmission {
-            source_version,
+            source_version: NativeSourceVersion::Cc293,
             // 关闭时省略外层新增字段，既有sender继续沿保留布局的默认合同执行。
             message_cache_policy: (message_cache == MessageCacheControlRewrite::Sub2api)
                 .then(|| "sub2api".into()),
@@ -4329,10 +4743,12 @@ impl GatewayService {
         if let Some(permit) = permit {
             permit.submitted();
         }
+        if let Some(turn) = native_turn.as_ref() {
+            turn.mark_submitted();
+        }
         info!(request_id = ?diagnostics::current_request_id(), native_job_id = %id,
             account_id = account.id, layer = "gateway", reason = "native_submission",
             "已提交本次原生作业");
-        let execution_location = transport.execution_location();
         let native_started = Instant::now();
         let mut response = match transport.submit_native(submission, submit_budget).await {
             Ok(response) => response,
@@ -4379,7 +4795,7 @@ impl GatewayService {
                     .and_then(|value| STANDARD.decode(value).ok())
             })
             .and_then(|bytes| serde_json::from_slice::<NativeRequestObservation>(&bytes).ok())
-            .filter(|observation| observation.source_version == source_version);
+            .filter(|observation| observation.source_version == NativeSourceVersion::Cc293);
         let native_upstream = observation.as_ref().is_some_and(|observation| {
             observation.schema_version == 1
                 && observation.body_sha256.len() == 64
@@ -4397,11 +4813,7 @@ impl GatewayService {
             trace.with_execution_location(execution_location);
             trace.commit_native(native_started);
         } else if response.status().is_success() || response.status().is_server_error() {
-            diagnostics::local_outcome(if source_version == NativeSourceVersion::Cc280 {
-                "native280_unobserved"
-            } else {
-                "native293_unobserved"
-            });
+            diagnostics::local_outcome("native293_unobserved");
             diagnostics::error_stage("native_observation");
         } else {
             diagnostics::error_stage("native_prepare");
@@ -4658,25 +5070,42 @@ fn upstream_url(path: &str, query: &str) -> String {
 
 // 只改变可由固定二进制无歧义表达的 session；其余输入仍走原来的校验与错误路径。
 fn native_pool_session(headers: &[(String, String)], body: &JsonValue) -> Option<String> {
-    let values: Vec<&str> = headers
-        .iter()
-        .filter(|(name, _)| name.eq_ignore_ascii_case("x-claude-code-session-id"))
-        .map(|(_, value)| value.as_str())
-        .collect();
-    if values.len() > 1 {
+    native_session_candidate(
+        headers
+            .iter()
+            .filter(|(name, _)| name.eq_ignore_ascii_case("x-claude-code-session-id")),
+        |(_, value)| Some(value.as_str()),
+        body,
+    )
+}
+
+fn native_session_candidate<'a, H: 'a>(
+    mut values: impl Iterator<Item = &'a H>,
+    raw_value: impl FnOnce(&'a H) -> Option<&'a str>,
+    body: &JsonValue,
+) -> Option<String> {
+    let header = match values.next() {
+        Some(value) => Some(raw_value(value)?),
+        None => None,
+    };
+    if values.next().is_some() {
         return None;
     }
     let session = if let Some(value) = body.pointer("/metadata/user_id") {
         let user: JsonValue = serde_json::from_str(value.as_str()?).ok()?;
         let session = user.get("session_id")?.as_str()?;
-        if values.first().is_some_and(|header| *header != session) {
+        if header.is_some_and(|header| header != session) {
             return None;
         }
         session.to_string()
     } else {
-        values.first()?.to_string()
+        header?.to_string()
     };
-    (session.len() == 36 && Uuid::parse_str(&session).is_ok()).then_some(session)
+    native_session_uuid(&session).then_some(session)
+}
+
+fn native_session_uuid(value: &str) -> bool {
+    value.len() == 36 && Uuid::parse_str(value).is_ok()
 }
 
 fn map_native_session<'a>(
@@ -5017,7 +5446,11 @@ fn request_headers_for_encoding(
 
 fn count_tokens_app_error_response(err: AppError) -> Response {
     match err {
-        e @ AppError::AdmissionLimited { .. } => e.into_response(),
+        e @ (AppError::AdmissionLimited { .. }
+        | AppError::TuiProviderBackoff { .. }
+        | AppError::TuiSubagentCapacity
+        | AppError::TuiSubagentAmbiguous
+        | AppError::TuiInput { .. }) => e.into_response(),
         AppError::SchedulingConflict => anthropic_error_response(
             StatusCode::SERVICE_UNAVAILABLE,
             "api_error",
@@ -5029,6 +5462,11 @@ fn count_tokens_app_error_response(err: AppError) -> Response {
         AppError::AgyInput { message, .. } => {
             anthropic_error_response(StatusCode::BAD_REQUEST, "invalid_request_error", message)
         }
+        err @ AppError::TuiInputUnsupported => anthropic_error_response(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "invalid_request_error",
+            &err.to_string(),
+        ),
         AppError::Unauthorized => anthropic_error_response(
             StatusCode::UNAUTHORIZED,
             "authentication_error",
@@ -5436,7 +5874,7 @@ fn try_decode_response_body_with_codings(
     Ok(decoded)
 }
 
-fn response_content_codings(headers: &HeaderMap) -> Vec<String> {
+pub(super) fn response_content_codings(headers: &HeaderMap) -> Vec<String> {
     headers
         .get_all(CONTENT_ENCODING)
         .iter()
@@ -5758,7 +6196,7 @@ fn query_model_is_fable(query: &str) -> bool {
         .unwrap_or(false)
 }
 
-fn request_slot_units(path: &str, body: &serde_json::Value) -> u32 {
+pub(super) fn request_slot_units(path: &str, body: &serde_json::Value) -> u32 {
     if path == "/v1/messages"
         && body
             .get("model")
@@ -7760,7 +8198,7 @@ fn default_fable_sticky_quota_fallback_enabled() -> bool {
 }
 
 /// 解析 Fable 周用量百分比上限,非法值回退默认配置。
-fn parse_fable_weekly_usage_limit_percent(raw: &str) -> u32 {
+pub(super) fn parse_fable_weekly_usage_limit_percent(raw: &str) -> u32 {
     raw.trim()
         .parse::<u32>()
         .ok()
@@ -8518,6 +8956,7 @@ struct SlotGuardBody {
     first_frame_logged: bool,
     /// 独立于自动遥测的一次性本地用量记录。
     usage_capture: Option<UsageCapture>,
+    tui_retirement: Option<Arc<AccountService>>,
 }
 
 /// prompt cache usage 日志上下文,只保存脱敏后的请求结构信息。
@@ -8633,6 +9072,7 @@ impl SlotGuardBody {
             message_telemetry_stop_reason: None,
             first_frame_logged: false,
             usage_capture: None,
+            tui_retirement: None,
         }
     }
 
@@ -8641,6 +9081,11 @@ impl SlotGuardBody {
             capture.configure_codings(&self.response_content_codings);
         }
         self.usage_capture = capture;
+        self
+    }
+
+    fn with_tui_retirement(mut self, service: Option<Arc<AccountService>>) -> Self {
+        self.tui_retirement = service;
         self
     }
 
@@ -9109,13 +9554,17 @@ impl Drop for SlotGuardBody {
             self.account_name
         );
         // permit 的 Drop 负责归还 semaphore
-        let _ = self.permit.take();
+        drop(self.permit.take());
+        if let Some(service) = self.tui_retirement.take() {
+            service.notify_tui_response_retired(self.telemetry_account.id);
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     include!("gateway_rate_limit_tests.rs");
+    include!("gateway_stream_delivery_tests.rs");
 
     use super::{map_native_session, native_pool_session, validate_native_account_features};
     use crate::service::rewriter::{DisabledThinkingRewrite, MessageCacheControlRewrite};
@@ -11112,8 +11561,6 @@ mod tests {
     #[tokio::test]
     #[ignore = "由 tests/native_signature_fixture.py 提供隔离进程及回环sender"]
     async fn native_signature_repair_gateway_roundtrip() {
-        use crate::service::native_contract::NativeSourceVersion;
-
         assert_eq!(std::env::var("FLOWER_SIGNATURE_FIXTURE").unwrap(), "1");
         let (service, store) = test_gateway_service_with_scheduling(
             Arc::new(MemoryStore::new()),
@@ -11181,7 +11628,7 @@ mod tests {
                     sent[before..]
                         .iter()
                         .all(|request| request["account_id"] == account.id
-                            && request["version"] == version)
+                            && request["version"] == "2.1.293")
                 );
                 assert!(
                     sent.last().unwrap()["body"]["messages"]
@@ -11255,7 +11702,6 @@ mod tests {
             let response = service
                 .forward_native_messages(
                     &other_account,
-                    NativeSourceVersion::Cc293,
                     &headers,
                     &bytes,
                     &candidate,
@@ -11267,6 +11713,8 @@ mod tests {
                     MessageCacheControlRewrite::Off,
                     &DisabledThinkingRewrite::off(),
                     &mut false,
+                    None,
+                    &mut None,
                 )
                 .await
                 .unwrap();
@@ -11466,9 +11914,12 @@ mod tests {
             let sent = snapshot().await;
             assert_eq!(sent.len() - before, attempts, "{label}");
             assert_eq!(sent[before]["bearer_kind"], "old", "{label}");
-            assert!(sent[before..].iter().all(
-                |request| request["account_id"] == account.id && request["version"] == version
-            ));
+            assert!(
+                sent[before..]
+                    .iter()
+                    .all(|request| request["account_id"] == account.id
+                        && request["version"] == "2.1.293")
+            );
             let diagnostics = service.diagnostics_store().unwrap();
             diagnostics.flush().await.unwrap();
             let detail = diagnostics.detail(&root_id).await.unwrap();
@@ -11821,7 +12272,7 @@ mod tests {
                     .map(|value| serde_json::from_str(&value).unwrap()),
                 binary_path: var("CCRB_TEST_BINARY").unwrap(),
                 work_root: root.join("workers").to_string_lossy().into_owned(),
-                // 双版真实回环使用低于旧公式的配置，核对版本入口同步准入。
+                // 用低于旧公式的上限验证实际额度准入。
                 memory_mib: if unlimited { 0 } else { 128 },
                 max_workers: 6,
             }),
@@ -11836,18 +12287,6 @@ mod tests {
             ),
             quota_identity: String::new(),
         };
-        let mut config = config;
-        if let Ok(binary) = var("CCRB_TEST_BINARY_280") {
-            use crate::service::native_contract::NativeRuntimeConfig;
-            config.native.as_mut().unwrap().runtimes.insert(
-                NativeSourceVersion::Cc280,
-                NativeRuntimeConfig {
-                    binary_path: binary,
-                    release: None,
-                    kernel_generation: None,
-                },
-            );
-        }
         let capture_directory = config.native_capture_dir.clone().unwrap();
         let path = root.join("sender.json");
         fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
@@ -11936,6 +12375,11 @@ mod tests {
                                 .unwrap(),
                         );
                         let response = service.handle_request(value, None).await;
+                        if native && version == "2.1.280" {
+                            assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+                            body::to_bytes(response.into_body(), 8192).await.unwrap();
+                            continue;
+                        }
                         let status = response.status();
                         let id = response.headers()["x-cc2api-request-id"]
                             .to_str()
@@ -11959,7 +12403,7 @@ mod tests {
                         .unwrap();
                         let detail = diagnostics.detail(&id).await.unwrap();
                         assert_eq!(detail.request.attempt_count, 1);
-                        assert_eq!(detail.attempts[0].profile_version, version);
+                        assert_eq!(detail.attempts[0].profile_version, "2.1.293");
                         let path =
                             format!("{capture_directory}/{}.json", detail.attempts[0].attempt_id);
                         let snapshot: Value = timeout(Duration::from_secs(4), async {
@@ -12004,7 +12448,7 @@ mod tests {
                             .unwrap();
                         let actual = observed["messages"].as_array().unwrap().last().unwrap();
                         assert_eq!(actual["label"], label);
-                        assert_eq!(actual["source_version"], version);
+                        assert_eq!(actual["source_version"], "2.1.293");
                         assert_eq!(actual["thinking"], prepared["thinking"]);
                         assert!(
                             actual["cache_ttls"]
@@ -12028,6 +12472,9 @@ mod tests {
                     .await
                     .unwrap();
                 service.reload_disabled_thinking_rewrite().await.unwrap();
+                if version == "2.1.280" {
+                    continue;
+                }
                 let label = format!(
                     "gateway-dual-thinking-signature-{}",
                     version.replace('.', "")
@@ -12182,17 +12629,12 @@ mod tests {
                 account.rate_limited_at = None;
                 store.update(&account).await.unwrap();
                 store.clear_rate_limit(account.id).await.unwrap();
-                let source_version = if version == "2.1.280" {
-                    NativeSourceVersion::Cc280
-                } else {
-                    NativeSourceVersion::Cc293
-                };
                 let transport = runtime_transport::prepare(&account, Duration::from_secs(30))
                     .await
                     .unwrap();
                 let ready = transport
                     .prepare_native(NativePreparation {
-                        source_version,
+                        source_version: NativeSourceVersion::Cc293,
                         account_id: account.id,
                         environment_id: String::new(),
                         generation: 0,
@@ -12260,7 +12702,7 @@ mod tests {
                         .unwrap();
                     let actual = observed["messages"].as_array().unwrap().last().unwrap();
                     assert_eq!(actual["label"], "hi");
-                    assert_eq!(actual["source_version"], version);
+                    assert_eq!(actual["source_version"], "2.1.293");
                     if status == 200 {
                         assert_eq!(
                             observed["prime_drains"],
@@ -12392,6 +12834,11 @@ mod tests {
                                 .unwrap(),
                         );
                         let response = service.handle_request(value, None).await;
+                        if native && version == "2.1.280" {
+                            assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+                            body::to_bytes(response.into_body(), 8192).await.unwrap();
+                            continue;
+                        }
                         let status = response.status();
                         let id = response
                             .headers()
@@ -12411,7 +12858,7 @@ mod tests {
                         wait_cache_diagnostics(diagnostics).await;
                         let detail = diagnostics.detail(&id).await.unwrap();
                         assert_eq!(detail.request.attempt_count, 1);
-                        assert_eq!(detail.attempts[0].profile_version, version);
+                        assert_eq!(detail.attempts[0].profile_version, "2.1.293");
                         let runtime = detail.attempts[0].runtime.as_ref().unwrap();
                         assert_eq!(
                             *pid.get_or_insert(runtime.worker_pid),
@@ -12604,6 +13051,11 @@ mod tests {
                             .unwrap(),
                     );
                     let response = service.handle_request(value, None).await;
+                    if native && version == "2.1.280" {
+                        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+                        body::to_bytes(response.into_body(), 8192).await.unwrap();
+                        continue;
+                    }
                     assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
                     assert_eq!(response.headers()["request-id"], "req_real_rate_limit");
                     let id = response.headers()["x-cc2api-request-id"]
@@ -12620,7 +13072,7 @@ mod tests {
                     diagnostics.flush().await.unwrap();
                     let detail = diagnostics.detail(&id).await.unwrap();
                     assert_eq!(detail.request.attempt_count, 1);
-                    assert_eq!(detail.attempts[0].profile_version, version);
+                    assert_eq!(detail.attempts[0].profile_version, "2.1.293");
                     assert_eq!(detail.attempts[0].status_code, Some(429));
                     assert!(
                         store
@@ -12644,7 +13096,7 @@ mod tests {
             let _ = fs::remove_dir_all(root);
             return;
         }
-        if var("CCRB_TEST_MULTI_VERSION").as_deref() == Ok("1") {
+        if var("CCRB_TEST_SINGLE_RUNTIME").as_deref() == Ok("1") {
             use futures_util::future::join_all;
             let make = |version: &str, label: &str, native: bool, haiku: bool| {
                 let mut body = json!({"model":if haiku {"claude-haiku-4-5"} else {"claude-sonnet-4-6"},
@@ -12694,20 +13146,17 @@ mod tests {
                     assert_eq!(
                         status,
                         StatusCode::OK,
-                        "双版并发索引{index}：{}",
+                        "客户端并发索引{index}：{}",
                         String::from_utf8_lossy(&bytes)
                     );
                 }
             });
             timeout(Duration::from_secs(90), join_all(parallel))
                 .await
-                .expect("双版本并发必须完整收口");
-            let physical = fs::read_dir(root.join("workers"))
-                .unwrap()
-                .filter(|entry| entry.as_ref().unwrap().file_name() != "280")
-                .count()
-                + fs::read_dir(root.join("workers/280")).unwrap().count();
-            assert_eq!(physical, 6, "两版共同遵守账号物理进程上限");
+                .expect("多客户端并发必须完整收口");
+            let physical = fs::read_dir(root.join("workers")).unwrap().count();
+            assert_eq!(physical, 6, "所有客户端共用 293 的物理进程上限");
+            assert!(!root.join("workers/280").exists());
             let diagnostics = service.diagnostics_store().unwrap();
             diagnostics.flush().await.unwrap();
             let page = diagnostics
@@ -12718,7 +13167,7 @@ mod tests {
                 .await
                 .unwrap();
             let mut initial_pids = HashSet::new();
-            let mut warm_hits = HashMap::new();
+            let mut warm_hits = 0;
             for item in page.items {
                 let detail = diagnostics.detail(&item.request_id).await.unwrap();
                 assert!(
@@ -12727,21 +13176,15 @@ mod tests {
                 );
                 assert_eq!(detail.request.original_session_id, item.original_session_id);
                 let attempt = &detail.attempts[0];
-                assert!(matches!(
-                    attempt.profile_version.as_str(),
-                    "2.1.280" | "2.1.293"
-                ));
+                assert_eq!(attempt.profile_version, "2.1.293");
                 let runtime = attempt.runtime.as_ref().unwrap();
                 initial_pids.insert(runtime.worker_pid);
                 if runtime.warm_hit {
-                    *warm_hits
-                        .entry(attempt.profile_version.clone())
-                        .or_insert(0) += 1;
+                    warm_hits += 1;
                 }
             }
             assert_eq!(initial_pids.len(), 6);
-            assert!(warm_hits.get("2.1.280").copied().unwrap_or(0) > 0);
-            assert!(warm_hits.get("2.1.293").copied().unwrap_or(0) > 0);
+            assert!(warm_hits > 0);
             account.setup_token = "synthetic-bearer-b".into();
             service.account_svc.update_account(&account).await.unwrap();
             for (version, label) in [
@@ -12759,7 +13202,7 @@ mod tests {
             for pid in initial_pids {
                 assert!(
                     fs::metadata(format!("/proc/{pid}/exe")).is_err(),
-                    "凭据轮换统一退役两版旧空闲进程"
+                    "凭据轮换时退役旧身份的空闲进程"
                 );
             }
             for (default, label) in [
@@ -12820,6 +13263,14 @@ mod tests {
                     None,
                 )
                 .await;
+            assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+            body::to_bytes(response.into_body(), 8192).await.unwrap();
+            let response = service
+                .handle_request(
+                    make("2.1.293", "gateway-dual-native-293", true, false),
+                    None,
+                )
+                .await;
             assert_eq!(response.status(), StatusCode::OK);
             let native_id = response.headers()["x-cc2api-request-id"]
                 .to_str()
@@ -12834,7 +13285,7 @@ mod tests {
                 native_detail.request.original_session_id.as_deref(),
                 Some("22222222-2222-4222-8222-222222222222")
             );
-            assert_eq!(native_detail.attempts[0].profile_version, "2.1.280");
+            assert_eq!(native_detail.attempts[0].profile_version, "2.1.293");
             let mut conflict = make("2.1.280", "gateway-dual-conflict", true, false);
             conflict.headers_mut().insert(
                 "user-agent",
@@ -12845,13 +13296,13 @@ mod tests {
             axum::body::to_bytes(response.into_body(), 1024 * 1024)
                 .await
                 .unwrap();
-            let mut missing = config.clone();
-            missing.native.as_mut().unwrap().runtimes.clear();
-            fs::write(&sender_path, serde_json::to_vec(&missing).unwrap()).unwrap();
+            let mut legacy = serde_json::to_value(&config).unwrap();
+            legacy["native"]["runtimes"] = json!({"2.1.280":{"binary_path":"/retired-worker"}});
+            fs::write(&sender_path, serde_json::to_vec(&legacy).unwrap()).unwrap();
             let response = service
                 .handle_request(make("2.1.280", "gateway-dual-missing", false, false), None)
                 .await;
-            assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+            assert_eq!(response.status(), StatusCode::OK);
             axum::body::to_bytes(response.into_body(), 1024 * 1024)
                 .await
                 .unwrap();
@@ -12864,7 +13315,7 @@ mod tests {
                     None,
                 )
                 .await;
-            assert_eq!(response.status(), StatusCode::OK);
+            assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
             axum::body::to_bytes(response.into_body(), 1024 * 1024)
                 .await
                 .unwrap();
@@ -12890,22 +13341,7 @@ mod tests {
             let messages = observed["messages"].as_array().unwrap();
             assert_eq!(messages.len(), 18, "拒绝路径保持零模型发送");
             for message in messages {
-                let expected = if message["label"].as_str().unwrap().contains("293") {
-                    "2.1.293"
-                } else if let Some(index) = message["label"]
-                    .as_str()
-                    .unwrap()
-                    .strip_prefix("gateway-dual-parallel-")
-                {
-                    if index.parse::<usize>().unwrap() % 2 == 0 {
-                        "2.1.280"
-                    } else {
-                        "2.1.293"
-                    }
-                } else {
-                    "2.1.280"
-                };
-                assert_eq!(message["source_version"], expected);
+                assert_eq!(message["source_version"], "2.1.293");
             }
             assert_eq!(observed["parallel_peak"], 6);
             sender.abort();
@@ -16478,11 +16914,9 @@ mod tests {
         server.abort();
     }
 
-    /// 真实 Router 先校验 API token，已认证请求才会进入编码声明校验。
-    /// @return 无；畸形编码抢先覆盖缺失/无效 token 的 401 或合法 token 未进入 Gateway 即失败。
-    #[tokio::test]
-    async fn gateway_compressed_request_router_authentication_precedes_decoding() {
-        let service = Arc::new(test_gateway_service().await);
+    /// 为指定测试网关装配正式路由与隔离的入口令牌。
+    /// @param service 使用测试依赖的网关。@return 路由与其接受的合成令牌。
+    async fn authenticated_gateway_router(service: Arc<GatewayService>) -> (Router, ApiToken) {
         let pool = AnyPoolOptions::new()
             .max_connections(1)
             .connect("sqlite::memory:")
@@ -16535,6 +16969,15 @@ mod tests {
             Arc::new(OAuthFlowService::new()),
             service.telemetry_svc.clone(),
         );
+        (router, token)
+    }
+
+    /// 真实 Router 先校验 API token，已认证请求才会进入编码声明校验。
+    /// @return 无；畸形编码抢先覆盖缺失/无效 token 的 401 或合法 token 未进入 Gateway 即失败。
+    #[tokio::test]
+    async fn gateway_compressed_request_router_authentication_precedes_decoding() {
+        let service = Arc::new(test_gateway_service().await);
+        let (router, token) = authenticated_gateway_router(service).await;
         for path in [
             "/v1/messages",
             COUNT_TOKENS_PATH,

@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
-import { dirname, join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import type { PreparedInput, RuntimeEvent, RuntimePayload, WorkerCommand } from '../shared/contracts';
 import { decodeWorkerFrame, runtimeEvent } from '../shared/protocol';
 import { BridgeError, errorText } from '../shared/errors';
@@ -30,7 +30,7 @@ export interface EngineConfig {
 
 /** 统一运行时接口，演示与真实原生来源始终分别标记。 */
 export interface Engine {
-  readonly sourceVersion?: '2.1.280' | '2.1.293';
+  readonly sourceVersion?: '2.1.293';
   readonly name: string;
   readonly binarySha256: string | null;
   readonly workerPid: number | null;
@@ -92,7 +92,7 @@ interface WorkerProcess {
 /** 固定账号、惰性启动并串行复用的官方原生引擎。 */
 export class NativeEngine implements Engine {
   /** 返回已核验执行体的协议版本。@return 固定源版本。 */
-  get sourceVersion(): '2.1.280' | '2.1.293' { return this.identity?.sourceVersion ?? '2.1.293'; }
+  get sourceVersion(): '2.1.293' { return this.identity?.sourceVersion ?? '2.1.293'; }
   /** 返回实际原生引擎名称。@return 来源与版本标识。 */
   get name(): string { return 'claude-code/' + this.sourceVersion; }
   private readonly config: EngineConfig;
@@ -134,7 +134,7 @@ export class NativeEngine implements Engine {
     if (!this.config.binaryPath || !this.config.home || !this.config.configDir) throw new BridgeError('native_configuration', '原生模式需要 CCRB_CLAUDE_BINARY、CCRB_CLAUDE_HOME 和 CCRB_CLAUDE_CONFIG_DIR', 503);
     const verified = await verifyRuntime(this.config.binaryPath);
     try {
-      if (verified.identity.kind === 'original') await readFile(this.preloadPath(verified.identity));
+      if (verified.identity.kind === 'original') await readFile(this.config.preloadPath);
       if (verified.identity.kind !== 'original' && this.config.baseUrl !== undefined) throw new BridgeError('native_configuration', '旧精简运行时尚未验证显式上游配置，请使用固定官方原版', 503);
       this.identity = verified.identity;
       this.stamp = verified.stamp;
@@ -155,10 +155,6 @@ export class NativeEngine implements Engine {
   private async retire(worker: WorkerProcess): Promise<void> {
     this.fail(worker, new BridgeError('runtime_closed', '工作进程已关闭', 502));
     await worker.loop;
-  }
-
-  private preloadPath(identity: RuntimeIdentity): string {
-    return identity.sourceVersion === '2.1.280' ? join(dirname(this.config.preloadPath), 'preload-280.mjs') : this.config.preloadPath;
   }
 
   private send(worker: WorkerProcess, command: WorkerCommand): void {
@@ -253,7 +249,7 @@ export class NativeEngine implements Engine {
         CLAUDE_CODE_GATEWAY_HINT_HEADERS: '1', CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
         DISABLE_AUTOUPDATER: '1', DISABLE_TELEMETRY: '1', DISABLE_ERROR_REPORTING: '1',
       };
-      if (verified.identity.kind === 'original') env.BUN_OPTIONS = '--preload ' + resolve(this.preloadPath(verified.identity));
+      if (verified.identity.kind === 'original') env.BUN_OPTIONS = '--preload ' + resolve(this.config.preloadPath);
       if (config.apiKey) env.ANTHROPIC_API_KEY = config.apiKey;
       if (config.oauthToken) env.CLAUDE_CODE_OAUTH_TOKEN = config.oauthToken;
       if (config.proxyUrl) { env.HTTP_PROXY = config.proxyUrl; env.HTTPS_PROXY = config.proxyUrl; }

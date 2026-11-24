@@ -4,9 +4,11 @@ from __future__ import annotations
 import ipaddress
 import hashlib
 import json
+import shlex
 import uuid
 import threading
 
+from docker.errors import DockerException
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
 
 from account_update_identity import configured_release
@@ -18,9 +20,10 @@ from cluster_migration_files import ArchiveDescriptor, ArchiveExport, ImportStag
 from cluster_migration_io import MigrationIO, MigrationUploadIncomplete
 from cluster_migration_lease import IndependentMigrationPermit, MigrationLease
 from cluster_migrations import NodeMigrations
-from cluster_migration_errors import migration_failure
+from cluster_migration_errors import MigrationFailure, migration_failure
 from cluster_migration_profiles import MigrationProfiles
 from system_profile import validate_computer_profile, validate_system_profile
+from tui_node_source import inspect_tui_node_source
 
 
 class MigrationStart(BaseModel):
@@ -116,11 +119,15 @@ class MigrationCoordinator:
                         self._receipt(observed, {'protocol': 1, 'node_key': source['node_key'], 'account_id': account_id,
                             'environment_id': row['environment_id'], 'assignment_revision': original['revision'], 'generation': 0})
                 execution = self._execution(account, request.version, source, target)
+                mode = self._require_target_tui_source(source, target, row, original['revision'], execution)
+                if mode is not None:
+                    execution['tui_source_mode'] = mode
                 return self.ledger.begin(request.operation_id, account_id, request.node_id, request.revision, execution=execution)
 
     def _execution(self, account, version, source, target):
         return {'account_name': account['name'], 'profile_path': account['profile_path'],
             'gateway_account_id': account['cc2api_account_id'], 'version': version,
+            'account_release': configured_release(self.runtime),
             'attempt_id': uuid.uuid4().hex, 'transfer_id': uuid.uuid4().hex,
             'source_node_key': source['node_key'], 'source_node_revision': source['revision'],
             'source_node_config_sha256': hashlib.sha256(source['config_json'].encode()).hexdigest(),
@@ -197,6 +204,67 @@ class MigrationCoordinator:
             environment_id=record['environment_id'], assignment_revision=record['source_revision'], generation=record['source_generation'])
         return migration, execution, identity, fence
 
+    def _tui_source_probe(self, node: dict, **scope) -> dict:
+        payload = {**scope, 'node_key': node['node_key'], 'deployment': self.runtime.deployment}
+        if node['kind'] == 'local':
+            return inspect_tui_node_source(self.runtime.data, self.runtime.client, self.runtime.image, payload)
+        # SSH 只返回固定模式或就绪标志，节点端自行核验其配置及 socket。
+        script = ('from pathlib import Path;from docker import DockerClient;'
+                  'from tui_node_source import inspect_tui_node_source;import json,os,sys;scope=json.load(sys.stdin);'
+                  'assert os.environ["V3_ROLE"]=="node-control" and scope["node_key"]==os.environ["V3_NODE_KEY"] '
+                  'and scope["deployment"]==os.environ["V3_DEPLOYMENT_ID"];'
+                  'client=DockerClient.from_env();'
+                  'print(json.dumps(inspect_tui_node_source(Path(os.environ["BENCH_DATA"]),client,'
+                  'os.environ["V3_ACCOUNT_IMAGE"],scope)));client.close()')
+        control = node_container_name(self.runtime.deployment, node['node_key'])
+        command = shlex.join(['docker', 'exec', '-i', control, 'python3', '-c', script])
+        result = self.service.connection(node['id'])._command(command, data=json.dumps(payload).encode(),
+            timeout=15, maximum_output=128)
+        return json.loads(result)
+
+    def _require_target_tui_source(self, source, target, row, revision, execution) -> str | None:
+        gateway_id = execution['gateway_account_id']
+        if gateway_id is None:
+            return None
+        planned = execution.get('tui_source_mode')
+        try:
+            configuration = self.gateway._request('GET', f'/admin/runtime/accounts/{gateway_id}/config')
+        except (OSError, ValueError):
+            if planned:
+                raise MigrationFailure('tui_source_unknown', 'preflight') from None
+            raise
+        if configuration.get('request_backend') != 'tui_v2':
+            if planned:
+                raise MigrationFailure('tui_source_unknown', 'preflight')
+            return None
+        scope = {'environment_id': row['environment_id'], 'generation': row['generation'],
+            'account_id': row['account_id'], 'gateway_account_id': gateway_id, 'release_id': execution['account_release']}
+        try:
+            result = self._tui_source_probe(source, action='source', revision=revision, **scope)
+            mode = result.get('mode') if isinstance(result, dict) else None
+        except (OSError, ValueError, DockerException):
+            mode = None
+        if mode not in ('local_provider', 'formal') or planned is not None and mode != planned:
+            raise MigrationFailure('tui_source_unknown', 'preflight')
+        try:
+            # V2 在原账号可接单时完成目标组件检查，后台同步走已有节点安装入口。
+            self._ready(target)
+        except ValueError:
+            raise MigrationFailure('component_version', 'preflight') from None
+        self._require_tui_node_ready(target, mode, 'target', scope, 'preflight')
+        return mode
+
+    def _require_tui_node_ready(self, node, mode, action, scope, stage) -> None:
+        field = 'supported' if action == 'target' else 'ready'
+        try:
+            result = self._tui_source_probe(node, action=action, mode=mode, **scope)
+            if isinstance(result, dict) and result.get(field) is True:
+                return
+        except (OSError, ValueError, DockerException):
+            pass
+        cause = 'tui_local_unavailable' if mode == 'local_provider' else 'tui_formal_unavailable'
+        raise MigrationFailure(cause, stage)
+
     def _lease(self, operation_id: str, execution: dict, account_id: int) -> MigrationLease | IndependentMigrationPermit:
         if execution['gateway_account_id'] is None:
             return IndependentMigrationPermit(self.ledger,operation_id,self.service.transports,account_id,abort=self.stopping)
@@ -215,7 +283,8 @@ class MigrationCoordinator:
         step = 'context'
         try:
             # 同步在两端操作锁之外等待；后台安装器使用同一把节点锁。
-            if migration['record']['last_confirmed_phase'] != 'committed' and not self.ledger.agy:
+            source_mode = migration['record'].get('checkpoints', {}).get('execution', {}).get('tui_source_mode')
+            if migration['record']['last_confirmed_phase'] != 'committed' and not self.ledger.agy and not source_mode:
                 step = 'preflight'
                 self.ledger.progress(operation_id, step)
                 self._ready(self.service.store.get(migration['target_node_id']), synchronize=True)
@@ -223,6 +292,19 @@ class MigrationCoordinator:
                 migration, execution, identity, fence = self._context(operation_id, account)
                 if migration['phase'] in ('completed', 'cancelled'):
                     return migration
+                checkpoints = migration['record'].get('checkpoints', {})
+                tui_mode = execution.get('tui_source_mode') or checkpoints.get('tui_source', {}).get('mode')
+                if not self.ledger.agy and migration['record']['last_confirmed_phase'] in ('requested', 'draining'):
+                    step = 'preflight'
+                    try:
+                        tui_mode = self._require_target_tui_source(self.service.store.get(migration['source_node_id']),
+                            self.service.store.get(migration['target_node_id']), row, fence.assignment_revision,
+                            {**execution, 'tui_source_mode': tui_mode})
+                    except MigrationFailure as error:
+                        self.ledger.cancel_unstarted_preflight(operation_id, error.public())
+                        raise
+                    if tui_mode and 'tui_source_mode' not in execution:
+                        self.ledger.checkpoint(operation_id, 'tui_source', {'mode': tui_mode})
                 early_cancel = self.ledger.agy and self._early_cancel(operation_id)
                 if early_cancel:
                     return self.cancel(operation_id)
@@ -314,7 +396,16 @@ class MigrationCoordinator:
                                     'generation': peer['environment']['generation']})
                             if migration['phase'] == 'verified':
                                 lease.check()
-                                self._ready(self.service.store.get(target_id))
+                                target = self.service.store.get(target_id)
+                                self._ready(target)
+                                if tui_mode:
+                                    step = 'prepare-import'
+                                    prepared = migration['record']['checkpoints']['target']['environment']
+                                    self._require_tui_node_ready(target, tui_mode, 'prepared', {
+                                        'operation_id': operation_id, 'target_revision': stage.target_revision,
+                                        'account_id': account['id'], 'gateway_account_id': execution['gateway_account_id'],
+                                        'environment_id': fence.environment_id, 'generation': prepared['generation'],
+                                        'release_id': execution['account_release']}, step)
                                 migration = self.ledger.commit(operation_id, migration['record']['checkpoints']['target']['environment'])
                         if migration['phase'] == 'committed':
                             lease.check()

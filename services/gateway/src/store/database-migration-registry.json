@@ -109,6 +109,15 @@
       "predecessor": 11,
       "rollback_mode": "compatible",
       "version": 12
+    },
+    {
+      "checksum": "2aa20269483745421b2e9c0f195cfe936d4b786549c59a99d1e1a459b9b5b5db",
+      "engine": "sqlite",
+      "id": "gateway.tui-backend.13",
+      "kind": "schema",
+      "predecessor": 12,
+      "rollback_mode": "compatible",
+      "version": 13
     }
   ]
 }

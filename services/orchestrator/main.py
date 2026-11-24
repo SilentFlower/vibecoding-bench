@@ -14532,17 +14532,25 @@ def v3_transport(account_id: int, wake: bool = True):
         connection.close()
     if len(rows) != 1:
         raise HTTPException(409, "账号没有唯一的 v3 环境绑定")
+    account = dict(rows[0])
     try:
-        if cluster_service and cluster_service.store.assignment(rows[0]['id'])['kind'] == 'ssh':
+        if cluster_service and cluster_service.store.assignment(account['id'])['kind'] == 'ssh':
             if not wake:
-                return None
-            account = dict(rows[0])
-            if credential_ownership:
-                credential_ownership.guard(account)
-            return cluster_service.prepare_remote(account, account_runtime, cc2api_client, _quota_identity(account))
-        if not wake:
-            return account_runtime.existing_transport(dict(rows[0]))
-        return account_runtime.transport(dict(rows[0]), effective_claude_code_version())
+                binding = cluster_service.existing_remote_transport(account, account_runtime)
+            else:
+                if credential_ownership:
+                    credential_ownership.guard(account)
+                binding = cluster_service.prepare_remote(account, account_runtime, cc2api_client, _quota_identity(account))
+        elif not wake:
+            placement = (lambda current: cluster_service.admit_local(current, allow_node_drain=True)) if cluster_service else None
+            binding = account_runtime.existing_transport(account, placement_check=placement)
+        else:
+            binding = account_runtime.transport(account, effective_claude_code_version())
+        if binding and cluster_service and configuration.get('request_backend') == 'tui_v2':
+            proofs = cluster_service.tui_transport_predecessors(account, account_runtime, binding)
+            if proofs:
+                return {**binding, 'tui_predecessors': proofs}
+        return binding
     except NativePreparationBlocked as error:
         raise HTTPException(503, "原生运行时资源预算不满足，请调整后重试",
             headers={'x-v3-runtime-reason': error.reason}) from None
@@ -14606,38 +14614,28 @@ def _v3_environment_summary(row: dict, ownerships: dict, native_preparations: di
                 row['state']='reconcile'
             row['fingerprint']=json.loads(row.pop('fingerprint_json'))
             return row
+    if row['account_id'] is not None:
+        connection = get_db()
+        try:
+            account = connection.execute('SELECT * FROM accounts WHERE id=?', (row['account_id'],)).fetchone()
+        finally:
+            connection.close()
+    row['gateway_account_id'] = account['cc2api_account_id'] if account else None
+    observation = native_preparations.get(row['gateway_account_id'])
+    backend = observation.get('request_backend') if observation else None
+    row['request_backend'] = backend if backend in ('legacy', 'native293', 'tui_v2') else None
     if cluster_service and row['account_id'] is not None:
         row['node'] = cluster_service.store.assignment(row['account_id'])
         if row['node']['kind'] == 'ssh':
-            connection = get_db()
-            try:
-                account = connection.execute('SELECT * FROM accounts WHERE id=?', (row['account_id'],)).fetchone()
-            finally:
-                connection.close()
-            row.update(cluster_service.remote_summary(row, account_runtime, effective_claude_code_version(),
-                native_preparations.get(account['cc2api_account_id']) if account else None))
+            row.update(cluster_service.remote_summary(row, account_runtime, effective_claude_code_version(), observation))
             row['fingerprint'] = json.loads(row.pop('fingerprint_json'))
             row['run_window'] = _account_run_window(dict(account), public=True, zone=row['fingerprint']['tz']) if account else None
-            row['gateway_account_id'] = account['cc2api_account_id'] if account else None
-            target = native_preparations.get(row.get('gateway_account_id'), {}).get('request_backend')
-            row['request_backend'] = target if target in ('legacy', 'native293') else None
             row['native_preparation'] = None
             return row
     row["role_status"] = account_runtime.role_status(row)
     blocker = account_runtime.reprofile_blocker(row)
     row["fingerprint"] = json.loads(row.pop("fingerprint_json"))
-    if row["account_id"] is not None:
-        connection = get_db()
-        try:
-            account = connection.execute("SELECT * FROM accounts WHERE id=?", (row["account_id"],)).fetchone()
-        finally:
-            connection.close()
-        row["run_window"] = _account_run_window(dict(account), public=True, zone=row["fingerprint"]["tz"]) if account else None
-        row['gateway_account_id'] = account['cc2api_account_id'] if account else None
-    else:
-        row["run_window"] = None
-    target = native_preparations.get(row.get('gateway_account_id'), {}).get('request_backend')
-    row['request_backend'] = target if target in ('legacy', 'native293') else None
+    row["run_window"] = _account_run_window(dict(account), public=True, zone=row["fingerprint"]["tz"]) if account else None
     row['native_preparation'] = account_runtime.native_preparation_summary(row, dict(account) if account else None, native_preparations, native_preparation_error)
     row["physical_features"] = physical_features_summary(row,
         account_runtime._root(row) / "runtime/physical-features.json", time.time())
@@ -14662,10 +14660,7 @@ def _v3_environment_summary(row: dict, ownerships: dict, native_preparations: di
         row["native_kernel"] = native_kernel_status(account_runtime, row)
     except (OSError, ValueError, TypeError):
         row["native_kernel"] = None
-    try:
-        row['native_kernels'] = {'2.1.293': row['native_kernel'], '2.1.280': native_kernel_status(account_runtime, row, '2.1.280')}
-    except (OSError, ValueError, TypeError):
-        row['native_kernels'] = {'2.1.293': row['native_kernel'], '2.1.280': None}
+    row['native_kernels'] = {'2.1.293': row['native_kernel']}
     row["platform_release"] = account_runtime.release_id
     row['content_capture'] = None
     row['criu'] = None
@@ -14746,7 +14741,16 @@ def refresh_v3_physical_features(environment_id: str) -> dict:
     """
     if not account_runtime:
         raise HTTPException(404, "v3 环境未启用")
-    row = _managed_environment(environment_id)
+    connection = get_db()
+    try:
+        environment = connection.execute("SELECT e.* FROM account_environments e WHERE e.environment_id=? "
+            "AND (e.account_id IS NULL OR EXISTS(SELECT 1 FROM accounts a "
+            "WHERE a.id=e.account_id AND a.deleted_at IS NULL))", (environment_id,)).fetchone()
+    finally:
+        connection.close()
+    if environment is None:
+        raise HTTPException(404, "环境不存在")
+    row = dict(environment)
     try:
         with ExitStack() as locks:
             for guard in (_oauth_owner_lock(row["name"]), _profile_lock(row["name"]),
@@ -14755,10 +14759,18 @@ def refresh_v3_physical_features(environment_id: str) -> dict:
                     raise RuntimeBusy("账号正在维护，请稍后刷新实测")
                 locks.callback(guard.release)
             # 锁前的列表快照可能已被重建替换，采集必须使用锁内当前代次。
-            current = _managed_environment(environment_id)
-            remote=_remote_environment_result(current,'environment-physical-refresh')
+            connection = get_db()
+            try:
+                current = connection.execute("SELECT e.* FROM account_environments e WHERE e.environment_id=? "
+                    "AND (e.account_id IS NULL OR EXISTS(SELECT 1 FROM accounts a "
+                    "WHERE a.id=e.account_id AND a.deleted_at IS NULL))", (environment_id,)).fetchone()
+            finally:
+                connection.close()
+            if current is None:
+                raise HTTPException(404, "环境不存在")
+            remote=_remote_environment_result(dict(current),'environment-physical-refresh')
             if remote is None:
-                account_runtime.refresh_physical_features(current)
+                account_runtime.refresh_physical_features(dict(current))
     except (ValueError, RuntimeError) as error:
         raise HTTPException(409, str(error)) from None
     except (DockerException, RequestException, OSError):

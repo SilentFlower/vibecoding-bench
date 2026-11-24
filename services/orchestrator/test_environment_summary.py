@@ -3,13 +3,39 @@ import threading
 import time
 import unittest
 from contextvars import ContextVar
-from unittest.mock import Mock, call, patch
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import MagicMock, Mock, call, patch
 
 import main
 
 
 class EnvironmentSummaryTests(unittest.TestCase):
     """只替换环境核对边界，验证实际路由的汇总语义。"""
+
+    def test_local_and_remote_report_effective_request_backend(self):
+        """本机与远程使用网关已生效的后端，未知值和缺失快照保持为空。@return 无。"""
+        row = {'environment_id': 'a' * 32, 'name': 'synthetic', 'account_id': 1,
+            'generation': 1, 'fingerprint_json': '{"tz":"UTC"}'}
+        db = Mock()
+        db.execute.return_value.fetchone.return_value = {'id': 1, 'cc2api_account_id': 7}
+        cluster = Mock()
+        cluster.remote_summary.return_value = {}
+        runtime = MagicMock()
+        runtime.environment_lock.return_value.acquire.return_value = False
+        with TemporaryDirectory() as directory, patch('agy_environment.lookup_environment', return_value=None), \
+                patch.multiple(main, account_runtime=runtime, cluster_service=cluster), \
+                patch.object(main, 'get_db', return_value=db), patch.object(main, 'effective_claude_code_version', return_value='2.1.293'):
+            runtime._root.return_value = Path(directory)
+            runtime._sender_config.return_value = Path(directory) / 'sender.json'
+            for kind in ('local', 'ssh'):
+                cluster.store.assignment.return_value = {'kind': kind}
+                for backend, expected in (('legacy', 'legacy'), ('native293', 'native293'), ('tui_v2', 'tui_v2'),
+                        ('future', None), (None, None)):
+                    with self.subTest(kind=kind, backend=backend):
+                        snapshots = {7: {'request_backend': backend, 'request_backend_pending': 'tui_v2'}} if backend else {}
+                        result = main._v3_environment_summary(dict(row), {}, snapshots, None)
+                        self.assertEqual(result['request_backend'], expected)
 
     def test_bounded_parallel_order_and_context(self):
         """慢环境并行读取后仍保持顺序及调用方上下文。@return None。"""

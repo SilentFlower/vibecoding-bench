@@ -94,6 +94,51 @@ def _agy_archive_path(name: str, kernel: str | None) -> bool:
     return False
 
 
+_NATIVE_ROOT = 'runtime/native'
+_TUI_UUID = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}')
+_TUI_KEY = re.compile(r'[a-f0-9]{64}')
+_TUI_WORKSPACE_PRIVATE_NAMES = {'.credentials.json', '.claude.json', 'sender.json', 'tui-local-provider.json'}
+
+
+def _cc_archive_path(name: str) -> bool:
+    """限定固定账号 native 卷中的可迁移资料。:param name: 清单相对路径。:return: 是否可归档。"""
+    if name == _NATIVE_ROOT:
+        return True
+    if not name.startswith(_NATIVE_ROOT + '/'):
+        return True
+    parts = name[len(_NATIVE_ROOT) + 1:].split('/')
+    area, *rest = parts
+    if area == 'tui-v2-submissions.json':
+        return not rest
+    if area == 'tui-workspaces':
+        if len(rest) == 1 and rest[0].endswith('.json'):
+            return _TUI_KEY.fullmatch(rest[0][:-5]) is not None
+        return not rest or (_TUI_KEY.fullmatch(rest[0]) is not None
+            and not _TUI_WORKSPACE_PRIVATE_NAMES.intersection(rest[1:]))
+    if area != 'tui-sessions':
+        return False
+    if not rest:
+        return True
+    session, *tail = rest
+    if not _TUI_UUID.fullmatch(session):
+        return False
+    home = ('home', '.claude', 'projects')
+    if len(tail) <= len(home):
+        return tuple(tail) == home[:len(tail)]
+    if tuple(tail[:len(home)]) != home:
+        return False
+    project = tail[len(home):]
+    prefix = '-native-tui-workspaces-'
+    if not project[0].startswith(prefix) or not _TUI_KEY.fullmatch(project[0][len(prefix):]):
+        return False
+    if len(project) == 1:
+        return True
+    if len(project) == 2:
+        return project[1] in (session + '.jsonl', session)
+    return project[1] == session and project[2] == 'subagents' and (
+        len(project) == 3 or len(project) == 4 and re.fullmatch(r'agent-[a-f0-9]+\.jsonl', project[3]) is not None)
+
+
 def _inventory(entries: dict, identity: ArchiveIdentity) -> int:
     if not isinstance(entries, Mapping) or not entries:
         raise ValueError('迁移文件清单大小无效')
@@ -108,6 +153,11 @@ def _inventory(entries: dict, identity: ArchiveIdentity) -> int:
                 not _agy_archive_path(name, identity.kernel)
                 or kind == 'symlink' and name.split('/')[0] not in ('projects', 'workspaces')):
             raise ValueError('AGY 迁移清单包含派生状态或不受信文件类型')
+        if not isinstance(identity, AgyArchiveIdentity) and (name == _NATIVE_ROOT or name.startswith(_NATIVE_ROOT + '/')):
+            if not _cc_archive_path(name) or kind == 'symlink':
+                raise ValueError('账号迁移清单包含 V2 派生状态或不受信文件类型')
+            if name == _NATIVE_ROOT and kind != 'directory':
+                raise ValueError('V2 持久卷必须是目录')
         extra = {'directory': set(), 'file': {'size', 'sha256'}, 'symlink': {'target'}}.get(kind) if isinstance(kind, str) else None
         if extra is None or set(item) != {'kind', 'mode', 'uid', 'gid'} | extra:
             raise ValueError('迁移文件条目类型无效')
@@ -176,8 +226,10 @@ def create_environment_archive(root: Path, target: Path, identity: ArchiveIdenti
 
 
 def _create(root, target, identity, excluded, entries, manifest_path):
-    include = (lambda name: _agy_archive_path(name, identity.kernel)) if isinstance(identity, AgyArchiveIdentity) else None
-    for name, item in iter_tree_inventory(root, set(excluded), include=include):
+    agy = isinstance(identity, AgyArchiveIdentity)
+    include = (lambda name: _agy_archive_path(name, identity.kernel)) if agy else _cc_archive_path
+    single_link = None if agy else lambda name: name.startswith(_NATIVE_ROOT + '/')
+    for name, item in iter_tree_inventory(root, set(excluded), include=include, single_link=single_link):
         entries.add(name, item)
     total = _inventory(entries, identity)
     with manifest_path.open('wb') as manifest:
@@ -212,7 +264,7 @@ def _create(root, target, identity, excluded, entries, manifest_path):
                         archive.addfile(member, reader)
                         if reader.digest.hexdigest() != item['sha256']:
                             raise ValueError('迁移期间源文件内容发生变化')
-            if not entries.compare(iter_tree_inventory(root, set(excluded), include=include)):
+            if not entries.compare(iter_tree_inventory(root, set(excluded), include=include, single_link=single_link)):
                 raise ValueError('迁移期间源环境发生变化')
         with target.open('rb') as output:
             os.fsync(output.fileno())

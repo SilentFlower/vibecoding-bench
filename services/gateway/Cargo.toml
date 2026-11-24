@@ -7,6 +7,8 @@ default-run = "claude-code-gateway"
 [features]
 # 只供隔离容器演练显式编译；正式构建不包含额外信任根读取代码。
 v3-verification = []
+# 只供独立回环验收二进制编译。
+tui-v2-candidate = []
 
 [dependencies]
 # HTTP
@@ -33,7 +35,7 @@ static_init = "1"
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1", features = ["preserve_order"] }
+serde_json = { version = "1", features = ["preserve_order", "raw_value"] }
 
 # Database
 sqlx = { version = "0.7", features = ["runtime-tokio", "sqlite", "postgres", "chrono", "any"] }

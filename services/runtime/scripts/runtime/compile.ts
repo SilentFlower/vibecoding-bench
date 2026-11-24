@@ -3,7 +3,6 @@ import { createHash } from 'node:crypto';
 import { dirname, resolve, sep } from 'node:path';
 import ts from 'typescript';
 import { NATIVE_EXPORTS_293, PROFILE_293 } from '../../src/runtime/293/source-profile';
-import { NATIVE_ALIASES_280, PROFILE_280 } from '../../src/runtime/280/source-profile';
 import { rewriteStaticText } from './static-prompts';
 import type { StaticTextRewrite } from './static-prompts';
 
@@ -11,10 +10,10 @@ const root = process.env.CCRB_BUILD_ROOT!;
 const source = process.env.CCRB_BUILD_SOURCE!;
 const project = process.env.CCRB_BUILD_PROJECT!;
 const version = process.env.CCRB_BUILD_VERSION ?? PROFILE_293.version;
-if (!['2.1.280', '2.1.293'].includes(version)) throw new Error('固定构建源版本无效');
-const profile = version === PROFILE_280.version ? PROFILE_280 : PROFILE_293;
-const requireBinding = version === PROFILE_280.version ? { module: '/$bunfs/root/chunk-8ykqrhh5.js', name: 'Re' } : { module: '/$bunfs/root/chunk-0y12vz6b.js', name: 'He' };
-const toolFactory = version === PROFILE_280.version ? 'Ht' : 'Vt';
+if (version !== PROFILE_293.version) throw new Error('固定构建源版本无效');
+const profile = PROFILE_293;
+const requireBinding = { module: '/$bunfs/root/chunk-0y12vz6b.js', name: 'He' };
+const toolFactory = 'Vt';
 const modules = resolve(root, 'modules');
 const manifest: { name: string; sha256: string }[] = JSON.parse(await readFile(resolve(root, 'modules.json'), 'utf8'));
 const sourceHashes = new Map(manifest.map(row => [row.name, row.sha256]));
@@ -27,21 +26,16 @@ const terminalAddons = new Map([
   ['/$bunfs/root/chunk-y8bhqk9z.js', '/$bunfs/root/audio-capture.node'],
   ['/$bunfs/root/chunk-2jb0trbw.js', '/$bunfs/root/clipboard-napi.node'],
 ]);
-if (version === PROFILE_280.version) {
-  terminalAddons.clear();
-  terminalAddons.set('/$bunfs/root/chunk-1r5zk7vg.js', '/$bunfs/root/audio-capture.node');
-  terminalAddons.set('/$bunfs/root/chunk-097fdbvh.js', '/$bunfs/root/clipboard-napi.node');
-}
 const plainResources = new Map<string, Promise<string>>();
 const resourceTranscodes: { file: string; source_sha256: string; plain_sha256: string; source_bytes: number; plain_bytes: number }[] = [];
 const nativeModules = new Set(['child_process', 'bun:ffi', 'perf_hooks', 'fs', 'path', 'stream', 'constants', 'util', 'assert', 'events', 'http', 'https', 'net', 'tls', 'url', 'http2', 'crypto', 'undici', 'os', 'tty', 'process', 'buffer', 'fs/promises', 'querystring', 'zlib', 'dns', 'module']);
 const mappings = new Set<string>();
-const definitions = Object.entries(profile.modules).map(([role, file]) => [role, file, version === PROFILE_280.version ? Object.values(NATIVE_ALIASES_280[role as keyof typeof NATIVE_ALIASES_280]) : NATIVE_EXPORTS_293[role as keyof typeof NATIVE_EXPORTS_293]] as const);
+const definitions = Object.entries(profile.modules).map(([role, file]) => [role, file, NATIVE_EXPORTS_293[role as keyof typeof NATIVE_EXPORTS_293]] as const);
 const imports = definitions.map(([role, file, symbols]) => 'import {' + symbols.map(symbol => symbol + ' as __' + role + '_' + symbol).join(',') + '} from ' + JSON.stringify(file) + ';').join('\n');
 const nativeBindings = '{' + definitions.map(([role, , symbols]) => role + ':{' + symbols.map(symbol => symbol + ':__' + role + '_' + symbol).join(',') + '}').join(',') + '}';
-const entry = imports + (version === PROFILE_280.version ? '\nimport {bindNative280} from ' + JSON.stringify(resolve(project, 'src/runtime/280/native.ts')) + ';' : '') +
+const entry = imports +
   '\nimport {reportStartupFailure,startWorker} from ' + JSON.stringify(resolve(project, 'src/runtime/293/worker.ts')) + ';\n' +
-  'try { await startWorker(' + (version === PROFILE_280.version ? 'bindNative280(' + nativeBindings + ')' : nativeBindings) + '); process.exit(0); } catch (error) { await reportStartupFailure(error); process.exit(111); }\n';
+  'try { await startWorker(' + nativeBindings + '); process.exit(0); } catch (error) { await reportStartupFailure(error); process.exit(111); }\n';
 await writeFile(resolve(root, 'entry.mjs'), entry);
 
 try {
@@ -99,7 +93,7 @@ try {
         const changes: { start: number; end: number; text: string }[] = [];
         const imports: string[] = [];
         const excludedBodies = new Set<ts.Node>();
-        if (version === PROFILE_293.version && file === PROFILE_293.modules.core) {
+        if (file === PROFILE_293.modules.core) {
           const staticText = rewriteStaticText(tree);
           changes.push(...staticText.changes);
           staticText.bodies.forEach(body => excludedBodies.add(body));
@@ -119,24 +113,10 @@ try {
               const create = definition.properties.find(property => property.name && ts.isIdentifier(property.name) && property.name.text === 'create');
               const hasName = definition.properties.some(property => property.name && ts.isIdentifier(property.name) && property.name.text === 'name');
               if (hasName && create && ts.isMethodDeclaration(create) && create.body) {
-                // 280在模块初始化时调用create取得权限声明，必须保留工厂，仅封闭返回对象的执行入口。
-                const guard = (body: ts.Block, kind: string): void => {
-                  const start = body.getStart(tree), end = body.getEnd();
-                  changes.push({ start, end, text: '{throw new Error("单轮桥接禁止执行本地工具");}' });
-                  executionGuards.push({ file, start, end, factory: callee.text, kind });
-                  excludedBodies.add(body);
-                };
-                if (version === PROFILE_293.version) guard(create.body, 'tool-create');
-                else {
-                  const visitFactory = (child: ts.Node): void => {
-                    if (ts.isMethodDeclaration(child) && child.name && ts.isIdentifier(child.name) && child.name.text === 'call' && child.body && ts.isObjectLiteralExpression(child.parent) && ts.isReturnStatement(child.parent.parent)) {
-                      guard(child.body, 'tool-call');
-                      return;
-                    }
-                    ts.forEachChild(child, visitFactory);
-                  };
-                  visitFactory(create.body);
-                }
+                const start = create.body.getStart(tree), end = create.body.getEnd();
+                changes.push({ start, end, text: '{throw new Error("单轮桥接禁止执行本地工具");}' });
+                executionGuards.push({ file, start, end, factory: callee.text, kind: 'tool-create' });
+                excludedBodies.add(create.body);
               }
             }
             const direct = ts.isPropertyAccessExpression(callee) && callee.name.text === 'require' && ts.isMetaProperty(callee.expression) && callee.expression.keywordToken === ts.SyntaxKind.ImportKeyword;

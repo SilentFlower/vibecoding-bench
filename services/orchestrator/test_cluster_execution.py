@@ -255,6 +255,7 @@ class NodeExecutionTests(unittest.TestCase):
         self.assertEqual(1, result['generation'])
         self.assertTrue(result['busy'])
         self.assertEqual({'cli': 'running'}, result['role_status'])
+        self.assertEqual({'2.1.293': None}, result['native_kernels'])
         self.assertEqual({'enabled': False}, result['content_capture'])
         self.assertEqual({'enabled': False}, result['criu'])
         self.assertEqual(7, result['gateway_account_id'])

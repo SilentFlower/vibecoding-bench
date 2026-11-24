@@ -174,7 +174,7 @@ def main():
     parser.add_argument('--output', type=Path)
     parser.add_argument('--expected-launcher', default=LAUNCHER)
     parser.add_argument('--expected-executable', default=EXECUTABLE)
-    parser.add_argument('--source-version', choices=('2.1.280', '2.1.293'), default='2.1.293')
+    parser.add_argument('--source-version', choices=('2.1.293',), default='2.1.293')
     args = parser.parse_args()
     for digest in (args.expected_launcher, args.expected_executable):
         if len(digest) != 64 or any(c not in '0123456789abcdef' for c in digest):

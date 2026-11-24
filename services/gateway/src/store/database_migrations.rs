@@ -14,7 +14,7 @@ use crate::store::db::{connect_sqlite, sqlite_connection_options};
 use crate::store::{
     account_platform_schema, account_work_schema, agy_media_schema, agy_safety_schema,
     agy_system_reminder_schema, agy_tool_receipts_schema, proxy_schema, proxy_sync_schema,
-    request_records_schema, session_policy_block_schema, usage_history_schema,
+    request_records_schema, session_policy_block_schema, tui_backend_schema, usage_history_schema,
 };
 
 /// 返回初始迁移源码摘要，测试代码不进入持久合同。
@@ -45,6 +45,11 @@ fn registry() -> Result<Value, sqlx::Error> {
             && step["checksum"] != usage_history_schema::checksum()
         {
             return Err(sqlx::Error::Protocol("历史用量迁移定义与登记不符".into()));
+        }
+        if step["id"] == "gateway.tui-backend.13"
+            && step["checksum"] != tui_backend_schema::checksum()
+        {
+            return Err(sqlx::Error::Protocol("V2 工具轮迁移定义与登记不符".into()));
         }
         if step["id"] == "gateway.agy-tool-receipts.11"
             && step["checksum"] != agy_tool_receipts_schema::checksum()
@@ -309,6 +314,9 @@ pub async fn plan(pool: &AnyPool, target: Option<usize>) -> Result<Value, sqlx::
     if rows.len() >= 12 {
         usage_history_schema::verify(pool).await?;
     }
+    if rows.len() >= 13 {
+        tui_backend_schema::verify(pool).await?;
+    }
     for step in &mut steps {
         step["state"] = json!(
             if step["version"].as_u64().unwrap_or(u64::MAX) <= rows.len() as u64 {
@@ -344,6 +352,7 @@ pub async fn migrate(pool: &AnyPool, driver: &str) -> Result<(), sqlx::Error> {
         agy_system_reminder_schema::apply(&mut transaction, driver).await?;
         agy_tool_receipts_schema::apply(&mut transaction).await?;
         usage_history_schema::apply(&mut transaction, driver).await?;
+        tui_backend_schema::apply(&mut transaction).await?;
         transaction.commit().await?;
         return Ok(());
     }
@@ -389,7 +398,8 @@ pub async fn apply(
                 | "gateway.agy-safety.9"
                 | "gateway.agy-system-reminder.10"
                 | "gateway.agy-tool-receipts.11"
-                | "gateway.usage-history.12",
+                | "gateway.usage-history.12"
+                | "gateway.tui-backend.13",
             ) => {}
             _ => return Err(sqlx::Error::Protocol("迁移实现尚未登记".into())),
         }
@@ -429,6 +439,10 @@ pub async fn apply(
         }
         if step["id"] == "gateway.usage-history.12" {
             usage_history_schema::apply(&mut transaction, "sqlite").await?;
+        }
+        if step["id"] == "gateway.tui-backend.13" {
+            tui_backend_schema::apply(&mut transaction).await?;
+            tui_backend_schema::verify_connection(&mut transaction).await?;
         }
         sqlx::query("CREATE TABLE IF NOT EXISTS system_schema_migrations (migration_id TEXT PRIMARY KEY,version INTEGER NOT NULL UNIQUE,checksum TEXT NOT NULL,applied_at TEXT NOT NULL,operation_id TEXT NOT NULL)")
             .execute(&mut *transaction).await?;
@@ -496,6 +510,7 @@ mod tests {
     use crate::store::account_store::AccountStore;
     use crate::store::account_work_schema;
     use crate::store::database_schema::migrate_legacy;
+    use crate::store::tui_backend_schema;
     use crate::store::usage_store::UsageStore;
     use chrono::{Duration, SecondsFormat, Utc};
     use sqlx::AnyPool;
@@ -564,7 +579,7 @@ mod tests {
         let upgrade = apply(&database, &Uuid::new_v4().to_string(), None)
             .await
             .unwrap();
-        assert_eq!(upgrade["current_version"], 12);
+        assert_eq!(upgrade["current_version"], 13);
         let value: (i64, String, i32) = sqlx::query_as(
             "SELECT id,platform,agy_system_prompt_as_user_reminder FROM accounts WHERE id=17",
         )
@@ -594,6 +609,55 @@ mod tests {
         );
     }
 
+    /// 正式版本 12 只能在核对工具归属后登记版本 13，失败时回滚。@return 无。
+    #[tokio::test]
+    async fn tui_backend_migration_requires_original_account_and_preserves_rows() {
+        let database = pool().await;
+        let operation = Uuid::new_v4().to_string();
+        apply(&database, &operation, Some(12)).await.unwrap();
+        sqlx::query("CREATE TABLE tui_backend_intents(account_id BIGINT PRIMARY KEY, target TEXT NOT NULL, binding TEXT NOT NULL, revision BIGINT NOT NULL)")
+            .execute(&database).await.unwrap();
+        assert!(apply(&database, &operation, None).await.is_err());
+        assert_eq!(
+            plan(&database, Some(12)).await.unwrap()["current_version"],
+            12
+        );
+        let partial: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE name='tui_native_turns'")
+                .fetch_one(&database)
+                .await
+                .unwrap();
+        assert_eq!(partial, 0);
+        sqlx::query("DROP TABLE tui_backend_intents")
+            .execute(&database)
+            .await
+            .unwrap();
+        let mut transaction = database.begin().await.unwrap();
+        tui_backend_schema::apply(&mut transaction).await.unwrap();
+        transaction.commit().await.unwrap();
+        sqlx::query("INSERT INTO accounts(id,email,token,device_id) VALUES(27,'fixture@example.invalid','synthetic','fixture')")
+            .execute(&database).await.unwrap();
+        sqlx::query("INSERT INTO tui_backend_intents VALUES(27,'native293','fixture:3',4)")
+            .execute(&database)
+            .await
+            .unwrap();
+        assert_eq!(
+            apply(&database, &operation, None).await.unwrap()["current_version"],
+            13
+        );
+        assert_eq!(
+            plan(&database, Some(12)).await.unwrap()["state"],
+            "compatible_newer"
+        );
+        let saved: (String, String, i64) = sqlx::query_as(
+            "SELECT target,binding,revision FROM tui_backend_intents WHERE account_id=27",
+        )
+        .fetch_one(&database)
+        .await
+        .unwrap();
+        assert_eq!(saved, ("native293".into(), "fixture:3".into(), 4));
+    }
+
     /// 从已发布版本6追加工作控制，保留原台账与平台结构。
     /// @return 无。
     #[tokio::test]
@@ -617,7 +681,7 @@ mod tests {
         let result = apply(&database, &Uuid::new_v4().to_string(), None)
             .await
             .unwrap();
-        assert_eq!(result["current_version"], 12);
+        assert_eq!(result["current_version"], 13);
         let preserved: Vec<(String, String, String, String)> = sqlx::query_as(
             "SELECT migration_id,CAST(version AS TEXT),checksum,operation_id FROM system_schema_migrations WHERE version<=6 ORDER BY version",
         )
@@ -648,7 +712,7 @@ mod tests {
         let result = apply(&database, &Uuid::new_v4().to_string(), None)
             .await
             .unwrap();
-        assert_eq!(result["current_version"], 12);
+        assert_eq!(result["current_version"], 13);
         let duration: String = sqlx::query_scalar(
             "SELECT value FROM settings WHERE key='session_policy_block_duration_minutes'",
         )
@@ -686,7 +750,7 @@ mod tests {
         let result = apply(&database, &Uuid::new_v4().to_string(), None)
             .await
             .unwrap();
-        assert_eq!(result["current_version"], 12);
+        assert_eq!(result["current_version"], 13);
         let original: String =
             sqlx::query_scalar("SELECT operation_id FROM system_schema_migrations")
                 .fetch_one(&database)

@@ -292,6 +292,10 @@ pub(crate) fn observe_response(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::service::runtime_transport::{
+        TUI_ERROR_SOURCE, TUI_GATEWAY_ID_HEADER, TUI_JSON_PROJECTION_V1, TUI_SSE_PROJECTION_V1,
+        tui_public_response,
+    };
     use bytes::Bytes;
     use flate2::{Compression, write::GzEncoder};
     use http_body::Frame;
@@ -568,5 +572,136 @@ mod tests {
             .list("all", "", 1, 20, Utc::now().timestamp_millis())
             .await
             .unwrap();
+    }
+
+    /// 同一已认证会话的 V2 JSON 和真实模型错误与 V1 使用同样的接受、隔离和排除条件。
+    #[tokio::test]
+    async fn session_policy_block_tui_delegated_json_and_errors() {
+        let service = service().await;
+        let error = json!({"type":"error","error":{"type":"invalid_request_error","upstream_code":"cyber_policy","message":"拒绝"}});
+        let text = json!({"type":"message","content":[{"type":"text","text":"usage policy [reasoning_extraction]"}]});
+        let refusal = json!({"type":"message","stop_reason":"refusal","content":[]});
+        let quote = json!({"message":"usage policy"});
+        let incomplete = json!({"type":"error","error":{"type":"api_error","message":"本机模型返回错误"},
+            "_tui_policy_evidence":{"error":{"message":"usage policy private details"}}});
+        let http = Some("local_provider_http");
+        let cases = [
+            (200, None, &refusal, true),
+            (200, None, &text, false),
+            (403, http, &error, true),
+            (400, Some("local_provider_event"), &error, true),
+            (401, http, &error, false),
+            (429, http, &error, false),
+            (403, http, &quote, false),
+            (403, None, &error, false),
+            (403, Some("local_provider_backoff"), &error, false),
+            (400, http, &incomplete, true),
+            (200, None, &incomplete, true),
+        ];
+        for (idx, (status, source, payload, expected)) in cases.into_iter().enumerate() {
+            let request = body(&format!("JSON会话{idx}"));
+            let mut raw = axum::http::Response::builder()
+                .status(status)
+                .header("content-type", "application/json")
+                .header(TUI_GATEWAY_ID_HEADER, TUI_JSON_PROJECTION_V1);
+            if let Some(source) = source {
+                raw = raw.header(TUI_ERROR_SOURCE, source);
+            }
+            let private = raw.body(payload.to_string()).unwrap().into();
+            scope(async {
+                service.begin(11, &request).await.unwrap();
+                let reply = tui_public_response(private, Some(7)).await.unwrap();
+                let late_error = status == 200 && payload == &incomplete;
+                assert_eq!(
+                    reply.status().as_u16(),
+                    if late_error { 502 } else { status }
+                );
+                assert_eq!(
+                    reply.extensions().get::<PolicyRefusal>().is_some(),
+                    expected && (status != 200 || late_error)
+                );
+                assert!(!reply.headers().contains_key(TUI_ERROR_SOURCE));
+                let wire = axum::body::to_bytes(reply.into_body(), 8192).await.unwrap();
+                assert!(!String::from_utf8_lossy(&wire).contains("upstream_code"));
+                assert!(!String::from_utf8_lossy(&wire).contains("private details"));
+                assert!(!String::from_utf8_lossy(&wire).contains("_tui_policy_evidence"));
+                assert_eq!(check_current().await.unwrap().is_some(), expected);
+                assert!(service.begin(12, &request).await.unwrap().is_none());
+            })
+            .await;
+        }
+    }
+
+    /// 真流先交付普通文本，拒答帧到达时再按当时的开关和期限登记原令牌。
+    #[tokio::test]
+    async fn session_policy_block_tui_stream_before_refusal_and_live_disable() {
+        use futures_util::StreamExt;
+        use std::time::Duration;
+        use tokio::sync::oneshot;
+        use tokio::time::timeout;
+
+        for enabled in [true, false] {
+            let service = service().await;
+            service.config.write().await.duration_ms = 120_000;
+            let request = body("同一真实流式会话");
+            let (release, wait) = oneshot::channel();
+            let opening = Bytes::from_static(b"event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"type\":\"message\",\"id\":\"msg_private\"}}\n\n");
+            let block = Bytes::from_static(b"event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n");
+            let text = Bytes::from_static(b"event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"usage policy [reasoning_extraction]\"}}\n\n");
+            let source = futures_util::stream::iter([opening, block.clone(), text.clone()].map(Ok::<_, std::io::Error>))
+                .chain(futures_util::stream::once(async move {
+                    wait.await.unwrap();
+                    Ok(Bytes::from_static(b"event: error\ndata: {\"type\":\"error\",\"error\":{\"code\":\"cyber_policy\",\"message\":\"policy test\"}}\n\n"))
+                }));
+            let private = axum::http::Response::builder()
+                .header("content-type", "text/event-stream")
+                .header(TUI_GATEWAY_ID_HEADER, TUI_SSE_PROJECTION_V1)
+                .body(reqwest::Body::wrap_stream(source))
+                .unwrap()
+                .into();
+            let mut stream = scope(async {
+                service.begin(11, &request).await.unwrap();
+                let response = tui_public_response(private, Some(7)).await.unwrap();
+                assert_eq!(response.status(), StatusCode::OK);
+                response.into_body().into_data_stream()
+            })
+            .await;
+            timeout(Duration::from_secs(2), async {
+                let start = stream.next().await.unwrap().unwrap();
+                assert!(start.starts_with(b"event: message_start"));
+                assert_eq!(stream.next().await.unwrap().unwrap(), block);
+                assert_eq!(stream.next().await.unwrap().unwrap(), text);
+            })
+            .await
+            .unwrap();
+            scope(async {
+                assert!(service.begin(11, &request).await.unwrap().is_none());
+            })
+            .await;
+            service.config.write().await.enabled = enabled;
+            release.send(()).unwrap();
+            let error = stream.next().await.unwrap().unwrap();
+            assert!(!String::from_utf8_lossy(&error).contains("cyber_policy"));
+            let page = service
+                .store
+                .list("all", "", 1, 10, Utc::now().timestamp_millis())
+                .await
+                .unwrap();
+            assert_eq!(page.total, i64::from(enabled));
+            if enabled {
+                let row = &page.items[0];
+                assert_eq!(row.expires_at_ms - row.blocked_at_ms, 120_000);
+                assert_eq!((row.account_id, row.api_token_id), (7, 11));
+                assert_eq!(row.reason, "content_policy");
+            }
+            scope(async {
+                assert_eq!(
+                    service.begin(11, &request).await.unwrap().is_some(),
+                    enabled
+                );
+                assert!(service.begin(12, &request).await.unwrap().is_none());
+            })
+            .await;
+        }
     }
 }

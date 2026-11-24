@@ -1,5 +1,42 @@
 # v3 固定账号运行环境契约
 
+## Scenario: Claude 账号 V1/V2 切换及已运行发送器查询
+
+### 1. Scope / Trigger
+
+- 修改 Claude 账号转发选择、私有 sender 发现、节点检查或账号凭据回执时，核对账号、节点分配和工具轮归属。
+
+### 2. Signatures
+
+- `PUT /admin/accounts/{id}` 单独提交 `request_backend` 与非负整数 `request_backend_revision`。管理视图返回生效值、待切目标、修订和 `tui_v2_available`。
+- `GET /internal/v3/transport/{account_id}?wake=false` 读取当前发送器。`NodeTransportInspection` 在节点 `inspect` 操作中携带正整数 `transport_gateway_account`。
+
+### 3. Contracts
+
+- 受管 Claude 账号有原生 `native293` 与交互 `tui_v2` 的账号级选择。管理读取只查现有绑定。保存涉及 V2 的切换时，编排确认无运行绑定后可以按需准备该账号。
+- 切换以实际 sender 状态、绑定代次及在途工具回执为准。活动轮按原绑定收尾。V2 新请求沿账号凭据解析获取当次 AT，通过单次私有提交交给目标账号 sender。
+- 原 `NodeInspection`、`BoundIdentityRead` 与 `CredentialStatusRead` 保持现有字段。节点 `inspect` 仅在收到 `transport_gateway_account` 时按 `NodeTransportInspection` 解析。其他请求使用各自原模型。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 外部管理写入缺少修订或修订已变更 | 返回缺少修订或并发冲突 |
+| 编排确认账号没有运行绑定 | 只读返回空。保存涉及 V2 的切换可以请求准备 |
+| 正在交付旧轮或等待旧工具回执 | 待切目标保留，原内核继续处理 |
+| 节点账号、环境、发行或代次证明不一致 | 拒绝该绑定 |
+
+### 5. Scenarios and Examples
+
+- 正常：在休眠账号保存 `{"request_backend":"tui_v2","request_backend_revision":0}`，编排准备同一账号后由 Gateway 登记已核验的绑定。
+- 边界：工具续轮进行时保存 `native293`，待原轮收尾后对账生效。
+- 兼容：旧节点凭据回执按原模型完整字段比较。扩展字段登记在 V2 专用请求模型，保持凭据查询和身份回执可用。
+
+### 6. Tests Required
+
+- `verify_tui_sender_status.py` 核对管理详情只读、休眠双向切换、在途工具续轮和错误绑定。
+- `test_cluster_credential_refresh`、`test_cluster_owner_runner` 核对旧节点凭据与身份回执。`test_cluster_transport` 核对排空时原 V2 路由可用和源隔离后的拒绝。
+
 ## Scenario: US 宿主管理工具继承既有口令例外
 
 ### 1. Scope / Trigger

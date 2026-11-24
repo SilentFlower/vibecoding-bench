@@ -6,7 +6,8 @@ import unittest
 from pathlib import Path
 from source_layout import source_path
 
-from system_release import BENCH_SCHEMA_SOURCES, GATEWAY_SCHEMA_SOURCES, REPO, data_contracts
+from system_release import BENCH_SCHEMA_SOURCES, GATEWAY_SCHEMA_SOURCES, RECEIPT_SCHEMA_SOURCE, REPO, data_contracts
+from database_migration_contract import registry_contract
 from verify_database_definitions import source_ownership, verify
 
 
@@ -18,7 +19,7 @@ class DatabaseDefinitionTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
-        for name in (*BENCH_SCHEMA_SOURCES.values(), 'orchestrator/database-migration-registry.json',
+        for name in (*BENCH_SCHEMA_SOURCES.values(), RECEIPT_SCHEMA_SOURCE, 'orchestrator/database-migration-registry.json',
                 'cc2api/src/store/database-migration-registry.json', *GATEWAY_SCHEMA_SOURCES.values()):
             target = self.root / name
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -28,9 +29,16 @@ class DatabaseDefinitionTests(unittest.TestCase):
         """真实仓库必须通过CI入口，避免最小夹具遗漏新增定义。@return None。"""
         self.assertEqual('passed', verify(REPO)['status'])
 
+    def test_tui_migration_extends_published_gateway_history(self) -> None:
+        """用 v1.33.4 签名清单的合同核对历史前缀，防止分支复用已发布编号。@return None。"""
+        registry = json.loads((self.root / 'cc2api/src/store/database-migration-registry.json').read_bytes())
+        published = {**registry, 'steps': registry['steps'][:12]}
+        self.assertEqual(registry_contract(published), '5e69c997d7d27da912c318bda9cfd3bf6366edaf5a7e55253d3974397df778c9')
+        self.assertEqual(registry['steps'][12]['id'], 'gateway.tui-backend.13')
+
     def test_incremental_definitions_require_unchanged_checksums(self) -> None:
         """目录及同步定义均绑定登记摘要，签发入口也拒绝漂移。@return None。"""
-        for name in ('proxy_schema.rs', 'proxy_sync_schema.rs', 'session_policy_block_schema.rs'):
+        for name in ('proxy_schema.rs', 'proxy_sync_schema.rs', 'session_policy_block_schema.rs', 'tui_backend_schema.rs'):
             with self.subTest(name=name):
                 path = self.root / 'cc2api/src/store' / name
                 original = path.read_text()
@@ -74,6 +82,18 @@ class DatabaseDefinitionTests(unittest.TestCase):
         (self.root / 'cc2api/src/store/settings_store.rs').write_text('const DEFAULT_ALLOW_SYSTEM_ROLE_MODELS: &str = "synthetic-new-default";\n')
         self.assertEqual(verify(self.root)['status'], 'passed')
         self.assertEqual(data_contracts(self.root), before)
+
+    def test_private_receipts_are_independent_and_checksum_bound(self) -> None:
+        """私有回执定义的变动会阻断签发，旧版无该组件仍可核验。@return None。"""
+        path = self.root / RECEIPT_SCHEMA_SOURCE
+        path.write_text(path.read_text() + '\nVERSION = 2\n')
+        with self.assertRaisesRegex(ValueError, '工具回执库'):
+            data_contracts(self.root)
+        path.unlink()
+        self.assertEqual(verify(self.root)['status'], 'passed')
+        (self.root / 'orchestrator/tui_tool_receipts.py').touch()
+        with self.assertRaisesRegex(ValueError, '工具回执库'):
+            verify(self.root)
 
     def test_unregistered_ddl_and_modified_schema_are_rejected(self) -> None:
         """新增业务 DDL 和覆盖登记定义均阻断。@return None。"""

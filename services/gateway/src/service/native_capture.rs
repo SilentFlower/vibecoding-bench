@@ -28,7 +28,7 @@ use axum::http::HeaderMap;
 
 const BODY_LIMIT: usize = 2 * 1024 * 1024;
 const INGRESS_PREVIEW_LIMIT: usize = 1024 * 1024;
-const SNAPSHOT_LIMIT: usize = 6 * 1024 * 1024;
+pub(super) const SNAPSHOT_LIMIT: usize = 6 * 1024 * 1024;
 // 完整入站只存一份正文，为脱敏替换、JSON 字符串转义及请求头预留空间。
 const REJECTED_SNAPSHOT_LIMIT: usize = 4 * GEMINI_BODY_LIMIT;
 const HEADER_LIMIT: usize = 128 * 1024;
@@ -199,6 +199,22 @@ fn prefix(value: &str, limit: usize) -> (&str, bool) {
         end -= 1;
     }
     (&value[..end], end < value.len())
+}
+
+/// 截断的 JSON 去掉末尾未闭合的字符串，避免后到的凭据只剩前缀而无法脱敏。
+fn closed_json_prefix(original: &str) -> &str {
+    let mut quote = None;
+    let mut escaped = false;
+    for (index, byte) in original.bytes().enumerate() {
+        if escaped {
+            escaped = false;
+        } else if quote.is_some() && byte == b'\\' {
+            escaped = true;
+        } else if byte == b'"' {
+            quote = if quote.is_some() { None } else { Some(index) };
+        }
+    }
+    &original[..quote.unwrap_or(original.len())]
 }
 
 /// 对原文进行统一秘密替换，保留键顺序与空白。@param original 原文。@param secrets 已知秘密。@return 脱敏原文。
@@ -400,6 +416,24 @@ fn body_changes(before: &Value, after: &Value) -> Value {
 }
 
 fn snapshot(submission: &NativeSubmission, payload: &Value) -> io::Result<Value> {
+    let mut secrets = vec![submission.bearer.clone()];
+    collect(&submission.input, &mut secrets);
+    snapshot_parts(
+        submission.request.account_id,
+        &submission.request.request_id,
+        submission.ingress_capture.as_ref(),
+        secrets,
+        payload,
+    )
+}
+
+fn snapshot_parts(
+    account_id: i64,
+    attempt_id: &str,
+    ingress: Option<&Value>,
+    mut secrets: Vec<String>,
+    payload: &Value,
+) -> io::Result<Value> {
     let rejected = payload["type"] == "error";
     let pairs: Vec<(String, String)> = if rejected {
         Vec::new()
@@ -411,8 +445,6 @@ fn snapshot(submission: &NativeSubmission, payload: &Value) -> io::Result<Value>
     } else {
         serde_json::from_str(payload["body"].as_str().ok_or(io::ErrorKind::InvalidData)?)?
     };
-    let mut secrets = vec![submission.bearer.clone()];
-    collect(&submission.input, &mut secrets);
     collect(&body_value, &mut secrets);
     if let Some(wire) = payload.get("_wire_final").filter(|_| !rejected) {
         collect(&wire["headers"], &mut secrets);
@@ -440,15 +472,15 @@ fn snapshot(submission: &NativeSubmission, payload: &Value) -> io::Result<Value>
     let redacted = redact_body(original, &secrets)?;
     let (body, truncated) = prefix(&redacted, BODY_LIMIT);
     let (headers, headers_truncated) = redact_headers(&pairs, &secrets);
-    let mut value = json!({"schema_version":1,"stage":if rejected {"ingress_rejected"} else {"cc_prepared"}, "account_id":submission.request.account_id,
-        "attempt_id":submission.request.request_id,"captured_at_ms":SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64,
+    let mut value = json!({"schema_version":1,"stage":if rejected {"ingress_rejected"} else {"cc_prepared"}, "account_id":account_id,
+        "attempt_id":attempt_id,"captured_at_ms":SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64,
         "headers":headers,"body":body,"body_truncated":truncated,"headers_truncated":headers_truncated,
         "original_body_bytes":if rejected {Value::Null} else {payload["body_bytes"].clone()},"original_body_sha256":if rejected {Value::Null} else {payload["body_sha256"].clone()}});
     if let Some(policy) = payload.get("cache_policy").filter(|_| !rejected) {
         value["cache_policy"] = message_cache_policy(policy).ok_or(io::ErrorKind::InvalidData)?;
     }
     let mut ingress_status = "unavailable";
-    if let Some(ingress) = submission.ingress_capture.as_ref() {
+    if let Some(ingress) = ingress {
         let input = ingress["body"].as_str().ok_or(io::ErrorKind::InvalidData)?;
         let digest = ingress["original_body_sha256"]
             .as_str()
@@ -477,6 +509,9 @@ fn snapshot(submission: &NativeSubmission, payload: &Value) -> io::Result<Value>
         let mut preview = json!({"source":"gateway_http_ingress","representation":"http_logical_bytes",
             "captured_at_ms":ingress["captured_at_ms"],"original_body_bytes":ingress["original_body_bytes"],
             "original_body_sha256":digest});
+        let input = if payload["type"] == "tui_provider_request" && ingress["body_truncated"] == true {
+            closed_json_prefix(input)
+        } else { input };
         let cleaned = redact_body(input, &secrets)?;
         let changes = if !rejected && ingress["body_truncated"] == false {
             serde_json::from_str::<Value>(&cleaned)
@@ -557,6 +592,17 @@ fn snapshot(submission: &NativeSubmission, payload: &Value) -> io::Result<Value>
         {"stage":"cc_prepared","source":"native_cc_prepared","representation":"json_before_native_transport","status":if rejected {"unavailable"} else if truncated || headers_truncated {"truncated"} else {"complete"},"note":if rejected {"本次在原生组装前拒绝"} else {"原生最终传输前的中间值"}},
         {"stage":"wire_final","source":"unavailable","representation":"unavailable","status":"unavailable","note":"平台本次未取得独立最终TLS写出采集"}
     ]);
+    if payload["type"] == "tui_provider_request" {
+        value["stage"] = json!("tui_provider_request");
+        value.as_object_mut().unwrap().remove("header_policy");
+        value["stages"] = json!([
+            {"stage":"ingress","source":"gateway_http_ingress","representation":"http_logical_bytes","status":ingress_status},
+            {"stage":"tui_provider_request","source":"tui_sender_http","representation":"http_request_to_local_provider",
+                "status":if truncated || headers_truncated {"truncated"} else {"complete"}},
+            {"stage":"wire_final","source":"unavailable","representation":"unavailable","status":"unavailable",
+                "note":"账号发送器使用回环 HTTP。独立提供方对外发起的 TLS 写出缺少观测来源。"}
+        ]);
+    }
     if let Some(policy) = value.get("cache_policy") {
         let note = format!(
             "原生最终传输前的中间值；消息缓存策略 {} / {}，新增断点 {} 个",
@@ -688,21 +734,8 @@ fn append_wire(value: &mut Value, wire: &Value, secrets: &[String]) -> io::Resul
     let unsafe_preview = !complete && wire["reason"].as_str() != Some("HTTP_PARTIAL");
     let original = if unsafe_preview { "" } else { original };
     let preview_pairs = if unsafe_preview { &[][..] } else { &pairs[..] };
-    // 预览在帮助进程内限长。去掉末尾未闭合字符串，防止未知秘密的残片越过脱敏器。
-    let mut quote = None;
-    let mut escaped = false;
-    if truncated || !complete {
-        for (index, byte) in original.bytes().enumerate() {
-            if escaped {
-                escaped = false;
-            } else if quote.is_some() && byte == b'\\' {
-                escaped = true;
-            } else if byte == b'"' {
-                quote = if quote.is_some() { None } else { Some(index) };
-            }
-        }
-    }
-    let cleaned = redact_body(&original[..quote.unwrap_or(original.len())], secrets)?;
+    let source = if truncated || !complete { closed_json_prefix(original) } else { original };
+    let cleaned = redact_body(source, secrets)?;
     let (body, clipped) = prefix(&cleaned, BODY_LIMIT);
     let (headers, headers_clipped) = redact_headers(preview_pairs, secrets);
     let reason = wire["reason"].as_str().filter(|reason| {
@@ -751,7 +784,7 @@ fn append_wire(value: &mut Value, wire: &Value, secrets: &[String]) -> io::Resul
     });
     let mut final_value = json!({"source":"native_tls_uprobe","representation":"http_entity_from_tls_accepted_write",
         "status":status,"reason":reason.or(if complete { None } else { Some("OBSERVER_FAILED") }),
-        "headers":headers,"body":body,"body_truncated":truncated || clipped || quote.is_some() || (unsafe_preview && !wire["body"].as_str().unwrap_or("").is_empty()),
+        "headers":headers,"body":body,"body_truncated":truncated || clipped || source.len() < original.len() || (unsafe_preview && !wire["body"].as_str().unwrap_or("").is_empty()),
         "headers_truncated":header_truncated || headers_clipped || (unsafe_preview && !pairs.is_empty()),
         "observed_body_bytes":wire["observed_body_bytes"],"body_sha256":wire["body_sha256"],
         "original_body_bytes":wire["observed_body_bytes"],"original_body_sha256":wire["body_sha256"],
@@ -820,6 +853,85 @@ fn append_wire(value: &mut Value, wire: &Value, secrets: &[String]) -> io::Resul
     }
     value["wire_final"] = final_value;
     Ok(())
+}
+
+/// 已脱敏的网关入站副本，以及已交给该 sender 的业务数据中需要逐字脱敏的值。
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct TuiCaptureInput {
+    ingress: Value,
+    repeated: Vec<String>,
+}
+
+impl TuiCaptureInput {
+    /// 生成本轮采集旁路数据。@param headers 原入站头。@param raw 入站实体。@param parsed 原正文。
+    /// @return 有界的私有信封，无法采集时业务继续。
+    pub(super) fn encode(headers: &HeaderMap, raw: &[u8], parsed: &Value) -> Option<Bytes> {
+        let pairs: Vec<_> = headers
+            .iter()
+            .map(|(name, value)| {
+                (
+                    name.as_str().to_owned(),
+                    String::from_utf8_lossy(value.as_bytes()).into_owned(),
+                )
+            })
+            .collect();
+        let ingress = ingress_snapshot(&pairs, raw, parsed, "", false)?;
+        let mut repeated = Vec::new();
+        collect(parsed, &mut repeated);
+        let body = std::str::from_utf8(raw).ok()?;
+        let options: Vec<_> = pairs
+            .iter()
+            .filter(|(k, _)| matches!(k.as_str(), "anthropic-beta" | "anthropic-version"))
+            .collect();
+        for (k, v) in &pairs {
+            if sensitive(k) {
+                let mut values = Vec::new();
+                add_secret(v, &mut values);
+                repeated.extend(values.into_iter().filter(|secret| {
+                    let escaped = serde_json::to_string(secret).expect("字符串可编码");
+                    body.contains(secret)
+                        || body.contains(&escaped[1..escaped.len() - 1])
+                        || options.iter().any(|(_, v)| v.contains(secret))
+                }));
+            }
+        }
+        repeated.sort_unstable();
+        repeated.dedup();
+        let bytes = serde_json::to_vec(&Self { ingress, repeated }).ok()?;
+        (bytes.len() <= SNAPSHOT_LIMIT).then(|| Bytes::from(bytes))
+    }
+
+    /// 按实发回环观察落盘，复用账号采集的目录、脱敏、时间与容量合同。
+    /// @param directory 账号私有目录。@param account 账号 ID。@param attempt 单次预留 UUID。
+    /// @param pairs 实际 HTTP 头。@param raw 实际已提交实体。@return 保存结果。
+    pub(super) fn save(
+        self,
+        directory: &Path,
+        account: i64,
+        attempt: Uuid,
+        pairs: Vec<(String, String)>,
+        raw: Vec<u8>,
+    ) -> io::Result<()> {
+        let digest = hex::encode(Sha256::digest(&raw));
+        let size = raw.len();
+        let body = String::from_utf8(raw).map_err(|_| io::ErrorKind::InvalidData)?;
+        let payload = json!({"type":"tui_provider_request","headers":pairs,"body":body,
+            "body_bytes":size,"body_sha256":digest});
+        let value = snapshot_parts(
+            account,
+            &attempt.to_string(),
+            Some(&self.ingress),
+            self.repeated,
+            &payload,
+        )?;
+        save_snapshot(directory, attempt, &value)
+    }
+}
+
+/// 预留现有后台写入容量。@return 忙时跳过本轮采集。
+pub(super) fn tui_writer() -> Option<tokio::sync::SemaphorePermit<'static>> {
+    WRITERS.try_acquire().ok()
 }
 
 fn save(directory: &Path, submission: &NativeSubmission, payload: &Value) -> io::Result<()> {
@@ -1187,6 +1299,82 @@ pub(crate) async fn record(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 真实回环提交使用独立阶段；两端凭据在任意头、正文副本中均脱敏。
+    #[test]
+    fn tui_provider_capture_keeps_actual_stage_and_redacts_both_ends() {
+        let root = std::env::temp_dir().join(format!("tui-provider-capture-{}", Uuid::new_v4()));
+        let attempt = Uuid::new_v4();
+        let mut headers = HeaderMap::new();
+        headers.insert("authorization", "Bearer outside-only-key".parse().unwrap());
+        headers.insert("cookie", "strictly-header-only".parse().unwrap());
+        let raw = br#"{"metadata":{"secret":"inside-metadata"},"messages":[{"role":"user","content":"outside-only-key inside-metadata provided-locally"}]}"#;
+        let parsed = serde_json::from_slice(raw).unwrap();
+        let input = TuiCaptureInput::encode(&headers, raw, &parsed).unwrap();
+        assert!(
+            !std::str::from_utf8(&input)
+                .unwrap()
+                .contains("strictly-header-only")
+        );
+        let input: TuiCaptureInput = serde_json::from_slice(&input).unwrap();
+        let sent = br#"{"messages":[{"role":"user","content":"outside-only-key inside-metadata provided-locally"}],"stream":true}"#;
+        input
+            .save(
+                &root,
+                7,
+                attempt,
+                vec![
+                    ("Authorization".into(), "Bearer provided-locally".into()),
+                    (
+                        "X-Synthetic".into(),
+                        "outside-only-key inside-metadata".into(),
+                    ),
+                ],
+                sent.to_vec(),
+            )
+            .unwrap();
+        let stored = fs::read_to_string(root.join(format!("{attempt}.json"))).unwrap();
+        for secret in [
+            "outside-only-key",
+            "inside-metadata",
+            "provided-locally",
+            "strictly-header-only",
+        ] {
+            assert!(!stored.contains(secret));
+        }
+        let snapshot: Value = serde_json::from_str(&stored).unwrap();
+        assert_eq!(snapshot["stage"], "tui_provider_request");
+        assert_eq!(
+            snapshot["original_body_sha256"],
+            hex::encode(Sha256::digest(sent))
+        );
+        assert_eq!(
+            snapshot["ingress"]["original_body_sha256"],
+            hex::encode(Sha256::digest(raw))
+        );
+        assert_eq!(snapshot["stages"][2]["status"], "unavailable");
+        assert!(snapshot.get("wire_final").is_none());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    /// 入口在提供方口令中间被裁剪时，未闭合字段不能将口令前缀写入私有文件。
+    #[test]
+    fn tui_capture_clips_before_unclosed_secret() {
+        let root = std::env::temp_dir().join(format!("tui-clipped-{}", Uuid::new_v4()));
+        let attempt = Uuid::new_v4();
+        let start = "{\"metadata\":{\"note\":\"";
+        let secret = "unique-CANARY-and-the-remainder";
+        let visibly_cut = "unique-CANARY";
+        let raw = format!("{start}{}{secret}\"}}}}", "x".repeat(INGRESS_PREVIEW_LIMIT-start.len()-visibly_cut.len()));
+        let parsed = serde_json::from_str(&raw).unwrap();
+        let input = TuiCaptureInput::encode(&HeaderMap::new(), raw.as_bytes(), &parsed).unwrap();
+        let input: TuiCaptureInput = serde_json::from_slice(&input).unwrap();
+        assert!(input.ingress["body"].as_str().unwrap().ends_with(visibly_cut));
+        input.save(&root,7,attempt,vec![("Authorization".into(),format!("Bearer {secret}"))],b"{}".to_vec()).unwrap();
+        let stored = fs::read_to_string(root.join(format!("{attempt}.json"))).unwrap();
+        assert!(!stored.contains(visibly_cut));
+        fs::remove_dir_all(root).unwrap();
+    }
 
     /// 发送前拒绝仍保存脱敏入站，明确标记组装与TLS尚未发生。
     /// @return 无；原始哈希、秘密脱敏或阶段归属变化时失败。

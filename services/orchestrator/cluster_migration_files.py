@@ -28,7 +28,6 @@ ENVIRONMENT_EXCLUSIONS = {
     'runtime/access': '目标按当前唯一凭据所有者发布执行快照',
     'runtime/cli': '目标按已冻结CLI策略重新建立控制配置',
     'runtime/native-criu': '目标重新建立暖进程，不恢复源宿主内存快照',
-    'runtime/native': '目标按原请求内核重新建立运行进程与临时工作区，API历史仍保留在flows',
     'runtime/account-image.json': '目标按实际同批镜像建立新的物理来源证明',
     'runtime/physical-features.json': '目标按实际宿主重新采集观察，逻辑画像保持',
 }

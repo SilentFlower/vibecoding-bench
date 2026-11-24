@@ -141,7 +141,8 @@ fn explicit_key(domain: &[u8], token_id: i64, id: &str) -> String {
     hex::encode(hash.finalize())
 }
 
-fn valid_id(id: &str) -> bool {
+/// 核对原始入口会话格式。@param id 会话原值。@return 合法时为 true。
+pub(super) fn valid_id(id: &str) -> bool {
     id.len() <= 256 && !id.trim().is_empty() && !id.chars().any(char::is_control)
 }
 
@@ -217,7 +218,7 @@ fn hash_string(hash: &mut Sha256, text: &str) {
     hash.update(text.as_bytes());
 }
 
-fn hash_json(hash: &mut Sha256, value: &Value, ignore_cache_control: bool) {
+pub(super) fn hash_json(hash: &mut Sha256, value: &Value, ignore_cache_control: bool) {
     match value {
         Value::Null => hash.update(b"n"),
         Value::Bool(value) => hash.update([b'b', u8::from(*value)]),

@@ -111,13 +111,14 @@ def tree_inventory(root: Path, excluded: set[str] | None = None, *, durable: boo
     return entries
 
 
-def iter_tree_inventory(root: Path, excluded: set[str] | None = None, *, durable: bool = False, include=None):
+def iter_tree_inventory(root: Path, excluded: set[str] | None = None, *, durable: bool = False, include=None, single_link=None):
     """逐条盘点原树，供迁移落磁盘索引以控制内存。
 
     :param root: 非链接环境根。
     :param excluded: 精确排除项。
     :param durable: 是否同步已核验资料。
     :param include: 可选路径准入函数，拒绝的目录不再遍历。
+    :param single_link: 可选普通文件判定，命中时拒绝具有其他硬链接的 inode。
     :return: 与原盘点相同的路径和元数据迭代器。
     """
     ignored = excluded or set()
@@ -150,6 +151,8 @@ def iter_tree_inventory(root: Path, excluded: set[str] | None = None, *, durable
                     file_fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
                     try:
                         before = os.fstat(file_fd)
+                        if single_link is not None and single_link(relative) and before.st_nlink != 1:
+                            raise ValueError('迁移私有文件含有额外硬链接')
                         if _identity(before) != _identity(metadata):
                             raise ValueError('盘点期间文件被替换')
                         item.update(kind='file', size=before.st_size, sha256=_hash(file_fd))

@@ -6,12 +6,15 @@ import '../request-records.css';
 
 const props = defineProps<{ snapshot: NonNullable<NativeCapture['snapshot']> }>();
 const action = ref('all');
-type RawStage = 'ingress' | 'decoded_gemini' | 'cc_prepared' | 'wire_final';
+type RawStage = 'ingress' | 'decoded_gemini' | 'cc_prepared' | 'tui_provider_request' | 'wire_final';
 const ingressOnly = computed(() => props.snapshot.stage === 'agy_ingress'
   || (props.snapshot.stage === 'ingress_rejected' && props.snapshot.stages?.length === 1
     && props.snapshot.stages[0]?.stage === 'ingress'));
-const rawStage = ref<RawStage>(ingressOnly.value || props.snapshot.stage === 'ingress_rejected' ? 'ingress' : props.snapshot.wire_final ? 'wire_final' : 'cc_prepared');
+const tuiProvider = computed(() => props.snapshot.stage === 'tui_provider_request');
+const rawStage = ref<RawStage>(tuiProvider.value ? 'tui_provider_request'
+  : ingressOnly.value || props.snapshot.stage === 'ingress_rejected' ? 'ingress' : props.snapshot.wire_final ? 'wire_final' : 'cc_prepared');
 const rawStages = computed<RawStage[]>(() => {
+  if (tuiProvider.value) return ['ingress', 'tui_provider_request', 'wire_final'];
   if (ingressOnly.value) return ['ingress'];
   if (props.snapshot.stage === 'agy_egress') return props.snapshot.ingress ? ['ingress', 'wire_final'] : ['wire_final'];
   if (props.snapshot.stage !== 'agy_prepared') return ['ingress', 'cc_prepared', 'wire_final'];
@@ -28,8 +31,9 @@ const preview = computed(() => {
   if (rawStage.value === 'ingress') return snapshot.ingress;
   if (rawStage.value === 'decoded_gemini') return snapshot.decoded_gemini;
   if (rawStage.value === 'wire_final') return snapshot.wire_final;
-  return snapshot.stage === 'cc_prepared' || snapshot.stage === 'agy_prepared' ? snapshot : undefined;
+  return snapshot.stage === 'cc_prepared' || snapshot.stage === 'agy_prepared' || snapshot.stage === 'tui_provider_request' ? snapshot : undefined;
 });
+const missingStageNote = computed(() => props.snapshot.stages?.find(stage => stage.stage === rawStage.value)?.note);
 const finalReason = computed(() => {
   const reason = props.snapshot.wire_final?.reason;
   if (!reason) return '';
@@ -53,6 +57,7 @@ function actionLabel(value: string): string {
 
 /** 展示阶段及证据完整性。@param value 持久状态或阶段。@return 中文标签。 */
 function label(value: string): string {
+  if (value === 'tui_provider_request') return 'Sender 提交给提供方';
   if(value==='cc_prepared' && props.snapshot.stage==='agy_prepared')return 'AGY原生提交';
   if(value==='wire_final' && props.snapshot.wire_final?.source==='agy_native_tls')return '最终 TLS 写出';
   if(value==='wire_final' && (props.snapshot.stage==='agy_prepared' || props.snapshot.stage==='agy_egress'))return '实际出站';
@@ -71,14 +76,14 @@ function bodyText(): string {
 <template>
   <div data-native-stages>
     <div class="request-stages"><article v-for="stage in stages" :key="stage.stage"><span>{{ label(stage.stage) }}</span><strong :class="{ready:stage.status==='complete'}">{{ label(stage.status) }}</strong><small>{{ stage.source }} · {{ stage.representation }}</small><small v-if="stage.note">{{ stage.note }}</small></article></div>
-    <section v-if="!ingressOnly" class="request-section"><div class="request-section-head"><h3>头部处理</h3><ChoiceSelect v-model="action" label="筛选头部处理动作" :options="[{value:'all',label:'全部动作'},{value:'drop',label:'只看删除'},{value:'runtime',label:'运行时处理'},{value:'context',label:'提取上下文'},{value:'keep',label:'保留'}]" /></div>
+    <section v-if="!ingressOnly && (!tuiProvider || snapshot.header_policy)" class="request-section"><div class="request-section-head"><h3>头部处理</h3><ChoiceSelect v-model="action" label="筛选头部处理动作" :options="[{value:'all',label:'全部动作'},{value:'drop',label:'只看删除'},{value:'runtime',label:'运行时处理'},{value:'context',label:'提取上下文'},{value:'keep',label:'保留'}]" /></div>
       <template v-if="snapshot.header_policy && snapshot.header_policy.status!=='unavailable'">
         <p class="request-header-summary">{{ label(snapshot.header_policy.status) }} · 保存 {{ snapshot.header_policy.stored_count ?? '未观测' }} / 实际 {{ snapshot.header_policy.observed_count ?? '未观测' }} 项<span>删除 {{ snapshot.header_policy.decisions.filter(item=>item.action==='drop').length }} 项</span></p>
         <div class="request-evidence-table"><table><thead><tr><th>字段</th><th>动作</th><th v-if="agyWire">阶段</th><th>原因</th></tr></thead><tbody><tr v-for="(item,index) in decisions" :key="index" :class="['keep','drop','runtime','context'].includes(item.action)?'request-header-'+item.action:''"><td><code>{{ item.name }}</code></td><td><span class="request-header-badge">{{ actionLabel(item.action) }}</span></td><td v-if="agyWire">{{ item.stage === 'egress' ? '出站适配' : '网关入口' }}</td><td>{{ item.reason }}</td></tr><tr v-if="!decisions.length"><td :colspan="agyWire ? 4 : 3">当前筛选下没有已保存的处理项。</td></tr></tbody></table></div>
       </template><p v-else class="form-help">{{ snapshot.header_policy?.note ?? '历史记录未保存逐字段处理明细。' }}</p>
     </section>
-    <section v-if="!ingressOnly" class="request-section"><h3>正文变化</h3>
-      <template v-if="snapshot.body_changes && snapshot.body_changes.status!=='unavailable'"><p class="form-help">{{ label(snapshot.body_changes.status) }} · 来源：入口与组装结果的观察差异。路径使用 JSON Pointer。</p><dl class="request-definitions"><template v-for="(item,index) in snapshot.body_changes.items" :key="index"><dt><code>{{ item.path || '/' }}</code></dt><dd>{{ actionLabel(item.action) }} · {{ item.reason }}</dd></template></dl><p v-if="!snapshot.body_changes.items.length" class="form-help">本次观察到的正文内容保持一致。</p></template><p v-else class="form-help">{{ snapshot.body_changes?.note ?? '历史记录未保存正文变化证据。' }}</p>
+    <section v-if="!ingressOnly && (!tuiProvider || snapshot.body_changes)" class="request-section"><h3>正文变化</h3>
+      <template v-if="snapshot.body_changes && snapshot.body_changes.status!=='unavailable'"><p class="form-help">{{ label(snapshot.body_changes.status) }} · {{ tuiProvider ? '对比入口与提交给提供方的正文。' : '对比入口与组装后的正文。' }}路径使用 JSON Pointer。</p><dl class="request-definitions"><template v-for="(item,index) in snapshot.body_changes.items" :key="index"><dt><code>{{ item.path || '/' }}</code></dt><dd>{{ actionLabel(item.action) }} · {{ item.reason }}</dd></template></dl><p v-if="!snapshot.body_changes.items.length" class="form-help">本次观察到的正文内容保持一致。</p></template><p v-else class="form-help">{{ snapshot.body_changes?.note ?? '历史记录未保存正文变化证据。' }}</p>
     </section>
     <details v-if="tlsWire" class="request-code-block request-wire-evidence" data-native-wire-final><summary>原生TLS接受证据</summary><div class="request-wire-content">
 
@@ -107,7 +112,7 @@ function bodyText(): string {
       <div class="request-wire-content"><p>实体完整性 {{ label(agyWire.status) }}<template v-if="agyWire.http_status != null"> · 上游 HTTP {{ agyWire.http_status }}</template></p><p class="request-wire-note">{{ agyWire.source === 'agy_native_tls' ? '请求头和正文来自 AGY 原生 TLS 写入实际接受的 HTTP 字节。' : '请求头和正文来自账号出站适配层的实际 HTTP 传输记录。' }}</p></div>
     </details>
     <section class="request-section"><div class="request-section-head"><h3>脱敏原文</h3><div class="request-stage-tabs" role="group" aria-label="原文阶段"><button v-for="stage in rawStages" :key="stage" type="button" :class="{active:rawStage===stage}" :aria-pressed="rawStage===stage" @click="rawStage=stage">{{ label(stage) }}</button></div></div>
-      <template v-if="preview"><p class="form-help request-evidence-hash">原正文 {{ preview.original_body_bytes ?? '未观测' }} 字节 · SHA256 {{ preview.original_body_sha256 ?? '未观测' }}</p><p v-if="preview.body_truncated || preview.headers_truncated" role="status" class="form-help">内容已截断。正文：{{ preview.body_truncated ? '已截断' : '完整' }}，请求头：{{ preview.headers_truncated ? '已截断' : '完整' }}。</p><details open class="request-code-block"><summary>请求头</summary><pre>{{ preview.headers.map(([name,value])=>name+': '+value).join('\n') }}</pre></details><details :open="preview.body.length <= 1024 * 1024" class="request-code-block"><summary>请求正文</summary><pre>{{ bodyText() }}</pre></details></template><div v-else class="request-empty-capture"><strong>本次未保存所选阶段的原文</strong><p>组装中间值与最终 TLS 观测分别展示。</p></div>
+      <template v-if="preview"><p class="form-help request-evidence-hash">原正文 {{ preview.original_body_bytes ?? '未观测' }} 字节 · SHA256 {{ preview.original_body_sha256 ?? '未观测' }}</p><p v-if="preview.body_truncated || preview.headers_truncated" role="status" class="form-help">内容已截断。正文：{{ preview.body_truncated ? '已截断' : '完整' }}，请求头：{{ preview.headers_truncated ? '已截断' : '完整' }}。</p><details open class="request-code-block"><summary>请求头</summary><pre>{{ preview.headers.map(([name,value])=>name+': '+value).join('\n') }}</pre></details><details :open="preview.body.length <= 1024 * 1024" class="request-code-block"><summary>请求正文</summary><pre>{{ bodyText() }}</pre></details></template><div v-else class="request-empty-capture"><strong>本次未保存所选阶段的原文</strong><p v-if="missingStageNote">{{ missingStageNote }}</p></div>
     </section>
   </div>
 </template>

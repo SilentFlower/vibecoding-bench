@@ -21,6 +21,8 @@ def read_rollout(directory: Path, deployment: str, control_release: str, account
     value = strict_json(raw, 8 * 1024 * 1024)
     if (value.get('schema_version') != 1 or value.get('deployment') != deployment
             or value.get('control_release') != control_release or value.get('account_release') != account_release
-            or not isinstance(value.get('environments'), dict)):
+            or not isinstance(value.get('environments'), dict)
+            or not isinstance(value.get('stopped_environments', {}), dict)
+            or not isinstance(value.get('rebuilt_environments', {}), dict)):
         raise ValueError('账号后台更新归属无效')
     return value

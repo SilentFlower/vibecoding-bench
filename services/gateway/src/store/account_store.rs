@@ -26,7 +26,81 @@ pub struct AccountStore {
     driver: String,
 }
 
+/// 候选账号的持久转发生效值、待切目标和修订号。
+pub(crate) struct TuiBackendSnapshot {
+    pub active: String,
+    pub target: String,
+    pub revision: i64,
+    pub binding: String,
+}
+
 impl AccountStore {
+    /// 同一次读取返回生效值和切换意向。@param id 账号。@return 持久快照。
+    pub(crate) async fn tui_backend(&self, id: i64) -> Result<TuiBackendSnapshot, AppError> {
+        let row = sqlx::query(
+            "SELECT a.request_backend, COALESCE(i.target,'') AS target, COALESCE(i.binding,'') AS binding,
+                    COALESCE(i.revision,0) AS revision
+             FROM accounts a LEFT JOIN tui_backend_intents i ON i.account_id=a.id WHERE a.id=$1",
+        )
+        .bind(id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(TuiBackendSnapshot {
+            active: row.try_get("request_backend")?,
+            target: row.try_get("target")?,
+            revision: row.try_get("revision")?,
+            binding: row.try_get("binding")?,
+        })
+    }
+
+    /// 同事务修改生效值和意向，拒绝覆盖较新修订。
+    /// @param id 账号。@param before 原快照。@param active 生效值。@param target 待切目标。
+    /// @param binding 排空所对应的环境绑定。@return 新快照。
+    pub(crate) async fn update_tui_backend(
+        &self,
+        id: i64,
+        before: &TuiBackendSnapshot,
+        active: &str,
+        target: &str,
+        binding: &str,
+    ) -> Result<TuiBackendSnapshot, AppError> {
+        let mut tx = self.pool.begin().await?;
+        sqlx::query("INSERT INTO tui_backend_intents (account_id,target,binding,revision) VALUES ($1,'','',0)
+            ON CONFLICT(account_id) DO NOTHING")
+            .bind(id).execute(&mut *tx).await?;
+        let changed = sqlx::query(
+            "UPDATE tui_backend_intents SET target=$1, binding=$2, revision=revision+1
+            WHERE account_id=$3 AND revision=$4",
+        )
+        .bind(target)
+        .bind(binding)
+        .bind(id)
+        .bind(before.revision)
+        .execute(&mut *tx)
+        .await?;
+        if changed.rows_affected() != 1 {
+            return Err(AppError::SchedulingConflict);
+        }
+        let updated = sqlx::query(
+            "UPDATE accounts SET request_backend=$1 WHERE id=$2 AND request_backend=$3",
+        )
+        .bind(active)
+        .bind(id)
+        .bind(&before.active)
+        .execute(&mut *tx)
+        .await?;
+        if updated.rows_affected() != 1 {
+            return Err(AppError::SchedulingConflict);
+        }
+        tx.commit().await?;
+        Ok(TuiBackendSnapshot {
+            active: active.into(),
+            target: target.into(),
+            binding: binding.into(),
+            revision: before.revision + 1,
+        })
+    }
+
     /// 按平台统计账号状态。@param platform 平台或 all。@return 状态计数。
     pub async fn platform_counts(&self, platform: &str) -> Result<Value, AppError> {
         let rows = sqlx::query("SELECT status,COUNT(*) AS count FROM accounts WHERE $1='all' OR platform=$1 GROUP BY status")

@@ -33,7 +33,7 @@ pub(crate) fn validate_idle_timeout(seconds: u64) -> Result<u64, AppError> {
     Ok(seconds)
 }
 
-/// 已独立适配的官方源版本，历史私有报文缺省为293。
+/// 原生源版本的报文与历史诊断标识，缺省为 293。
 #[derive(
     Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq, Hash, PartialOrd, Ord,
 )]
@@ -46,6 +46,14 @@ pub enum NativeSourceVersion {
 }
 
 impl NativeSourceVersion {
+    /// 校验私有执行信封中的版本。@return 293 可提交，退役版本在接触进程前拒绝。
+    pub(crate) fn require_executable(self) -> Result<(), AppError> {
+        if self != Self::Cc293 {
+            return Err(AppError::BadRequest("原生执行内核仅支持 2.1.293".into()));
+        }
+        Ok(())
+    }
+
     /// 判断是否采用历史省略版本合同。@param self 当前源版本。@return 是否为293。
     pub fn is_default(&self) -> bool {
         *self == Self::Cc293

@@ -32,6 +32,7 @@ use crate::service::version_profile::{
     apply_identity_to_env_json, default_profile, profile_for_key,
 };
 use crate::store::account_store::AccountStore;
+use crate::store::account_store::TuiBackendSnapshot;
 use crate::store::scheduling_store::SchedulingStore;
 
 #[path = "agy_account.rs"]
@@ -258,6 +259,9 @@ fn waiting_queue_capacity(concurrency: i32) -> i32 {
 pub struct AccountQueue {
     /// CLI draining 与 API 活动计数共用门禁。
     pub runtime_gate: RuntimeGate,
+    /// 候选路由判定跨越物理准入；写锁只在切换真正生效时取得。
+    pub(crate) tui_route: Arc<RwLock<()>>,
+    pub(crate) tui_config: Arc<AsyncMutex<()>>,
     /// 活跃槽位信号量。
     slots: Arc<Semaphore>,
     /// 等待位信号量，实际通过槽位和 CLI 门禁后归还。
@@ -380,6 +384,8 @@ impl AccountQueue {
         let active_requests = Arc::new(AtomicI64::new(0));
         Self {
             runtime_gate: RuntimeGate::new(active_requests.clone()),
+            tui_route: Arc::new(RwLock::new(())),
+            tui_config: Arc::new(AsyncMutex::new(())),
             slots: Arc::new(Semaphore::new(cap as usize)),
             queue_cap: Arc::new(Semaphore::new(qc as usize)),
             slot_max: Arc::new(AtomicI32::new(cap)),
@@ -514,6 +520,28 @@ impl AccountQueue {
         timeout: Duration,
         slot_units: u32,
     ) -> Result<AccountSlotPermit, QueueWaitError> {
+        self.acquire_api(timeout, slot_units, None).await
+    }
+
+    /// 使用原有 FIFO 槽位和 V2 迁移排空准入。
+    /// @param timeout 原准入余量。@param slot_units 固定槽位权重。@param continuation 已核验原回执。
+    /// @return 本账号的普通活动许可。
+    pub(super) async fn acquire_tui(
+        &self,
+        timeout: Duration,
+        slot_units: u32,
+        continuation: bool,
+    ) -> Result<AccountSlotPermit, QueueWaitError> {
+        self.acquire_api(timeout, slot_units, Some(continuation))
+            .await
+    }
+
+    async fn acquire_api(
+        &self,
+        timeout: Duration,
+        slot_units: u32,
+        tui: Option<bool>,
+    ) -> Result<AccountSlotPermit, QueueWaitError> {
         let started = Instant::now();
         let slot_units = slot_units.max(1);
         // 1. 进等待区：拿不到等待位说明队列满，降级。
@@ -558,11 +586,12 @@ impl AccountQueue {
         let _gate_guard = scopeguard::guard((), move |_| {
             gate_waiting_units.fetch_sub(slot_units as i64, Ordering::Relaxed);
         });
-        if !self
-            .runtime_gate
-            .enter(timeout.saturating_sub(started.elapsed()))
-            .await
-        {
+        let remaining = timeout.saturating_sub(started.elapsed());
+        let admitted = match tui {
+            Some(continuation) => self.runtime_gate.enter_tui(remaining, continuation).await,
+            None => self.runtime_gate.enter(remaining).await,
+        };
+        if !admitted {
             return Err(QueueWaitError::Timeout);
         }
         drop(queue_permit);
@@ -609,6 +638,7 @@ pub struct AccountService {
     /// 独立接单与整体准入，保留已接纳请求的生命周期。
     pub work_controls: AccountWorkControls,
     native_changes: broadcast::Sender<(i64, bool, bool)>,
+    tui_retirements: broadcast::Sender<i64>,
     credential_gates: Mutex<HashMap<i64, Arc<CredentialGate>>>,
     agy_capacity_edits: Mutex<HashMap<i64, String>>,
     scheduler: Option<Arc<V3Scheduler>>,
@@ -750,6 +780,7 @@ impl AccountService {
     ) -> Self {
         Self {
             native_changes: broadcast::channel(128).0,
+            tui_retirements: broadcast::channel(128).0,
             work_controls: AccountWorkControls::new(settings_store.database_pool()),
             store,
             cache,
@@ -1140,6 +1171,64 @@ impl AccountService {
 
     pub async fn get_account(&self, id: i64) -> Result<Account, AppError> {
         self.store.get_by_id(id).await
+    }
+
+    /// 读取 V2 切换快照。@param id 归属账号。@return 生效值、目标及版本。
+    pub(crate) async fn tui_backend(&self, id: i64) -> Result<TuiBackendSnapshot, AppError> {
+        self.store.tui_backend(id).await
+    }
+
+    /// 读取待原进程收口的 V2 轮次。@param id 已认证维护对应的账号。@return 是否阻止物理隔离。
+    pub(crate) async fn tui_pending(&self, id: i64) -> Result<bool, AppError> {
+        super::tui_native_drain::occupied_v2(self.tui_database(), id).await
+    }
+
+    /// 查询全局更新需要保留的 V2 工具轮。@return 是否还有原工具回执。
+    pub(crate) async fn awaiting_tui_tools(&self) -> Result<bool, AppError> {
+        super::tui_native_drain::awaiting_v2_tools(self.tui_database()).await
+    }
+
+    /// 供 V2 排空对账访问账号所在持久库。@return 共享连接池。
+    pub(super) fn tui_database(&self) -> sqlx::AnyPool {
+        self.settings_store.database_pool()
+    }
+
+    /// 启动账号转发切换意向对账。@param self 同一 Gateway 账号服务。@return 无。
+    pub fn start_tui_backend_reconciliation(self: &Arc<Self>) {
+        let service = self.clone();
+        let retirements = self.tui_retirements.subscribe();
+        tokio::spawn(crate::service::tui_backend::reconcile_intents(
+            service,
+            retirements,
+        ));
+    }
+
+    /// 响应归还普通 HTTP 槽后，唤醒该账号的切换对账。@param id 账号。@return 无。
+    pub(super) fn notify_tui_response_retired(&self, id: i64) {
+        let _ = self.tui_retirements.send(id);
+    }
+
+    /// 保存同一账号的原子切换结果。@param id 账号。@param before 原快照。
+    /// @param active 生效值。@param target 待切目标。@param binding 原环境绑定。@return 新快照。
+    pub(crate) async fn update_tui_backend(
+        &self,
+        id: i64,
+        before: &TuiBackendSnapshot,
+        active: &str,
+        target: &str,
+        binding: &str,
+    ) -> Result<TuiBackendSnapshot, AppError> {
+        let saved = self
+            .store
+            .update_tui_backend(id, before, active, target, binding)
+            .await?;
+        if before.active != saved.active {
+            if let Some(scheduler) = &self.scheduler {
+                scheduler.account_updated(id);
+            }
+            self.notify_native_change(id, true);
+        }
+        Ok(saved)
     }
 
     /// 在已取得维护许可后同步代理并使原生准备快照失效。
@@ -2113,6 +2202,23 @@ impl AccountService {
 
     pub async fn resolve_upstream_token(&self, id: i64) -> Result<String, AppError> {
         let _credential_activity = self.upstream_activity(id).await?;
+        self.resolve_claude_bearer(id).await
+    }
+
+    /// 在 V2 原工具允许排空续轮的同一次活动内解析凭据。
+    /// @param id 已绑定账号。@param original_tool 本轮是否接续原工具。
+    /// @return 账号凭据与覆盖实际发送生命周期的活动许可。
+    pub(super) async fn resolve_tui_upstream_token(
+        &self,
+        id: i64,
+        original_tool: bool,
+    ) -> Result<(String, CredentialActivity), AppError> {
+        let activity = self.upstream_tui_activity(id, original_tool).await?;
+        let bearer = self.resolve_claude_bearer(id).await?;
+        Ok((bearer, activity))
+    }
+
+    async fn resolve_claude_bearer(&self, id: i64) -> Result<String, AppError> {
         let account = self.store.get_by_id(id).await?;
         if !account.is_claude_code() {
             return Err(AppError::ServiceUnavailable(
@@ -3223,7 +3329,7 @@ fn validate_account_usage_limits(account: &Account) -> Result<(), AppError> {
 }
 
 /// 仅用有效且尚未重置的普通窗口判断账号是否达到本地控制线。
-fn account_usage_limit_reached(account: &Account) -> bool {
+pub(super) fn account_usage_limit_reached(account: &Account) -> bool {
     [
         ("five_hour", account.five_hour_usage_limit_percent),
         ("seven_day", account.seven_day_usage_limit_percent),

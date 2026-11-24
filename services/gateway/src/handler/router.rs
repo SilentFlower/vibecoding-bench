@@ -1,10 +1,9 @@
 use crate::handler::proxies;
 use crate::handler::session_policy_blocks;
 use crate::model::proxy::ProxyConnection;
-use crate::service::account::{AccountCapacityInfo, AccountQueue};
+use crate::service::account::AccountCapacityInfo;
 use crate::service::oauth_flow::GenerateAuthUrlRequest;
 use crate::service::proxy::ProxyService;
-use crate::service::runtime_lease::RuntimeLease;
 use crate::service::session_policy_block::SessionPolicyBlockConfig;
 use crate::store::settings_store::{
     DEFAULT_SESSION_POLICY_BLOCK_DURATION_MINUTES, DEFAULT_SESSION_POLICY_BLOCK_ENABLED,
@@ -16,6 +15,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use chrono::{TimeZone, Utc};
+use futures_util::{StreamExt, TryStreamExt, stream};
 use rust_embed::Embed;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -58,7 +58,7 @@ use crate::service::oauth_flow::OAuthFlowService;
 use crate::service::rewriter::{
     CacheControlTtlRewrite, ClaudeCodeContextSanitizerMode, MessageCacheControlRewrite,
 };
-use crate::service::runtime_bridge;
+use crate::service::runtime_bridge::{self, RuntimeConfigPermit};
 use crate::service::system_update;
 use crate::service::telemetry::TelemetryService;
 use crate::service::v3_scheduling::{PhaseCounts, SchedulingConfig, now_ms};
@@ -343,8 +343,10 @@ pub fn build_router(
 
 /// 读取双端维护接管证明；管理员鉴权沿用管理路由。
 /// @return 精确 epoch 和完整响应生命周期内的进程活动数。
-async fn system_update_status() -> Result<Json<Value>, AppError> {
-    Ok(Json(system_update::snapshot()?))
+async fn system_update_status(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
+    let mut snapshot = system_update::snapshot()?;
+    snapshot["tui_tool_pending"] = json!(state.account_svc.awaiting_tui_tools().await?);
+    Ok(Json(snapshot))
 }
 
 #[derive(Deserialize)]
@@ -362,6 +364,11 @@ async fn system_update_cutover(
     Json(input): Json<SystemUpdateCutover>,
 ) -> Result<Json<Value>, AppError> {
     require_v3_credential_service(&headers)?;
+    if state.account_svc.awaiting_tui_tools().await? {
+        return Err(AppError::ServiceUnavailable(
+            "请先完成原 V2 工具轮，再切换服务".into(),
+        ));
+    }
     let receipt = system_update::cutover(&input.operation_id, &input.epoch)?;
     state.gemini_svc.release_tools_for_cutover();
     Ok(Json(receipt))
@@ -520,10 +527,22 @@ async fn list_accounts(
         .collect::<Vec<_>>();
     let proxy_records = state.proxy_svc.store.matching(&connections).await?;
 
+    // 账号列表仍须报告编辑能力。探测并行有界，避免离线账号串行拖慢整页。
+    let views: Vec<Value> = stream::iter(accounts.iter().cloned())
+        .map(|account| {
+            let service = state.account_svc.clone();
+            async move {
+                let mut value = serde_json::to_value(&account).unwrap_or_default();
+                crate::service::tui_backend::append_view(&service, &account, &mut value).await?;
+                Ok::<_, AppError>(value)
+            }
+        })
+        .buffered(8)
+        .try_collect()
+        .await?;
     // 为每个账号附加遥测会话过期时间 + 调度评分信息
     let mut data: Vec<serde_json::Value> = Vec::with_capacity(accounts.len());
-    for a in &accounts {
-        let mut obj = serde_json::to_value(a).unwrap_or_default();
+    for (a, mut obj) in accounts.iter().zip(views) {
         obj["work_control"] =
             serde_json::to_value(state.account_svc.work_controls.snapshot(a.id).await?)
                 .map_err(|_| AppError::Internal("账号工作状态编码失败".into()))?;
@@ -772,6 +791,9 @@ async fn runtime_lease_status(
         .await;
     let mut snapshot = queue.runtime_gate.snapshot();
     snapshot["waiting"] = serde_json::json!(queue.waiting_count());
+    if account.is_claude_code() {
+        snapshot["tui_pending"] = json!(state.account_svc.tui_pending(id).await?);
+    }
     Ok(Json(snapshot))
 }
 
@@ -981,6 +1003,17 @@ async fn runtime_lease_update(
     } else if input.operation == "prepare-cli-shared" {
         queue.runtime_gate.prepare_shared_cli(&input.owner)?;
     } else {
+        if input.operation == "claim"
+            && account.is_claude_code()
+            && (crate::service::runtime_lease::node_migration_owner(&input.owner)
+                || input.owner.starts_with("node-sync:")
+                || input.owner.starts_with("maintenance:system-update:"))
+            && state.account_svc.tui_pending(id).await?
+        {
+            return Err(AppError::ServiceUnavailable(
+                "原 V2 工具轮仍需在源节点收口".into(),
+            ));
+        }
         queue.runtime_gate.update(
             &input.owner,
             input.generation.as_deref().unwrap_or_default(),
@@ -1089,6 +1122,7 @@ async fn get_account(
 ) -> Result<Json<Value>, AppError> {
     let account = state.account_svc.get_account(id).await?;
     let mut value = json!(account);
+    crate::service::tui_backend::append_view(&state.account_svc, &account, &mut value).await?;
     if account.is_antigravity() {
         value["credential_state"] = state.account_svc.agy_state(id).await?;
         value["agy_request_usage"] = json!(agy_account_usage(&state, &[id]).await.get(&id));
@@ -1345,79 +1379,12 @@ async fn import_cli_process(
     ))
 }
 
-/// 配置修改期间阻止新推理进入，检查和写库之间不能出现新活动请求。
-pub(super) struct RuntimeConfigPermit {
-    queue: Arc<AccountQueue>,
-    lease: RuntimeLease,
-}
-
-impl Drop for RuntimeConfigPermit {
-    fn drop(&mut self) {
-        if self
-            .queue
-            .runtime_gate
-            .update(&self.lease.owner, &self.lease.generation, "release")
-            .is_err()
-        {
-            warn!("v3 configuration lease requires reconciliation");
-        }
-    }
-}
-
-/// 持有原账号配置门禁并核对当前活动。
-/// @param state 应用服务。@param account 当前账号。@param force 强制核对独立网关队列。
-/// @return 维护许可，释放时恢复原接单状态。
 pub(super) async fn config_permit(
     state: &AppState,
     account: &Account,
     force: bool,
 ) -> Result<Option<RuntimeConfigPermit>, AppError> {
-    config_permit_for(state, account, force, None).await
-}
-
-async fn config_permit_for(
-    state: &AppState,
-    account: &Account,
-    force: bool,
-    deletion: Option<&DeletionSelector>,
-) -> Result<Option<RuntimeConfigPermit>, AppError> {
-    if account.is_antigravity() {
-        if state.account_svc.agy_state(account.id).await?["phase"] != "ready" {
-            return Err(AppError::BadRequest("AGY 原凭据操作待核对".into()));
-        }
-    }
-    if !force
-        && state.account_svc.scheduler().is_none()
-        && std::env::var("V3_RUNTIME_URL")
-            .unwrap_or_default()
-            .is_empty()
-    {
-        return Ok(None);
-    }
-    let queue = state
-        .account_svc
-        .get_or_create_queue(account.id, account.concurrency)
-        .await;
-    let lease = queue
-        .runtime_gate
-        .prepare(&format!("gateway-config:{}", Uuid::new_v4()))?;
-    let permit = RuntimeConfigPermit { queue, lease };
-    if permit.queue.runtime_gate.snapshot()["active"]
-        .as_i64()
-        .unwrap_or(0)
-        != 0
-        || permit.queue.waiting_count() != 0
-    {
-        return Err(AppError::BadRequest("account runtime is busy".into()));
-    }
-    if !force
-        || !std::env::var("V3_RUNTIME_URL")
-            .unwrap_or_default()
-            .is_empty()
-    {
-        runtime_bridge::quiesce(account.id, &permit.lease, deletion).await?;
-    }
-    Ok(Some(permit))
+    runtime_bridge::account_config_permit(&state.account_svc, account, force, None).await
 }
 
 /// 解码可选套餐字段，区分未提交与明确清除。
@@ -1451,7 +1418,7 @@ async fn update_account(
     State(state): State<AppState>,
     Path(id): Path<i64>,
     Json(updates): Json<serde_json::Value>,
-) -> Result<Json<Account>, AppError> {
+) -> Result<Json<Value>, AppError> {
     let _proxy_guard = if updates.get("proxy_id").is_some() || updates.get("proxy_url").is_some() {
         Some(state.proxy_svc.mutations.lock().await)
     } else {
@@ -1486,6 +1453,64 @@ async fn update_account(
         object.insert("proxy_url".into(), json!(url));
     }
     let mut existing = state.account_svc.get_account(id).await?;
+    let _tui_config = {
+        use crate::service::{runtime_transport::tui_scope, tui_backend};
+
+        if tui_scope(&existing) {
+            let queue = state
+                .account_svc
+                .get_or_create_queue(id, existing.concurrency)
+                .await;
+            let lock = queue.tui_config.clone().lock_owned().await;
+            existing = state.account_svc.get_account(id).await?;
+            let expected = updates
+                .get("request_backend_revision")
+                .map(|value| {
+                    value
+                        .as_i64()
+                        .filter(|number| *number >= 0)
+                        .ok_or_else(|| AppError::BadRequest("转发方式修订必须为非负整数".into()))
+                })
+                .transpose()?;
+            let route = state.account_svc.tui_backend(id).await?;
+            let backend_only = updates.as_object().is_some_and(|fields| {
+                fields.keys().all(|key| {
+                    matches!(key.as_str(), "request_backend" | "request_backend_revision")
+                })
+            });
+            if let Some(target) = updates.get("request_backend")
+                && (target == tui_backend::TUI_V2
+                    || route.active == tui_backend::TUI_V2
+                    || !route.target.is_empty()
+                    // 切回 V1 的回包丢失后，旧修订的重试应读取完成状态，避免重复申请原生维护。
+                    || (backend_only && expected.is_some() && route.revision > 0
+                        && target.as_str() == Some(route.active.as_str())))
+            {
+                let target = target
+                    .as_str()
+                    .ok_or_else(|| AppError::BadRequest("request_backend 必须为文本".into()))?;
+                if !backend_only {
+                    return Err(AppError::BadRequest("请独立保存 V2 转发方式".into()));
+                }
+                return Ok(Json(
+                    tui_backend::change_locked(
+                        &state.account_svc,
+                        &existing,
+                        &queue,
+                        target,
+                        expected,
+                    )
+                    .await?,
+                ));
+            }
+            if expected.is_some_and(|revision| revision != route.revision) {
+                return Err(AppError::SchedulingConflict);
+            }
+            Some(lock)
+        } else {
+            None
+        }
+    };
     if !existing.is_claude_code() && !existing.is_antigravity() {
         return Err(AppError::BadRequest("未知账号平台，请核对原记录".into()));
     }
@@ -1506,9 +1531,9 @@ async fn update_account(
         } else {
             None
         };
-        return Ok(Json(
-            state.account_svc.update_agy_fields(id, &updates).await?,
-        ));
+        return Ok(Json(json!(
+            state.account_svc.update_agy_fields(id, &updates).await?
+        )));
     }
 
     if updates
@@ -1566,7 +1591,7 @@ async fn update_account(
             .account_svc
             .update_subscription_metadata(id, subscription, tier)
             .await?;
-        return Ok(Json(state.account_svc.get_account(id).await?));
+        return Ok(Json(json!(state.account_svc.get_account(id).await?)));
     }
     if let Some(value) = &subscription {
         if value != &existing.subscription_type && tier.is_none() {
@@ -1741,7 +1766,7 @@ async fn update_account(
                 {
                     state.account_svc.request_native_wake(id);
                 }
-                return Ok(Json(existing));
+                return Ok(Json(json!(existing)));
             }
         }
     }
@@ -1816,7 +1841,7 @@ async fn update_account(
     {
         state.account_svc.request_native_wake(id);
     }
-    Ok(Json(existing))
+    Ok(Json(json!(existing)))
 }
 
 /// 在 cc2api 账号锁内解析满足有效期要求的 OAuth 凭据。
@@ -1879,8 +1904,8 @@ async fn delete_account(
     if selector.environment_id.is_some() && !account.is_antigravity() {
         return Err(AppError::BadRequest("删除重试的账号平台已变化".into()));
     }
-    let _runtime_permit = config_permit_for(
-        &state,
+    let _runtime_permit = runtime_bridge::account_config_permit(
+        &state.account_svc,
         &account,
         false,
         account.is_antigravity().then_some(&selector),
@@ -3181,6 +3206,10 @@ async fn request_native_capture(
         "native280_cc_prepared" | "native293_cc_prepared"
     ) {
         runtime_bridge::native_capture(attempt.account_id, &attempt.attempt_id).await?
+    } else if attempt.context.as_ref().and_then(|c| c.kernel.as_deref()) == Some("tui_v2")
+        && attempt.capture_status.as_deref() == Some("queued")
+    {
+        runtime_bridge::tui_capture(attempt.account_id, &attempt.attempt_id).await?
     } else {
         serde_json::json!({"state":"unsupported", "message":"此尝试使用其他转发方式"})
     };

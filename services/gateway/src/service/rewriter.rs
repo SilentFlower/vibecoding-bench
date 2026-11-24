@@ -2,6 +2,7 @@ use base64::Engine;
 use once_cell::sync::Lazy;
 use rand::Rng;
 use regex::{NoExpand, Regex};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
@@ -1337,14 +1338,17 @@ impl ClaudeCodeContextSanitizerConfig {
 ///
 /// 该设置只决定是否覆盖已有 `cache_control.type == "ephemeral"` 的 `ttl`;
 /// 不创建新的 `cache_control`,避免无意增加缓存断点。
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CacheControlTtlRewrite {
     /// 不改写请求体中的 cache_control ttl。
     #[default]
+    #[serde(rename = "off")]
     Off,
     /// 将已有 ephemeral cache_control 的 ttl 改写为 5m。
+    #[serde(rename = "5m")]
     FiveMinutes,
     /// 将已有 ephemeral cache_control 的 ttl 改写为 1h。
+    #[serde(rename = "1h")]
     OneHour,
 }
 

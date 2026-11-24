@@ -91,6 +91,31 @@ class ClusterNodeTests(unittest.TestCase):
             connection.execute('UPDATE accounts SET deleted_at=NULL WHERE id=?', (deleted,))
         self.assertEqual(3, next(row['account_count'] for row in self.store.list() if row['node_key'] == 'local'))
 
+    def test_remote_summary_exposes_only_the_observed_293_kernel(self) -> None:
+        """新中央读取旧节点时只展示 293；280 的信息不能充当 293 状态。@return 无。"""
+        node = self.store.create('a' * 32, NodeConfiguration(**self.config))
+        connection = self.database()
+        self.addCleanup(connection.close)
+        with connection:
+            account = connection.execute("INSERT INTO accounts(name,profile_path,cc2api_account_id) VALUES('fake','profiles/fake',7)").lastrowid
+            connection.execute('UPDATE account_node_assignments SET node_id=?,revision=3 WHERE account_id=?', (node['id'], account))
+        row = {'account_id': account, 'environment_id': 'e' * 32, 'generation': 3}
+        old = {'source_version': '2.1.280', 'state': 'builtin'}
+        current = {'source_version': '2.1.293', 'state': 'builtin'}
+        observed = {**row, 'assignment_revision': 3, 'gateway_account_id': 7, 'busy': False, 'state': 'ready',
+            'role_status': {}, 'identity_status': '已确认', 'physical_features': None, 'cli_versions': ['2.1.280'],
+            'runtime_release': 'fixture', 'content_capture': None, 'criu': None, 'native_kernel': old,
+            'native_kernels': {'2.1.280': old, '2.1.293': current}}
+        runtime = SimpleNamespace(release_id='fixture', deployment='test')
+        with patch.object(self.service, 'connection') as remote:
+            remote.return_value.prepare_environment.return_value = observed
+            summary = self.service.remote_summary(row, runtime, '2.1.280')
+            self.assertEqual((summary['native_kernel'], summary['native_kernels']), (current, {'2.1.293': current}))
+            self.assertEqual(summary['cli_versions'], ['2.1.280'])
+            del observed['native_kernels']['2.1.293']
+            summary = self.service.remote_summary(row, runtime, '2.1.280')
+            self.assertEqual((summary['native_kernel'], summary['native_kernels']), (None, {'2.1.293': None}))
+
     def test_missing_registered_cluster_structure_is_rejected(self) -> None:
         """已登记库损坏时拒绝伪装成功。:return: None。"""
         connection = self.database()

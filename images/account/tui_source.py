@@ -1,0 +1,446 @@
+"""在账号 sender 容器中，向其父进程交付原版交互会话的事件。"""
+
+from contextlib import closing, contextmanager
+import fcntl
+import hashlib
+from io import BytesIO
+import json
+import logging
+import os
+from pathlib import Path
+import select
+import signal
+import socket
+import socketserver
+import stat
+import struct
+import sys
+from threading import Lock
+import time
+from uuid import UUID
+
+# sender 以 -I 启动，解释器会跳过脚本目录；只加载同一只读安装目录内的应用模块。
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from tui_input_policy import InputRejection
+from tui_message_json import MessageJSON
+from tui_messages import (
+    ModelResponseError,
+    SubagentAmbiguousError,
+    SubagentBindingError,
+    SubagentCapacityError,
+    encode as json_bytes,
+    wire_events,
+)
+
+
+# 与 tui_sender.rs 的私有控制帧、Messages 正文和数据分片上限对应。
+CONTROL_LIMIT = 4096
+BODY_LIMIT = 10 * 1024 * 1024
+CHUNK_LIMIT = 64 * 1024
+IO_TIMEOUT = 120
+SOCKET = Path("/run/v3/tui-v2/events.sock")
+BINDING_FIELDS = ("account_id", "environment_id", "generation", "release_id")
+
+
+def _control(stream):
+    data = stream.readline(CONTROL_LIMIT + 1)
+    if not data:
+        raise EOFError
+    if len(data) > CONTROL_LIMIT or not data.endswith(b"\n"):
+        raise ValueError("控制帧长度无效")
+    value = json.loads(data)
+    if not isinstance(value, dict):
+        raise ValueError("控制帧须为对象")
+    return value
+
+
+def _reply(stream, fields):
+    stream.write(json.dumps(fields, ensure_ascii=False, separators=(",", ":")).encode() + b"\n")
+
+
+class _Disconnected:
+    """供本轮进程准入直接查询取消信号，排队时无需另开监视线程。"""
+
+    def __init__(self, connection):
+        self.poll = select.poll()
+        self.poll.register(connection, select.POLLRDHUP | select.POLLHUP | select.POLLERR)
+
+    def is_set(self):
+        """读取私有 socket 对端是否已放弃预留。@return 是否取消。"""
+        return bool(self.poll.poll(0))
+
+
+class AccountSource:
+    """管理当前绑定的会话驱动。@param path sender 配置。@param factory 交互驱动构造器。"""
+
+    def __init__(self, path, factory):
+        self.path = path
+        self.factory = factory
+        self.lock = Lock()
+        self.driver = None
+        self.epoch = None
+        self.maximum = 0
+        self.connections = 0
+
+    def _config(self):
+        # 配置由编排原子替换。只将公开的绑定字段和容量传入交互驱动。
+        doc = json.loads(self.path.read_bytes())
+        binding = {key: doc["binding"][key] for key in BINDING_FIELDS}
+        maximum = doc["tui_v2"]["max_reservations"]
+        if type(maximum) is not int or not 1 <= maximum <= 64:
+            raise ValueError("账号预留配置无效")
+        epoch = (tuple(binding.values()), hashlib.sha256(doc["binding"]["secret"].encode()).digest())
+        return binding, maximum, epoch
+
+    @contextmanager
+    def _driver_for(self, epoch, maximum):
+        with self.lock:
+            resize = (self.maximum != maximum and not self.connections and self.driver is not None
+                      and self.driver.idle())
+            if self.driver is None or self.epoch != epoch or resize:
+                if self.driver is not None:
+                    # 原上下文中在等工具的进程仍属于原绑定；拒绝沿用到新配置。
+                    self.driver.close()
+                    self.driver = None
+                self.driver = self.factory({"max_reservations": maximum})
+                self.epoch = epoch
+                self.maximum = maximum
+            self.connections += 1
+            driver = self.driver
+        try:
+            yield driver
+        finally:
+            with self.lock:
+                self.connections -= 1
+
+    def exchange(self, reader, writer, connection):
+        """处理一次父进程的绑定探测或提交。@param reader 输入。@param writer 输出。@param connection 连接。@return 无。"""
+        hello = _control(reader)
+        binding, maximum, epoch = self._config()
+        proof = {"protocol": 1, **binding, "nonce": hello["nonce"]}
+        if str(UUID(proof["nonce"])) != proof["nonce"] or hello.get("action") not in ("status", "bind"):
+            return
+        if any(hello.get(key) != value for key, value in proof.items()):
+            return
+        with self._driver_for(epoch, maximum) as driver:
+            self._exchange_bound(reader, writer, connection, proof, hello["action"], driver, epoch)
+
+    def _exchange_bound(self, reader, writer, connection, proof, action, driver, epoch):
+        ready = driver.ready()
+        state = {
+            **proof,
+            "ready": ready,
+            "idle": ready and driver.idle(),
+            "model_headers_protocol": 1,
+            "body_policy_protocol": 1,
+            "input_policy_protocol": 1,
+            "capture_http_protocol": 1,
+            "agent_scope_protocol": 1,
+            "upstream_session_protocol": 1,
+        }
+        managed_oauth = getattr(driver, "managed_oauth", False)
+        if managed_oauth:
+            state["managed_oauth_protocol"] = 1
+        _reply(writer, state)
+        if not ready or action == "status":
+            return
+        prepared = _control(reader)
+        if prepared.get("action") != "prepare" or any(
+            prepared.get(key) != value for key, value in proof.items()
+        ):
+            return
+        reservation = prepared["reservation"]
+        if any(
+            reservation[key] != proof[key]
+            for key in ("account_id", "environment_id", "generation")
+        ):
+            return
+        if "input_format" in prepared:
+            if prepared["input_format"] not in ("claude_code", "claude_code_280"):
+                return
+            reservation = {**reservation, "input_format": prepared["input_format"]}
+        if "body_policy" in prepared:
+            policy = prepared["body_policy"]
+            if (
+                not isinstance(policy, dict)
+                or policy.keys() != {"sub2api", "ttl", "adaptive"}
+                or type(policy["sub2api"]) is not bool
+                or type(policy["adaptive"]) is not bool
+                or policy["ttl"] not in ("off", "5m", "1h")
+            ):
+                return
+            reservation = {**reservation, "body_policy": policy}
+        size = prepared["body_len"]
+        if type(size) is not int or not 0 < size <= BODY_LIMIT:
+            return
+        body = reader.read(size)
+        if (
+            len(body) != size
+            or hashlib.sha256(body).hexdigest() != prepared["body_sha256"]
+        ):
+            return
+        header_size = prepared.get("model_headers_len", 0)
+        if type(header_size) is not int or not 0 <= header_size <= BODY_LIMIT:
+            return
+        if header_size:
+            raw_headers = reader.read(header_size)
+            if len(raw_headers) != header_size:
+                return
+            headers = json.loads(raw_headers)
+            if (
+                not isinstance(headers, dict)
+                or headers.keys() - {"anthropic-version", "anthropic-beta"}
+                or any(
+                    not isinstance(v, str) or not all(" " <= c <= "~" for c in v)
+                    for v in headers.values()
+                )
+            ):
+                return
+            reservation = {**reservation, "model_headers": headers}
+        deadline = reservation["deadline_unix_ms"] / 1000
+        if time.time() >= deadline:
+            return
+        try:
+            handle = driver.prepare(
+                reservation, body, cancel_event=_Disconnected(connection)
+            )
+        except ModelResponseError as exc:
+            if exc.source == "local_provider_backoff" and exc.status == 429 and exc.retry_after is not None:
+                _reply(writer, {**state, "error": exc.source, "retry_after": exc.retry_after})
+            return
+        except SubagentCapacityError:
+            _reply(writer, {**state, "error": "subagent_capacity"})
+            return
+        except SubagentAmbiguousError:
+            _reply(writer, {**state, "error": "subagent_ambiguous"})
+            return
+        except SubagentBindingError:
+            _reply(writer, {**state, "error": "subagent_binding"})
+            return
+        except InputRejection as exc:
+            _reply(writer, {**state, "error": "input_rejected", "code": exc.code})
+            return
+        except ValueError:
+            _reply(writer, {**state, "error": "unsupported_input"})
+            return
+        except TimeoutError:
+            _reply(writer, {**state, "error": "capacity"})
+            return
+        with closing(handle):
+            reply = {
+                **state,
+                "kind": handle.kind,
+                "workspace_protocol": 1,
+                "workspace_resume": getattr(handle, "workspace_resume", False),
+            }
+            if reservation.get("agent_hint") is not None:
+                reply["agent_session"] = handle.actor.reservation["session_id"]
+            if handle.kind not in ("new", "continuation") or (
+                reservation["continuation_only"] and handle.kind != "continuation"
+            ):
+                return
+            _reply(writer, reply)
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                return
+            connection.settimeout(remaining)
+            command = _control(reader)
+            if (command.get("action") != "send" or command.get("reservation_id") != reservation["reservation_id"]
+                    or not isinstance(command.get("workspace"), dict)
+                    or time.time() >= deadline or self._config()[2] != epoch):
+                return
+            token = command.get("account_token")
+            if managed_oauth:
+                if not isinstance(token, str) or not 0 < len(token) <= 2048 or any(not 33 <= ord(c) <= 126 for c in token):
+                    return
+            elif "account_token" in command:
+                return
+            connection.settimeout(IO_TIMEOUT)
+            if command.get("capture_http") is not True:
+                self._send_handle(writer, connection, handle, command)
+                return
+            handle.capture = []
+            try:
+                self._send_handle(writer, connection, handle, command)
+                # 正常客户端流已发出结束符；私有尾帧由 sender 后台收取。
+                pairs, raw = handle.capture[0] if handle.capture else ([], b"")
+                headers = json_bytes(pairs)
+                writer.write(struct.pack("!II", len(headers), len(raw)))
+                writer.write(headers)
+                writer.write(raw)
+            finally:
+                # 等待工具的进程可继续存活；本轮采集的正文和提供方凭据随本次发送释放。
+                handle.capture = None
+
+    def _send_handle(self, writer, connection, handle, command):
+        try:
+            events = iter(handle.send(command))
+        except ModelResponseError as exc:
+            self._json_end(writer, exc.status, exc.private_body, error=exc)
+            return
+        with closing(events):
+            if not handle.stream:
+                self._message_json(writer, events, connection)
+                return
+            # 第一帧之前发生的启动失败不能被发布为成功响应。
+            try:
+                first = next(events, None)
+            except ModelResponseError as exc:
+                self._json_end(writer, exc.status, exc.private_body, error=exc)
+                return
+            if not first:
+                return
+            _reply(writer, {"status": 200, "content_type": "text/event-stream", "message_id_mode": "gateway"})
+            self._chunks(writer, first)
+            for event in events:
+                self._chunks(writer, event)
+            writer.write(struct.pack("!I", 0))
+
+    def _message_json(self, writer, events, connection):
+        # 主轮始终只提交一次。与下游网关已有的 JSON 正常化容量一致。
+        output = MessageJSON(BODY_LIMIT)
+        sent = False
+        error = None
+        last = time.monotonic()
+        disconnect = _Disconnected(connection)
+        try:
+            for frame in events:
+                if disconnect.is_set():
+                    raise EOFError
+                for _, data in wire_events(BytesIO(frame)):
+                    if data is not None:
+                        output.add(data)
+                if not sent and (output.message is not None or time.monotonic() - last >= IO_TIMEOUT / 2):
+                    _reply(writer, {"status": 200, "content_type": "application/json", "message_id_mode": "gateway"})
+                    sent = True
+                if sent and time.monotonic() - last >= IO_TIMEOUT / 2:
+                    # 长回答已持续产生模型事件，私有 JSON 流用合法空白维持分块空闲期限。
+                    self._chunks(writer, b" ")
+                    last = time.monotonic()
+            payload = output.finish()
+            status = 200
+        except ModelResponseError as exc:
+            status, payload = exc.status, exc.private_body
+            error = exc
+        except TimeoutError:
+            status = 504
+            payload = json_bytes({"type": "error", "error": {"type": "timeout_error", "message": "V2 模型响应超时"}})
+        except (ValueError, KeyError, TypeError, RuntimeError, OverflowError):
+            status = 502
+            payload = json_bytes({"type": "error", "error": {"type": "api_error", "message": "V2 模型响应无效或提前终止"}})
+        self._json_end(writer, status, payload, sent=sent, error=error)
+
+    def _json_end(self, writer, status, payload, *, sent=False, error=None):
+        if not sent:
+            head = {"status": status, "content_type": "application/json", "message_id_mode": "gateway"}
+            if error and error.source is not None:
+                head["error_source"] = error.source
+                if error.retry_after is not None:
+                    head["retry_after"] = error.retry_after
+            _reply(writer, head)
+        self._chunks(writer, payload)
+        writer.write(struct.pack("!I", 0))
+
+    @staticmethod
+    def _chunks(stream, data):
+        if not isinstance(data, bytes) or not data:
+            raise ValueError("会话事件不是有效字节")
+        for offset in range(0, len(data), CHUNK_LIMIT):
+            piece = data[offset:offset + CHUNK_LIMIT]
+            stream.write(struct.pack("!I", len(piece)) + piece)
+
+    def close(self):
+        """收回该进程持有的会话资源。@return 无。"""
+        with self.lock:
+            if self.driver is not None:
+                self.driver.close()
+                self.driver = None
+                self.epoch = None
+
+
+class SourceHandler(socketserver.StreamRequestHandler):
+    """仅接收父 sender 在私有 socket 上建立的连接。"""
+
+    def handle(self):
+        """验证内核报告的对端身份后执行握手。@return 无。"""
+        fmt = "3i"
+        peer = self.request.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize(fmt))
+        pid, uid, _ = struct.unpack(fmt, peer)
+        if (pid, uid) != (self.server.sender_pid, os.geteuid()):
+            return
+        self.request.settimeout(IO_TIMEOUT)
+        try:
+            self.server.source.exchange(self.rfile, self.wfile, self.request)
+        except (EOFError, BrokenPipeError, ConnectionResetError):
+            # 准备后断开是 sender 的取消协议。
+            pass
+        except Exception as exc:
+            # 正文、路径、鉴权和工具回执均不能进入容器日志。
+            logging.warning("V2 会话连接结束，错误类型 %s", type(exc).__name__)
+
+
+class SourceServer(socketserver.ThreadingUnixStreamServer):
+    """每个已预留的轮独立传递事件，慢客户端只对本轮形成背压。"""
+
+    daemon_threads = True
+
+
+@contextmanager
+def listen(path, source, sender_pid):
+    """独占监听目录，安全回收上一次异常退出的 socket。
+
+    @param path 账号私有 socket。@param source 账号驱动。@param sender_pid 父进程。
+    @return 已绑定的 Unix 服务。
+    """
+    directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        info = os.fstat(directory)
+        if info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode) != 0o700:
+            raise PermissionError("V2 socket 目录权限无效")
+        fcntl.flock(directory, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        try:
+            info = path.lstat()
+        except FileNotFoundError:
+            pass
+        else:
+            if not stat.S_ISSOCK(info.st_mode) or info.st_uid != os.geteuid():
+                raise PermissionError("V2 socket 文件归属无效")
+            # 旧协议来源也可能仍在运行；锁只能互斥支持新协议的监听者。
+            with socket.socket(socket.AF_UNIX) as probe:
+                try:
+                    probe.connect(str(path))
+                except ConnectionRefusedError:
+                    path.unlink()
+                else:
+                    raise FileExistsError("V2 socket 已被活动来源占用")
+        with SourceServer(str(path), SourceHandler) as server:
+            try:
+                server.source = source
+                server.sender_pid = sender_pid
+                yield server
+            finally:
+                path.unlink(missing_ok=True)
+    finally:
+        os.close(directory)
+
+
+def main():
+    """在受管账号内启动内置事件源。@return 无。"""
+    # 解释器以 -I 运行，只在安装目录加载随镜像交付的会话驱动。
+    from tui_session import SessionDriver
+
+    os.umask(0o077)
+    def stop(signum, frame):
+        raise SystemExit(0)
+
+    signal.signal(signal.SIGTERM, stop)
+    with closing(AccountSource(Path(sys.argv[1]), SessionDriver)) as source:
+        with listen(SOCKET, source, os.getppid()) as server:
+            # sender 意外退出时也收回原会话；Linux 会将孤儿重挂给其他父进程。
+            server.timeout = 1.0
+            while os.getppid() == server.sender_pid:
+                server.handle_request()
+
+
+if __name__ == "__main__":
+    main()

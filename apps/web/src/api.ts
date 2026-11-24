@@ -71,6 +71,8 @@ export interface OverallWorkStatus {
   message?: string | null
 }
 
+export type RequestBackend = 'legacy' | 'native293' | 'tui_v2'
+
 export interface Account {
   id: number
   platform?: string
@@ -115,7 +117,11 @@ export interface Account {
     }
   }
   billing_mode: string
-  request_backend?: 'legacy' | 'native293'
+  request_backend?: RequestBackend
+  request_backend_pending?: RequestBackend | null
+  request_backend_revision?: number
+  request_backend_wait_reason?: 'draining' | 'runtime_unconfirmed'
+  tui_v2_available?: boolean
   account_uuid?: string | null
   organization_uuid?: string | null
   subscription_type?: string | null
@@ -697,7 +703,7 @@ export interface NativeCapture {
       items: { path: string; action: 'added' | 'removed' | 'changed'; reason: string }[]
     }
   } & (
-    | ({ stage: 'cc_prepared' | 'agy_prepared' } & NativeCapturePreview)
+    | ({ stage: 'cc_prepared' | 'agy_prepared' | 'tui_provider_request' } & NativeCapturePreview)
     | ({ stage: 'ingress_rejected' | 'agy_ingress' | 'agy_egress' } & Partial<NativeCapturePreview>)
   )
 }

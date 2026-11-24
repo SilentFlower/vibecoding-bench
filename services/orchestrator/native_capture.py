@@ -118,7 +118,7 @@ def _validate_stage_details(value: dict) -> None:
             raise ValueError('阶段状态数量无效')
         names = set()
         for stage in stages:
-            if (not isinstance(stage, dict) or stage.get('stage') not in {'ingress', 'header_policy', 'cc_prepared', 'wire_final'}
+            if (not isinstance(stage, dict) or stage.get('stage') not in {'ingress', 'header_policy', 'cc_prepared', 'tui_provider_request', 'wire_final'}
                     or stage['stage'] in names or stage.get('status') not in statuses
                     or any(not isinstance(stage.get(key), str) or len(stage[key]) > 512 for key in ('source', 'representation'))):
                 raise ValueError('阶段状态字段无效')
@@ -142,8 +142,30 @@ def _read(directory: int, account_id: int, attempt_id: str, now_ms: int) -> tupl
     value = json.loads(data)
     if (not isinstance(value, dict) or type(value.get('schema_version')) is not int or value.get('schema_version') != 1
             or type(value.get('account_id')) is not int or value.get('account_id') != account_id or value.get('attempt_id') != attempt_id
-            or value.get('stage') not in {'cc_prepared', 'ingress_rejected'}):
+            or value.get('stage') not in {'cc_prepared', 'ingress_rejected', 'tui_provider_request'}):
         raise ValueError('采集文件归属或阶段无效')
+    if value['stage'] == 'tui_provider_request':
+        stages = value.get('stages')
+        if not isinstance(stages, list) or any(not isinstance(stage, dict) for stage in stages):
+            raise ValueError('V2 提供方采集缺少阶段')
+        by_name = {stage.get('stage'): stage for stage in stages}
+        provider = by_name.get('tui_provider_request', {})
+        wire = by_name.get('wire_final', {})
+        pairs = value.get('headers')
+        digest = value.get('original_body_sha256')
+        if (not isinstance(value.get('ingress'), dict) or not isinstance(value.get('body'), str)
+                or type(value.get('original_body_bytes')) is not int or value['original_body_bytes'] < 0
+                or not isinstance(digest, str) or len(digest) != 64 or any(c not in '0123456789abcdef' for c in digest)
+                or type(value.get('headers_truncated')) is not bool or type(value.get('body_truncated')) is not bool
+                or not isinstance(pairs, list) or len(pairs) > 4096
+                or any(not isinstance(pair, list) or len(pair) != 2 or any(not isinstance(x, str) for x in pair)
+                       for pair in pairs) or sum(len(x.encode()) for pair in pairs for x in pair) > 128*1024
+                or set(by_name) != {'ingress', 'tui_provider_request', 'wire_final'} or 'wire_final' in value
+                or provider.get('source') != 'tui_sender_http'
+                or provider.get('representation') != 'http_request_to_local_provider'
+                or provider.get('status') not in {'complete', 'truncated'}
+                or wire.get('status') != 'unavailable' or wire.get('source') != 'unavailable'):
+            raise ValueError('V2 回环采集来源或 TLS 阶段无效')
     if value['stage'] == 'ingress_rejected':
         # 拒绝证据只允许入口原文；空的组装预览不能被当作实际出站内容。
         stages = value.get('stages', [])

@@ -1,4 +1,4 @@
-"""280/293原生sender的部署合同与构建输入。"""
+"""293 原生 sender 的部署合同与构建输入。"""
 import hashlib
 import os
 import re
@@ -13,20 +13,35 @@ SHA256 = '017ec892b9dfbf08bf4cb2e5bf59048cb41a0ecfc21b1ad518751a23a911b9b7'
 POOL_MIB = 256
 WORKER_MIB = 192
 RESTORE_IMAGE_MIB = 108
-VERSION_280 = 'builtin-2.1.280'
-SHA256_280 = '186b1e9a77738d11584e5fb9da293634a8a6ab68df146666ce81c16ab596de88'
-BYTES_280 = 27097232
 BYTES = 27392144
 
 
 def installed_versions(labels: dict) -> tuple[str, ...]:
     """读取镜像明确提供的固定源版本。@param labels 已核验镜像标签。@return 支持版本集合。"""
     value = labels.get('vibebench.native-runtime-versions')
-    if value in (None, '2.1.293'):
-        return ('2.1.293',)
-    if value != '2.1.280,2.1.293':
+    # 旧双版本镜像也包含相同的 293 制品；账号安装表仅登记当前运行的版本。
+    if value not in (None, '2.1.293', '2.1.280,2.1.293'):
         raise ValueError('账号镜像的原生运行时版本集合无效')
-    return ('2.1.280', '2.1.293')
+    return ('2.1.293',)
+
+
+def registered_293(configuration: dict | None) -> dict | None:
+    """选取账号实际登记的 293，兼容旧安装表和根配置。
+
+    :param configuration: 原生 sender 配置。
+    :return: 293 的独立登记；缺少固定路径或版本不符时返回 None。
+    """
+    if not isinstance(configuration, dict):
+        return None
+    runtimes = configuration.get('runtimes', {})
+    if not isinstance(runtimes, dict):
+        return None
+    # 显式登记取代根内核。旧根可能属于 280，其发行与代次均不能混入 293。
+    selected = runtimes.get('2.1.293', configuration)
+    if (not isinstance(selected, dict) or selected.get('source_version', '2.1.293') != '2.1.293'
+            or selected.get('binary_path') != '/usr/local/bin/ccrb-runtime'):
+        return None
+    return selected
 
 
 def native_resource_layout(configuration: dict | None) -> dict | None:
@@ -54,10 +69,10 @@ def builtin_config(configuration: dict | None, versions: tuple[str, ...]) -> dic
     """按目标镜像归一化内核安装表，保留已经冻结的资源和账号布局。
 
     :param configuration: 已校验的目标或历史原生配置。
-    :param versions: 目标镜像明确声明的官方源版本集合。
+    :param versions: 目标镜像声明中当前获准执行的版本集合。
     :return: 仅引用镜像内置程序的配置；基础后端保持None。
     """
-    if versions not in (('2.1.293',), ('2.1.280', '2.1.293')):
+    if versions != ('2.1.293',):
         raise ValueError('原生运行时版本集合无效')
     result = native_resource_layout(configuration)
     if result is None:
@@ -66,8 +81,6 @@ def builtin_config(configuration: dict | None, versions: tuple[str, ...]) -> dic
     result['binary_path'] = '/usr/local/bin/ccrb-runtime'
     result.pop('source_version', None)
     result.pop('runtimes', None)
-    if '2.1.280' in versions:
-        result['runtimes'] = {'2.1.280': {'binary_path': '/usr/local/bin/ccrb-runtime-280'}}
     return result
 
 
@@ -109,11 +122,12 @@ def sender_config(configuration: dict, memory: str, swap: str = '0', budget: str
     :param memory: 已冻结的账号 RAM 总预算。
     :param swap: 已冻结的额外 swap。
     :param budget: 原生 sender RAM；省略时读取部署环境。
-    :param versions: 已核验镜像提供的源版本集合，历史镜像仅293。
-    :return: 原生池配置；legacy 返回 None，配置或账号总预算无效时抛出 ValueError。
+    :param versions: 从已核验镜像标签筛出的受支持版本。
+    :return: native293 的原生池配置。legacy 和 tui_v2 使用各自的发送路径，返回 None。
+        配置或账号总预算无效时抛出 ValueError。
     """
     backend = configuration.get('request_backend', 'legacy')
-    if backend == 'legacy':
+    if backend in ('legacy', 'tui_v2'):
         return None
     if backend != 'native293':
         raise ValueError('未知账号请求后端')
@@ -123,7 +137,7 @@ def sender_config(configuration: dict, memory: str, swap: str = '0', budget: str
         raise NativePreparationBlocked('native_sender_budget_missing', '原生方式需要显式 V3_NATIVE_SENDER_MEMORY')
     workers = int(configuration.get('concurrency', 3)) * 2
     ram = 0 if unlimited else memory_bytes(value)
-    if versions not in (('2.1.293',), ('2.1.280', '2.1.293')):
+    if versions != ('2.1.293',):
         raise ValueError('原生运行时版本集合无效')
     if workers <= 0:
         raise ValueError('原生 sender 的账号并发必须为正数')
@@ -131,11 +145,8 @@ def sender_config(configuration: dict, memory: str, swap: str = '0', budget: str
         isolated_account_limits(memory, swap, value)
     except ValueError as error:
         raise NativePreparationBlocked('account_memory_insufficient', str(error)) from error
-    result = {'binary_path': '/usr/local/bin/ccrb-runtime', 'work_root': '/native',
-              'memory_mib': ram // 1024 ** 2, 'max_workers': workers}
-    if '2.1.280' in versions:
-        result['runtimes'] = {'2.1.280': {'binary_path': '/usr/local/bin/ccrb-runtime-280'}}
-    return result
+    return {'binary_path': '/usr/local/bin/ccrb-runtime', 'work_root': '/native',
+            'memory_mib': ram // 1024 ** 2, 'max_workers': workers}
 
 
 def stage_asset(destination: Path, source: str | None = None, version: str = '2.1.293') -> dict:
@@ -146,19 +157,9 @@ def stage_asset(destination: Path, source: str | None = None, version: str = '2.
     :param version: 明确的官方源版本，历史入口为293。
     :return: 已校验的版本、大小及 SHA256 记录。
     """
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    if version not in ('2.1.280', '2.1.293'):
+    if version != '2.1.293':
         raise ValueError('未知原生运行时源版本')
-    if version == '2.1.280':
-        source = source or os.environ.get('V3_NATIVE_RUNTIME_280_ASSET')
-        if not source:
-            raise ValueError('构建双版本镜像需要 V3_NATIVE_RUNTIME_280_ASSET 指向已验收的280制品')
-        shutil.copyfile(source, destination)
-        if destination.stat().st_size != BYTES_280 or hashlib.sha256(destination.read_bytes()).hexdigest() != SHA256_280:
-            destination.unlink()
-            raise ValueError('280原生运行时附件身份不匹配')
-        destination.chmod(0o755)
-        return {'version': VERSION_280, 'source_version': version, 'asset': ASSET, 'sha256': SHA256_280, 'bytes': BYTES_280}
+    destination.parent.mkdir(parents=True, exist_ok=True)
     source = source or os.environ.get('V3_NATIVE_RUNTIME_ASSET')
     if not source:
         raise ValueError('请先在本仓库准备293制品，并设置 V3_NATIVE_RUNTIME_ASSET')

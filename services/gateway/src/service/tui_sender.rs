@@ -1,0 +1,2203 @@
+//! 账号 sender 持有单次预留及同容器 Unix 事件通道。
+
+use std::collections::HashMap;
+use std::io;
+use std::os::unix::fs::{FileTypeExt, MetadataExt};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+use axum::body::{Body, Bytes, to_bytes};
+use axum::extract::Request;
+use axum::http::{HeaderMap, HeaderValue, StatusCode, header::CONTENT_TYPE};
+use axum::response::{IntoResponse, Response};
+use base64::{Engine, engine::general_purpose::STANDARD};
+use futures_util::stream::unfold;
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+use tokio::net::UnixStream;
+use tokio::sync::watch;
+use tokio::time::{Instant, sleep_until, timeout, timeout_at};
+use uuid::Uuid;
+
+use crate::error::AppError;
+use crate::service::request_body_codec::REQUEST_BODY_LIMIT;
+use crate::service::request_session::valid_id;
+use crate::service::native_capture::{TuiCaptureInput, tui_writer};
+use crate::service::runtime_transport::{TUI_CAPTURE, TUI_ERROR_SOURCE};
+use crate::service::runtime_transport::{
+    REQUEST_BUDGET_MS, TUI_BODY_POLICY, TUI_GATEWAY_ID_HEADER, TUI_INPUT_FORMAT, TUI_INPUT_POLICY,
+    TUI_JSON_PROJECTION_V1, TUI_SSE_PROJECTION_HEADER, TUI_SSE_PROJECTION_V1, TUI_UPSTREAM_SESSION,
+    TUI_MANAGED_OAUTH, TUI_V2_STATUS_PROTOCOL, TransportBinding, TuiBodyPolicy, now_ms, request_budget,
+    tui_delegates_json, tui_input_rejection, tui_model_headers, tui_projection_marker,
+    valid_tui_account_token,
+};
+use crate::service::tui_sender_response;
+use crate::service::tui_tool_history::SERVER_SESSION_PREFIX;
+use axum::http::header::RETRY_AFTER;
+#[path = "tui_submission_log.rs"]
+mod submission_log;
+#[path = "tui_workspace.rs"]
+mod workspace;
+
+const SOCKET: &str = "/run/v3/tui-v2/events.sock";
+const SUBMISSION_STORAGE: &str = "/native";
+const RESERVATION_HEADER: &str = "x-v3-tui-reservation";
+const HANDOFF_HEADER: &str = "x-v3-tui-handoff-kind";
+const CONTROL_LIMIT: usize = 4096;
+const CHUNK_LIMIT: usize = 64 * 1024;
+const MAX_RESERVATIONS: usize = 64;
+// 保留有界的已用 ID 到原截止，防止重放重新进入工作源。
+const MAX_RECORDS: usize = 1024;
+const IO_TIMEOUT: Duration = Duration::from_millis(REQUEST_BUDGET_MS);
+
+/// 私有 sender 文档中显式登记的本机事件源容量。路径由 sender 固定。
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SourceConfig {
+    max_reservations: usize,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct Identity {
+    account_id: i64,
+    environment_id: String,
+    generation: u64,
+    principal_id: i64,
+    session_id: String,
+    reservation_id: String,
+    deadline_unix_ms: u64,
+    continuation_only: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    agent_hint: Option<String>,
+}
+
+impl Identity {
+    fn decode(headers: &HeaderMap, binding: &TransportBinding) -> Result<Self, AppError> {
+        let mut headers = headers.get_all(RESERVATION_HEADER).iter();
+        let raw = headers.next().ok_or_else(invalid_identity)?.as_bytes();
+        if headers.next().is_some() || raw.len() > CONTROL_LIMIT {
+            return Err(invalid_identity());
+        }
+        let data = STANDARD.decode(raw).map_err(|_| invalid_identity())?;
+        let identity: Self = serde_json::from_slice(&data).map_err(|_| invalid_identity())?;
+        let id = Uuid::parse_str(&identity.reservation_id).map_err(|_| invalid_identity())?;
+        if binding.account_id <= 0
+            || binding.generation == 0
+            || binding.release_id.is_empty()
+            || identity.principal_id <= 0
+            || !valid_id(&identity.session_id)
+            || identity
+                .agent_hint
+                .as_deref()
+                .is_some_and(|hint| !valid_id(hint))
+            || id.to_string() != identity.reservation_id
+            || identity.account_id != binding.account_id
+            || identity.environment_id != binding.environment_id
+            || identity.generation != binding.generation
+        {
+            return Err(invalid_identity());
+        }
+        Ok(identity)
+    }
+
+    fn deadlines(
+        &self,
+        binding: &TransportBinding,
+        wall_now: u64,
+    ) -> Result<(Instant, Instant), AppError> {
+        let now = Instant::now();
+        let deadline = now
+            + request_budget(
+                binding,
+                self.account_id,
+                &self.environment_id,
+                self.generation,
+                &self.reservation_id,
+                self.deadline_unix_ms,
+                wall_now,
+                REQUEST_BUDGET_MS,
+            )?;
+        // 执行预算按共享约束取较小值。已用 ID 须覆盖整个原信封的有效期。
+        let replay_until = now + Duration::from_millis(self.deadline_unix_ms - wall_now);
+        Ok((deadline, replay_until))
+    }
+}
+
+enum Phase {
+    Preparing,
+    Ready {
+        connection: BufReader<UnixStream>,
+        workspace: Option<workspace::Candidate>,
+        session_mapping: bool,
+        managed_oauth: bool,
+    },
+    Submitted,
+    Closed,
+}
+
+struct Record {
+    identity: Identity,
+    agent_probe: bool,
+    binding_proof: [u8; 32],
+    deadline: Instant,
+    replay_until: Instant,
+    ticket: Uuid,
+    cancel: watch::Sender<bool>,
+    phase: Phase,
+}
+
+type Book = Arc<Mutex<HashMap<String, Record>>>;
+
+struct Slot {
+    book: Book,
+    id: String,
+    ticket: Uuid,
+    armed: bool,
+}
+
+impl Drop for Slot {
+    fn drop(&mut self) {
+        if !self.armed {
+            return;
+        }
+        let mut book = self.book.lock().unwrap();
+        if let Some(record) = book
+            .get_mut(&self.id)
+            .filter(|record| record.ticket == self.ticket)
+        {
+            if record.replay_until <= Instant::now() {
+                book.remove(&self.id);
+            } else {
+                record.phase = Phase::Closed;
+            }
+        }
+    }
+}
+
+/// sender 进程的本机预留账本及固定事件通道。
+pub(super) struct TuiSender {
+    path: PathBuf,
+    submission_storage: PathBuf,
+    book: Book,
+}
+
+impl Default for TuiSender {
+    fn default() -> Self {
+        Self {
+            path: SOCKET.into(),
+            submission_storage: SUBMISSION_STORAGE.into(),
+            book: Book::default(),
+        }
+    }
+}
+
+fn unavailable() -> AppError {
+    AppError::ServiceUnavailable("V2 本机事件源未通过准备或绑定核验".into())
+}
+
+fn invalid_identity() -> AppError {
+    AppError::BadRequest("V2 预留身份或正文不匹配".into())
+}
+
+fn consumed() -> AppError {
+    AppError::BadRequest("V2 预留不存在、已提交或已取消".into())
+}
+
+fn limited() -> AppError {
+    AppError::AdmissionLimited { retry_after: 1 }
+}
+
+fn source_error() -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidData, "V2 本机事件通道无效或提前终止")
+}
+
+fn setting(config: Option<&Value>) -> Result<SourceConfig, AppError> {
+    let parsed = config
+        .and_then(|value| SourceConfig::deserialize(value).ok())
+        .ok_or_else(unavailable)?;
+    if !(1..=MAX_RESERVATIONS).contains(&parsed.max_reservations) {
+        return Err(unavailable());
+    }
+    Ok(parsed)
+}
+
+fn binding_proof(binding: &TransportBinding) -> [u8; 32] {
+    // 绑定秘密或发行发生变化时，旧预留即使环境代次相同也不得被新配置认领。
+    Sha256::digest(serde_json::to_vec(binding).expect("绑定只含 JSON 基本类型")).into()
+}
+
+fn occupied(book: &HashMap<String, Record>) -> usize {
+    book.values()
+        .filter(|record| !matches!(record.phase, Phase::Closed))
+        .count()
+}
+
+fn prune(book: &mut HashMap<String, Record>) {
+    let now = Instant::now();
+    book.retain(|_, record| {
+        match record.phase {
+            Phase::Submitted => return true,
+            Phase::Preparing => {
+                if record.deadline <= now {
+                    record.cancel.send_replace(true);
+                }
+                // 等待原任务丢弃正文及连接后再释放名额。
+                return true;
+            }
+            Phase::Ready { .. } if record.deadline <= now => record.phase = Phase::Closed,
+            _ => {}
+        }
+        record.replay_until > now
+    });
+}
+
+async fn open(path: &Path) -> io::Result<BufReader<UnixStream>> {
+    let owner = unsafe { libc::geteuid() };
+    let directory = tokio::fs::symlink_metadata(path.parent().ok_or_else(source_error)?).await?;
+    let socket = tokio::fs::symlink_metadata(path).await?;
+    if !directory.is_dir()
+        || directory.uid() != owner
+        || directory.mode() & 0o777 != 0o700
+        || !socket.file_type().is_socket()
+        || socket.uid() != owner
+        || socket.mode() & 0o077 != 0
+    {
+        return Err(source_error());
+    }
+    let connection = UnixStream::connect(path).await?;
+    let peer = connection.peer_cred()?;
+    if peer.uid() != owner || !peer.pid().is_some_and(|pid| pid > 0) {
+        return Err(source_error());
+    }
+    Ok(BufReader::new(connection))
+}
+
+async fn write_json(connection: &mut BufReader<UnixStream>, value: &Value) -> io::Result<()> {
+    let mut wire = serde_json::to_vec(value).map_err(|_| source_error())?;
+    wire.push(b'\n');
+    connection.get_mut().write_all(&wire).await
+}
+
+async fn read_json(connection: &mut BufReader<UnixStream>) -> io::Result<Value> {
+    let mut wire = Vec::new();
+    connection
+        .take(CONTROL_LIMIT as u64 + 1)
+        .read_until(b'\n', &mut wire)
+        .await?;
+    if wire.len() > CONTROL_LIMIT || wire.last() != Some(&b'\n') {
+        return Err(source_error());
+    }
+    serde_json::from_slice(&wire).map_err(|_| source_error())
+}
+
+fn handshake(binding: &TransportBinding) -> Value {
+    json!({"protocol": TUI_V2_STATUS_PROTOCOL, "nonce": Uuid::new_v4().to_string(), "account_id": binding.account_id,
+        "environment_id": binding.environment_id, "generation": binding.generation,
+        "release_id": binding.release_id})
+}
+
+fn verify_reply(reply: &Value, proof: &Value) -> io::Result<bool> {
+    if !proof
+        .as_object()
+        .is_some_and(|fields| fields.iter().all(|(key, field)| reply[key] == *field))
+        || reply["ready"] != true
+    {
+        return Err(source_error());
+    }
+    reply["idle"].as_bool().ok_or_else(source_error)
+}
+
+struct VerifiedSource {
+    connection: BufReader<UnixStream>,
+    proof: Value,
+    idle: bool,
+    model_headers: bool,
+    capture_http: bool,
+    body_policy: bool,
+    input_policy: bool,
+    agent_scope: bool,
+    session_mapping: bool,
+    managed_oauth: bool,
+}
+
+async fn verify_source(
+    path: &Path,
+    binding: &TransportBinding,
+    action: &str,
+) -> io::Result<VerifiedSource> {
+    let mut connection = open(path).await?;
+    let proof = handshake(binding);
+    let mut control = proof.clone();
+    control["action"] = json!(action);
+    write_json(&mut connection, &control).await?;
+    let reply = read_json(&mut connection).await?;
+    let idle = verify_reply(&reply, &proof)?;
+    Ok(VerifiedSource {
+        connection,
+        proof,
+        idle,
+        capture_http: reply["capture_http_protocol"].as_u64() == Some(1),
+        model_headers: reply["model_headers_protocol"].as_u64() == Some(1),
+        body_policy: reply["body_policy_protocol"].as_u64() == Some(1),
+        input_policy: reply["input_policy_protocol"].as_u64() == Some(1),
+        agent_scope: reply["agent_scope_protocol"].as_u64() == Some(1),
+        session_mapping: reply["upstream_session_protocol"].as_u64() == Some(1),
+        managed_oauth: reply["managed_oauth_protocol"].as_u64() == Some(1),
+    })
+}
+
+impl TuiSender {
+    /// 使用原预留的期限接收可选采集正文。@param binding 实际绑定。@param headers 私有头。@return 原截止。
+    pub(super) fn capture_deadline(binding: &TransportBinding, headers: &HeaderMap) -> Result<Instant, AppError> {
+        Ok(Identity::decode(headers, binding)?.deadlines(binding, now_ms())?.0)
+    }
+
+    /// 统计仍占用 sender 的准备或发送。@return 当前本机预留数。
+    pub(super) fn active(&self) -> u64 {
+        let mut book = self.book.lock().unwrap();
+        prune(&mut book);
+        occupied(&book) as u64
+    }
+
+    /// 探测受授权的本机事件源。@param binding 已鉴权账号。@param config 私有源配置。
+    /// @return 当前源可用时的空闲状态。
+    pub(super) async fn status(
+        &self,
+        binding: &TransportBinding,
+        config: Option<&Value>,
+    ) -> Option<bool> {
+        setting(config).ok()?;
+        let idle = timeout(Duration::from_secs(1), async {
+            submission_log::was_consumed(&self.submission_storage, binding, None).await?;
+            verify_source(&self.path, binding, "status")
+                .await
+                .map(|source| source.idle)
+        })
+        .await
+        .ok()?
+        .ok()?;
+        Some(idle && self.active() == 0)
+    }
+
+    fn reserve(
+        &self,
+        identity: Identity,
+        binding: &TransportBinding,
+        deadline: Instant,
+        replay_until: Instant,
+        maximum: usize,
+    ) -> Result<(Slot, watch::Receiver<bool>), AppError> {
+        let id = identity.reservation_id.clone();
+        let ticket = Uuid::new_v4();
+        let (cancel, signal) = watch::channel(false);
+        {
+            let mut book = self.book.lock().unwrap();
+            prune(&mut book);
+            if book.contains_key(&id) {
+                return Err(consumed());
+            }
+            if book.len() >= MAX_RECORDS {
+                return Err(limited());
+            }
+            // 私有身份已由账号 binding 校验。单个独立握手位让源核对子代理票据；
+            // 无权启动的请求在 prepare 被拒，普通队列和工具回执各自保留原额度。
+            let probe_used = book
+                .values()
+                .any(|record| record.agent_probe && !matches!(record.phase, Phase::Closed));
+            let agent_probe =
+                !probe_used && identity.agent_hint.is_some() && !identity.continuation_only;
+            if !agent_probe && occupied(&book) - usize::from(probe_used) >= maximum {
+                return Err(limited());
+            }
+            // 正在排队的新轮不能占完所有握手位置，最后一位供持有原进程的工具续轮入场。
+            if !agent_probe
+                && !identity.continuation_only
+                && maximum > 1
+                && book
+                    .values()
+                    .filter(|record| !record.agent_probe && matches!(record.phase, Phase::Preparing))
+                    .count()
+                    >= maximum - 1
+            {
+                return Err(limited());
+            }
+            book.insert(
+                id.clone(),
+                Record {
+                    identity,
+                    agent_probe,
+                    binding_proof: binding_proof(binding),
+                    deadline,
+                    replay_until,
+                    ticket,
+                    cancel,
+                    phase: Phase::Preparing,
+                },
+            );
+        }
+        let weak = Arc::downgrade(&self.book);
+        tokio::spawn(async move {
+            sleep_until(deadline).await;
+            if let Some(book) = weak.upgrade() {
+                prune(&mut book.lock().unwrap());
+            }
+        });
+        Ok((
+            Slot {
+                book: self.book.clone(),
+                id,
+                ticket,
+                armed: true,
+            },
+            signal,
+        ))
+    }
+
+    /// 在读取正文前占用名额，并将原始正文发给本地预留端。
+    /// @param binding 已鉴权账号。@param config 私有源配置。@param request 内部请求。@return 预留类别。
+    pub(super) async fn prepare(
+        &self,
+        binding: &TransportBinding,
+        config: Option<&Value>,
+        request: Request,
+    ) -> Result<Response, AppError> {
+        let identity = Identity::decode(request.headers(), binding)?;
+        let mut policy_headers = request.headers().get_all(TUI_BODY_POLICY).iter();
+        let policy = policy_headers
+            .next()
+            .map(|value| {
+                if value.as_bytes().len() > 256 || policy_headers.next().is_some() {
+                    return Err(invalid_identity());
+                }
+                serde_json::from_slice::<TuiBodyPolicy>(value.as_bytes())
+                    .map_err(|_| invalid_identity())
+            })
+            .transpose()?;
+        let (deadline, replay_until) = identity.deadlines(binding, now_ms())?;
+        let (mut slot, mut cancelled) = self.reserve(
+            identity.clone(),
+            binding,
+            deadline,
+            replay_until,
+            setting(config)?.max_reservations,
+        )?;
+        let capture_requested = tui_projection_marker(request.headers(), TUI_CAPTURE, "1");
+        let prepared = async {
+            if submission_log::was_consumed(
+                &self.submission_storage,
+                binding,
+                Some(&identity.reservation_id),
+            )
+            .await
+            .map_err(|_| unavailable())?
+            {
+                return Err(consumed());
+            }
+            // 先在将承载正文的同一个 socket 核对账号。遇到错绑时连预留信封也不送出。
+            let VerifiedSource {
+                mut connection,
+                proof,
+                model_headers,
+                capture_http,
+                body_policy,
+                input_policy,
+                agent_scope,
+                session_mapping,
+                managed_oauth,
+                ..
+            } = verify_source(&self.path, binding, "bind")
+                .await
+                .map_err(|_| unavailable())?;
+            if identity.agent_hint.is_some() && !agent_scope {
+                return Err(AppError::TuiInputUnsupported);
+            }
+            if policy.is_some() && !body_policy {
+                return Err(unavailable());
+            }
+            let option_bytes = if model_headers {
+                let options = tui_model_headers(request.headers())?;
+                (!options.is_empty())
+                    .then(|| serde_json::to_vec(&options).expect("版本和功能声明均为字符串"))
+            } else {
+                None
+            };
+            let native_input = request
+                .headers()
+                .get(TUI_INPUT_FORMAT)
+                .and_then(|value| value.to_str().ok())
+                .filter(|format| {
+                    model_headers && matches!(*format, "claude_code" | "claude_code_280")
+                })
+                .map(str::to_owned);
+            let body = to_bytes(request.into_body(), REQUEST_BODY_LIMIT)
+                .await
+                .map_err(|_| invalid_identity())?;
+            if body.is_empty() {
+                return Err(invalid_identity());
+            }
+            let mut control = proof.clone();
+            control["action"] = json!("prepare");
+            control["reservation"] = json!(identity);
+            control["body_len"] = json!(body.len());
+            control["body_sha256"] = json!(hex::encode(Sha256::digest(&body)));
+            if let Some(policy) = policy {
+                control["body_policy"] = json!(policy);
+            }
+            if let Some(format) = native_input {
+                control["input_format"] = json!(format);
+            }
+            if let Some(bytes) = &option_bytes {
+                // 独立分段，较长的功能清单也不挤占旧握手的 4KiB 控制帧。
+                control["model_headers_len"] = json!(bytes.len());
+            }
+            write_json(&mut connection, &control)
+                .await
+                .map_err(|_| unavailable())?;
+            connection
+                .get_mut()
+                .write_all(&body)
+                .await
+                .map_err(|_| unavailable())?;
+            if let Some(bytes) = option_bytes {
+                connection
+                    .get_mut()
+                    .write_all(&bytes)
+                    .await
+                    .map_err(|_| unavailable())?;
+            }
+            let reply = read_json(&mut connection)
+                .await
+                .map_err(|_| unavailable())?;
+            verify_reply(&reply, &proof).map_err(|_| unavailable())?;
+            if reply["error"] == "input_rejected" {
+                return Err(reply["code"]
+                    .as_str()
+                    .and_then(tui_input_rejection)
+                    .unwrap_or_else(unavailable));
+            }
+            if reply["error"] == "unsupported_input" {
+                return Err(AppError::TuiInputUnsupported);
+            }
+            if reply["error"] == "capacity" {
+                return Err(limited());
+            }
+            if reply["error"] == "local_provider_backoff" {
+                let retry_after = reply["retry_after"].as_u64().ok_or_else(unavailable)?;
+                return Err(AppError::TuiProviderBackoff { retry_after });
+            }
+            if reply["error"] == "subagent_capacity" && identity.agent_hint.is_some() {
+                return Err(AppError::TuiSubagentCapacity);
+            }
+            if reply["error"] == "subagent_ambiguous" && identity.agent_hint.is_some() {
+                return Err(AppError::TuiSubagentAmbiguous);
+            }
+            if reply["error"] == "subagent_binding" && identity.agent_hint.is_some() {
+                return Err(invalid_identity());
+            }
+            let kind = match reply["kind"].as_str() {
+                Some("new") if !identity.continuation_only => "new",
+                Some("continuation") => "continuation",
+                _ => return Err(invalid_identity()),
+            };
+            // 支持绑定的源在准备时仅预留容量，到 send 才获得实际启动目录。
+            let branch = match (identity.agent_hint.as_ref(), reply.get("agent_session")) {
+                (None, None) => None,
+                (Some(_), Some(value)) if agent_scope => Some(
+                    value
+                        .as_str()
+                        .filter(|text| {
+                            text.strip_prefix(SERVER_SESSION_PREFIX)
+                                .is_some_and(|uuid| {
+                                    Uuid::parse_str(uuid).is_ok_and(|id| {
+                                        id.get_version_num() == 4 && id.to_string() == uuid
+                                    })
+                                })
+                        })
+                        .ok_or_else(invalid_identity)?
+                        .to_owned(),
+                ),
+                _ => return Err(invalid_identity()),
+            };
+            let workspace = match reply.get("workspace_protocol") {
+                None if branch.is_none() => None,
+                Some(version) if version.as_u64() == Some(1) => {
+                    let resume = match reply.get("workspace_resume") {
+                        None => false,
+                        Some(value) => value.as_bool().ok_or_else(invalid_identity)?,
+                    };
+                    Some(workspace::Candidate::from_request(
+                        &body,
+                        kind == "new" && !resume,
+                        branch,
+                    )?)
+                }
+                _ => return Err(unavailable()),
+            };
+            Ok((
+                connection,
+                kind,
+                workspace,
+                capture_http,
+                input_policy,
+                session_mapping,
+                managed_oauth,
+            ))
+        };
+        let (connection, kind, workspace, capture_http, input_policy, session_mapping, managed_oauth) =
+            tokio::select! {
+                biased;
+                _ = cancelled.changed() => return Err(consumed()),
+                result = timeout_at(deadline, prepared) => result.map_err(|_| limited())??,
+            };
+        let mut book = self.book.lock().unwrap();
+        let record = book
+            .get_mut(&slot.id)
+            .filter(|record| {
+                record.ticket == slot.ticket
+                    && matches!(record.phase, Phase::Preparing)
+                    && !*record.cancel.borrow()
+                    && record.deadline > Instant::now()
+            })
+            .ok_or_else(consumed)?;
+        record.phase = Phase::Ready {
+            connection,
+            workspace,
+            session_mapping,
+            managed_oauth,
+        };
+        slot.armed = false;
+        let mut response = (StatusCode::NO_CONTENT, [(HANDOFF_HEADER, kind)]).into_response();
+        if input_policy {
+            response.headers_mut().insert(TUI_INPUT_POLICY, HeaderValue::from_static("1"));
+        }
+        if session_mapping {
+            response
+                .headers_mut()
+                .insert(TUI_UPSTREAM_SESSION, HeaderValue::from_static("1"));
+        }
+        if managed_oauth {
+            response
+                .headers_mut()
+                .insert(TUI_MANAGED_OAUTH, HeaderValue::from_static("1"));
+        }
+        if capture_requested && capture_http {
+            response.headers_mut().insert(TUI_CAPTURE, HeaderValue::from_static("1"));
+        }
+        if policy.is_some() {
+            response
+                .headers_mut()
+                .insert(TUI_BODY_POLICY, HeaderValue::from_static("1"));
+        }
+        Ok(response)
+    }
+
+    fn claim(
+        &self,
+        binding: &TransportBinding,
+        identity: &Identity,
+        requires_session_mapping: bool,
+        has_account_token: bool,
+    ) -> Result<(Slot, BufReader<UnixStream>, Option<workspace::Candidate>), AppError> {
+        let mut book = self.book.lock().unwrap();
+        prune(&mut book);
+        let record = book
+            .get_mut(&identity.reservation_id)
+            .ok_or_else(consumed)?;
+        if record.identity != *identity || record.binding_proof != binding_proof(binding) {
+            return Err(invalid_identity());
+        }
+        let Phase::Ready {
+            session_mapping,
+            managed_oauth,
+            ..
+        } = &record.phase
+        else {
+            return Err(consumed());
+        };
+        if (requires_session_mapping && !session_mapping) || *managed_oauth != has_account_token {
+            return Err(unavailable());
+        }
+        let Phase::Ready {
+            connection,
+            workspace,
+            ..
+        } = std::mem::replace(&mut record.phase, Phase::Submitted)
+        else {
+            unreachable!()
+        };
+        Ok((
+            Slot {
+                book: self.book.clone(),
+                id: identity.reservation_id.clone(),
+                ticket: record.ticket,
+                armed: true,
+            },
+            connection,
+            workspace,
+        ))
+    }
+
+    /// 单次认领原 socket 并按需交付真实字节。@param binding 已鉴权账号。
+    /// @param config 私有源配置。@param headers 原预留信封。@return 事件源的内容类型和流。
+    pub(super) async fn send(
+        &self,
+        binding: &TransportBinding,
+        config: Option<&Value>,
+        headers: &HeaderMap,
+        capture: Option<(PathBuf, TuiCaptureInput)>,
+    ) -> Result<Response, AppError> {
+        let identity = Identity::decode(headers, binding)?;
+        let (deadline, _) = identity.deadlines(binding, now_ms())?;
+        setting(config)?;
+        let mut session_headers = headers.get_all(TUI_UPSTREAM_SESSION).iter();
+        let upstream_session = session_headers
+            .next()
+            .map(|value| {
+                let value = value.to_str().map_err(|_| invalid_identity())?;
+                if session_headers.next().is_some()
+                    || value.len() != 36
+                    || Uuid::parse_str(value).is_err()
+                    || identity.session_id.len() != 36
+                    || Uuid::parse_str(&identity.session_id).is_err()
+                {
+                    return Err(invalid_identity());
+                }
+                Ok(value)
+            })
+            .transpose()?;
+        let mut token_headers = headers.get_all(TUI_MANAGED_OAUTH).iter();
+        let account_token = token_headers
+            .next()
+            .map(|value| {
+                let token = value.to_str().map_err(|_| invalid_identity())?;
+                if token_headers.next().is_some() || !valid_tui_account_token(token) {
+                    return Err(invalid_identity());
+                }
+                Ok(token)
+            })
+            .transpose()?;
+        let (slot, mut connection, workspace) =
+            self.claim(binding, &identity, upstream_session.is_some(), account_token.is_some())?;
+        // 先同步提交事实。进程退出或回包丢失后，重放的 prepare 与 send 仍无法触发第二次提交。
+        let committed = timeout_at(
+            deadline,
+            submission_log::consume(
+                &self.submission_storage,
+                binding,
+                &identity.reservation_id,
+                identity.deadline_unix_ms,
+                submission_log::Terminal::Submitted,
+            ),
+        )
+        .await
+        .map_err(|_| limited())?
+        .map_err(|_| unavailable())?;
+        if !committed {
+            return Err(consumed());
+        }
+        if Instant::now() >= deadline {
+            return Err(limited());
+        }
+        let mut command = json!({"action": "send", "reservation_id": identity.reservation_id});
+        if let Some(upstream_session) = upstream_session {
+            command["upstream_session_id"] = json!(upstream_session);
+        }
+        if let Some(token) = account_token {
+            command["account_token"] = json!(token);
+        }
+        let capture = capture.and_then(|(directory, input)| {
+            let id = Uuid::parse_str(&identity.reservation_id).ok()?;
+            Some((directory, input, identity.account_id, id, tui_writer()?))
+        });
+        let capturing = capture.is_some();
+        if capturing {
+            command["capture_http"] = json!(true);
+        }
+        if let Some(candidate) = workspace {
+            let root = self.submission_storage.clone();
+            let launch = tokio::task::spawn_blocking(move || candidate.bind(&root, &identity));
+            command["workspace"] = timeout_at(deadline, launch)
+                .await
+                .map_err(|_| limited())?
+                .map_err(|_| unavailable())??;
+            if Instant::now() >= deadline {
+                return Err(limited());
+            }
+        }
+        let head = timeout(IO_TIMEOUT, async {
+            write_json(&mut connection, &command).await?;
+            read_json(&mut connection).await
+        })
+        .await
+        .ok()
+        .and_then(Result::ok)
+        .ok_or_else(|| AppError::BadGateway("V2 本机事件源提交结果待核对".into()))?;
+        let status = head["status"]
+            .as_u64()
+            .and_then(|status| u16::try_from(status).ok())
+            .and_then(|status| StatusCode::from_u16(status).ok())
+            .filter(|status| {
+                *status == StatusCode::OK || status.is_client_error() || status.is_server_error()
+            })
+            .ok_or_else(|| AppError::BadGateway("V2 本机事件源响应状态无效".into()))?;
+        let content_type = match head["content_type"].as_str() {
+            Some("text/event-stream") => "text/event-stream",
+            Some("application/json") => "application/json",
+            _ => return Err(AppError::BadGateway("V2 本机事件源内容类型无效".into())),
+        };
+        // 省略此字段是旧协议。显式声明必须能核验，以免未知模式静默退回原字节。
+        let gateway_ids = match head.get("message_id_mode") {
+            None => false,
+            Some(Value::String(mode)) if mode == "gateway" => true,
+            Some(_) => {
+                return Err(AppError::BadGateway("V2 本机事件源消息 ID 模式无效".into()));
+            }
+        };
+        let body = Body::from_stream(unfold(
+            Some((connection, slot, capture)),
+            |state| async move {
+                let (mut connection, slot, capture) = state?;
+                let chunk = timeout(IO_TIMEOUT, read_chunk(&mut connection))
+                    .await
+                    .unwrap_or_else(|_| Err(source_error()));
+                match chunk {
+                    Ok(Some(bytes)) => Some((Ok(bytes), Some((connection, slot, capture)))),
+                    Ok(None) => {
+                        if let Some((directory, input, account, id, permit)) = capture {
+                            tokio::spawn(async move {
+                                match timeout(IO_TIMEOUT, read_capture_footer(&mut connection))
+                                    .await
+                                {
+                                    Ok(Ok((pairs, raw))) => {
+                                        let written = tokio::task::spawn_blocking(move || {
+                                            let _permit = permit;
+                                            input.save(&directory, account, id, pairs, raw)
+                                        })
+                                        .await;
+                                        if !matches!(written, Ok(Ok(()))) {
+                                            tracing::warn!(account_id=account, attempt_id=%id, "V2 提供方请求采集未保存");
+                                        }
+                                    }
+                                    _ => {
+                                        tracing::warn!(account_id=account, attempt_id=%id, "V2 提供方请求缺少已提交观察")
+                                    }
+                                }
+                            });
+                        }
+                        None
+                    }
+                    Err(error) => Some((Err(error), None)),
+                }
+            },
+        ));
+        if !gateway_ids {
+            return Ok((status, [(CONTENT_TYPE, content_type)], body).into_response());
+        }
+        // 分开协商 JSON 和 SSE，使旧 Gateway 仍收到它接受的投影格式。
+        let (mut response, mode) =
+            if content_type == "application/json" && tui_delegates_json(headers) {
+                (
+                    (status, [(CONTENT_TYPE, content_type)], body).into_response(),
+                    TUI_JSON_PROJECTION_V1,
+                )
+            } else if content_type == "text/event-stream"
+                && tui_projection_marker(headers, TUI_SSE_PROJECTION_HEADER, TUI_SSE_PROJECTION_V1)
+            {
+                (
+                    (status, [(CONTENT_TYPE, content_type)], body).into_response(),
+                    TUI_SSE_PROJECTION_V1,
+                )
+            } else {
+                (
+                    tui_sender_response::project(status, content_type, body).await,
+                    "gateway",
+                )
+            };
+        response
+            .headers_mut()
+            .insert(TUI_GATEWAY_ID_HEADER, HeaderValue::from_static(mode));
+        if capturing {
+            response.headers_mut().insert(TUI_CAPTURE, HeaderValue::from_static("queued"));
+        }
+        // 只采信已绑定源的私有控制帧；不从入站头、错误正文或任意模型扩展提取等待期。
+        if !status.is_success() && content_type == "application/json" {
+            let origin = match head["error_source"].as_str() {
+                Some("local_provider_http") => Some("local_provider_http"),
+                Some("managed_oauth_http") if account_token.is_some() => Some("managed_oauth_http"),
+                Some("local_provider_backoff") if status == StatusCode::TOO_MANY_REQUESTS => {
+                    Some("local_provider_backoff")
+                }
+                Some("local_provider_event") => Some("local_provider_event"),
+                _ => None,
+            };
+            if let Some(origin) = origin {
+                response
+                    .headers_mut()
+                    .insert(TUI_ERROR_SOURCE, HeaderValue::from_static(origin));
+                if status == StatusCode::TOO_MANY_REQUESTS
+                    && origin != "local_provider_event"
+                    && let Some(seconds) = head["retry_after"].as_u64()
+                {
+                    response
+                        .headers_mut()
+                        .insert(RETRY_AFTER, HeaderValue::from(seconds));
+                }
+            }
+        }
+        Ok(response)
+    }
+
+    /// 在确认回复前持久化取消。@param binding 已鉴权账号。@param headers 原预留信封。@return HTTP 204。
+    pub(super) async fn cancel(
+        &self,
+        binding: &TransportBinding,
+        headers: &HeaderMap,
+    ) -> Result<StatusCode, AppError> {
+        let identity = Identity::decode(headers, binding)?;
+        let proof = binding_proof(binding);
+        let wall_now = now_ms();
+        let deadlines = (identity.deadline_unix_ms > wall_now)
+            .then(|| identity.deadlines(binding, wall_now))
+            .transpose()?;
+        {
+            let mut book = self.book.lock().unwrap();
+            prune(&mut book);
+            if let Some(record) = book.get_mut(&identity.reservation_id) {
+                if record.identity != identity || record.binding_proof != proof {
+                    return Err(invalid_identity());
+                }
+                match record.phase {
+                    Phase::Preparing => {
+                        record.cancel.send_replace(true);
+                    }
+                    Phase::Ready { .. } => record.phase = Phase::Closed,
+                    _ => {}
+                }
+            } else if let Some((deadline, replay_until)) = deadlines {
+                if book.len() >= MAX_RECORDS {
+                    return Err(limited());
+                }
+                // 取消可能先到。先封住本进程，再在共享记录中与发送竞争终态。
+                book.insert(
+                    identity.reservation_id.clone(),
+                    Record {
+                        identity: identity.clone(),
+                        agent_probe: false,
+                        binding_proof: proof,
+                        deadline,
+                        replay_until,
+                        ticket: Uuid::new_v4(),
+                        cancel: watch::channel(true).0,
+                        phase: Phase::Closed,
+                    },
+                );
+            }
+        }
+        if let Some((_, replay_until)) = deadlines {
+            // 已记录发送仍返回幂等取消回执，原流继续运行。
+            timeout_at(
+                replay_until,
+                submission_log::consume(
+                    &self.submission_storage,
+                    binding,
+                    &identity.reservation_id,
+                    identity.deadline_unix_ms,
+                    submission_log::Terminal::Cancelled,
+                ),
+            )
+            .await
+            .map_err(|_| limited())?
+            .map_err(|_| unavailable())?;
+        }
+        Ok(StatusCode::NO_CONTENT)
+    }
+}
+
+/// 从同一次已鉴权发送的正文结束符后读取独立采集，保持首帧和终帧实时交付。
+async fn read_capture_footer(
+    connection: &mut BufReader<UnixStream>,
+) -> io::Result<(Vec<(String, String)>, Vec<u8>)> {
+    let headers_len = connection.read_u32().await? as usize;
+    let body_len = connection.read_u32().await? as usize;
+    if headers_len > REQUEST_BODY_LIMIT || body_len == 0 || body_len > REQUEST_BODY_LIMIT {
+        return Err(source_error());
+    }
+    let mut header = vec![0; headers_len];
+    connection.read_exact(&mut header).await?;
+    let headers = serde_json::from_slice(&header)?;
+    let mut body = vec![0; body_len];
+    connection.read_exact(&mut body).await?;
+    Ok((headers, body))
+}
+
+async fn read_chunk(connection: &mut BufReader<UnixStream>) -> io::Result<Option<Bytes>> {
+    let size = connection.read_u32().await? as usize;
+    if size == 0 {
+        return Ok(None);
+    }
+    if size > CHUNK_LIMIT {
+        return Err(source_error());
+    }
+    let mut bytes = vec![0; size];
+    connection.read_exact(&mut bytes).await?;
+    Ok(Some(Bytes::from(bytes)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::fs::{Permissions, create_dir, remove_dir_all, set_permissions};
+    use std::os::unix::fs::PermissionsExt;
+
+    use http_body_util::BodyExt;
+    use tokio::net::UnixListener;
+    use tokio::sync::oneshot;
+
+    struct Source {
+        sender: TuiSender,
+        listener: UnixListener,
+        binding: TransportBinding,
+        config: Value,
+    }
+
+    impl Source {
+        fn new() -> Self {
+            let folder = std::env::temp_dir().join(format!("tui-{}", Uuid::new_v4()));
+            create_dir(&folder).unwrap();
+            set_permissions(&folder, Permissions::from_mode(0o700)).unwrap();
+            let path = folder.join("events.sock");
+            let listener = UnixListener::bind(&path).unwrap();
+            set_permissions(&path, Permissions::from_mode(0o600)).unwrap();
+            let binding = TransportBinding {
+                account_id: 42,
+                environment_id: "d".repeat(32),
+                generation: 5,
+                endpoint: "http://localhost:8091".into(),
+                secret: "synthetic-binding".repeat(3),
+                release_id: "test-release".into(),
+            };
+            Self {
+                sender: TuiSender {
+                    path,
+                    submission_storage: folder,
+                    book: Book::default(),
+                },
+                listener,
+                binding,
+                config: json!({"max_reservations": 1}),
+            }
+        }
+
+        fn identity(&self) -> Identity {
+            Identity {
+                account_id: self.binding.account_id,
+                environment_id: self.binding.environment_id.clone(),
+                generation: self.binding.generation,
+                principal_id: 91,
+                session_id: "test-session".into(),
+                reservation_id: Uuid::new_v4().to_string(),
+                deadline_unix_ms: now_ms() + 30_000,
+                continuation_only: false,
+                agent_hint: None,
+            }
+        }
+
+        async fn prepare(
+            &self,
+            identity: &Identity,
+            body: &'static [u8],
+        ) -> Result<Response, AppError> {
+            let request = Request::builder()
+                .header(RESERVATION_HEADER, header(identity))
+                .body(Body::from(body))
+                .unwrap();
+            self.sender
+                .prepare(&self.binding, Some(&self.config), request)
+                .await
+        }
+
+        async fn send(&self, identity: &Identity) -> Result<Response, AppError> {
+            self.sender
+                .send(&self.binding, Some(&self.config), &headers(identity), None)
+                .await
+        }
+
+        async fn cancel(&self, identity: &Identity) -> Result<StatusCode, AppError> {
+            self.sender.cancel(&self.binding, &headers(identity)).await
+        }
+
+        async fn receive(&self, action: &str) -> (BufReader<UnixStream>, Value) {
+            let (connection, _) = self.listener.accept().await.unwrap();
+            let mut connection = BufReader::new(connection);
+            let mut control = read_json(&mut connection).await.unwrap();
+            if action == "prepare" {
+                assert_eq!(control["action"], "bind");
+                assert!(control.get("reservation").is_none() && control.get("body_len").is_none());
+                let nonce = control["nonce"].clone();
+                control["ready"] = json!(true);
+                control["idle"] = json!(false);
+                write_json(&mut connection, &control).await.unwrap();
+                control = read_json(&mut connection).await.unwrap();
+                assert_eq!(control["nonce"], nonce);
+            }
+            assert_eq!(control["action"], action);
+            control.as_object_mut().unwrap().remove("action");
+            control["ready"] = json!(true);
+            control["idle"] = json!(false);
+            (connection, control)
+        }
+    }
+
+    /// 真实来源在准备阶段可拒绝不支持的输入，此时没有可提交的预留。@return 无。
+    #[tokio::test]
+    async fn source_rejects_unsupported_input_before_submission() {
+        let source = Source::new();
+        let identity = source.identity();
+        let body = b"{}";
+        let (prepared, ()) = tokio::join!(source.prepare(&identity, body), async {
+            let (mut socket, mut reply) = source.receive("prepare").await;
+            let mut input = [0; 2];
+            socket.read_exact(&mut input).await.unwrap();
+            assert_eq!(&input, body);
+            reply["error"] = json!("unsupported_input");
+            write_json(&mut socket, &reply).await.unwrap();
+        });
+        assert!(matches!(prepared, Err(AppError::TuiInputUnsupported)));
+        assert_eq!(source.sender.active(), 0);
+        assert!(source.send(&identity).await.is_err());
+    }
+
+    /// 受信准备源返回可公开的业务分类，未知码保持私有，全部为零投递。
+    #[tokio::test]
+    async fn input_policy_rejection_preserves_status_without_submitting() {
+        let source = Source::new();
+        for (reason, status) in [
+            ("invalid_context_management", Some(StatusCode::BAD_REQUEST)),
+            (
+                "unsupported_parameter",
+                Some(StatusCode::UNPROCESSABLE_ENTITY),
+            ),
+            ("untrusted", None),
+        ] {
+            let id = source.identity();
+            let (prepared, ()) = tokio::join!(source.prepare(&id, b"{}"), async {
+                let (mut socket, mut reply) = source.receive("prepare").await;
+                socket.read_exact(&mut [0; 2]).await.unwrap();
+                reply["error"] = json!("input_rejected");
+                reply["code"] = json!(reason);
+                write_json(&mut socket, &reply).await.unwrap();
+            });
+            match (prepared, status) {
+                (Err(AppError::TuiInput { code, status, .. }), Some(expected)) => {
+                    assert_eq!((code, status), (reason, expected));
+                }
+                (Err(AppError::ServiceUnavailable(_)), None) => {}
+                _ => panic!("准备错误映射不符"),
+            }
+            assert_eq!(source.sender.active(), 0);
+            assert!(source.send(&id).await.is_err());
+        }
+    }
+
+    /// 绑定的本机提供方在预留前退避，实际模型尚无可投递的句柄。@return 无。
+    #[tokio::test]
+    async fn provider_backoff_preserves_wait_without_preparing() {
+        let source = Source::new();
+        let identity = source.identity();
+        let (prepared, ()) = tokio::join!(source.prepare(&identity, b"{}"), async {
+            let (mut socket, mut reply) = source.receive("prepare").await;
+            socket.read_exact(&mut [0; 2]).await.unwrap();
+            reply["error"] = json!("local_provider_backoff");
+            reply["retry_after"] = json!(41);
+            write_json(&mut socket, &reply).await.unwrap();
+        });
+        assert!(matches!(
+            prepared,
+            Err(AppError::TuiProviderBackoff { retry_after: 41 })
+        ));
+        assert_eq!(source.sender.active(), 0);
+        assert!(source.send(&identity).await.is_err());
+    }
+
+    /// AT 只在受管来源握手通过、原预留匹配后交付一次。@return 无。
+    #[tokio::test]
+    async fn account_token_requires_negotiated_source_and_bound_reservation() {
+        let source = Source::new();
+        let identity = source.identity();
+        let (prepared, mut socket) = tokio::join!(source.prepare(&identity, b"{}"), async {
+            let (socket, _) = source.listener.accept().await.unwrap();
+            let mut socket = BufReader::new(socket);
+            let mut proof = read_json(&mut socket).await.unwrap();
+            assert_eq!(proof["action"], "bind");
+            proof["ready"] = json!(true);
+            proof["idle"] = json!(false);
+            proof["managed_oauth_protocol"] = json!(1);
+            write_json(&mut socket, &proof).await.unwrap();
+            let prepare = read_json(&mut socket).await.unwrap();
+            assert!(prepare.get("account_token").is_none());
+            socket.read_exact(&mut [0; 2]).await.unwrap();
+            proof["kind"] = json!("new");
+            write_json(&mut socket, &proof).await.unwrap();
+            socket
+        });
+        assert_eq!(prepared.unwrap().headers()[TUI_MANAGED_OAUTH], "1");
+        assert!(source.send(&identity).await.is_err());
+        let mut credential_headers = headers(&identity);
+        let token = "synthetic-account-at";
+        credential_headers.insert(TUI_MANAGED_OAUTH, HeaderValue::from_static(token));
+        let mut wrong_identity = identity.clone();
+        wrong_identity.account_id += 1;
+        let mut wrong_headers = headers(&wrong_identity);
+        wrong_headers.insert(TUI_MANAGED_OAUTH, HeaderValue::from_static(token));
+        let send = |headers| {
+            source
+                .sender
+                .send(&source.binding, Some(&source.config), headers, None)
+        };
+        assert!(send(&wrong_headers).await.is_err());
+        let (response, ()) = tokio::join!(send(&credential_headers), async {
+            let command = read_json(&mut socket).await.unwrap();
+            assert_eq!(command["reservation_id"], identity.reservation_id);
+            assert_eq!(command["account_token"], token);
+            write_json(&mut socket, &json!({"status":200, "content_type":"text/event-stream"}))
+                .await
+                .unwrap();
+            chunk(&mut socket, b"data: test\n\n").await;
+            chunk(&mut socket, b"").await;
+        });
+        assert_eq!(
+            response.unwrap().into_body().collect().await.unwrap().to_bytes(),
+            "data: test\n\n"
+        );
+        assert!(send(&credential_headers).await.is_err());
+    }
+
+    /// 只有来自绑定模型 HTTP 的 429 可将等待期带出私有 socket。@return 无。
+    #[tokio::test]
+    async fn provider_http_retry_after_from_bound_send_head() {
+        let source = Source::new();
+        for (origin, seconds) in [
+            ("local_provider_http", Some(72)),
+            ("local_provider_event", None),
+            ("unknown", None),
+        ] {
+            let identity = source.identity();
+            let (prepared, mut socket) = tokio::join!(source.prepare(&identity, b"{}"), async {
+                let (mut socket, mut reply) = source.receive("prepare").await;
+                socket.read_exact(&mut [0; 2]).await.unwrap();
+                reply["kind"] = json!("new");
+                write_json(&mut socket, &reply).await.unwrap();
+                socket
+            });
+            assert!(prepared.is_ok());
+            let (response, ()) = tokio::join!(source.send(&identity), async {
+                assert_eq!(read_json(&mut socket).await.unwrap()["action"], "send");
+                write_json(
+                    &mut socket,
+                    &json!({"status":429, "content_type":"application/json",
+                    "message_id_mode":"gateway", "error_source":origin, "retry_after":72}),
+                )
+                .await
+                .unwrap();
+                chunk(
+                    &mut socket,
+                    br#"{"type":"error","error":{"type":"rate_limit_error","message":"busy"}}"#,
+                )
+                .await;
+                chunk(&mut socket, b"").await;
+            });
+            let response = response.unwrap();
+            assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+            assert_eq!(
+                response.headers().get(RETRY_AFTER).map(|value| value
+                    .to_str()
+                    .unwrap()
+                    .parse::<u64>()
+                    .unwrap()),
+                seconds
+            );
+            assert!(source.send(&identity).await.is_err());
+        }
+    }
+
+    /// 新来源单独接收同轮的协议声明，大于控制帧的 beta 清单仍保留；私有凭据始终留在 sender。
+    #[tokio::test]
+    async fn negotiated_model_headers_follow_intact_body_only() {
+        let source = Source::new();
+        let id = source.identity();
+        let policy = json!({"sub2api":true,"ttl":"5m","adaptive":true});
+        let option = "x".repeat(CONTROL_LIMIT + 1);
+        let request = Request::builder()
+            .header(RESERVATION_HEADER, header(&id))
+            .header("anthropic-version", "2023-06-01")
+            .header("anthropic-beta", "first")
+            .header("anthropic-beta", &option)
+            .header("authorization", "fixture-local-only")
+            .header("x-api-key", "fixture-client-only")
+            .header(TUI_INPUT_FORMAT, "claude_code")
+            .header(TUI_BODY_POLICY, policy.to_string())
+            .body(Body::from("{}"))
+            .unwrap();
+        let (prepared, ()) = tokio::join!(
+            source
+                .sender
+                .prepare(&source.binding, Some(&source.config), request),
+            async {
+                let (mut socket, mut reply) = source.receive("bind").await;
+                reply["model_headers_protocol"] = json!(1);
+                reply["body_policy_protocol"] = json!(1);
+                reply["input_policy_protocol"] = json!(1);
+                write_json(&mut socket, &reply).await.unwrap();
+                let control = read_json(&mut socket).await.unwrap();
+                assert_eq!(control["input_format"], "claude_code");
+                assert_eq!(control["body_policy"], policy);
+                let mut original = [0; 2];
+                socket.read_exact(&mut original).await.unwrap();
+                assert_eq!(&original, b"{}");
+                let mut data = vec![0; control["model_headers_len"].as_u64().unwrap() as usize];
+                socket.read_exact(&mut data).await.unwrap();
+                assert_eq!(
+                    serde_json::from_slice::<Value>(&data).unwrap(),
+                    json!({"anthropic-version":"2023-06-01","anthropic-beta":format!("first,{option}")})
+                );
+                reply["kind"] = json!("new");
+                write_json(&mut socket, &reply).await.unwrap();
+            }
+        );
+        let response = prepared.unwrap();
+        assert_eq!(response.status(), StatusCode::NO_CONTENT);
+        assert_eq!(response.headers()[TUI_BODY_POLICY], "1");
+        assert_eq!(response.headers()[TUI_INPUT_POLICY], "1");
+        assert_eq!(source.cancel(&id).await.unwrap(), StatusCode::NO_CONTENT);
+    }
+
+    /// 映射只随已协商的 send 到达，旧源和重复头不消费预留。@return 无。
+    #[tokio::test]
+    async fn upstream_session_mapping_requires_same_reserved_source() {
+        for supported in [false, true] {
+            let source = Source::new();
+            let mut id = source.identity();
+            id.session_id = Uuid::new_v4().to_string();
+            let mapped = Uuid::new_v4().to_string();
+            let (prepared, mut socket) = tokio::join!(source.prepare(&id, b"{}"), async {
+                let (socket, _) = source.listener.accept().await.unwrap();
+                let mut socket = BufReader::new(socket);
+                let mut reply = read_json(&mut socket).await.unwrap();
+                assert_eq!(
+                    reply.as_object_mut().unwrap().remove("action"),
+                    Some(json!("bind"))
+                );
+                reply["ready"] = json!(true);
+                reply["idle"] = json!(true);
+                if supported {
+                    reply["upstream_session_protocol"] = json!(1);
+                }
+                write_json(&mut socket, &reply).await.unwrap();
+                let prepare = read_json(&mut socket).await.unwrap();
+                assert_eq!(prepare["action"], "prepare");
+                assert_eq!(prepare["reservation"]["session_id"], id.session_id);
+                assert!(prepare.get("upstream_session_id").is_none());
+                socket.read_exact(&mut [0; 2]).await.unwrap();
+                reply["kind"] = json!("new");
+                write_json(&mut socket, &reply).await.unwrap();
+                socket
+            });
+            assert_eq!(
+                prepared
+                    .unwrap()
+                    .headers()
+                    .contains_key(TUI_UPSTREAM_SESSION),
+                supported
+            );
+            let mut send_headers = headers(&id);
+            send_headers.append(TUI_UPSTREAM_SESSION, mapped.parse().unwrap());
+            send_headers.append(TUI_UPSTREAM_SESSION, mapped.parse().unwrap());
+            assert!(
+                source
+                    .sender
+                    .send(&source.binding, Some(&source.config), &send_headers, None)
+                    .await
+                    .is_err()
+            );
+            send_headers.insert(TUI_UPSTREAM_SESSION, mapped.parse().unwrap());
+            if !supported {
+                assert!(
+                    source
+                        .sender
+                        .send(&source.binding, Some(&source.config), &send_headers, None)
+                        .await
+                        .is_err()
+                );
+                send_headers.remove(TUI_UPSTREAM_SESSION);
+            }
+            let (sent, ()) = tokio::join!(
+                source
+                    .sender
+                    .send(&source.binding, Some(&source.config), &send_headers, None),
+                async {
+                    let send = read_json(&mut socket).await.unwrap();
+                    assert_eq!(send["action"], "send");
+                    assert_eq!(send["reservation_id"], id.reservation_id);
+                    assert_eq!(
+                        send["upstream_session_id"].as_str(),
+                        supported.then_some(mapped.as_str())
+                    );
+                    write_json(
+                        &mut socket,
+                        &json!({"status":200,"content_type":"text/event-stream"}),
+                    )
+                    .await
+                    .unwrap();
+                    socket.write_all(&0u32.to_be_bytes()).await.unwrap();
+                }
+            );
+            assert_eq!(sent.unwrap().status(), StatusCode::OK);
+            assert!(source.send(&id).await.is_err());
+        }
+    }
+
+    /// 老账号源遇到启用的正文策略在提交前拒绝并释放预留。@return 无。
+    #[tokio::test]
+    async fn body_policy_requires_source_support_before_body_transfer() {
+        let source = Source::new();
+        let id = source.identity();
+        let request = Request::builder()
+            .header(RESERVATION_HEADER, header(&id))
+            .header(
+                TUI_BODY_POLICY,
+                r#"{"sub2api":true,"ttl":"off","adaptive":false}"#,
+            )
+            .body(Body::from("原文"))
+            .unwrap();
+        let (result, ()) = tokio::join!(
+            source
+                .sender
+                .prepare(&source.binding, Some(&source.config), request),
+            async {
+                let (mut socket, reply) = source.receive("bind").await;
+                write_json(&mut socket, &reply).await.unwrap();
+                let mut remaining = Vec::new();
+                socket.read_to_end(&mut remaining).await.unwrap();
+                assert!(remaining.is_empty());
+            }
+        );
+        assert!(matches!(result, Err(AppError::ServiceUnavailable(_))));
+        assert_eq!(source.sender.active(), 0);
+    }
+
+    /// 唯一物理进程正在等工具时，排队的新握手必须让原工具续轮获得最后一个位置。
+    #[tokio::test]
+    async fn queued_prepares_leave_room_for_a_registered_tool_return() {
+        let source = Source::new();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let reserve = |identity| {
+            source
+                .sender
+                .reserve(identity, &source.binding, deadline, deadline, 2)
+        };
+        let _waiting = reserve(source.identity()).unwrap();
+        assert!(matches!(
+            reserve(source.identity()),
+            Err(AppError::AdmissionLimited { .. })
+        ));
+        let mut child = source.identity();
+        child.agent_hint = Some("unverified-child".into());
+        let (probe, _) = reserve(child).unwrap();
+        let mut duplicate_hint = source.identity();
+        duplicate_hint.agent_hint = Some("another-unverified-child".into());
+        assert!(matches!(
+            reserve(duplicate_hint),
+            Err(AppError::AdmissionLimited { .. })
+        ));
+        let mut original = source.identity();
+        original.continuation_only = true;
+        let _returning = reserve(original).unwrap();
+        assert_eq!(source.sender.active(), 3);
+        // 来源拒绝未关联的线索时，prepare 的 RAII 同步关闭专用位置。
+        drop(probe);
+        assert_eq!(source.sender.active(), 2);
+        let mut retry = source.identity();
+        retry.agent_hint = Some("verified-at-source".into());
+        let _next_probe = reserve(retry).unwrap();
+        assert_eq!(source.sender.active(), 3);
+    }
+
+    impl Drop for Source {
+        fn drop(&mut self) {
+            let _ = remove_dir_all(self.sender.path.parent().unwrap());
+        }
+    }
+
+    fn header(identity: &Identity) -> HeaderValue {
+        HeaderValue::from_str(&STANDARD.encode(serde_json::to_vec(identity).unwrap())).unwrap()
+    }
+
+    fn headers(identity: &Identity) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert(RESERVATION_HEADER, header(identity));
+        headers
+    }
+
+    async fn chunk(connection: &mut BufReader<UnixStream>, bytes: &[u8]) {
+        connection
+            .get_mut()
+            .write_u32(bytes.len() as u32)
+            .await
+            .unwrap();
+        connection.get_mut().write_all(bytes).await.unwrap();
+    }
+
+    /// 准备与取消不落盘，只有认领发送后才可获得当前主体的工作目录。
+    /// @return 无。
+    #[tokio::test]
+    async fn workspace_is_bound_only_at_authenticated_send() {
+        let source = Source::new();
+        let body = br#"{"messages":[{"role":"user","content":"hello"}]}"#;
+        let base = source.sender.submission_storage.join("tui-workspaces");
+        for cancel in [true, false] {
+            let identity = source.identity();
+            let (prepared, mut socket) = tokio::join!(source.prepare(&identity, body), async {
+                let (mut socket, mut reply) = source.receive("prepare").await;
+                let mut bytes = vec![0; body.len()];
+                socket.read_exact(&mut bytes).await.unwrap();
+                assert_eq!(bytes, body);
+                reply["kind"] = json!("new");
+                reply["workspace_protocol"] = json!(1);
+                write_json(&mut socket, &reply).await.unwrap();
+                socket
+            });
+            assert_eq!(prepared.unwrap().status(), StatusCode::NO_CONTENT);
+            assert!(!base.exists());
+            if cancel {
+                assert_eq!(
+                    source.cancel(&identity).await.unwrap(),
+                    StatusCode::NO_CONTENT
+                );
+                assert!(!base.exists());
+                continue;
+            }
+            let other = Identity {
+                principal_id: identity.principal_id + 1,
+                ..identity.clone()
+            };
+            assert!(source.send(&other).await.is_err());
+            assert!(!base.exists());
+            let (response, ()) = tokio::join!(source.send(&identity), async {
+                let command = read_json(&mut socket).await.unwrap();
+                assert_eq!(command["reservation_id"], identity.reservation_id);
+                let launch = &command["workspace"];
+                assert_eq!(launch["version"], 1);
+                assert!(Path::new(launch["work_dir"].as_str().unwrap()).is_dir());
+                let record: Value = serde_json::from_slice(
+                    &std::fs::read(launch["binding_file"].as_str().unwrap()).unwrap(),
+                )
+                .unwrap();
+                assert_eq!(record["native_session_id"], launch["native_session_id"]);
+                write_json(
+                    &mut socket,
+                    &json!({"status":200,"content_type":"text/event-stream"}),
+                )
+                .await
+                .unwrap();
+                socket.get_mut().write_u32(0).await.unwrap();
+            });
+            assert_eq!(response.unwrap().status(), StatusCode::OK);
+        }
+    }
+
+    /// 同一预留在发送前占用名额，响应按源字节逐段返回，发送后仍可安全重放取消。@return 无。
+    #[tokio::test]
+    async fn accepted_socket_delivers_original_frames_once() {
+        let source = Source::new();
+        let body = "{\n \"text\":\"一\"\n}".as_bytes();
+        let (idle, ()) = tokio::join!(
+            source.sender.status(&source.binding, Some(&source.config)),
+            async {
+                let (mut socket, mut reply) = source.receive("status").await;
+                reply["idle"] = json!(true);
+                write_json(&mut socket, &reply).await.unwrap();
+            }
+        );
+        assert_eq!(idle, Some(true));
+        let mut identity = source.identity();
+        identity.continuation_only = true;
+        let (prepared, mut socket) = tokio::join!(source.prepare(&identity, body), async {
+            let (mut socket, mut reply) = source.receive("prepare").await;
+            assert_eq!(reply["reservation"], json!(&identity));
+            assert_eq!(reply["body_len"], body.len());
+            assert_eq!(reply["body_sha256"], hex::encode(Sha256::digest(body)));
+            let mut actual = vec![0; body.len()];
+            socket.read_exact(&mut actual).await.unwrap();
+            assert_eq!(actual, body);
+            reply["kind"] = json!("continuation");
+            write_json(&mut socket, &reply).await.unwrap();
+            socket
+        });
+        let prepared = prepared.unwrap();
+        assert_eq!(prepared.status(), StatusCode::NO_CONTENT);
+        assert_eq!(prepared.headers()[HANDOFF_HEADER], "continuation");
+        assert_eq!(source.sender.active(), 1);
+        assert!(matches!(
+            source.prepare(&source.identity(), body).await,
+            Err(AppError::AdmissionLimited { .. })
+        ));
+        assert!(source.prepare(&identity, b"{}").await.is_err());
+        let other = Identity {
+            principal_id: 92,
+            ..identity.clone()
+        };
+        assert!(source.send(&other).await.is_err());
+        assert!(source.cancel(&other).await.is_err());
+        let new_binding = TransportBinding {
+            secret: "rotated-binding".repeat(3),
+            ..source.binding.clone()
+        };
+        assert!(
+            source
+                .sender
+                .send(&new_binding, Some(&source.config), &headers(&identity), None)
+                .await
+                .is_err()
+        );
+
+        let large_chunk = vec![b'x'; CHUNK_LIMIT];
+        let chunks = 10 * 1024 * 1024 / CHUNK_LIMIT + 1;
+        let (release, waiting) = oneshot::channel();
+        let (_done, ()) = tokio::join!(
+            async {
+                let response = source.send(&identity).await.unwrap();
+                assert_eq!(response.headers()[CONTENT_TYPE], "text/event-stream");
+                let mut stream = response.into_body();
+                assert_eq!(
+                    stream.frame().await.unwrap().unwrap().into_data().unwrap(),
+                    "data: 行\n\n"
+                );
+                assert_eq!(
+                    source.cancel(&identity).await.unwrap(),
+                    StatusCode::NO_CONTENT
+                );
+                assert!(source.send(&identity).await.is_err());
+                assert_eq!(source.sender.active(), 1);
+                release.send(()).unwrap();
+                assert_eq!(
+                    stream.frame().await.unwrap().unwrap().into_data().unwrap(),
+                    r#"data: {"type":"content_block_delta","delta":{"type":"text_delta","text":""#,
+                );
+                // 一个超 10 MiB 的原始事件仍由 64 KiB UDS 块逐个交付。
+                for _ in 0..chunks {
+                    assert_eq!(
+                        stream.frame().await.unwrap().unwrap().into_data().unwrap(),
+                        large_chunk.as_slice(),
+                    );
+                }
+                assert_eq!(stream.collect().await.unwrap().to_bytes(), "\"}}\n\n");
+            },
+            async {
+                assert_eq!(
+                    read_json(&mut socket).await.unwrap(),
+                    json!({"action":"send","reservation_id":identity.reservation_id})
+                );
+                write_json(
+                    &mut socket,
+                    &json!({"status":200,"content_type":"text/event-stream"}),
+                )
+                .await
+                .unwrap();
+                chunk(&mut socket, "data: 行\n\n".as_bytes()).await;
+                waiting.await.unwrap();
+                chunk(
+                    &mut socket,
+                    br#"data: {"type":"content_block_delta","delta":{"type":"text_delta","text":""#,
+                )
+                .await;
+                for _ in 0..chunks {
+                    chunk(&mut socket, &large_chunk).await;
+                }
+                chunk(&mut socket, b"\"}}\n\n").await;
+                chunk(&mut socket, b"").await;
+            }
+        );
+        assert_eq!(source.sender.active(), 0);
+        assert!(source.send(&identity).await.is_err());
+        assert!(source.prepare(&identity, body).await.is_err());
+    }
+
+    /// 只有已绑定来源的 send 回包能开启转换。@return 无。
+    #[tokio::test]
+    async fn gateway_id_opt_in_is_read_from_bound_send_head_only() {
+        let source = Source::new();
+        let request = br#"{"model":"fixture","messages":[{"role":"user","content":[{"type":"text","text":"cache prefix","cache_control":{"type":"ephemeral","ttl":"1h"}}]}]}"#;
+        let wire = br#" { "type":"message", "id":"msg_original", "content":[], "usage":{"cache_read_input_tokens":42} } "#;
+        for (status, mode) in [
+            (200, None),
+            (400, None),
+            (200, Some(json!("unknown"))),
+            (200, Some(Value::Null)),
+            (200, Some(json!(true))),
+            (200, Some(json!("gateway"))),
+        ] {
+            let gateway_ids = mode.as_ref().and_then(Value::as_str) == Some("gateway");
+            let rejected = mode.is_some() && !gateway_ids;
+            let identity = source.identity();
+            let (prepared, mut socket) = tokio::join!(source.prepare(&identity, request), async {
+                let (mut socket, mut reply) = source.receive("prepare").await;
+                assert_eq!(reply["body_sha256"], hex::encode(Sha256::digest(request)));
+                let mut actual = vec![0; request.len()];
+                socket.read_exact(&mut actual).await.unwrap();
+                assert_eq!(actual, request);
+                reply["kind"] = json!("new");
+                reply["message_id_mode"] = json!("gateway");
+                write_json(&mut socket, &reply).await.unwrap();
+                socket
+            });
+            assert_eq!(prepared.unwrap().status(), StatusCode::NO_CONTENT);
+            let (reply, ()) = tokio::join!(source.send(&identity), async {
+                assert_eq!(
+                    read_json(&mut socket).await.unwrap(),
+                    json!({"action":"send","reservation_id":identity.reservation_id})
+                );
+                let mut head = json!({"status":status,"content_type":"application/json"});
+                if let Some(mode) = mode {
+                    head["message_id_mode"] = mode;
+                }
+                write_json(&mut socket, &head).await.unwrap();
+                if rejected {
+                    assert_eq!(
+                        timeout(Duration::from_secs(2), socket.read(&mut [0]))
+                            .await
+                            .unwrap()
+                            .unwrap(),
+                        0
+                    );
+                } else {
+                    chunk(&mut socket, wire).await;
+                    chunk(&mut socket, b"").await;
+                }
+            });
+            if rejected {
+                assert!(
+                    matches!(reply, Err(AppError::BadGateway(detail)) if detail.contains("消息 ID 模式"))
+                );
+                assert_eq!(source.sender.active(), 0);
+                assert!(source.send(&identity).await.is_err());
+                continue;
+            }
+            let reply = reply.unwrap();
+            assert_eq!(reply.status().as_u16(), status);
+            assert_eq!(
+                reply
+                    .headers()
+                    .get(TUI_GATEWAY_ID_HEADER)
+                    .map(|value| value.to_str().unwrap()),
+                gateway_ids.then_some("gateway")
+            );
+            let bytes = reply.into_body().collect().await.unwrap().to_bytes();
+            if gateway_ids {
+                let body: Value = serde_json::from_slice(&bytes).unwrap();
+                let id = body["id"].as_str().unwrap();
+                assert!(id.starts_with("msg_"));
+                assert_ne!(id, "msg_original");
+                assert_eq!(body["usage"]["cache_read_input_tokens"], 42);
+            } else {
+                assert_eq!(bytes, wire.as_slice());
+            }
+        }
+    }
+
+    /// 只有新网关协商委托后，原始 SSE 政策码才进入私有链路。@return 无。
+    #[tokio::test]
+    async fn raw_sse_preserves_policy_code_only_when_gateway_negotiated() {
+        let source = Source::new();
+        let frame = b"event: error\ndata: {\"type\":\"error\",\"error\":{\"upstream_code\":\"cyber_policy\"}}\n\n";
+        for delegated in [true, false] {
+            let identity = source.identity();
+            let (prepared, mut socket) = tokio::join!(source.prepare(&identity, b"{}"), async {
+                let (mut socket, mut reply) = source.receive("prepare").await;
+                socket.read_exact(&mut [0; 2]).await.unwrap();
+                reply["kind"] = json!("new");
+                write_json(&mut socket, &reply).await.unwrap();
+                socket
+            });
+            prepared.unwrap();
+            let mut negotiated = headers(&identity);
+            if delegated {
+                negotiated.insert(
+                    TUI_SSE_PROJECTION_HEADER,
+                    HeaderValue::from_static(TUI_SSE_PROJECTION_V1),
+                );
+            }
+            let (reply, ()) = tokio::join!(
+                source.sender.send(&source.binding, Some(&source.config), &negotiated, None),
+                async {
+                    assert_eq!(read_json(&mut socket).await.unwrap()["action"], "send");
+                    write_json(&mut socket, &json!({
+                        "status": 200, "content_type": "text/event-stream", "message_id_mode": "gateway"
+                    })).await.unwrap();
+                    chunk(&mut socket, frame).await;
+                    chunk(&mut socket, b"").await;
+                }
+            );
+            let reply = reply.unwrap();
+            let expected = if delegated { TUI_SSE_PROJECTION_V1 } else { "gateway" };
+            assert_eq!(reply.headers()[TUI_GATEWAY_ID_HEADER], expected);
+            let wire = reply.into_body().collect().await.unwrap().to_bytes();
+            assert_eq!(String::from_utf8_lossy(&wire).contains("cyber_policy"), delegated);
+        }
+    }
+
+    /// 已认领的 JSON 从 UDS 逐块交付，准入到期不截断同一次提交。@return 无。
+    #[tokio::test]
+    async fn gateway_id_json_arrives_after_admission_deadline() {
+        let source = Source::new();
+        let identity = Identity {
+            deadline_unix_ms: now_ms() + 3_000,
+            ..source.identity()
+        };
+        let (prepared, mut socket) = tokio::join!(source.prepare(&identity, b"{}"), async {
+            let (mut socket, mut head) = source.receive("prepare").await;
+            let mut actual = [0; 2];
+            socket.read_exact(&mut actual).await.unwrap();
+            assert_eq!(&actual, b"{}");
+            head["kind"] = json!("new");
+            write_json(&mut socket, &head).await.unwrap();
+            socket
+        });
+        assert_eq!(prepared.unwrap().status(), StatusCode::NO_CONTENT);
+        let deadline = source.sender.book.lock().unwrap()[&identity.reservation_id].deadline;
+
+        let mut negotiated = headers(&identity);
+        negotiated.insert(
+            TUI_GATEWAY_ID_HEADER,
+            HeaderValue::from_static(TUI_JSON_PROJECTION_V1),
+        );
+        let (head_seen, wait_head) = oneshot::channel();
+        let (reply, ()) = tokio::join!(
+            async {
+                let private = source
+                    .sender
+                    .send(&source.binding, Some(&source.config), &negotiated, None)
+                    .await
+                    .unwrap();
+                assert!(Instant::now() < deadline);
+                assert_eq!(
+                    private.headers()[TUI_GATEWAY_ID_HEADER],
+                    TUI_JSON_PROJECTION_V1
+                );
+                head_seen.send(()).unwrap();
+                tui_sender_response::project(
+                    private.status(),
+                    "application/json",
+                    private.into_body(),
+                )
+                .await
+            },
+            async {
+                assert_eq!(
+                    read_json(&mut socket).await.unwrap(),
+                    json!({"action":"send","reservation_id":identity.reservation_id})
+                );
+                write_json(
+                &mut socket,
+                &json!({"status":200,"content_type":"application/json","message_id_mode":"gateway"}),
+            )
+            .await
+            .unwrap();
+                // Gateway 能在准入截止前读到私有头。任何正文都在截止之后交给它。
+                timeout_at(deadline, wait_head).await.unwrap().unwrap();
+                sleep_until(deadline + Duration::from_millis(200)).await;
+                assert!(Instant::now() > deadline);
+                assert_eq!(source.sender.active(), 1);
+                chunk(
+                    &mut socket,
+                    br#"{"type":"message","id":"msg_source","role":"assistant","model":"fixture","#,
+                )
+                .await;
+                chunk(&mut socket, br#""content":[],"stop_reason":"end_turn","stop_sequence":null,"usage":{"input_tokens":10,"output_tokens":2,"cache_read_input_tokens":5}}"#).await;
+                chunk(&mut socket, b"").await;
+            }
+        );
+        assert_eq!(reply.status(), StatusCode::OK);
+        let body = reply.into_body().collect().await.unwrap().to_bytes();
+        let body: Value = serde_json::from_slice(&body).unwrap();
+        let id = body["id"].as_str().unwrap().strip_prefix("msg_").unwrap();
+        assert!(Uuid::parse_str(id).is_ok());
+        assert_eq!(body["usage"]["cache_read_input_tokens"], 5);
+        assert_eq!(source.sender.active(), 0);
+    }
+
+    /// 迟到的准备、显式取消与截止回收都关闭本机通道。@return 无。
+    #[tokio::test]
+    async fn cancelled_or_expired_reservations_never_submit() {
+        let mut source = Source::new();
+        let early = source.identity();
+        assert_eq!(source.cancel(&early).await.unwrap(), StatusCode::NO_CONTENT);
+        assert!(source.prepare(&early, b"{}").await.is_err());
+        let waiting = source.identity();
+        let (result, ()) = tokio::join!(source.prepare(&waiting, b"{}"), async {
+            let (mut socket, _) = source.receive("prepare").await;
+            let mut body = [0; 2];
+            socket.read_exact(&mut body).await.unwrap();
+            assert_eq!(
+                source.cancel(&waiting).await.unwrap(),
+                StatusCode::NO_CONTENT
+            );
+            assert_eq!(
+                source.cancel(&waiting).await.unwrap(),
+                StatusCode::NO_CONTENT
+            );
+            assert_eq!(socket.read(&mut [0]).await.unwrap(), 0);
+        });
+        assert!(result.is_err());
+        assert_eq!(source.sender.active(), 0);
+        let expiring = Identity {
+            deadline_unix_ms: now_ms() + 1000,
+            ..source.identity()
+        };
+        let (result, ()) = tokio::join!(source.prepare(&expiring, b"{}"), async {
+            let (mut socket, mut reply) = source.receive("prepare").await;
+            socket.read_exact(&mut [0; 2]).await.unwrap();
+            reply["kind"] = json!("new");
+            write_json(&mut socket, &reply).await.unwrap();
+            assert_eq!(
+                timeout(Duration::from_secs(2), socket.read(&mut [0]))
+                    .await
+                    .unwrap()
+                    .unwrap(),
+                0
+            );
+        });
+        assert_eq!(result.unwrap().status(), StatusCode::NO_CONTENT);
+        assert_eq!(source.sender.active(), 0);
+        // 本机通道按单调时钟关闭，取消回执按墙钟签发。先确认信封的绝对截止已过。
+        let remaining_ms = expiring.deadline_unix_ms.saturating_sub(now_ms());
+        tokio::time::sleep(Duration::from_millis(remaining_ms + 1)).await;
+        assert!(now_ms() >= expiring.deadline_unix_ms);
+        assert!(source.send(&expiring).await.is_err());
+        assert_eq!(
+            source.cancel(&expiring).await.unwrap(),
+            StatusCode::NO_CONTENT
+        );
+
+        let disk: Value = serde_json::from_slice(
+            &std::fs::read(
+                source
+                    .sender
+                    .submission_storage
+                    .join("tui-v2-submissions.json"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            disk,
+            json!({"account_id":source.binding.account_id,
+            "environment_id":source.binding.environment_id,"committed":{},"cancelled":{
+                (&early.reservation_id):early.deadline_unix_ms,
+                (&waiting.reservation_id):waiting.deadline_unix_ms,
+            }})
+        );
+        source.sender.book = Book::default();
+        for identity in [&early, &waiting] {
+            assert!(identity.deadline_unix_ms > now_ms());
+            assert!(matches!(
+                source.prepare(identity, b"{}").await,
+                Err(AppError::BadRequest(_))
+            ));
+            assert!(matches!(
+                source.send(identity).await,
+                Err(AppError::BadRequest(_))
+            ));
+            assert_eq!(
+                source.cancel(identity).await.unwrap(),
+                StatusCode::NO_CONTENT
+            );
+        }
+        assert!(
+            timeout(Duration::from_millis(100), source.listener.accept())
+                .await
+                .is_err()
+        );
+    }
+
+    /// 错绑事件源失去就绪资格，发出部分正文后提前结束会报告传输错误。@return 无。
+    #[tokio::test]
+    async fn bad_source_proof_and_truncated_stream_are_rejected() {
+        let source = Source::new();
+        assert_eq!(source.sender.status(&source.binding, None).await, None);
+        let (idle, ()) = tokio::join!(
+            source.sender.status(&source.binding, Some(&source.config)),
+            async {
+                let (mut socket, mut reply) = source.receive("status").await;
+                reply["generation"] = json!(0);
+                write_json(&mut socket, &reply).await.unwrap();
+            }
+        );
+        assert_eq!(idle, None);
+        let identity = source.identity();
+        let (prepared, mut socket) = tokio::join!(source.prepare(&identity, b"{}"), async {
+            let (mut socket, mut reply) = source.receive("prepare").await;
+            socket.read_exact(&mut [0; 2]).await.unwrap();
+            reply["kind"] = json!("new");
+            write_json(&mut socket, &reply).await.unwrap();
+            socket
+        });
+        assert!(prepared.is_ok());
+        let (sent, ()) = tokio::join!(source.send(&identity), async {
+            assert_eq!(read_json(&mut socket).await.unwrap()["action"], "send");
+            write_json(
+                &mut socket,
+                &json!({"status":200,"content_type":"text/event-stream"}),
+            )
+            .await
+            .unwrap();
+            chunk(&mut socket, b"partial").await;
+            drop(socket);
+        });
+        let mut body = sent.unwrap().into_body();
+        assert_eq!(
+            body.frame().await.unwrap().unwrap().into_data().unwrap(),
+            "partial"
+        );
+        assert!(body.frame().await.unwrap().is_err());
+        assert_eq!(source.sender.active(), 0);
+        assert!(source.send(&identity).await.is_err());
+    }
+
+    /// 同 UID 的错绑事件源只能见到绑定握手。@return 无。
+    #[tokio::test]
+    async fn wrong_bind_receives_neither_reservation_nor_body() {
+        let source = Source::new();
+        for (field, value) in [("generation", json!(6)), ("account_id", json!(97))] {
+            let identity = source.identity();
+            let (prepared, received) =
+                tokio::join!(source.prepare(&identity, b"private body"), async {
+                    let (mut socket, mut reply) = source.receive("bind").await;
+                    assert!(reply.get("reservation").is_none() && reply.get("body_len").is_none());
+                    reply[field] = value;
+                    write_json(&mut socket, &reply).await.unwrap();
+                    let mut received = Vec::new();
+                    socket.read_to_end(&mut received).await.unwrap();
+                    received
+                });
+            assert!(matches!(prepared, Err(AppError::ServiceUnavailable(_))));
+            assert!(received.is_empty());
+            assert_eq!(source.sender.active(), 0);
+        }
+    }
+
+    /// 回包前断开，新的 sender 仍从持久提交事实拒绝原未过期两步重放。@return 无。
+    #[tokio::test]
+    async fn lost_reply_then_restart_rejects_prepare_and_send_replay() {
+        let mut source = Source::new();
+        let identity = source.identity();
+        let (prepared, mut socket) = tokio::join!(source.prepare(&identity, b"{}"), async {
+            let (mut socket, mut reply) = source.receive("prepare").await;
+            socket.read_exact(&mut [0; 2]).await.unwrap();
+            reply["kind"] = json!("new");
+            write_json(&mut socket, &reply).await.unwrap();
+            socket
+        });
+        assert!(prepared.is_ok());
+        let (sent, ()) = tokio::join!(source.send(&identity), async {
+            assert_eq!(read_json(&mut socket).await.unwrap()["action"], "send");
+            assert!(
+                submission_log::was_consumed(
+                    &source.sender.submission_storage,
+                    &source.binding,
+                    Some(&identity.reservation_id)
+                )
+                .await
+                .unwrap()
+            );
+            drop(socket);
+        });
+        assert!(matches!(sent, Err(AppError::BadGateway(_))));
+        source.sender = TuiSender {
+            path: source.sender.path.clone(),
+            submission_storage: source.sender.submission_storage.clone(),
+            book: Book::default(),
+        };
+        assert!(identity.deadline_unix_ms > now_ms());
+        assert!(matches!(
+            source.prepare(&identity, b"{}").await,
+            Err(AppError::BadRequest(_))
+        ));
+        assert!(matches!(
+            source.send(&identity).await,
+            Err(AppError::BadRequest(_))
+        ));
+        assert!(
+            timeout(Duration::from_millis(100), source.listener.accept())
+                .await
+                .is_err()
+        );
+        assert_eq!(source.sender.active(), 0);
+    }
+
+    /// 两种终态共享文件锁。写入新终态时清除两类已过期记录。@return 无。
+    #[tokio::test]
+    async fn send_and_cancel_share_durable_admission_and_expiry_cleanup() {
+        let source = Source::new();
+        let log = source
+            .sender
+            .submission_storage
+            .join("tui-v2-submissions.json");
+        let expired = [Uuid::new_v4().to_string(), Uuid::new_v4().to_string()];
+        std::fs::write(
+            &log,
+            serde_json::to_vec(&json!({"account_id":source.binding.account_id,
+            "environment_id":source.binding.environment_id,"committed":{(&expired[0]):1},
+            "cancelled":{(&expired[1]):1}}))
+            .unwrap(),
+        )
+        .unwrap();
+        set_permissions(&log, Permissions::from_mode(0o600)).unwrap();
+        let identity = source.identity();
+        let record = |terminal| {
+            submission_log::consume(
+                &source.sender.submission_storage,
+                &source.binding,
+                &identity.reservation_id,
+                identity.deadline_unix_ms,
+                terminal,
+            )
+        };
+        let (sent, cancelled) = tokio::join!(
+            record(submission_log::Terminal::Submitted),
+            record(submission_log::Terminal::Cancelled)
+        );
+        let sent = sent.unwrap();
+        assert_ne!(sent, cancelled.unwrap());
+        let disk: Value = serde_json::from_slice(&std::fs::read(log).unwrap()).unwrap();
+        let (winner, loser) = if sent {
+            ("committed", "cancelled")
+        } else {
+            ("cancelled", "committed")
+        };
+        assert_eq!(
+            disk[winner],
+            json!({(&identity.reservation_id): identity.deadline_unix_ms})
+        );
+        assert_eq!(disk[loser], json!({}));
+    }
+
+    /// 存储失效时不给出已取消的确认。@return 无。
+    #[tokio::test]
+    async fn cancel_requires_writable_private_storage() {
+        let source = Source::new();
+        set_permissions(
+            &source.sender.submission_storage,
+            Permissions::from_mode(0o750),
+        )
+        .unwrap();
+        assert!(matches!(
+            source.cancel(&source.identity()).await,
+            Err(AppError::ServiceUnavailable(_))
+        ));
+    }
+}

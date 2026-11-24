@@ -19,6 +19,7 @@ pub mod request_records_schema;
 pub mod scheduling_store;
 pub mod settings_store;
 pub mod token_store;
+pub mod tui_backend_schema;
 pub mod usage_history_schema;
 pub mod usage_store;
 
@@ -26,3 +27,6 @@ pub mod proxy_sync_schema;
 
 pub mod session_policy_block_schema;
 pub mod session_policy_block_store;
+
+#[cfg(test)]
+mod tui_backend_tests;

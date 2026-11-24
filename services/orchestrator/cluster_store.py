@@ -306,6 +306,19 @@ class ClusterStore:
         finally:
             connection.close()
 
+    def cc_draining(self, account_id: int, revision: int) -> bool:
+        """确认 CC 原分配仍可接收原轮。@param account_id 编排账号。@param revision 原分配。@return 是否尚未隔离。"""
+        connection = self.database()
+        try:
+            return connection.execute(
+                "SELECT 1 FROM node_migrations WHERE account_id=? "
+                "AND phase IN ('requested','reconcile') AND json_extract(record_json,'$.last_confirmed_phase')='requested' "
+                "AND json_extract(record_json,'$.source_revision')=? "
+                "AND COALESCE(json_extract(record_json,'$.checkpoints.cancellation.before_fence'),0)=0",
+                (account_id, revision)).fetchone() is not None
+        finally:
+            connection.close()
+
     def assign_unstarted(self, account_id: int, node_id: int, revision: int) -> dict:
         """在短事务内分配尚未产生运行资料的账号，已有实例须迁移。
 

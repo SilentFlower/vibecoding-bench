@@ -13,6 +13,39 @@ from unittest.mock import patch
 class NativeCaptureTests(unittest.TestCase):
     """用合成快照验证归属、链接和读取边界。"""
 
+    def test_tui_provider_capture_excludes_unobserved_tls(self):
+        """回环请求按账号读取；将该阶段伪记为实际 TLS 的文件拒绝显示。@return 无。"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            folder = root / 'flows/api/cc-prepared'
+            folder.mkdir(parents=True)
+            attempt = str(uuid.uuid4())
+            now = int(time.time() * 1000)
+            stage = {'stage': 'tui_provider_request', 'status': 'complete', 'source': 'tui_sender_http',
+                     'representation': 'http_request_to_local_provider'}
+            item = {'schema_version': 1, 'stage': stage['stage'], 'account_id': 3, 'attempt_id': attempt,
+                    'captured_at_ms': now, 'body': '{}', 'headers': [], 'body_truncated': False,
+                    'headers_truncated': False, 'original_body_bytes': 2, 'original_body_sha256': '0'*64,
+                    'ingress': {'status':'complete','body':'{}','headers':[],'captured_at_ms':now,
+                                'body_truncated':False,'headers_truncated':False,'original_body_bytes':2,
+                                'original_body_sha256':'0'*64},
+                    'stages': [{'stage':'ingress','status':'complete','source':'gateway_http_ingress',
+                                'representation':'http_logical_bytes'}, stage,
+                               {'stage':'wire_final','status':'unavailable','source':'unavailable',
+                                'representation':'unavailable'}]}
+            path = folder / (attempt + '.json')
+            path.write_text(json.dumps(item))
+            self.assertEqual(read_capture(root, 3, attempt), item)
+            with self.assertRaises(ValueError):
+                read_capture(root, 4, attempt)
+            for key, value in [('source', 'native_tls_uprobe'), ('status','complete')]:
+                with self.subTest(key=key):
+                    changed = json.loads(json.dumps(item))
+                    changed['stages'][-1][key] = value
+                    path.write_text(json.dumps(changed))
+                    with self.assertRaises(ValueError):
+                        read_capture(root, 3, attempt)
+
     def test_protected_rejected_capture_is_readable_and_expires(self):
         """拒绝证据沿原归属与七天期限读取，后台清理识别独立文件名。@return None。"""
         with tempfile.TemporaryDirectory() as temporary:

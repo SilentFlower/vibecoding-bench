@@ -4,6 +4,7 @@ import json
 import os
 import uuid
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 
 from runtime_files import atomic_json, directory_fd
 from system_update_contract import safe_read, strict_json
@@ -45,8 +46,18 @@ def read_policy(runtime, row: dict) -> dict | None:
     :param row: 当前环境行。
     :return: 已验证策略或None；损坏与错误归属拒绝使用。
     """
+    return read_policy_at(runtime._root(row), row)
+
+
+def read_policy_at(environment: Path, row: dict) -> dict | None:
+    """读取已核验环境目录中的私有 CPU 策略。
+
+    :param environment: 调用方已核验归属的环境目录。
+    :param row: 当前环境及账号标识。
+    :return: 已验证策略或 None。
+    """
     try:
-        value = strict_json(safe_read(runtime._root(row) / 'runtime/cpu-resources.json', 8192, private=True), 8192)
+        value = strict_json(safe_read(environment / 'runtime/cpu-resources.json', 8192, private=True), 8192)
     except FileNotFoundError:
         return None
     if (set(value) != {'schema_version', 'environment_id', 'account_id', 'revision', 'nano_cpus'}
