@@ -95,33 +95,44 @@ def _legacy_tool_history(contents, tool_names):
     aliases = Counter(result['name'] for group in results for _, result in group if isinstance(result.get('name'), str))
     normalized = list(contents)
     legacy_history = False
+
+    def recoverable(call, result, parallel):
+        """检查旧客户端的结果别名能否唯一标记该调用。"""
+        alias = result.get('name')
+        if ('id' in call or 'id' in result or not isinstance(alias, str)
+                or alias in names or alias in ids or aliases[alias] != 1):
+            return False
+        if LEGACY_TOOL_ID.fullmatch(alias):
+            return True
+        if parallel:
+            return False
+        short = LEGACY_SHORT_ID.fullmatch(alias)
+        # 纯字母短码也可能是真实函数名，需要同一历史中此前的旧式回填作为依据。
+        return bool(LEGACY_UUID_ID.fullmatch(alias)
+                    or short and (legacy_history or any(character.isdigit() for character in alias)))
+
     for index in range(len(contents) - 1):
-        if len(calls[index]) != 1 or len(results[index + 1]) != 1:
+        batch, replies = calls[index], results[index + 1]
+        if not batch or len(batch) != len(replies):
             continue
         left, right = contents[index:index + 2]
         if left.get('role') != 'model' or right.get('role', 'user') != 'user':
             continue
-        call_index, call = calls[index][0]
-        result_index, result = results[index + 1][0]
-        alias = result.get('name')
-        if ('id' in call or 'id' in result or not isinstance(alias, str)
-                or alias in names or alias in ids or aliases[alias] != 1):
+        parallel = len(batch) > 1
+        # 没有显式 ID 时，只有同名组能沿已有的组内顺序配对。异名工具的结果允许交错。
+        if parallel and any(call.get('name') != batch[0][1].get('name') for _, call in batch):
             continue
-        short = LEGACY_SHORT_ID.fullmatch(alias)
-        anchored = (LEGACY_TOOL_ID.fullmatch(alias) or LEGACY_UUID_ID.fullmatch(alias)
-                    or short and any(character.isdigit() for character in alias))
-        # 纯字母短码也可能是真实函数名，只有此前已识别出同一请求的旧式回填才恢复。
-        if not anchored and not (short and legacy_history):
+
+        if not all(recoverable(call, result, parallel) for (_, call), (_, result) in zip(batch, replies)):
             continue
-        legacy_history |= bool(anchored)
-        # 只有观测到的一对一旧格式能恢复；公开入站和活跃工具轮的原始身份继续保留。
-        for offset, part_index, field, value in (
-            (index, call_index, 'functionCall', {**call, 'id': alias}),
-            (index + 1, result_index, 'functionResponse', {**result, 'id': alias, 'name': call.get('name')}),
-        ):
-            parts = list(contents[offset]['parts'])
-            parts[part_index] = {**parts[part_index], field: value}
-            normalized[offset] = {**contents[offset], 'parts': parts}
+        legacy_history = True
+        call_parts, result_parts = list(left['parts']), list(right['parts'])
+        for (ci, call), (ri, result) in zip(batch, replies):
+            alias = result['name']
+            call_parts[ci] = {**call_parts[ci], 'functionCall': {**call, 'id': alias}}
+            result_parts[ri] = {**result_parts[ri], 'functionResponse': {**result, 'id': alias, 'name': call.get('name')}}
+        normalized[index] = {**left, 'parts': call_parts}
+        normalized[index + 1] = {**right, 'parts': result_parts}
     return normalized
 
 
@@ -175,8 +186,8 @@ def native_history(contents, tool_names=(), gif=None, *, native_model):
         response=[];thinking=[];calls=[];thinking_signature=None;media=[]
         for j,part in enumerate(parts):
             location=path+'/parts/'+str(j);checked_fields(part,{'text','thought','thoughtSignature','functionCall','functionResponse','inlineData','inline_data'},location)
-            if (not part and role == 'model' and j == 0 and len(parts) == 2
-                    and isinstance(parts[1], dict) and 'functionCall' in parts[1]):
+            if (not part and role == 'model' and j == 0 and len(parts) > 1
+                    and all(isinstance(item, dict) and 'functionCall' in item for item in parts[1:])):
                 # 保留 Part 原位，避免合成调用 ID 和校验错误路径中的索引左移。
                 continue
             image = media_part(part, location, role, gif)
