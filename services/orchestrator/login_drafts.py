@@ -83,23 +83,25 @@ class LoginDraftStore:
         """
         connection = self.database()
         try:
-            api_environments = set()
+            # 已退役的正式环境保留历史行和个人文件，旧标记也不能把它变回草稿。
+            excluded = {row[0] for row in connection.execute(
+                "SELECT environment_id FROM account_environments WHERE state='retired'")}
             if connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='platform_api_environments'").fetchone():
-                api_environments = {row[0] for row in connection.execute("SELECT environment_id FROM platform_api_environments")}
+                excluded.update(row[0] for row in connection.execute("SELECT environment_id FROM platform_api_environments"))
             # API 专用环境没有任务账号 ID，正式归属以平台映射为准。
             rows = {row["environment_id"]: dict(row) for row in connection.execute(
-                "SELECT * FROM account_environments WHERE account_id IS NULL") if row["environment_id"] not in api_environments}
+                "SELECT * FROM account_environments WHERE account_id IS NULL") if row["environment_id"] not in excluded}
             if connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='node_login_drafts'").fetchone():
                 for row in connection.execute("SELECT e.* FROM account_environments e JOIN node_login_drafts d "
                         "ON d.environment_id=e.environment_id WHERE d.phase<>'closed' AND d.saved_account_id IS NOT NULL"):
-                    if row['environment_id'] not in api_environments:
+                    if row['environment_id'] not in excluded:
                         rows[row['environment_id']]=dict(row)
         finally:
             connection.close()
         if self.directory.is_symlink():
             raise ValueError("草稿目录归属异常")
         for path in self.directory.glob("*.json"):
-            if path.stem not in rows and path.stem not in api_environments:
+            if path.stem not in rows and path.stem not in excluded:
                 if not re.fullmatch(r"[a-f0-9]{32}", path.stem):
                     continue
                 try:
@@ -133,7 +135,9 @@ class LoginDraftStore:
             row = connection.execute("SELECT * FROM account_environments WHERE environment_id=?", (environment_id,)).fetchone()
         finally:
             connection.close()
-        return dict(row) if row else next((row for row in self.rows() if row["environment_id"] == environment_id), None)
+        if row:
+            return None if row["state"] == "retired" else dict(row)
+        return next((item for item in self.rows() if item["environment_id"] == environment_id), None)
 
     def guard(self, row: dict, generation: str | None = None, allow_submitting: bool = False,
               allow_reconcile: bool = False) -> dict:

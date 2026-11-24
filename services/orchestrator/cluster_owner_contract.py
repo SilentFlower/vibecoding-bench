@@ -145,3 +145,8 @@ class OwnerReceipt(BaseModel):
     scope:OwnerScope
     phase:Literal['preparing','published']='preparing'
     stopped:StrictBool=False
+    environment_removed:StrictBool=False
+
+    def wire(self) -> dict:
+        """仅在实际完成退休时扩展回执，使普通交接兼容旧中央。@return 节点公开回执。"""
+        return self.model_dump(exclude=set() if self.environment_removed else {'environment_removed'})

@@ -54,6 +54,8 @@ class AgyMigrationCoordinator(MigrationCoordinator):
             raise ValueError('AGY 账号归属已变化或迁移目标与当前节点相同')
         nodes = {'source_node_id': original['node_id'], 'target_node_id': request.node_id}
         with self.service.migration_nodes(nodes), self.placement.current(account_id) as (row, assignment):
+            if 'agy_account_deletion' in json.loads(row['fingerprint_json']):
+                raise ValueError('原 AGY 环境正在删除，请等待清理完成')
             if (assignment != original or row['generation'] < 1 or row['state'] not in ('ready', 'stopped')):
                 raise ValueError('AGY 当前运行环境需要确认后才能迁移')
             source, target = (self.service.store.get(nodes[key]) for key in ('source_node_id', 'target_node_id'))

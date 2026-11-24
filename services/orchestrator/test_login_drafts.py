@@ -379,6 +379,18 @@ class LoginDraftTests(unittest.TestCase):
         self.assertIsNone(environment["account_id"])
         self.assertEqual([row["name"] for row in main.list_login_drafts()], ["new-draft"])
 
+    def test_retired_account_with_stale_login_marker_keeps_its_home(self) -> None:
+        """工程账号退役后，旧草稿标记和旧删除请求均不能清理保留的资料。@return 无。"""
+        eid = self.row['environment_id']
+        atomic_json(self.root / 'login-drafts' / (eid + '.json'), {'phase': 'deleting', 'name': self.row['name']})
+        with self.database() as connection:
+            connection.execute("UPDATE account_environments SET state='retired',name=? WHERE environment_id=?", ('retired:' + eid, eid))
+        settings = self.envroot / 'home/.claude/settings.json'
+        settings.write_text('保留')
+        self.assertEqual(main.list_login_drafts(), [])
+        self.assertTrue(main.delete_login_draft(eid, 'legacy-1')['ok'])
+        self.assertEqual(settings.read_text(), '保留')
+
     def test_delete_is_complete_and_idempotent(self) -> None:
         """删除清理唯一容器、完整 HOME/profile 和数据库，重复不越界。@return None。"""
         profile = self.root / "profiles" / self.row["name"]

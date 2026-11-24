@@ -31,8 +31,10 @@ class PlatformFixture(AccountDesignFixture):
         self.selected_proxy = dict(id='synthetic-route', revision='synthetic-revision',
             name='新合成线路', public_url='socks5h://candidate.example.test:1080')
         now = int(time.time() * 1000)
+        self.accounts[0]['usage_data']['capabilities']['provider']['userTier'] = {'name': 'Google AI Ultra', 'id': 'g1-ultra-tier'}
+        self.accounts[1]['usage_data']['capabilities']['provider']['userTier'] = 'Google AI Pro'
         self.accounts[0]['usage_data']['platform_quota'] = {
-            'status': 'ok', 'plan': '演示 Pro', 'checked_at_ms': now,
+            'status': 'ok', 'plan': 'Pro', 'tier': 'Google AI Ultra', 'checked_at_ms': now,
             'groups': {'observed_at_ms': now, 'items': [{'name': 'Gemini Pro', 'windows': [
                 {'id': 'pro-5h', 'period': '5h', 'remaining_fraction': 0, 'reset_at': '2099-01-01T05:00:00Z'},
                 {'id': 'pro-week', 'period': 'weekly', 'remaining_fraction': None, 'reset_at': None},
@@ -96,6 +98,8 @@ async def main():
         first = page.locator('.account-card').filter(has_text='AGY账号1')
         second = page.locator('.account-card').filter(has_text='AGY账号2')
         await expect(first.locator('.account-usage-windows')).to_have_count(0)
+        await expect(first.locator('.account-plan')).to_have_text('Ultra')
+        await expect(second.locator('.account-plan')).to_have_text('Pro')
         windows = first.locator('.agy-quota-window')
         await expect(windows.first).to_contain_text('5 小时')
         await expect(windows.first.locator('.agy-quota-value')).to_have_text('已用 100% · 剩余 0%')
@@ -146,8 +150,9 @@ async def main():
         await expect(dialog.locator('.agy-model-quotas')).to_contain_text('已用 60% · 剩余 40%')
         await expect(dialog.locator('.agy-model-quotas .usage-window-bar i')).to_have_css('background-color', await token_color(page, '--ui-color-warning'))
         await dialog.locator('summary').filter(has_text='套餐与来源').click()
-        await expect(dialog.locator('.account-provider-details')).to_contain_text('演示 Pro')
-        await expect(dialog.locator('.account-provider-details')).to_contain_text('合成分级')
+        await expect(dialog.locator('.account-plan')).to_have_text('Ultra')
+        await expect(dialog.locator('.account-provider-details')).to_contain_text('Pro')
+        await expect(dialog.locator('.account-provider-details')).to_contain_text('Google AI Ultra')
         await expect(dialog.locator('.account-provider-details pre')).to_have_count(0)
         # 工作区页签为分段控件（role=radio）；反重力账号同样有调度页签，概览「调度详情」可进入。
         await expect(dialog.locator('.account-workspace-tabs').get_by_role('radio',name='环境与诊断',exact=True)).to_have_count(1)
@@ -209,6 +214,19 @@ async def main():
         await page.get_by_role('combobox',name='平台筛选').click()
         await page.get_by_role('option',name='Antigravity',exact=True).click()
         await expect(page.locator('.account-card')).to_have_count(2)
+        # 同一个自定义账号名下覆盖旧快照和缺失值，避免名称本身影响订阅标签。
+        old_data = fixture.accounts[1]['usage_data']
+        old_data['capabilities']['provider'] = {}
+        old_data['platform_quota'] = {'status':'partial','checked_at_ms':0,'tier':'Google AI Ultra','plan':'Pro'}
+        await page.reload()
+        await expect(second.locator('.account-plan')).to_have_text('Ultra')
+        old_data['platform_quota']['tier'] = '  '
+        await page.reload()
+        await expect(second.locator('.account-plan')).to_have_text('Pro')
+        del old_data['platform_quota']
+        await page.reload()
+        await expect(second).to_be_visible()
+        await expect(second.locator('.account-plan')).to_have_count(0)
         await page.set_viewport_size({'width':390,'height':844})
         await first.get_by_role('button',name='编辑',exact=True).click()
         assert await dialog.evaluate('e=>e.scrollWidth<=e.clientWidth+1')

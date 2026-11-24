@@ -13,7 +13,7 @@ from account_isolation import ISOLATION_VERSION, ROLE_COLUMNS
 from account_runtime import RuntimeCapacityUnavailable
 from account_update_identity import configured_release
 from agy_capacity import CapacityError, _receipt as capacity_receipt, change_capacity
-from agy_environment import BackgroundPreparationDeferred, INITIAL_PREPARATION, background_wake, lookup, register, summary, transport
+from agy_environment import BackgroundPreparationDeferred, INITIAL_PREPARATION, background_wake, lookup, register, stop_environment, summary, transport
 from agy_node import AgyNode
 from agy_node_contract import AgyLocation, AgyPreparation
 from cluster_deployment import node_container_name
@@ -76,6 +76,8 @@ class AgyPlacement:
                 raise ValueError('AGY 网关凭据或账号尚未就绪')
             register(self.runtime, account_id)
         with self.current(account_id) as (row, assignment):
+            if 'agy_account_deletion' in json.loads(row['fingerprint_json']):
+                raise ValueError('AGY 原账号正在删除')
             if background:
                 if assignment['phase'] != 'ready':
                     raise BackgroundPreparationDeferred('node_transition')
@@ -150,6 +152,10 @@ class AgyPlacement:
         current = self.store.agy_assignment(row['gateway_account_id'])
         if any(current[key] != assignment[key] for key in ('node_id', 'revision', 'phase')):
             raise ValueError('AGY 环境准备期间节点归属已变化')
+        if 'agy_account_deletion' in before:
+            # 节点镜像只返回运行指纹，中央删除意图直到账号提交和归档都必须可恢复。
+            after['agy_account_deletion'] = before['agy_account_deletion']
+            actual = {**actual, 'fingerprint_json':json.dumps(after)}
         self.runtime._update(row, **{key: actual[key] for key in (
             'fingerprint_json', 'generation', 'state', 'isolation_version', *ROLE_COLUMNS.values())})
 
@@ -288,23 +294,95 @@ class AgyPlacement:
                 # 活动缩容或暂时失联保留原回执，后续周期继续核对。
                 continue
 
-    def reconcile_retired(self) -> None:
-        """收口已删除账号留下的 SSH 归属。@return 无。"""
-        candidates = self.store.agy_retirement_candidates()
-        if not candidates:
+    def prepare_deletion(self, account_id: int, proof: dict) -> None:
+        """在原许可内记录删除目标，然后清空所属节点。@param account_id 网关账号。@param proof 网关租约与可选的重试环境。@return 无。"""
+        expected = proof.get('environment_id')
+        if lookup(self.runtime, account_id) is None:
+            if expected is not None:
+                raise ValueError('原 AGY 删除环境已经变化')
             return
-        present = {row['id'] for row in self.runtime.gateway.list_accounts(require_complete=True, platform='antigravity')}
-        for candidate in candidates:
-            account_id = candidate['account_id']
-            if account_id in present:
-                continue
+        with self.current(account_id) as (row, assignment):
+            scope = self.scope(row, assignment)
+            fingerprint = json.loads(row['fingerprint_json'])
+            intent = fingerprint.get('agy_account_deletion')
+            if (assignment['phase'] != 'ready' or expected is not None and (expected != row['environment_id'] or intent is None)
+                    or intent is not None and intent != scope):
+                raise ValueError('原 AGY 删除范围已经变化')
+            with self._maintenance(account_id, proof):
+                if intent is None:
+                    fingerprint['agy_account_deletion'] = scope
+                    self.runtime._update(row, fingerprint_json=json.dumps(fingerprint))
+                if not self._removed(row, scope):
+                    self._remove_deletion_roles(row, assignment)
+                    fingerprint = json.loads(row['fingerprint_json'])
+                    fingerprint['agy_removed_generation'] = row['generation']
+                    self.runtime._update(row, fingerprint_json=json.dumps(fingerprint))
+
+    @staticmethod
+    def _removed(row, scope):
+        fingerprint = json.loads(row['fingerprint_json'])
+        return (fingerprint.get('agy_account_deletion') == scope
+            and fingerprint.get('agy_removed_generation') == row['generation']
+            and row['state'] == 'stopped' and not any(row.get(column) for column in ROLE_COLUMNS.values()))
+
+    def _remove_deletion_roles(self, row, assignment):
+        if assignment['kind'] == 'local':
+            if self.runtime._running_sender_active(row):
+                raise ValueError('AGY 原发送器仍有活动，等待删除重试')
+            stop_environment(self.runtime, row, remove=True)
+            self.runtime.remove_retired_work_files(row)
+            return
+        actual = self.exact(row, assignment, 'agy-control', action='retire', body={})['environment']
+        if (any(actual.get(k) != row[k] for k in ('gateway_account_id','platform','environment_id','generation','account_id'))
+                or actual.get('state') != 'stopped' or any(actual[k] is not None for k in ROLE_COLUMNS.values())):
+            raise ValueError('AGY 删除回执与原环境或角色移除结果不一致')
+        self._mirror(row, assignment, actual)
+
+    def finish_deletion(self, account_id: int, *, visible: set[int] | None = None) -> bool:
+        """核实已删除账号的原环境并归档，重试沿同一持久归属。@param account_id 网关账号。@param visible 本轮完整账号列表。@return 是否存在并已归档。"""
+        if lookup(self.runtime, account_id) is None:
+            return False
+        with self.current(account_id) as (row, assignment):
+            intent = json.loads(row['fingerprint_json']).get('agy_account_deletion')
+            if intent is not None and intent != self.scope(row, assignment):
+                raise ValueError('原删除回执的节点或代次已变化')
+            if assignment['phase'] == 'retired':
+                return True
+            if assignment['phase'] != 'ready':
+                raise ValueError('AGY 环境归属正在变更，请重试原删除')
+            if visible is None:
+                visible = {item['id'] for item in self.runtime.gateway.list_accounts(require_complete=True, platform='antigravity')}
+            if account_id in visible:
+                return False
             try:
                 self.configuration(account_id)
             except ValueError as error:
-                # 完整列表用于筛选，单账号 404 确认删除，避免分页移动掩盖有效账号。
                 cause = error.__cause__
-                if isinstance(cause, HTTPError) and cause.code == 404:
-                    self.store.retire_agy_assignment(candidate)
-            except (RuntimeError, OSError):
-                # 原网关失联时保留归属，由后续清理周期重新核对。
+                if not isinstance(cause, HTTPError) or cause.code != 404:
+                    raise
+            else:
+                return False
+            # 凭据副本清理也需要原代回执，只有停止状态的旧记录仍需到所属节点核验。
+            if not self._removed(row, self.scope(row, assignment)):
+                self._remove_deletion_roles(row, assignment)
+            candidate = {**assignment, 'environment_id': row['environment_id'], 'generation': row['generation']}
+            if not self.store.retire_agy_assignment(candidate):
+                raise ValueError('AGY 环境清理回执已变化，请重试原删除')
+            return True
+
+    def reconcile_retired(self) -> None:
+        """恢复网关提交后中断的删除，节点暂时失联时保留原归属。@return 无。"""
+        candidates = self.store.agy_retirement_candidates()
+        if not candidates:
+            return
+        visible = {row['id'] for row in self.runtime.gateway.list_accounts(require_complete=True, platform='antigravity')}
+        for candidate in candidates:
+            account_id = candidate['account_id']
+            try:
+                if account_id not in visible:
+                    self.finish_deletion(account_id, visible=visible)
+                elif candidate.get('pending'):
+                    # 回调网关时不持环境锁，网关重新取得维护许可并核对原环境。
+                    self.runtime.gateway._request('DELETE', f"/admin/accounts/{account_id}?environment_id={candidate['environment_id']}")
+            except (ValueError, RuntimeError, OSError, DockerException):
                 continue

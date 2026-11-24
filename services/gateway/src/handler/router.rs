@@ -1372,6 +1372,15 @@ pub(super) async fn config_permit(
     account: &Account,
     force: bool,
 ) -> Result<Option<RuntimeConfigPermit>, AppError> {
+    config_permit_for(state, account, force, None).await
+}
+
+async fn config_permit_for(
+    state: &AppState,
+    account: &Account,
+    force: bool,
+    deletion: Option<&DeletionSelector>,
+) -> Result<Option<RuntimeConfigPermit>, AppError> {
     if account.is_antigravity() {
         if state.account_svc.agy_state(account.id).await?["phase"] != "ready" {
             return Err(AppError::BadRequest("AGY 原凭据操作待核对".into()));
@@ -1406,7 +1415,7 @@ pub(super) async fn config_permit(
             .unwrap_or_default()
             .is_empty()
     {
-        runtime_bridge::quiesce(account.id, &permit.lease).await?;
+        runtime_bridge::quiesce(account.id, &permit.lease, deletion).await?;
     }
     Ok(Some(permit))
 }
@@ -1848,13 +1857,39 @@ async fn resolve_oauth_credentials(
     }))
 }
 
+/// 后台重试携带的原运行环境，普通人工删除沿当前账号解析。
+#[derive(Deserialize)]
+pub(crate) struct DeletionSelector {
+    pub(crate) environment_id: Option<String>,
+}
+
 async fn delete_account(
     State(state): State<AppState>,
     Path(id): Path<i64>,
+    Query(selector): Query<DeletionSelector>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let account = state.account_svc.get_account(id).await?;
-    let _runtime_permit = config_permit(&state, &account, false).await?;
+    let account = match state.account_svc.get_account(id).await {
+        Ok(account) => account,
+        // 网关提交成功后可能丢失节点响应，重复删除继续核对原 AGY 归属。
+        Err(AppError::NotFound) if runtime_bridge::finish_agy_deletion(id).await? => {
+            return Ok(Json(serde_json::json!({"status": "deleted"})));
+        }
+        Err(error) => return Err(error),
+    };
+    if selector.environment_id.is_some() && !account.is_antigravity() {
+        return Err(AppError::BadRequest("删除重试的账号平台已变化".into()));
+    }
+    let _runtime_permit = config_permit_for(
+        &state,
+        &account,
+        false,
+        account.is_antigravity().then_some(&selector),
+    )
+    .await?;
     state.account_svc.delete_account(id).await?;
+    if account.is_antigravity() {
+        runtime_bridge::finish_agy_deletion(id).await?;
+    }
     Ok(Json(serde_json::json!({"status": "deleted"})))
 }
 

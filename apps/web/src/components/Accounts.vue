@@ -367,11 +367,7 @@ function changeWorkspaceTab(tab: typeof workspaceTab.value): void {
 const detailAccount = computed(() => accounts.value.find(account => account.id === detailAccountId.value) ?? null);
 const overviewCapabilities = computed(() => detailAccount.value?.usage_data?.capabilities);
 const overviewQuota = computed(() => detailAccount.value?.usage_data?.platform_quota);
-const overviewAgyTier = computed(() => {
-  const tier = overviewCapabilities.value?.provider?.userTier;
-  const name = typeof tier === 'string' ? tier : tier && typeof tier === 'object' && 'name' in tier ? tier.name : null;
-  return overviewQuota.value?.tier ?? (typeof name === 'string' && name.trim() ? name.trim() : null);
-});
+const overviewAgyTier = computed(() => detailAccount.value && agySubscriptionTier(detailAccount.value));
 const overviewAgySource = computed(() => {
   const nativeVersion = detailAccount.value && agyVersion(detailAccount.value);
   return nativeVersion ? `Antigravity ${nativeVersion} 原生观测` : '未观测';
@@ -382,10 +378,22 @@ function agyVersion(account: Account): string | undefined {
   return account.usage_data?.capabilities?.source?.match(/^agy:([\d.]+):native$/)?.[1];
 }
 
+/**
+ * 读取原生用户档位。额度快照仍可为历史账号提供档位名称。
+ * @param account 当前反重力账号。
+ * @return 观测到的用户订阅档位。
+ */
+function agySubscriptionTier(account: Account): string | null {
+  const tier = account.usage_data?.capabilities?.provider?.userTier;
+  const name = typeof tier === 'object' && tier !== null && 'name' in tier ? tier.name : tier;
+  return (typeof name === 'string' && name.trim()) || account.usage_data?.platform_quota?.tier?.trim() || null;
+}
+
 /** 使用平台实际可读的套餐标签。@param account 当前账号。@return 精简标签。 */
 function cardPlan(account: Account): string | null {
   if (account.platform !== 'antigravity') return subscriptionLabel(account.subscription_type, account.rate_limit_tier);
-  return account.usage_data?.platform_quota?.plan?.replace(/^Google AI /i, '') || null;
+  const label = agySubscriptionTier(account) || account.usage_data?.platform_quota?.plan?.trim();
+  return label?.replace(/^Google AI\s+/i, '') || null;
 }
 
 /** 格式化当前调度模式的评分。@param account 账号调度快照。@return 带模式的紧凑评分文字。 */
@@ -1508,8 +1516,8 @@ async function copyText(text: string) {
             <details class="account-capability-details">
               <summary>套餐与来源<ChevronRight :size="14" /></summary>
               <dl class="account-provider-details">
-                <div><dt>套餐</dt><dd>{{ overviewQuota?.plan || '未提供' }}</dd></div>
-                <div><dt>账号分级</dt><dd>{{ overviewAgyTier || '未提供' }}</dd></div>
+                <div><dt>平台计划</dt><dd>{{ overviewQuota?.plan || '未提供' }}</dd></div>
+                <div><dt>订阅档位</dt><dd>{{ overviewAgyTier || '未提供' }}</dd></div>
                 <div><dt>来源</dt><dd>{{ overviewAgySource }}</dd></div>
               </dl>
             </details>

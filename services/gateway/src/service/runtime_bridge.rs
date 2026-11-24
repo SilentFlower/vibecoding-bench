@@ -21,7 +21,7 @@ use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use uuid::Uuid;
 
 use crate::error::AppError;
-use crate::handler::router::AppState;
+use crate::handler::router::{AppState, DeletionSelector};
 use crate::model::proxy::ProxySyncTarget;
 use crate::service::runtime_lease::RuntimeLease;
 use crate::service::runtime_transport::{PreparedTransport, TransportBinding};
@@ -195,12 +195,23 @@ pub(crate) fn publish_agy_ingress(
 /// @param account_id 修改的账号 ID。
 /// @param lease 当前配置事务的门禁证明。
 /// @return 空闲实例已停止；忙或未知时拒绝修改。
-pub async fn quiesce(account_id: i64, lease: &RuntimeLease) -> Result<(), AppError> {
+pub(crate) async fn quiesce(
+    account_id: i64,
+    lease: &RuntimeLease,
+    deletion: Option<&DeletionSelector>,
+) -> Result<(), AppError> {
     let (base, token, client) = config()?;
+    let mut proof = json!({"owner":lease.owner, "generation":lease.generation});
+    let path = if let Some(selector) = deletion {
+        proof["environment_id"] = json!(selector.environment_id);
+        format!("{base}/internal/v3/agy-environments/{account_id}/prepare-deletion")
+    } else {
+        format!("{base}/internal/v3/quiesce/{account_id}")
+    };
     let response = client
-        .post(format!("{base}/internal/v3/quiesce/{account_id}"))
+        .post(path)
         .bearer_auth(token)
-        .json(&serde_json::json!({"owner": lease.owner, "generation": lease.generation}))
+        .json(&proof)
         .timeout(Duration::from_secs(20))
         .send()
         .await
@@ -211,6 +222,34 @@ pub async fn quiesce(account_id: i64, lease: &RuntimeLease) -> Result<(), AppErr
         ));
     }
     Ok(())
+}
+
+/// 在账号删除事务提交后确认 AGY 专属环境已退役，失败可重试原账号。
+/// @param account_id 原网关账号。
+/// @return 是否命中并完成一个受管环境。
+pub(crate) async fn finish_agy_deletion(account_id: i64) -> Result<bool, AppError> {
+    if std::env::var("V3_RUNTIME_URL")
+        .unwrap_or_default()
+        .is_empty()
+    {
+        return Ok(false);
+    }
+    let (base, token, client) = config()?;
+    let pending = || AppError::ServiceUnavailable("反重力账号环境清理待重试".into());
+    let result: Value = client
+        .post(format!(
+            "{base}/internal/v3/agy-environments/{account_id}/retirement"
+        ))
+        .bearer_auth(token)
+        .timeout(Duration::from_secs(20))
+        .send()
+        .await
+        .and_then(|response| response.error_for_status())
+        .map_err(|_| pending())?
+        .json()
+        .await
+        .map_err(|_| pending())?;
+    result["retired"].as_bool().ok_or_else(pending)
 }
 
 /// 在所属编排器准备或收口并发变更。@param account_id 网关账号。@param operation_id 固定操作。@param before 原上限。@param target 新上限。@param phase 准备或收口。@return 同操作的生效回执。

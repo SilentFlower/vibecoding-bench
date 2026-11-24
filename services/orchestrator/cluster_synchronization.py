@@ -155,6 +155,62 @@ class NodeSynchronization:
         if not self.service.store.save_preparation(node_id, revision, state):
             raise ValueError('节点同步期间配置已变化')
 
+    def _cleanup_deleted_draft_roles(self, node_id, node_key, environment_id, containers):
+        """核对旧版已保存草稿的删除记录与实际停止容器。@param node_id 原节点。@param node_key 节点身份。@param environment_id 原环境。@param containers 本轮列出的角色。@return 是否已清理。"""
+        if not isinstance(environment_id, str) or not re.fullmatch('[a-f0-9]{32}', environment_id):
+            return False
+        connection = self.service.store.database()
+        try:
+            row = connection.execute("SELECT e.*,d.record_json,d.operation_id FROM account_environments e "
+                "JOIN node_login_drafts d ON d.environment_id=e.environment_id AND d.saved_account_id=e.account_id "
+                "LEFT JOIN accounts a ON a.id=e.account_id WHERE e.environment_id=? AND d.node_id=? "
+                "AND d.phase='closed' AND e.state='stopped' AND (a.id IS NULL OR a.deleted_at IS NOT NULL) "
+                "AND NOT EXISTS (SELECT 1 FROM account_node_assignments b WHERE b.account_id=e.account_id "
+                "AND (b.node_id<>d.node_id OR b.phase<>'ready'))", (environment_id,node_id)).fetchone()
+        finally:
+            connection.close()
+        if row is None:
+            return False
+        draft = json.loads(row['record_json'])
+        activation = draft.get('activation') or {}
+        request = activation.get('request') or {}
+        scope = request.get('scope') or {}
+        if (activation.get('phase') != 'activated' or request.get('account_id') != row['account_id']
+                or any(scope.get(k) != v for k,v in {'node_key':node_key,'environment_id':environment_id,
+                    'name':row['name'],'operation_id':row['operation_id']}.items())):
+            return False
+        labels = {'vibebench.product':'v3', 'vibebench.deployment':self.runtime.deployment,
+            'vibebench.cluster-node':node_key, 'vibebench.environment':environment_id}
+        role_ids = {ROLE_LABELS[k]:row[column] for k,column in ROLE_COLUMNS.items()}
+        # 批量核验通过后才移除。中途断线时，剩余角色仍需分别匹配原始完整 ID。
+        for obj in containers:
+            obj.reload()
+            state = obj.attrs.get('State', {})
+            if (not obj.id or role_ids.get(obj.labels.get('vibebench.role')) != obj.id
+                    or any(obj.labels.get(k) != v for k,v in labels.items())
+                    or state.get('Running') is not False or state.get('Pid') != 0):
+                raise NodeSynchronizationWait('已删除账号的节点角色归属或实际停止状态待核对')
+        for obj in sorted(containers, key=lambda c: c.labels['vibebench.role'] == ROLE_LABELS['network']):
+            try:
+                obj.remove()
+            except NotFound:
+                pass
+        connection = self.service.store.database()
+        try:
+            with connection:
+                result = connection.execute("UPDATE account_environments SET account_id=NULL,name='retired:' || environment_id,"
+                    "state='retired',container_id=NULL,network_container_id=NULL,sender_container_id=NULL "
+                    "WHERE environment_id=? AND account_id=? AND name=? AND generation=? AND state='stopped' "
+                    "AND container_id IS ? AND network_container_id IS ? AND sender_container_id IS ? "
+                    "AND NOT EXISTS (SELECT 1 FROM accounts WHERE id=? AND deleted_at IS NULL)",
+                    (environment_id,row['account_id'],row['name'],row['generation'],row['container_id'],
+                     row['network_container_id'],row['sender_container_id'],row['account_id']))
+                if result.rowcount != 1:
+                    raise NodeSynchronizationWait('原账号的历史环境登记已变化，需要重新核对')
+        finally:
+            connection.close()
+        return True
+
     def _historical_environment(self, node, control: str, node_id: int, environment_id: str) -> bool:
         """核对终态迁移留下的停止副本。:param node: SSH连接。:param control: 原控制容器。:param node_id: 当前节点。:param environment_id: 历史环境。:return: 收据及实际停止证明是否一致。"""
         if not isinstance(environment_id, str) or not re.fullmatch('[a-f0-9]{32}', environment_id):
@@ -554,6 +610,16 @@ print(json.dumps({'paused':valid,'environment':root.exists()}))
                     known = {item['environment']['environment_id'] for item in job['accounts']}
                     fenced = {item['environment']['environment_id'] for item in job['accounts']
                         if str(item['account']['id']) in job['fences']}
+                    deleted = {item['environment']['environment_id'] for item in job['accounts']
+                        if item['account'].get('deleted_at') is not None}
+                    historical = {}
+                    for container in containers:
+                        env_id = container.labels.get('vibebench.environment')
+                        if env_id and (env_id not in known or env_id in deleted):
+                            historical.setdefault(env_id, []).append(container)
+                    removed = {env_id for env_id, group in historical.items()
+                        if self._cleanup_deleted_draft_roles(node_id, row['node_key'], env_id, group)}
+                    containers = [c for c in containers if c.labels.get('vibebench.environment') not in removed]
                     for container in containers:
                         if container.id != job['old_container'] and container.labels.get('vibebench.environment') not in known:
                             container.reload()

@@ -94,3 +94,32 @@
 - `agy_account_changes_recheck_prewarm_before_backoff_expires` 核对启停、重授权、换代理、账号删除和受控失败原因。`test_cancel_warm_wakes_the_capacity_waiter` 核对降容等待的取消和零模型提交。
 - `test_agy_supervisor` 验证数字为 1 的物理额度、旧工具轮优先及凭据换代。隔离 `verify_agy_prewarm.py` 核对首笔热命中、实际进程退出、换代、发送器正常重启、网关启动扫描及模型调用总数。
 - `verify_agy_environment_ui.py` 核对等待准备、容量原因、准备失败和真实热进程就绪文案。
+
+## 账号删除与专属环境退役
+
+### 1. 适用范围
+
+账号管理删除反重力网关账号，或工程账号页删除已保存的 Claude 账号时，按实际绑定和节点清理专属环境。
+
+### 2. 接口与登记
+
+- `DELETE /admin/accounts/{id}` 在配置租约内调用 `POST /internal/v3/agy-environments/{id}/prepare-deletion`。网关提交后调用同前缀的 `/retirement`。后台重试使用原 `environment_id`。
+- `DELETE /api/accounts/{aid}?environment_id={eid}` 接受账号页看到的不可变环境 ID。工程删除范围含账号、绑定、环境、节点、分配版本和运行代次。
+
+### 3. 资源与历史
+
+先记录范围，再由实际所有者移除 CLI、发送器和网络角色，清理运行凭据副本和进程检查点。个人 HOME 配置、项目和历史引用保留。工程环境的原行归档为 `state='retired'`，反重力保留平台映射并将节点分配标为 `retired`。单独解绑继续沿用凭据交接流程。
+
+### 4. 校验与失败
+
+- 节点断连或实际移除回执缺失时保留原范围，巡检重试。同名重建使用独立环境 ID。
+- 已归档的工程环境从账号环境列表和登录草稿中移出。对旧环境发起停止、重建或对账返回 404。已在等待环境锁的维护操作取得锁后重新核对归档状态。
+- 节点升级核对旧版已关闭草稿的保存及激活记录、已删除账号、所属节点、完整容器 ID、标签和实际停止状态。归属冲突时保留现场。
+
+### 5. 示例
+
+反重力删除中途节点断开，恢复连接后对原账号和代次继续清理。工程账号重新以同名保存后，旧页面重试删除原环境得到成功回执，新环境继续可用。用旧环境 ID 请求重建时，从当前账号页重新读取有效环境。
+
+### 6. 回归依据
+
+`test_deleted_binding`、`test_cluster_owner_node`、`test_agy_node_migration` 和 `test_cluster_synchronization` 核对数据保留、实际移除、重复删除和历史升级。用 `verify_agy_accounts_ui.py` 核对反重力卡片和详情标题依次采用原生 `userTier` 名称、额度快照 `tier`、旧 `plan`。详情分别标明订阅档位和平台计划。

@@ -48,7 +48,7 @@ class AgyControl(AgyLocation):
     """节点 AGY 管理操作。@param action 固定操作。@param body 原管理入参。"""
 
     action: Literal['capture-read', 'capture-set', 'cpu-read', 'cpu-set',
-        'kernel-read', 'kernel-set', 'stop', 'rebuild', 'reconcile', 'quiesce']
+        'kernel-read', 'kernel-set', 'stop', 'rebuild', 'reconcile', 'quiesce', 'retire']
     body: dict
 
 

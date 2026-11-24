@@ -14,7 +14,7 @@ use crate::store::db::{connect_sqlite, sqlite_connection_options};
 use crate::store::{
     account_platform_schema, account_work_schema, agy_media_schema, agy_safety_schema,
     agy_system_reminder_schema, agy_tool_receipts_schema, proxy_schema, proxy_sync_schema,
-    request_records_schema, session_policy_block_schema,
+    request_records_schema, session_policy_block_schema, usage_history_schema,
 };
 
 /// 返回初始迁移源码摘要，测试代码不进入持久合同。
@@ -41,6 +41,11 @@ fn registry() -> Result<Value, sqlx::Error> {
         return Err(sqlx::Error::Protocol("迁移定义与登记不符".into()));
     }
     for (index, step) in steps.iter().enumerate() {
+        if step["id"] == "gateway.usage-history.12"
+            && step["checksum"] != usage_history_schema::checksum()
+        {
+            return Err(sqlx::Error::Protocol("历史用量迁移定义与登记不符".into()));
+        }
         if step["id"] == "gateway.agy-tool-receipts.11"
             && step["checksum"] != agy_tool_receipts_schema::checksum()
         {
@@ -301,6 +306,9 @@ pub async fn plan(pool: &AnyPool, target: Option<usize>) -> Result<Value, sqlx::
     if rows.len() >= 11 {
         agy_tool_receipts_schema::verify(pool).await?;
     }
+    if rows.len() >= 12 {
+        usage_history_schema::verify(pool).await?;
+    }
     for step in &mut steps {
         step["state"] = json!(
             if step["version"].as_u64().unwrap_or(u64::MAX) <= rows.len() as u64 {
@@ -335,6 +343,7 @@ pub async fn migrate(pool: &AnyPool, driver: &str) -> Result<(), sqlx::Error> {
         agy_safety_schema::apply(&mut transaction, driver).await?;
         agy_system_reminder_schema::apply(&mut transaction, driver).await?;
         agy_tool_receipts_schema::apply(&mut transaction).await?;
+        usage_history_schema::apply(&mut transaction, driver).await?;
         transaction.commit().await?;
         return Ok(());
     }
@@ -379,7 +388,8 @@ pub async fn apply(
                 | "gateway.agy-media.8"
                 | "gateway.agy-safety.9"
                 | "gateway.agy-system-reminder.10"
-                | "gateway.agy-tool-receipts.11",
+                | "gateway.agy-tool-receipts.11"
+                | "gateway.usage-history.12",
             ) => {}
             _ => return Err(sqlx::Error::Protocol("迁移实现尚未登记".into())),
         }
@@ -416,6 +426,9 @@ pub async fn apply(
         }
         if step["id"] == "gateway.agy-tool-receipts.11" {
             agy_tool_receipts_schema::apply(&mut transaction).await?;
+        }
+        if step["id"] == "gateway.usage-history.12" {
+            usage_history_schema::apply(&mut transaction, "sqlite").await?;
         }
         sqlx::query("CREATE TABLE IF NOT EXISTS system_schema_migrations (migration_id TEXT PRIMARY KEY,version INTEGER NOT NULL UNIQUE,checksum TEXT NOT NULL,applied_at TEXT NOT NULL,operation_id TEXT NOT NULL)")
             .execute(&mut *transaction).await?;
@@ -480,8 +493,11 @@ pub async fn maintenance(arguments: &[String]) -> Result<Value, String> {
 #[cfg(test)]
 mod tests {
     use super::{apply, plan};
+    use crate::store::account_store::AccountStore;
     use crate::store::account_work_schema;
     use crate::store::database_schema::migrate_legacy;
+    use crate::store::usage_store::UsageStore;
+    use chrono::{Duration, SecondsFormat, Utc};
     use sqlx::AnyPool;
     use sqlx::any::{AnyPoolOptions, install_default_drivers};
     use uuid::Uuid;
@@ -493,6 +509,44 @@ mod tests {
             .connect("sqlite::memory:")
             .await
             .unwrap()
+    }
+
+    /// 旧库升级保留原明细，账号删除后仍可按原 ID 汇总，重复迁移与删除幂等。
+    #[tokio::test]
+    async fn deleted_account_retains_pre_upgrade_usage() {
+        let database = pool().await;
+        sqlx::query("PRAGMA foreign_keys=ON")
+            .execute(&database)
+            .await
+            .unwrap();
+        let operation = Uuid::new_v4().to_string();
+        apply(&database, &operation, Some(11)).await.unwrap();
+        sqlx::query("INSERT INTO accounts(id,email,token,device_id) VALUES(71,'history@example.test','fixture','fixture')")
+            .execute(&database).await.unwrap();
+        let now = Utc::now();
+        let started = (now - Duration::minutes(1)).to_rfc3339_opts(SecondsFormat::Millis, true);
+        sqlx::query("INSERT INTO usage_records VALUES('historic',71,$1,$1,'fixture',23,3,0,0,0,0,1.25,0,'v1')")
+            .bind(&started).execute(&database).await.unwrap();
+        apply(&database, &operation, None).await.unwrap();
+        let accounts = AccountStore::new(database.clone(), "sqlite".into());
+        let original = accounts.get_by_id(71).await.unwrap();
+        accounts.delete(71).await.unwrap();
+        accounts.delete(71).await.unwrap();
+        apply(&database, &operation, None).await.unwrap();
+        let history = UsageStore::new(database.clone())
+            .summaries(&[original], now)
+            .await
+            .unwrap();
+        for window in [&history[&71].five_hour, &history[&71].seven_day] {
+            assert_eq!(
+                (window.requests, window.tokens, window.cost_usd),
+                (1, 26, 1.25)
+            );
+        }
+        assert_eq!(
+            plan(&database, Some(11)).await.unwrap()["state"],
+            "compatible_newer"
+        );
     }
 
     /// 旧账号补齐关闭值，重复执行保留已保存的设置。
@@ -510,7 +564,7 @@ mod tests {
         let upgrade = apply(&database, &Uuid::new_v4().to_string(), None)
             .await
             .unwrap();
-        assert_eq!(upgrade["current_version"], 11);
+        assert_eq!(upgrade["current_version"], 12);
         let value: (i64, String, i32) = sqlx::query_as(
             "SELECT id,platform,agy_system_prompt_as_user_reminder FROM accounts WHERE id=17",
         )
@@ -563,7 +617,7 @@ mod tests {
         let result = apply(&database, &Uuid::new_v4().to_string(), None)
             .await
             .unwrap();
-        assert_eq!(result["current_version"], 11);
+        assert_eq!(result["current_version"], 12);
         let preserved: Vec<(String, String, String, String)> = sqlx::query_as(
             "SELECT migration_id,CAST(version AS TEXT),checksum,operation_id FROM system_schema_migrations WHERE version<=6 ORDER BY version",
         )
@@ -594,7 +648,7 @@ mod tests {
         let result = apply(&database, &Uuid::new_v4().to_string(), None)
             .await
             .unwrap();
-        assert_eq!(result["current_version"], 11);
+        assert_eq!(result["current_version"], 12);
         let duration: String = sqlx::query_scalar(
             "SELECT value FROM settings WHERE key='session_policy_block_duration_minutes'",
         )
@@ -632,7 +686,7 @@ mod tests {
         let result = apply(&database, &Uuid::new_v4().to_string(), None)
             .await
             .unwrap();
-        assert_eq!(result["current_version"], 11);
+        assert_eq!(result["current_version"], 12);
         let original: String =
             sqlx::query_scalar("SELECT operation_id FROM system_schema_migrations")
                 .fetch_one(&database)

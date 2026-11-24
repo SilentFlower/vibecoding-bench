@@ -195,7 +195,7 @@ class RemoteOwnerTests(unittest.TestCase):
         self.assertTrue(result['deleted'])
         with self.node.executor.database() as connection:
             self.assertEqual((None,0),tuple(connection.execute('SELECT cc2api_account_id,enabled FROM accounts WHERE id=1').fetchone()))
-            self.assertEqual(0,connection.execute('SELECT generation FROM account_environments WHERE account_id=1').fetchone()[0])
+            self.assertEqual((0,'retired',None),tuple(connection.execute('SELECT generation,state,account_id FROM account_environments WHERE environment_id=?',(environment,)).fetchone()))
         self.assertFalse((self.node.executor.data/'environments'/environment/'home').exists())
 
     def test_manual_disabled_account_can_enter_idle_migration_guard_without_enabling(self) -> None:

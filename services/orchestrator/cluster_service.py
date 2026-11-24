@@ -579,6 +579,9 @@ class ClusterService:
             raise ValueError('远程账号 profile 归属无效')
         row = runtime._row(name, account['id'], account.get('timezone'))
         with runtime.environment_lock(row['environment_id']):
+            row = runtime._row(name, account['id'], account.get('timezone'))
+            if 'account_deletion' in json.loads(row['fingerprint_json']):
+                raise RuntimeBusy('原工程账号正在删除')
             assignment = self.store.assignment(account['id'])
             if assignment['kind'] != 'ssh' or not assignment['enabled'] or assignment['phase'] != 'ready':
                 raise RuntimeBusy('远程节点尚未接单或正在维护')

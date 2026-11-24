@@ -44,18 +44,19 @@ SQLite 固定维护入口为 `claude-code-gateway database-migrations plan|apply
 ### 4. Validation & Error Matrix
 
 - SQLite 建连及回调成功时交付连接。回调执行失败按 SQLx 建连错误处理，出错连接不交给业务。
-- 删除账号或代理时，由对应 SQLite 外键清理关联子行。
+- 删除账号或代理时，凭据操作、调度绑定及代理同步记录按外键清理。SQLite 迁移 `gateway.usage-history.12` 和 PostgreSQL 启动迁移解除 `usage_records.account_id` 的账号外键。历史明细按原账号 ID 保留，继续使用八天的时间窗口。
 - 无效 SQLite DSN 返回配置或建连错误。离线只读查询遇目标文件缺失即失败。指向符号链接的离线请求返回「数据库维护路径无效」。
 
 ### 5. Scenarios and Examples
 
-- 多条连接在并发删除时各自执行外键约束。被替换连接的后继连接也执行约束。
+- 多条连接在并发删除时各自执行外键约束。被替换连接的后继连接也执行约束。例如删除账号后，用原账号 ID 汇总窗口内的请求、Token 和费用，结果与删除前一致。
 - 在池上执行一次外键 PRAGMA 只处理该次查询借到的连接。连接级设置放在 `after_connect`。
 - `sqlite:/data/nested%20name/gateway.sqlite` 以 `/data/nested name` 为父目录。用原始 URI 建目录会在当前工作目录留下字面量路径。
 
 ### 6. Tests Required
 
-- `sqlite_pool_enforces_foreign_keys_during_concurrent_deletes` 检查池中每条连接及替换连接的外键状态，在真实迁移后的库中并发删除账号与代理。断言其子行清空，其它实体的子行保留。
+- `sqlite_pool_enforces_foreign_keys_during_concurrent_deletes` 检查池中每条连接及替换连接的外键状态，在真实迁移后的库中并发删除账号与代理。断言相应凭据与调度子行清空，两个账号的历史用量均保留。
+- `deleted_account_retains_pre_upgrade_usage` 从第 11 版写入已计价明细，升级后重复删除和迁移，核对 5 小时及 7 天统计仍是同一条记录、26 Token 和 1.25 美元。
 - `sqlite_pool_creates_the_decoded_dsn_path` 检查带前缀及编码的实际落盘路径。`sqlite_migrations_resolve_dsn_before_opening_the_file` 运行真实离线 CLI，覆盖缺库只读失败、apply 创建及 verify、带前缀的符号链接拒绝。
 
 ## Settings Key 契约

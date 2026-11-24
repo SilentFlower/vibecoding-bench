@@ -60,17 +60,17 @@ class CpuResourceContractTests(unittest.TestCase):
             path = Path(temporary)/'state.sqlite'
             with sqlite3.connect(path) as connection:
                 connection.executescript("CREATE TABLE accounts(id INTEGER,deleted_at TEXT);"
-                    "CREATE TABLE account_environments(environment_id TEXT,account_id INTEGER,generation INTEGER);"
-                    "INSERT INTO accounts VALUES(7,NULL);INSERT INTO account_environments VALUES('synthetic',7,15);")
+                    "CREATE TABLE account_environments(environment_id TEXT,account_id INTEGER,generation INTEGER,state TEXT);"
+                    "INSERT INTO accounts VALUES(7,NULL);INSERT INTO account_environments VALUES('synthetic',7,15,'ready');")
             def connect():
                 connection = sqlite3.connect(path)
                 connection.row_factory = sqlite3.Row
                 return connection
             with patch('main.get_db',side_effect=connect):
-                self.assertEqual(main._cpu_environment('synthetic')['generation'],15)
+                self.assertEqual(main._managed_environment('synthetic')['generation'],15)
                 with sqlite3.connect(path) as connection:
                     connection.execute("UPDATE accounts SET deleted_at='synthetic-deleted'")
-                with self.assertRaises(main.HTTPException) as error:main._cpu_environment('synthetic')
+                with self.assertRaises(main.HTTPException) as error:main._managed_environment('synthetic')
                 self.assertEqual(error.exception.status_code,404)
 
 

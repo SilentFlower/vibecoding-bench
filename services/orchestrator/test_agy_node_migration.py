@@ -158,6 +158,24 @@ class AgyMigrationTests(unittest.TestCase):
             placement.transport(7, wake=False, background=True)
         placement.command.assert_called_once()
 
+    def test_local_deleted_account_retires_its_environment(self):
+        """本机 AGY 实际收口后也归档，同号的工程环境仍可用。@return 无。"""
+        with self.database() as connection:
+            connection.execute("UPDATE account_environments SET state='stopped' WHERE name='agy:7'")
+        placement = AgyPlacement.__new__(AgyPlacement)
+        placement.store = self.store
+        placement.runtime = SimpleNamespace(database=self.database, environment_lock=lambda _: threading.RLock(), gateway=Mock())
+        placement.runtime.gateway.list_accounts.return_value = []
+        missing = ValueError('原账号已删除')
+        missing.__cause__ = HTTPError('http://fixture.invalid', 404, 'not found', None, None)
+        placement.runtime.gateway._request.side_effect = missing
+        placement._remove_deletion_roles = Mock()
+        placement.reconcile_retired()
+        self.assertEqual(self.store.agy_assignment(7)['phase'], 'retired')
+        with self.database() as connection:
+            env = connection.execute("SELECT state FROM account_environments WHERE name='cc-fixture'").fetchone()
+            self.assertNotEqual(env['state'], 'retired')
+
     def test_remote_archive_requires_gateway_deletion_and_same_stopped_generation(self):
         """只有网关确认删除且最新投影已静默时，原分配才从节点工作中归档。@return 无。"""
         with self.database() as connection:
@@ -166,7 +184,8 @@ class AgyMigrationTests(unittest.TestCase):
         placement = AgyPlacement.__new__(AgyPlacement)
         placement.store = self.store
         gateway = Mock()
-        placement.runtime = SimpleNamespace(gateway=gateway)
+        placement.runtime = SimpleNamespace(database=self.database, environment_lock=lambda _: threading.RLock(), gateway=gateway)
+        placement._remove_deletion_roles = Mock()
         gateway.list_accounts.return_value = []
         gateway._request.return_value = {'account_id': 7, 'platform': 'antigravity', 'auth_type': 'oauth'}
         placement.reconcile_retired()
@@ -215,7 +234,12 @@ class AgyMigrationTests(unittest.TestCase):
             self.assertEqual(next(row for row in snapshot['environments'] if row['environment_id'] == 'a' * 32)['blockers'], [])
 
             with self.database() as connection:
-                connection.execute("UPDATE agy_node_assignments SET node_id=1,phase='ready' WHERE account_id=7")
+                connection.execute("UPDATE agy_node_assignments SET node_id=1 WHERE account_id=7")
+            snapshot = runtime_snapshot(runtime)
+            self.assertTrue(snapshot['ready'])
+            self.assertNotIn('a' * 32, [env['environment_id'] for env in snapshot['environments']])
+            with self.database() as connection:
+                connection.execute("UPDATE agy_node_assignments SET phase='ready' WHERE account_id=7")
             self.ledger.begin('e' * 32, 7, 2, 1)
             runtime.locality = None
             self.assertIn('请先完成或取消原 AGY 节点迁移', runtime_snapshot(runtime)['agy_update_blockers'][0])

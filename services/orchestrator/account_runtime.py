@@ -394,6 +394,12 @@ class AccountRuntime:
         try:
             row = connection.execute("SELECT * FROM account_environments WHERE account_id=? OR name=?",
                                      (account_id, name)).fetchone()
+            if account_id is not None and (row is None or row["account_id"] is None) and connection.execute(
+                    "SELECT 1 FROM account_environments WHERE state='retired' "
+                    "AND json_extract(fingerprint_json,'$.account_deletion.account_id')=? "
+                    "AND NOT EXISTS (SELECT 1 FROM accounts WHERE id=? AND name=? AND deleted_at IS NULL)",
+                    (account_id, account_id, name)).fetchone():
+                raise RuntimeBusy('工程账号已删除')
             if row:
                 if account_id is not None and row["account_id"] not in (None, account_id):
                     raise ValueError("环境已绑定其它账号")
@@ -755,6 +761,25 @@ class AccountRuntime:
             remove_scratchpad_volume(self, row)
             self._update(row, container_id=None, sender_container_id=None, network_container_id=None)
 
+    def remove_retired_work_files(self, row: dict) -> None:
+        """清除已移除角色的凭据副本和进程检查点。@param row 原环境。@return 无。"""
+        root = self._root(row)
+        # HOME 里的个人文件和工程另有持久归属。只从已固定的原目录移除已知运行材料。
+        for path in (self._sender_config(row), root / 'home/.claude/.credentials.json', root / 'runtime/native-criu'):
+            try:
+                directory = _directory_fd(path.parent)
+            except FileNotFoundError:
+                continue
+            try:
+                if path.name == 'native-criu':
+                    shutil.rmtree(path.name, dir_fd=directory)
+                else:
+                    os.unlink(path.name, dir_fd=directory)
+            except FileNotFoundError:
+                pass
+            finally:
+                os.close(directory)
+
     def ensure(self, account: dict, version: str | None = None, allow_inactive_login: bool = False,
                allow_login_recovery: bool = False, preserve_proxy: bool = False,
                scenario_resources: bool = False, ownership_source: str | None = None,
@@ -785,6 +810,8 @@ class AccountRuntime:
             if self.credential_ownership:
                 self.credential_ownership.guard(account, ownership_source)
             row = self._row(account["name"], account.get("id"), account.get("timezone"))
+            if 'account_deletion' in json.loads(row['fingerprint_json']):
+                raise RuntimeBusy('原工程账号正在删除')
             # 历史画像门禁没有凭据失效证据；只迁移生命周期，不旋转画像或 HOME。
             if row["state"] in ("profile_reauth", "profile_reauth_reconcile"):
                 self._update(row, state="reconcile" if row["state"] == "profile_reauth_reconcile" else "stopped")
@@ -1525,6 +1552,8 @@ class AccountRuntime:
             if pending_upgrade(self._root(row)):
                 raise ValueError('历史内核维护待环境对账')
             validate_records(self._root(row), account.get('cc2api_account_id'))
+            if handoff_credentials and 'account_deletion' in json.loads(row['fingerprint_json']):
+                raise RuntimeBusy('原工程账号正在删除')
             handoff = self._root(row) / "runtime/credential-handoff.json"
             profile = self.data / "profiles" / account["name"] / ".credentials.json"
             take_ownership = handoff_credentials and account.get("cc2api_account_id") is not None and target_id is None
@@ -1568,8 +1597,11 @@ class AccountRuntime:
                 if take_ownership:
                     # 交接所需资料先校验，身份/完整性冲突不能先清空本地绑定。
                     local_credentials = self._local_credentials(row, account, True)
-                self._stop_environment(row)
-                # 已解析的旧 API 请求只能遇到停止的实例；下一唤醒轮换秘密和代次。
+                if handoff_credentials:
+                    self._stop_environment(row)
+                else:
+                    self._stop_environment(row, remove=True)
+                    self.remove_retired_work_files(row)
                 self._update(row, state="stopped")
                 archive_binding_records(self._root(row), account.get('cc2api_account_id'))
                 if local_credentials is not None and not handoff.exists():
@@ -1600,7 +1632,8 @@ class AccountRuntime:
                     try:
                         gateway._request("POST", path, {"operation": "release", "owner": lease["owner"], "generation": lease["generation"]})
                     except Exception:
-                        self._update(row, state="reconcile")
+                        if handoff_credentials:
+                            self._update(row, state="reconcile")
                         raise
 
     def claim(self, row: dict, account: dict, source: str, idle_only: bool = False,
@@ -3415,9 +3448,12 @@ class AccountRuntime:
             connection = self.database()
             try:
                 record = connection.execute("SELECT * FROM account_environments WHERE environment_id=?", (environment_id,)).fetchone()
-                if not record:
+                if not record or record['state'] == 'retired':
                     raise ValueError("环境不存在")
                 row = dict(record)
+                # 维护请求可能在删除前进入等待，只有锁内重新读取的原环境还能接受操作。
+                if 'account_deletion' in json.loads(row['fingerprint_json']):
+                    raise RuntimeBusy('原工程账号正在删除')
                 if expected_generation is not None and (type(expected_generation) is not int or expected_generation!=row['generation']):
                     raise ValueError('环境代次已经变化，请重新读取')
                 account = connection.execute("SELECT * FROM accounts WHERE id=?", (row["account_id"],)).fetchone()

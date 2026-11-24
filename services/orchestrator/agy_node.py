@@ -251,6 +251,8 @@ class AgyNode:
                         or summary(runtime, row).get('reconcile_allowed') is not True):
                     raise ValueError('AGY 原发送器仍有活动')
                 stop_environment(runtime, row, remove=action != 'stop', retire_initial=action != 'quiesce')
+                if action == 'retire':
+                    runtime.remove_retired_work_files(row)
                 result = {'ok': True}
             return {'protocol': 1, **request.model_dump(include=set(AgyLocation.model_fields)),
                 'value': result, 'environment': row}

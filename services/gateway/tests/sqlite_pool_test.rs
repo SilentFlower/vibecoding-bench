@@ -19,7 +19,6 @@ async fn assert_child_owners(pool: &AnyPool, accounts: &[i64], proxies: &[&str])
         "oauth_account_ownerships",
         "oauth_credential_imports",
         "oauth_handoff_operations",
-        "usage_records",
     ] {
         let query = format!("SELECT account_id FROM {table} ORDER BY account_id");
         let owners = sqlx::query_scalar::<_, i64>(&query)
@@ -28,6 +27,13 @@ async fn assert_child_owners(pool: &AnyPool, accounts: &[i64], proxies: &[&str])
             .unwrap();
         assert_eq!(owners, accounts, "{table}");
     }
+    // 用量的原账号标识随历史保留，凭据和调度数据仍按账号级联。
+    let usage_accounts =
+        sqlx::query_scalar::<_, i64>("SELECT account_id FROM usage_records ORDER BY account_id")
+            .fetch_all(pool)
+            .await
+            .unwrap();
+    assert_eq!(usage_accounts, [1, 2]);
     let owners =
         sqlx::query_scalar::<_, String>("SELECT proxy_id FROM proxy_route_sync ORDER BY proxy_id")
             .fetch_all(pool)

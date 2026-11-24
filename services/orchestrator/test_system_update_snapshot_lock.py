@@ -141,6 +141,16 @@ class SnapshotLockTests(unittest.TestCase):
         store.list.return_value = []
         self.assertTrue(runtime_snapshot(self.runtime)['ready'])
 
+    def test_retired_account_skips_updates_without_node_probe(self) -> None:
+        """已删除的工程账号保留历史行，升级时不再向旧节点发起草稿核对。@return 无。"""
+        with sqlite3.connect(self.root / 'bench.sqlite') as connection:
+            connection.execute("UPDATE account_environments SET state='retired',name='retired:synthetic'")
+        self.runtime.locality = Mock(side_effect=AssertionError('已退役环境不应唤醒'))
+        for central, control in ((False, False), (True, False), (True, True)):
+            snapshot = runtime_snapshot(self.runtime, central, control)
+            self.assertTrue(snapshot['ready'])
+            self.assertEqual([], snapshot['environments'])
+
     def test_archived_closed_draft_keeps_history_without_node_probe(self) -> None:
         """归档回执已确认原草稿清理，平台沿中央历史完成快照。:return: 无。"""
         self.runtime.locality = Mock(side_effect=AssertionError('归档后的草稿无需执行归属检查'))

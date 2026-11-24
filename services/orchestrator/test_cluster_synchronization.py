@@ -170,6 +170,36 @@ class NodeSynchronizationTests(unittest.TestCase):
         self.old.stop.assert_not_called()
         self.old.rename.assert_not_called()
 
+    def test_deleted_saved_draft_is_verified_before_node_update(self):
+        """旧版本删除后的三角色按完整 ID 回收，其他停止角色保持保护。@return 无。"""
+        eid, op = 'd'*32, 'e'*32
+        scope = {'environment_id':eid,'node_key':self.row['node_key'],'operation_id':op,'name':'draft'}
+        record = {'activation':{'phase':'activated','request':{'scope':scope,'account_id':18}}}
+        with self.fixture.database() as connection:
+            connection.execute("INSERT INTO accounts(id,name,profile_path,enabled,deleted_at) VALUES(18,'draft','profiles/draft',0,10)")
+            connection.execute("UPDATE account_node_assignments SET node_id=? WHERE account_id=18",(self.row['id'],))
+            connection.execute("INSERT INTO account_environments(environment_id,account_id,name,fingerprint_json,generation,state,"
+                "container_id,sender_container_id,network_container_id) VALUES(?,18,'draft','{}',4,'stopped','cli','sender','network')",(eid,))
+            connection.execute("INSERT INTO node_login_drafts(environment_id,node_id,operation_id,sid,generation,phase,"
+                "saved_account_id,record_json,created_at,updated_at) VALUES(?,?,?,? ,?,'closed',18,?,1,1)",
+                (eid,self.row['id'],op,'1'*12,'2'*32,json.dumps(record)))
+        roles = [Mock(id=identifier,labels={**self.old.labels,'vibebench.environment':eid,'vibebench.role':role},
+            attrs={'State':{'Running':False,'Pid':0}}) for identifier,role in
+            [('cli','account'),('sender','account-sender'),('network','account-network')]]
+        roles[1].id = 'replacement'
+        with self.assertRaises(NodeSynchronizationWait):
+            self.sync._cleanup_deleted_draft_roles(self.row['id'],self.row['node_key'],eid,roles)
+        for obj in roles:
+            obj.remove.assert_not_called()
+        roles[1].id = 'sender'
+        self.remote.containers.list.side_effect = lambda **opts: [self.old,*roles] if opts.get('all') else []
+        result = self.sync.install(self.installer,self.row['id'],1)
+        self.assertEqual(result['phase'],'ready')
+        for obj in roles:
+            obj.remove.assert_called_once_with()
+        with self.fixture.database() as connection:
+            self.assertEqual(tuple(connection.execute("SELECT state,account_id FROM account_environments WHERE environment_id=?",(eid,)).fetchone()),('retired',None))
+
     def test_unknown_role_is_blocked_before_stopping_control(self) -> None:
         """中央零账号不代表真实Node空闲，未知角色保持现场。:return: None。"""
         unknown=Mock(id='unknown',labels={'vibebench.environment':'unregistered'})

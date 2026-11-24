@@ -68,6 +68,7 @@ from sse_starlette.sse import EventSourceResponse
 from starlette.websockets import WebSocketState
 
 from quota_protocol import merge_quota_observation, passive_recovery_decision, quota_decision, quota_observation, quota_timestamp, warmup_quota_decision, warmup_sample_used
+from account_environment_deletion import archive_environment, remember_deletion
 from account_runtime import AccountRuntime, RuntimeBusy, RuntimeCapacityUnavailable, V3_DEFAULT_TIMEZONE, atomic_json, derive_v3_fingerprint
 from account_work_control import AccountWorkCoordinator
 from oauth_refresh_probe import OAUTH_REFRESH_SCRIPT, execute_oauth_refresh_probe
@@ -9868,6 +9869,8 @@ def _node_migration_guard(aid: int):
                 or row is None):
             raise ValueError('账号或环境已变化，请重新读取归属')
         account, environment = dict(current), dict(row)
+        if 'account_deletion' in json.loads(environment['fingerprint_json']):
+            raise RuntimeBusy('原工程账号正在删除')
         _require_oauth_owner_transition_idle(account)
         if credential_ownership:
             credential_ownership.guard(account)
@@ -10033,8 +10036,11 @@ def list_accounts():
     nodes = cluster_service.store.assignment_summaries() if cluster_service else {}
     conn = get_db()
     try:
+        environment_field = 'e.environment_id' if account_runtime else 'NULL'
+        environment_join = 'LEFT JOIN account_environments e ON e.account_id=a.id ' if account_runtime else ''
         rows = conn.execute(
-            "SELECT a.*, s.value AS display_name FROM accounts a LEFT JOIN app_settings s "
+            f"SELECT a.*, s.value AS display_name,{environment_field} AS owned_environment_id FROM accounts a "
+            + environment_join + "LEFT JOIN app_settings s "
             "ON s.key='account_display_name:' || a.id WHERE a.deleted_at IS NULL ORDER BY a.id"
         ).fetchall()
         accounts = []
@@ -10722,20 +10728,37 @@ def delete_account_cc2api_binding(aid: int):
 
 
 @app.delete("/api/accounts/{aid}")
-def delete_account(aid: int):
+def delete_account(aid: int, environment_id: str | None = None):
     """
     删除账号；已有历史引用时软删除并退出可用集合。
 
     :param aid: bench accounts.id
+    :param environment_id: 列表中看到的环境标识，用于区分同名重建后的账号。
     :return: 删除方式和历史引用计数
     """
+    return _delete_account(aid, expected_environment=environment_id)
+
+
+def _delete_account(aid: int, expected=None, expected_environment=None):
+    """在原所有者锁内删除，巡检只能接续持久化的原环境。"""
     conn = get_db()
     try:
         row = conn.execute(
             "SELECT * FROM accounts WHERE id=? AND deleted_at IS NULL",
             (aid,),
         ).fetchone()
+        if account_runtime and expected_environment is not None:
+            if not re.fullmatch('[a-f0-9]{32}', expected_environment):
+                raise HTTPException(400, '原环境标识无效')
+            archived = conn.execute("SELECT 1 FROM account_environments WHERE state='retired' AND environment_id=? "
+                "AND json_extract(fingerprint_json,'$.account_deletion.account_id')=?", (expected_environment,aid)).fetchone()
+            if archived:
+                return {"ok": True, "deleted": True}
         if not row:
+            if account_runtime and expected_environment is None and conn.execute(
+                    "SELECT 1 FROM account_environments WHERE state='retired' "
+                    "AND json_extract(fingerprint_json,'$.account_deletion.account_id')=?",(aid,)).fetchone():
+                return {"ok": True, "deleted": True}
             raise HTTPException(404, "账号不存在")
         account = dict(row)
     finally:
@@ -10753,6 +10776,32 @@ def delete_account(aid: int):
         finally:
             conn.close()
         _require_oauth_owner_transition_idle(account)
+        scope = None
+        if account_runtime:
+            original_id = expected['environment_id'] if expected is not None else expected_environment
+            if original_id is not None:
+                # 旧后台任务或迟到的页面请求只能使用原运行环境。
+                connection = get_db()
+                try:
+                    current = connection.execute("SELECT * FROM account_environments WHERE account_id=? AND environment_id=?",
+                        (aid, original_id)).fetchone()
+                    if current is None:
+                        raise HTTPException(409, '原删除操作的环境已经变化')
+                    row = dict(current)
+                finally:
+                    connection.close()
+            else:
+                row = account_runtime._row(account['name'], aid)
+            assignment = cluster_service.store.assignment(aid) if cluster_service else {'node_key':'local', 'revision':1}
+            with account_runtime.environment_lock(row['environment_id']), _db_lock:
+                connection = get_db()
+                try:
+                    with connection:
+                        scope = remember_deletion(connection, account, row, assignment, expected)
+                except ValueError as error:
+                    raise HTTPException(409, str(error)) from None
+                finally:
+                    connection.close()
         if credential_ownership:
             try:
                 credential_ownership.retire(account)
@@ -10772,7 +10821,18 @@ def delete_account(aid: int):
                         ).fetchone()
                         if not current:
                             raise HTTPException(404, "账号不存在")
+                        if scope is not None:
+                            if cluster_service:
+                                assignment = conn.execute("SELECT n.node_key,b.revision,b.phase FROM account_node_assignments b "
+                                    "JOIN cluster_nodes n ON n.id=b.node_id WHERE b.account_id=?", (aid,)).fetchone()
+                                if not assignment or tuple(assignment) != (scope['node_key'],scope['revision'],'ready'):
+                                    raise ValueError('原删除作业的节点归属已变化')
+                            archive_environment(conn, scope)
                         counts = _account_reference_counts(conn, aid)
+                        if conn.execute("SELECT 1 FROM sqlite_master WHERE name='node_login_drafts'").fetchone():
+                            drafts = conn.execute("SELECT count(*) FROM node_login_drafts WHERE saved_account_id=?", (aid,)).fetchone()[0]
+                            if drafts:
+                                counts['saved_login_drafts'] = drafts
                         if sum(counts.values()) > 0:
                             # 任务、批次和 run 都按 account_id 保存历史引用；软删除能保留
                             # 历史语义，同时让后台刷新器和新运行入口都不再选中该账号。
@@ -14056,6 +14116,23 @@ _agy_auth_manager = None
 _agy_auth_manager_lock = threading.Lock()
 
 
+def _resume_account_deletions() -> None:
+    """重新进入原账号的删除流程，已归档和已经换代的环境保持独立。@return 无。"""
+    connection = get_db()
+    try:
+        pending = connection.execute("SELECT json_extract(e.fingerprint_json,'$.account_deletion') FROM "
+            "account_environments e JOIN accounts a ON a.id=e.account_id WHERE a.deleted_at IS NULL "
+            "AND json_type(e.fingerprint_json,'$.account_deletion')='object'").fetchall()
+    finally:
+        connection.close()
+    for item in pending:
+        scope = json.loads(item[0])
+        try:
+            _delete_account(scope['account_id'], scope)
+        except (HTTPException, RuntimeError, OSError, ValueError, DockerException):
+            continue
+
+
 async def _agy_auth_cleanup_loop():
     """回收到期原生授权并收口容量操作，失败保留原操作等待重试。@return 无。"""
     while True:
@@ -14076,6 +14153,7 @@ async def _agy_auth_cleanup_loop():
                     finally:
                         if account_runtime:
                             from agy_capacity import reconcile_pending
+                            _resume_account_deletions()
                             reconcile_pending(account_runtime)
                             if agy_placement:
                                 agy_placement.reconcile_capacities()
@@ -14363,6 +14441,31 @@ def v3_agy_ingress(account_id: int, attempt_id: str, body: AgyIngressIn):
     return {'state':'saved'}
 
 
+@app.post('/internal/v3/agy-environments/{account_id}/prepare-deletion')
+def prepare_agy_environment_deletion(account_id: int, body: dict) -> dict:
+    """在网关删除前持久登记并静默专属环境。@param account_id 网关账号。@param body 网关租约及重试来源。@return 准备回执。"""
+    if not agy_placement:
+        raise HTTPException(503, 'AGY 运行环境管理暂不可用')
+    try:
+        with UPDATE_GATE.admission('agy-environment-retirement'):
+            agy_placement.prepare_deletion(account_id, body)
+            return {'ok': True}
+    except (ValueError, RuntimeError, OSError, DockerException):
+        raise HTTPException(409, 'AGY 原环境仍有活动或清理待重试') from None
+
+
+@app.post('/internal/v3/agy-environments/{account_id}/retirement')
+def finish_agy_environment_deletion(account_id: int) -> dict:
+    """凭网关删除事实确认专属环境清理。@param account_id 网关账号。@return 原环境清理回执。"""
+    if not agy_placement:
+        raise HTTPException(503, 'AGY 运行环境管理暂不可用')
+    try:
+        with UPDATE_GATE.admission('agy-environment-retirement'):
+            return {'retired': agy_placement.finish_deletion(account_id)}
+    except (ValueError, RuntimeError, OSError, DockerException):
+        raise HTTPException(503, 'AGY 环境清理待重试') from None
+
+
 @app.post('/internal/v3/agy-environments/{account_id}')
 def v3_agy_environment(account_id: int, prepare: bool = False) -> dict:
     """登记环境并按需申请后台绑定。@param account_id 网关账号。@param prepare 是否申请预热绑定。@return 当前归属与准备状态。"""
@@ -14602,12 +14705,13 @@ def v3_environments() -> list[dict]:
         return []
     connection = get_db()
     try:
-        # 已删除账号的环境仅保留历史；未绑定草稿和未删除的停用账号仍需可见。
+        # AGY 和未提交的登录草稿都没有工程账号 ID，按平台映射排除已退役环境。
+        active_agy = ("AND NOT EXISTS (SELECT 1 FROM platform_api_environments p JOIN agy_node_assignments b "
+            "ON b.account_id=p.gateway_account_id WHERE p.environment_id=e.environment_id AND b.phase='retired') "
+            if agy_placement is not None else "")
         rows = [dict(row) for row in connection.execute(
-            "SELECT e.* FROM account_environments e "
-            "WHERE e.account_id IS NULL OR EXISTS ("
-            "SELECT 1 FROM accounts a WHERE a.id=e.account_id AND a.deleted_at IS NULL) "
-            "ORDER BY e.name"
+            "SELECT e.* FROM account_environments e WHERE e.state<>'retired' AND (e.account_id IS NULL OR EXISTS ("
+            "SELECT 1 FROM accounts a WHERE a.id=e.account_id AND a.deleted_at IS NULL)) " + active_agy + "ORDER BY e.name"
         )]
     finally:
         connection.close()
@@ -14642,16 +14746,7 @@ def refresh_v3_physical_features(environment_id: str) -> dict:
     """
     if not account_runtime:
         raise HTTPException(404, "v3 环境未启用")
-    connection = get_db()
-    try:
-        environment = connection.execute("SELECT e.* FROM account_environments e WHERE e.environment_id=? "
-            "AND (e.account_id IS NULL OR EXISTS(SELECT 1 FROM accounts a "
-            "WHERE a.id=e.account_id AND a.deleted_at IS NULL))", (environment_id,)).fetchone()
-    finally:
-        connection.close()
-    if environment is None:
-        raise HTTPException(404, "环境不存在")
-    row = dict(environment)
+    row = _managed_environment(environment_id)
     try:
         with ExitStack() as locks:
             for guard in (_oauth_owner_lock(row["name"]), _profile_lock(row["name"]),
@@ -14660,18 +14755,10 @@ def refresh_v3_physical_features(environment_id: str) -> dict:
                     raise RuntimeBusy("账号正在维护，请稍后刷新实测")
                 locks.callback(guard.release)
             # 锁前的列表快照可能已被重建替换，采集必须使用锁内当前代次。
-            connection = get_db()
-            try:
-                current = connection.execute("SELECT e.* FROM account_environments e WHERE e.environment_id=? "
-                    "AND (e.account_id IS NULL OR EXISTS(SELECT 1 FROM accounts a "
-                    "WHERE a.id=e.account_id AND a.deleted_at IS NULL))", (environment_id,)).fetchone()
-            finally:
-                connection.close()
-            if current is None:
-                raise HTTPException(404, "环境不存在")
-            remote=_remote_environment_result(dict(current),'environment-physical-refresh')
+            current = _managed_environment(environment_id)
+            remote=_remote_environment_result(current,'environment-physical-refresh')
             if remote is None:
-                account_runtime.refresh_physical_features(dict(current))
+                account_runtime.refresh_physical_features(current)
     except (ValueError, RuntimeError) as error:
         raise HTTPException(409, str(error)) from None
     except (DockerException, RequestException, OSError):
@@ -14881,10 +14968,11 @@ def _remote_environment_result(row: dict, operation: str, body: dict | None = No
     return None
 
 
-def _cpu_environment(environment_id: str) -> dict:
+def _managed_environment(environment_id: str) -> dict:
+    """查找仍可管理的工程或平台环境。@param environment_id 原环境标识。@return 当前环境行。"""
     connection = get_db()
     try:
-        row = connection.execute("SELECT e.* FROM account_environments e WHERE e.environment_id=? "
+        row = connection.execute("SELECT e.* FROM account_environments e WHERE e.environment_id=? AND e.state<>'retired' "
             "AND (e.account_id IS NULL OR EXISTS(SELECT 1 FROM accounts a WHERE a.id=e.account_id "
             "AND a.deleted_at IS NULL))", (environment_id,)).fetchone()
     finally:
@@ -14905,7 +14993,7 @@ def v3_cpu_resources(environment_id: str) -> dict:
         raise HTTPException(404)
     try:
         with account_runtime.environment_lock(environment_id):
-            row=_cpu_environment(environment_id)
+            row=_managed_environment(environment_id)
             remote=_remote_environment_result(row,'environment-cpu-read')
             if remote is not None:
                 return remote
@@ -14929,7 +15017,7 @@ def v3_set_cpu_resources(environment_id: str, body: CpuResourceOperation) -> dic
     try:
         with UPDATE_GATE.admission('environment-cpu'):
             with account_runtime.environment_lock(environment_id):
-                row=_cpu_environment(environment_id)
+                row=_managed_environment(environment_id)
                 remote=_remote_environment_result(row,'environment-cpu-set',body.model_dump())
                 if remote is not None:
                     return remote
@@ -15085,7 +15173,7 @@ def v3_environment_maintenance(environment_id: str, body: dict):
     connection = get_db()
     try:
         environment = connection.execute("SELECT COALESCE(a.name,e.name) AS name,e.account_id FROM account_environments e "
-            "LEFT JOIN accounts a ON a.id=e.account_id WHERE e.environment_id=?", (environment_id,)).fetchone()
+            "LEFT JOIN accounts a ON a.id=e.account_id WHERE e.environment_id=? AND e.state<>'retired'", (environment_id,)).fetchone()
     finally:
         connection.close()
     if not environment:
@@ -15102,7 +15190,7 @@ def v3_environment_maintenance(environment_id: str, body: dict):
                 credential_ownership.cancel_return(credential_ownership._account(environment['account_id']))
                 return {'ok': True}
             with _profile_lock(environment["name"]):
-                row=_cpu_environment(environment_id)
+                row=_managed_environment(environment_id)
                 remote=_remote_environment_result(row,'environment-maintenance',body)
                 if remote is None:
                     account_runtime.maintenance(environment_id, body.get("operation", ""), body.get('expected_generation'))

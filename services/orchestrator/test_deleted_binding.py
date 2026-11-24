@@ -302,10 +302,61 @@ class DeletedBindingTests(unittest.TestCase):
 
     def test_delete_local_account_with_deleted_remote_binding(self) -> None:
         """本地删除复用相同收口规则，不依赖已经删除的远端。@return None。"""
+        work = self.runtime._root(self.row) / 'home/.claude'
+        work.mkdir(parents=True, exist_ok=True)
+        (work / '.credentials.json').write_text('合成过期凭据')
+        (work / 'settings.json').write_text('个人配置')
         result = main.delete_account(1)
         self.assertTrue(result['ok'])
+        self.container.remove.assert_called_once_with()
+        self.assertFalse((work / '.credentials.json').exists())
+        self.assertEqual((work / 'settings.json').read_text(), '个人配置')
         with closing(main.get_db()) as database:
             self.assertIsNone(database.execute('SELECT id FROM accounts WHERE id=1').fetchone())
+
+    def test_late_maintenance_preserves_retirement_and_new_account(self) -> None:
+        """旧页面和已等待的运行时维护均保持删除终态，旧请求不能操作同名重建环境。@return 无。"""
+        eid, generation = self.row['environment_id'], self.row['generation']
+        self.assertTrue(main.delete_account(1, eid)['ok'])
+        with closing(main.get_db()) as db, db:
+            db.execute("INSERT INTO accounts(id,name,profile_path) VALUES(1,'synthetic','profiles/synthetic')")
+        fresh = self.runtime._row('synthetic',1)
+        for operation in ('stop', 'rebuild', 'reconcile', 'reprofile'):
+            with self.subTest(operation=operation):
+                with self.assertRaises(main.HTTPException) as missing:
+                    main.v3_environment_maintenance(eid, {'operation':operation, 'expected_generation':generation})
+                self.assertEqual(404, missing.exception.status_code)
+                with self.assertRaisesRegex(ValueError, '环境不存在'):
+                    self.runtime.maintenance(eid, operation, generation)
+        self.assertTrue(main.delete_account(1, eid)['deleted'])
+        with closing(main.get_db()) as db:
+            self.assertEqual('retired', db.execute('SELECT state FROM account_environments WHERE environment_id=?',(eid,)).fetchone()[0])
+            self.assertEqual(1, db.execute('SELECT account_id FROM account_environments WHERE environment_id=?',(fresh['environment_id'],)).fetchone()[0])
+
+    def test_retry_deletion_uses_the_original_environment_after_failure(self) -> None:
+        """部分清理可自动恢复，同名重建后旧删除意图不再生效。@return 无。"""
+        self.container.remove.side_effect = [OSError('合成节点暂离'), None]
+        with self.assertRaises((OSError, main.HTTPException)):
+            main.delete_account(1)
+        with closing(main.get_db()) as db:
+            scope = json.loads(db.execute("SELECT json_extract(fingerprint_json,'$.account_deletion') FROM "
+                "account_environments WHERE account_id=1").fetchone()[0])
+        main._resume_account_deletions()
+        self.assertTrue(main.delete_account(1)['deleted'])
+        fresh_draft = self.runtime._row('synthetic')
+        with self.assertRaisesRegex(ValueError, '工程账号已删除'):
+            self.runtime._row('synthetic', 1)
+        self.assertIsNone(self.runtime._row('synthetic')['account_id'])
+        with closing(main.get_db()) as db, db:
+            db.execute("INSERT INTO accounts(id,name,profile_path) VALUES(1,'synthetic','profiles/synthetic')")
+        fresh = self.runtime._row('synthetic',1)
+        self.assertEqual(fresh['environment_id'],fresh_draft['environment_id'])
+        self.assertNotEqual(fresh['environment_id'],scope['environment_id'])
+        self.assertTrue(main.delete_account(1,scope['environment_id'])['deleted'])
+        with self.assertRaises(main.HTTPException):
+            main._delete_account(1,scope)
+        with closing(main.get_db()) as db:
+            self.assertIsNotNone(db.execute("SELECT 1 FROM accounts WHERE id=1 AND deleted_at IS NULL").fetchone())
 
     def test_delete_local_account_does_not_require_usable_credentials(self) -> None:
         """显式删除不应要求先修复缺 RT 的损坏凭据，仍停止旧实例。@return None。"""

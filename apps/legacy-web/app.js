@@ -605,7 +605,9 @@ function bindAccountActions() {
       return;
     }
     if (id && await confirmRuntimeAction(`删除账号 #${id}?`)) {
-      await API(`/accounts/${id}`, { method: 'DELETE' });
+      const env = e.target.dataset.deleteEnv;
+      const query = env ? `?environment_id=${encodeURIComponent(env)}` : '';
+      await API(`/accounts/${id}${query}`, { method: 'DELETE' });
       await renderAccounts();
     }
   };
@@ -703,7 +705,7 @@ async function renderAccounts() {
       <div class="work-condition"><span>Claude Code</span><strong>${escapeHTML(a.claude_code_version||'继承全局')}</strong></div>
       <div class="work-account-links"><a href="#projects?account=${a.id}">工程迭代 ${runtimeIcon('arrow')}</a>${worker?workerAction:`<a href="#warmup?account=${a.id}">Pi 养号 ${runtimeIcon('arrow')}</a>`}</div>
       <section class="work-gateway-actions" aria-label="${escapeHTML(accountDisplayName(a))}的网关账号操作"><div class="work-gateway-heading"><span>${runtimeIcon('key')}网关账号</span><strong>${bound?'#'+escapeHTML(a.cc2api_account_id):'尚未关联'}</strong></div><div class="work-gateway-buttons">${!bound?`<button type="button" class="btn btn-sm" data-cc2-create="${a.id}">${runtimeIcon('plus')}创建网关账号</button><button type="button" class="btn btn-sm" data-cc2-bind="${a.id}">关联已有账号</button>`:''}${!bound||RUNTIME_BASE?`<button type="button" class="btn btn-sm" data-relogin="${a.id}">${runtimeIcon('key')}${bound?'重新授权并同步':'重新授权'}</button>`:''}${bound?`<button type="button" class="btn btn-sm btn-danger danger" data-cc2-unbind="${a.id}">解绑</button>`:''}${a.credential_ownership?.phase&&a.credential_ownership.phase!=='ready'?'<a class="btn btn-sm" href="#environments">凭据交接对账</a>':''}</div><p class="work-strip" data-tone="${tone}" role="status">${runtimeIcon(tone==='danger'?'alert':'info')}<span>${escapeHTML(message||'')}</span></p></section>
-      <footer><button type="button" class="btn btn-sm" data-account-work="${a.id}">${a.enabled?'整体停用':'整体启用'}</button><button type="button" class="btn btn-sm" data-account-work-status="${a.id}">收尾进度</button><button type="button" class="btn btn-sm" data-cli-settings="${a.id}">CLI 配置</button><button type="button" class="btn btn-sm" data-quota="${a.id}">额度</button><button type="button" class="btn btn-sm" data-warmup-config="${a.id}">养号 / 额度设置</button>${RUNTIME_BASE?`<button type="button" class="btn btn-sm" data-run-window-config="${a.id}">运行时段</button>`:''}<button type="button" class="btn btn-sm btn-danger danger" data-del="${a.id}">删除</button></footer>
+      <footer><button type="button" class="btn btn-sm" data-account-work="${a.id}">${a.enabled?'整体停用':'整体启用'}</button><button type="button" class="btn btn-sm" data-account-work-status="${a.id}">收尾进度</button><button type="button" class="btn btn-sm" data-cli-settings="${a.id}">CLI 配置</button><button type="button" class="btn btn-sm" data-quota="${a.id}">额度</button><button type="button" class="btn btn-sm" data-warmup-config="${a.id}">养号 / 额度设置</button>${RUNTIME_BASE?`<button type="button" class="btn btn-sm" data-run-window-config="${a.id}">运行时段</button>`:''}<button type="button" class="btn btn-sm btn-danger danger" data-del="${a.id}" data-delete-env="${escapeHTML(a.owned_environment_id || '')}">删除</button></footer>
     </article>`;
   }).join('') || '<div class="work-empty"><h3>暂无任务账号</h3><p>添加账号后可以授权并开始任务。</p></div>');
 

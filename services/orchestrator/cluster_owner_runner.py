@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import time
 from contextlib import contextmanager
-from uuid import uuid4
+from uuid import NAMESPACE_OID, uuid4, uuid5
 from urllib.error import HTTPError
 
 from account_runtime import RuntimeBusy
@@ -65,6 +65,8 @@ class RemoteOwnerTransitions:
         original=self._location(account)
         location,row,assignment,node=original
         with self.runtime.environment_lock(row['environment_id']):
+            if handoff_credentials and 'account_deletion' in json.loads(row['fingerprint_json']):
+                raise RuntimeBusy('原工程账号正在删除')
             if self.sessions.ledger.active(account['id']):
                 raise RuntimeBusy('原节点仍有执行待收口，凭据交接继续等待')
             record=record if record is not None else self.ownership.state(account['id'])
@@ -77,13 +79,15 @@ class RemoteOwnerTransitions:
             else:
                 if row['generation']!=0 or account.get('cc2api_account_id') is not None or handoff_credentials:
                     current=self._rpc(account,'get',location.model_dump(),original)
-                if current is not None and current.phase=='preparing':
+                if current is not None and (current.phase=='preparing' or not handoff_credentials and current.scope.retire):
                     scope=current.scope
                     if (scope.target_binding!=target_id or scope.handoff_credentials!=handoff_credentials
                             or account.get('cc2api_account_id') not in (scope.previous_binding,scope.target_binding)):
                         raise ValueError('原节点已有另一交接待完成')
                 else:
-                    scope=OwnerScope(**location.model_dump(),operation_id=uuid4().hex,generation=row['generation'],
+                    operation = uuid4() if handoff_credentials else uuid5(NAMESPACE_OID,
+                        f"retire:{location.node_key}:{location.environment_id}:{location.assignment_revision}:{row['generation']}")
+                    scope=OwnerScope(**location.model_dump(),operation_id=operation.hex,generation=row['generation'],
                         previous_binding=account.get('cc2api_account_id'),target_binding=target_id,
                         handoff_credentials=handoff_credentials,retire=not handoff_credentials)
             leases=[]
@@ -133,9 +137,10 @@ class RemoteOwnerTransitions:
                 if not handoff_credentials:
                     # 删除会级联移除中央分配；先确认Node已退休，避免成功删库后才追认旧归属。
                     receipt=self._rpc(account,'publish',OwnerPublish(**prepare.model_dump()).model_dump(),original)
-                    if receipt is None or receipt.scope!=scope or receipt.phase!='published' or not receipt.stopped:
-                        raise ValueError('原节点退休停止仍需核对')
-                    self.runtime._update(row,state='stopped')
+                    if (receipt is None or receipt.scope!=scope or receipt.phase!='published'
+                            or not receipt.stopped or not receipt.environment_removed):
+                        raise ValueError('所属节点尚未确认移除原环境，请更新节点后重试')
+                    self.runtime._update(row, state='stopped', container_id=None, sender_container_id=None, network_container_id=None)
                 yield
                 if not handoff_credentials:
                     return

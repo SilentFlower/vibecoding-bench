@@ -1,11 +1,13 @@
 """所属Node按原凭据交接执行实际停止和原运行凭据发布。"""
 from __future__ import annotations
 
+import json
 import re
 import time
 from urllib.error import HTTPError
 
 from account_runtime import RuntimeBusy
+from account_environment_deletion import archive_environment
 from cluster_execution import NodeLocation, _GatewaySnapshot
 from database_migrations import apply_migrations
 from cluster_owner_contract import OwnerPrepare, OwnerPublish, OwnerReceipt
@@ -60,6 +62,26 @@ def _path(executor, environment_id):
     return executor.data/'environments'/environment_id/'runtime/owner-transition.json'
 
 
+def _archived_owner(executor, location, scope=None):
+    # 原角色和资料归档后姓名槽位可用于新账号，重读只能返回原环境的终态回执。
+    if location.node_key != executor.node_key:
+        raise ValueError('原节点身份不一致')
+    connection = executor.database()
+    try:
+        stored = connection.execute("SELECT json_extract(fingerprint_json,'$.owner_retirement') FROM account_environments "
+            "WHERE environment_id=? AND state='retired' AND account_id IS NULL", (location.environment_id,)).fetchone()
+    finally:
+        connection.close()
+    if stored is None:
+        return None
+    receipt = OwnerReceipt.model_validate_json(stored[0])
+    if (not receipt.environment_removed or not receipt.scope.retire or receipt.phase != 'published'
+            or not receipt.stopped or scope is not None and receipt.scope != scope
+            or any(getattr(receipt.scope, key) != value for key, value in location.model_dump().items())):
+        raise ValueError('节点退休回执与原删除范围不一致')
+    return receipt.wire()
+
+
 def owner_receipt(executor, request: NodeLocation) -> dict | None:
     """查询当前环境的原交接，不构造运行时或续期。
 
@@ -68,6 +90,9 @@ def owner_receipt(executor, request: NodeLocation) -> dict | None:
     :return: 无令牌持久回执；尚无操作时为None。
     """
     with executor._locked(read_only=True,environment_id=request.environment_id):
+        archived = _archived_owner(executor, request)
+        if archived is not None:
+            return archived
         executor._inspection_row(request)
         return _read(executor,request)
 
@@ -79,7 +104,7 @@ def _read(executor, location):
         return None
     if any(getattr(receipt.scope,key)!=value for key,value in location.model_dump().items()):
         raise ValueError('原节点交接的账号或分配范围已经变化')
-    return receipt.model_dump()
+    return receipt.wire()
 
 
 def _account(executor, scope):
@@ -183,9 +208,12 @@ def prepare_owner(executor, request: OwnerPrepare) -> dict:
     request=OwnerPrepare.model_validate(request.model_dump())
     scope=request.scope
     with executor._locked(environment_id=scope.environment_id):
+        location = NodeLocation.model_validate(scope.model_dump(include=set(NodeLocation.model_fields)))
+        archived = _archived_owner(executor, location, scope)
+        if archived is not None:
+            return archived
         _initial_retirement(executor,request)
         account,row=_account(executor,scope)
-        location=NodeLocation.model_validate(scope.model_dump(include=set(NodeLocation.model_fields)))
         previous=_read(executor,location)
         if previous is not None and previous['scope']==scope.model_dump():
             if previous['phase']=='published':
@@ -199,13 +227,13 @@ def prepare_owner(executor, request: OwnerPrepare) -> dict:
         try:
             _idle(executor,runtime,row,resuming=previous is not None and previous['scope']==scope.model_dump() and previous['stopped'])
             receipt=OwnerReceipt(scope=scope)
-            atomic_json(_path(executor,scope.environment_id),receipt.model_dump())
+            atomic_json(_path(executor,scope.environment_id),receipt.wire())
             runtime._stop_environment(row)
             _stopped(runtime,row)
             runtime._update(row,state='stopped')
             receipt.stopped=True
-            atomic_json(_path(executor,scope.environment_id),receipt.model_dump())
-            return receipt.model_dump()
+            atomic_json(_path(executor,scope.environment_id),receipt.wire())
+            return receipt.wire()
         finally:
             executor._release_runtime(runtime)
 
@@ -220,12 +248,15 @@ def publish_owner(executor, request: OwnerPublish) -> dict:
     request=OwnerPublish.model_validate(request.model_dump())
     scope=request.scope
     with executor._locked(environment_id=scope.environment_id):
+        location = NodeLocation.model_validate(scope.model_dump(include=set(NodeLocation.model_fields)))
+        archived = _archived_owner(executor, location, scope)
+        if archived is not None:
+            return archived
         account,row=_account(executor,scope)
-        location=NodeLocation.model_validate(scope.model_dump(include=set(NodeLocation.model_fields)))
         record=_read(executor,location)
         if record is None or record['scope']!=scope.model_dump() or not record['stopped']:
             raise ValueError('原节点交接实际停止尚未确认')
-        if record['phase']=='published':
+        if record['phase']=='published' and (not scope.retire or record.get('environment_removed')):
             return record
         _deadline(request)
         if account['cc2api_account_id'] not in (scope.previous_binding,scope.target_binding):
@@ -263,7 +294,23 @@ def publish_owner(executor, request: OwnerPublish) -> dict:
                                 (scope.target_binding,int(scope.retire),scope.account_id))
                     finally:
                         connection.close()
+            if scope.retire:
+                # 中央即将删除账号。旧节点的 stopped 回执不能代替 Docker 实际移除结果。
+                if executor._scoped_containers(scope.environment_id):
+                    raise ValueError('原节点环境仍有角色待清理')
+                record['environment_removed'] = True
             record['phase']='published'
+            if scope.retire:
+                connection = executor.database()
+                try:
+                    with connection:
+                        archive_environment(connection, {**scope.model_dump(), 'name':account['name']})
+                        connection.execute("UPDATE account_environments SET fingerprint_json=json_set(fingerprint_json,"
+                            "'$.owner_retirement',json(?)) WHERE environment_id=?", (json.dumps(record),scope.environment_id))
+                        connection.execute("UPDATE accounts SET name=? WHERE id=? AND name=? AND enabled=0",
+                            ('retired:'+scope.environment_id,scope.account_id,account['name']))
+                finally:
+                    connection.close()
             atomic_json(_path(executor,scope.environment_id),record)
             return record
         finally:

@@ -100,6 +100,15 @@
       "predecessor": 10,
       "rollback_mode": "compatible",
       "version": 11
+    },
+    {
+      "checksum": "ead65338a92fc08ff8d0e40766e6ae54321653fc375fa98d7a9457bba68a7244",
+      "engine": "sqlite",
+      "id": "gateway.usage-history.12",
+      "kind": "schema",
+      "predecessor": 11,
+      "rollback_mode": "compatible",
+      "version": 12
     }
   ]
 }

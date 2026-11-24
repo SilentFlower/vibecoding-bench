@@ -269,29 +269,30 @@ class ClusterStore:
             connection.close()
 
     def agy_retirement_candidates(self) -> list[dict]:
-        """读取已经静默且保留资料的 SSH 环境。@return 原归属和静默代次。"""
+        """读取本机和 SSH 上仍有归属的 AGY 环境。@return 账号、分配版本和环境代次。"""
         connection = self.database()
         try:
-            return [dict(row) for row in connection.execute('SELECT b.account_id,b.node_id,b.revision,e.environment_id,e.generation '
-                'FROM agy_node_assignments b JOIN cluster_nodes n ON n.id=b.node_id '
-                'JOIN platform_api_environments p ON p.gateway_account_id=b.account_id '
-                "JOIN account_environments e ON e.environment_id=p.environment_id WHERE n.kind='ssh' AND b.phase='ready' "
-                "AND e.state='stopped' AND e.container_id IS NULL AND e.network_container_id IS NULL AND e.sender_container_id IS NULL")]
+            return [dict(row) for row in connection.execute(
+                "SELECT b.account_id,b.node_id,b.revision,e.environment_id,e.generation, "
+                "json_type(e.fingerprint_json,'$.agy_account_deletion') AS pending "
+                "FROM agy_node_assignments b JOIN platform_api_environments p ON p.gateway_account_id=b.account_id "
+                "JOIN account_environments e ON e.environment_id=p.environment_id WHERE b.phase='ready'")]
         finally:
             connection.close()
 
-    def retire_agy_assignment(self, candidate: dict) -> None:
-        """网关确认删除后归档原分配，资料和迁移历史继续关联原节点。@param candidate 原静默范围。@return 无。"""
+    def retire_agy_assignment(self, candidate: dict) -> bool:
+        """归档同代已清空的环境，保留历史查询所需的节点和平台映射。@param candidate 已核验的原归属。@return 是否完成原代归档。"""
         with self.lock:
             connection = self.database()
             try:
                 with connection:
-                    connection.execute("UPDATE agy_node_assignments SET phase='retired' "
+                    changed = connection.execute("UPDATE agy_node_assignments SET phase='retired' "
                         "WHERE account_id=:account_id AND node_id=:node_id AND revision=:revision AND phase='ready' AND EXISTS ("
-                        'SELECT 1 FROM platform_api_environments p JOIN account_environments e ON e.environment_id=p.environment_id '
+                        "SELECT 1 FROM platform_api_environments p JOIN account_environments e ON e.environment_id=p.environment_id "
                         "WHERE p.gateway_account_id=:account_id AND e.environment_id=:environment_id AND e.generation=:generation "
                         "AND e.state='stopped' AND e.container_id IS NULL AND e.network_container_id IS NULL AND e.sender_container_id IS NULL)",
                         candidate)
+                    return changed.rowcount == 1
             finally:
                 connection.close()
 

@@ -33,7 +33,10 @@ class NodeOwnerTests(unittest.TestCase):
             self.executor.database,lambda timezone:{},Mock())
         self.addCleanup(self.runtime.heartbeat_pool.shutdown)
         self.runtime.node_key=self.executor.node_key
-        self.runtime._stop_environment=Mock()
+        def stop(row, remove=False):
+            if remove:
+                self.runtime._update(row, container_id=None, sender_container_id=None, network_container_id=None)
+        self.runtime._stop_environment=Mock(side_effect=stop)
         self.runtime._running_sender_active=Mock(return_value=0)
         self.runtime._network_runtime=lambda row:self.runtime._root(row)/'runtime/network'
         self.executor._runtime=Mock(return_value=self.runtime)
