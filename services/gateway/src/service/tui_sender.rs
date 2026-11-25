@@ -818,6 +818,7 @@ impl TuiSender {
         if let Some(token) = account_token {
             command["account_token"] = json!(token);
         }
+        let managed_capture = account_token.is_some();
         let capture = capture.and_then(|(directory, input)| {
             let id = Uuid::parse_str(&identity.reservation_id).ok()?;
             Some((directory, input, identity.account_id, id, tui_writer()?))
@@ -868,7 +869,7 @@ impl TuiSender {
         };
         let body = Body::from_stream(unfold(
             Some((connection, slot, capture)),
-            |state| async move {
+            move |state| async move {
                 let (mut connection, slot, capture) = state?;
                 let chunk = timeout(IO_TIMEOUT, read_chunk(&mut connection))
                     .await
@@ -884,7 +885,7 @@ impl TuiSender {
                                     Ok(Ok((pairs, raw))) => {
                                         let written = tokio::task::spawn_blocking(move || {
                                             let _permit = permit;
-                                            input.save(&directory, account, id, pairs, raw)
+                                            input.save(&directory, account, id, pairs, raw, managed_capture)
                                         })
                                         .await;
                                         if !matches!(written, Ok(Ok(()))) {

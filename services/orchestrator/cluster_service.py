@@ -45,6 +45,28 @@ from system_update_contract import safe_read, strict_json
 logger = logging.getLogger(__name__)
 
 
+def _matches_upgrade_account_release(journal: dict, node: dict, account_release: str) -> bool:
+    """核对已完成的 SSH 节点升级对应的账号镜像版本。
+
+    :param journal: 已核对节点身份和配置的完成记录。
+    :param node: 当前节点的配置修订和安装回执。
+    :param account_release: 已认证发送器的实际账号镜像版本。
+    :return: 已有证据是否对应这次账号换版。
+    """
+    if 'target_account_release' in journal:
+        return journal['target_account_release'] == account_release
+    # 旧日志只登记目标控制版本，账号版本由同一节点、同一配置修订的安装回执提供。
+    try:
+        prepared = strict_json((node.get('preparation_json') or '{}').encode())
+    except ValueError:
+        return False
+    return (prepared.get('state') == 'prepared' and prepared.get('node_id') == journal['node_id']
+            and prepared.get('node_key') == journal['node_key']
+            and prepared.get('revision') == node['revision'] == journal.get('revision')
+            and bool(journal.get('target_release')) and prepared.get('release') == journal['target_release']
+            and prepared.get('account_release') == account_release)
+
+
 class ClusterService:
     """管理人工登记的执行节点。
 
@@ -675,7 +697,7 @@ class ClusterService:
             if (journal.get('phase') == 'completed' and journal.get('node_key') == current['node_key']
                     and journal.get('node_id') == current['node_id']
                     and journal.get('config_sha256') == hashlib.sha256(node['config_json'].encode()).hexdigest()
-                    and journal.get('target_account_release') == binding['release_id']):
+                    and _matches_upgrade_account_release(journal, node, binding['release_id'])):
                 source = journal.get('fences', {}).get(str(account['id']), {})
                 source_account = next((item['account'] for item in journal.get('accounts', [])
                     if item.get('account', {}).get('id') == account['id']), {})

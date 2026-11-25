@@ -17,8 +17,8 @@ async def verify_tui_stages(page, dialog):
     preview = {'headers': [], 'body_truncated': False, 'headers_truncated': False,
                'original_body_bytes': None, 'original_body_sha256': None}
     missing = '独立提供方的对外 TLS 写出尚未观测'
-    snapshot = {**preview, 'stage': 'tui_provider_request', 'body': '{"model":"test"}',
-                'ingress': {**preview, 'body': '{"metadata":{"audit_label":"test"}}'},
+    snapshot = {**preview, 'stage': 'tui_provider_request', 'body': '{"model":"test"}', 'headers': [['Accept','text/event-stream']],
+                'ingress': {**preview, 'headers': [['X-Trace','fixture']], 'body': '{"metadata":{"audit_label":"test"}}'},
                 'stages': [{'stage':'ingress', 'status':'complete', 'source':'gateway_http_ingress', 'representation':'http_logical_bytes'},
                            {'stage':'tui_provider_request', 'status':'complete', 'source':'tui_sender_http', 'representation':'http_request_to_local_provider'},
                            {'stage':'wire_final', 'status':'unavailable', 'source':'unavailable', 'representation':'unavailable', 'note':missing}]}
@@ -27,13 +27,25 @@ async def verify_tui_stages(page, dialog):
     await page.get_by_role('button', name='详情', exact=True).first.click()
     await dialog.get_by_role('button', name='阶段证据', exact=True).click()
     stages = dialog.locator('[data-native-stages]')
-    await expect(stages.get_by_role('button', name='Sender 提交给提供方')).to_have_attribute('aria-pressed', 'true')
+    await expect(stages.get_by_role('button', name='模型请求提交')).to_have_attribute('aria-pressed', 'true')
+    await expect(stages.get_by_role('row', name='accept — 已记录')).to_be_visible()
+    await expect(stages.get_by_role('row', name='x-trace 已记录 —')).to_be_visible()
     await expect(stages.locator('pre').last).to_contain_text('"model"')
     await stages.get_by_role('button', name='入口原文').click()
     await expect(stages.locator('pre').last).to_contain_text('audit_label')
     await stages.get_by_role('button', name='最终TLS写出').click()
-    await expect(stages.locator('.request-empty-capture')).to_contain_text(missing)
+    await expect(stages.locator('.request-empty-capture')).to_contain_text('最终 TLS 写出未采集')
     await expect(stages.locator('pre')).to_have_count(0)
+    for representation, label, note in (
+        ('request_to_account_sender', '提交给账号发送器', '当前发送器未采集最终 TLS 写出。'),
+        ('http_request_written_to_loopback_provider', '提交给本地提供方', missing),
+    ):
+        snapshot['stages'][1]['representation'] = representation
+        snapshot['stages'][2]['note'] = note
+        await dialog.get_by_role('button', name='刷新阶段证据').click()
+        await expect(stages.get_by_role('button', name=label)).to_be_visible()
+        await stages.get_by_role('button', name='最终TLS写出').click()
+        await expect(stages.locator('.request-empty-capture')).to_contain_text(note)
 
 
 async def main():

@@ -595,12 +595,13 @@ fn snapshot_parts(
     if payload["type"] == "tui_provider_request" {
         value["stage"] = json!("tui_provider_request");
         value.as_object_mut().unwrap().remove("header_policy");
+        let managed = payload["managed_oauth"] == true;
         value["stages"] = json!([
             {"stage":"ingress","source":"gateway_http_ingress","representation":"http_logical_bytes","status":ingress_status},
-            {"stage":"tui_provider_request","source":"tui_sender_http","representation":"http_request_to_local_provider",
+            {"stage":"tui_provider_request","source":"tui_sender_http","representation":if managed {"request_to_account_sender"} else {"http_request_written_to_loopback_provider"},
                 "status":if truncated || headers_truncated {"truncated"} else {"complete"}},
             {"stage":"wire_final","source":"unavailable","representation":"unavailable","status":"unavailable",
-                "note":"账号发送器使用回环 HTTP。独立提供方对外发起的 TLS 写出缺少观测来源。"}
+                "note":if managed {"已记录交给账号发送器的请求。当前发送器未采集最终 TLS 写出。"} else {"已记录回环 HTTP 请求。独立提供方的对外 TLS 写出尚未观测。"}}
         ]);
     }
     if let Some(policy) = value.get("cache_policy") {
@@ -904,7 +905,7 @@ impl TuiCaptureInput {
 
     /// 按实发回环观察落盘，复用账号采集的目录、脱敏、时间与容量合同。
     /// @param directory 账号私有目录。@param account 账号 ID。@param attempt 单次预留 UUID。
-    /// @param pairs 实际 HTTP 头。@param raw 实际已提交实体。@return 保存结果。
+    /// @param pairs 实际提交头。@param raw 已提交实体。@param managed 已核对的账号出站模式。@return 保存结果。
     pub(super) fn save(
         self,
         directory: &Path,
@@ -912,12 +913,13 @@ impl TuiCaptureInput {
         attempt: Uuid,
         pairs: Vec<(String, String)>,
         raw: Vec<u8>,
+        managed: bool,
     ) -> io::Result<()> {
         let digest = hex::encode(Sha256::digest(&raw));
         let size = raw.len();
         let body = String::from_utf8(raw).map_err(|_| io::ErrorKind::InvalidData)?;
         let payload = json!({"type":"tui_provider_request","headers":pairs,"body":body,
-            "body_bytes":size,"body_sha256":digest});
+            "body_bytes":size,"body_sha256":digest,"managed_oauth":managed});
         let value = snapshot_parts(
             account,
             &attempt.to_string(),
@@ -1331,6 +1333,7 @@ mod tests {
                     ),
                 ],
                 sent.to_vec(),
+                false,
             )
             .unwrap();
         let stored = fs::read_to_string(root.join(format!("{attempt}.json"))).unwrap();
@@ -1344,6 +1347,7 @@ mod tests {
         }
         let snapshot: Value = serde_json::from_str(&stored).unwrap();
         assert_eq!(snapshot["stage"], "tui_provider_request");
+        assert_eq!(snapshot["stages"][1]["representation"], "http_request_written_to_loopback_provider");
         assert_eq!(
             snapshot["original_body_sha256"],
             hex::encode(Sha256::digest(sent))
@@ -1370,8 +1374,11 @@ mod tests {
         let input = TuiCaptureInput::encode(&HeaderMap::new(), raw.as_bytes(), &parsed).unwrap();
         let input: TuiCaptureInput = serde_json::from_slice(&input).unwrap();
         assert!(input.ingress["body"].as_str().unwrap().ends_with(visibly_cut));
-        input.save(&root,7,attempt,vec![("Authorization".into(),format!("Bearer {secret}"))],b"{}".to_vec()).unwrap();
+        input.save(&root,7,attempt,vec![("Authorization".into(),format!("Bearer {secret}"))],b"{}".to_vec(),true).unwrap();
         let stored = fs::read_to_string(root.join(format!("{attempt}.json"))).unwrap();
+        let snapshot: Value = serde_json::from_str(&stored).unwrap();
+        assert_eq!(snapshot["stages"][1]["representation"], "request_to_account_sender");
+        assert_eq!(snapshot["stages"][2]["status"], "unavailable");
         assert!(!stored.contains(visibly_cut));
         fs::remove_dir_all(root).unwrap();
     }

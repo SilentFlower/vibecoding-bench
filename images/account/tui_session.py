@@ -133,7 +133,7 @@ def _agent_prompt(messages):
             break
         content = row["content"]
         if isinstance(content, str) and content:
-            return sha256(content.encode()).digest()
+            return content
         if isinstance(content, list) and all(
             block["type"] == "text" and isinstance(block.get("text"), str)
             for block in content
@@ -150,7 +150,7 @@ def _agent_prompt(messages):
                     )
                 ]
             if len(texts) == 1 and texts[0]:
-                return sha256(texts[0].encode()).digest()
+                return texts[0]
         break
     raise SubagentBindingError("子代理首轮缺少可核对的输入")
 
@@ -954,12 +954,12 @@ class SessionDriver:
                 self.background_agents[key] = offer
         self.lock.notify_all()
 
-    def _claim_agent(self, identity, hint, prompt, *, exact_receipt_only):
+    def _claim_agent(self, identity, hint, prompts, *, exact_receipt_only):
         self._prune_background()
         matched = self.background_agents.get((*identity, hint))
         if matched is not None:
             if (
-                matched.prompt != prompt
+                matched.prompt not in prompts
                 or matched.claimed is not None
                 or matched.conflicted
             ):
@@ -976,9 +976,10 @@ class SessionDriver:
                 matching.extend(
                     offer
                     for offer in actor.agent_offers.values()
-                    if not offer.receipt_received and offer.prompt == prompt
+                    if not offer.receipt_received and offer.prompt in prompts
                 )
-        if len(matching) > 1:
+        # CLI 有时在后台首轮多附一个 LF。这种匹配必须等原工具的启动回执核对子 ID。
+        if len(matching) > 1 or matching and matching[0].prompt != prompts[0]:
             return None
         if not matching or matching[0].claimed is not None:
             raise SubagentBindingError("子代理需要同一会话中唯一待交接的 Agent 工具")
@@ -1101,7 +1102,11 @@ class SessionDriver:
                 or any(item.actor_key == actor_key for item in self.waiters)
             ):
                 raise SubagentBindingError("此子代理已持有独立进程，工具回执须返回原轮")
-            child_prompt = _agent_prompt(messages) if agent_hint is not None else None
+            if agent_hint is not None:
+                child_text = _agent_prompt(messages)
+                prompts = [sha256(child_text.encode()).digest()]
+                if child_text.endswith("\n"):
+                    prompts.append(sha256(child_text[:-1].encode()).digest())
             offer = None
             ticket = _Waiting(actor_key)
             handoff_limit = time.monotonic() + _AGENT_HANDOFF_SECONDS
@@ -1116,7 +1121,7 @@ class SessionDriver:
                         offer = ticket.offer = self._claim_agent(
                             identity,
                             agent_hint,
-                            child_prompt,
+                            prompts,
                             exact_receipt_only=ticket.exact_receipt_only,
                         )
                         if offer is None:

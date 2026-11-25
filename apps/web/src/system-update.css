@@ -70,8 +70,13 @@
     gap: calc(var(--ui-space-unit) * 1.5);
     min-width: 0;
   }
-  .su-download-progress progress { width: 100%; accent-color: var(--ui-color-primary); }
+  .su-download-track { height: 6px; overflow: hidden; border-radius: 999px; background: var(--ui-color-track); }
+  .su-download-track > span { display: block; height: 100%; border-radius: inherit; background: var(--ui-color-primary); }
+  .su-download-state { display: inline-flex; align-items: center; gap: var(--ui-space-unit); color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); }
+  .su-download-state svg { width: 12px; height: 12px; color: var(--ui-color-primary); }
   .su-download-progress .su-meta { margin: 0; overflow-wrap: anywhere; }
+  .su-byte-details summary { width: fit-content; cursor: pointer; }
+  .su-byte-details p { margin: var(--ui-space-unit) 0 0; }
   .su-log { display: flex; flex-direction: column; gap: 5px; margin: 0; padding: 0; list-style: none; }
   .su-log li { position: relative; display: grid; grid-template-columns: 64px 10px 120px minmax(0, 1fr); align-items: center; gap: calc(var(--ui-space-unit) * 2.5); height: 34px; padding: 0 calc(var(--ui-space-unit) * 3); border-radius: calc(var(--ui-radius-control) + 1px); background: var(--ui-color-surface); font-size: var(--ui-font-size-meta); }
   .su-log time { color: var(--ui-color-text-4); font: 500 var(--ui-font-size-sm) var(--ui-font-family-mono); }

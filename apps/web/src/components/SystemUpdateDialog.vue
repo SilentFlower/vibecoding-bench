@@ -86,6 +86,17 @@ const downloadPercent = computed(() => {
 const downloadComponents = { control: '平台与网关镜像', account: '账号运行镜像', bundle: '离线镜像包' };
 const downloadStates = { downloading: '下载中', cached: '使用本地缓存', loading: '正在解包', verifying: '正在校验' };
 const byteFormat = new Intl.NumberFormat('zh-CN');
+/** 将实际传输量换算成二进制容量。@param bytes 字节数。@return 带单位的容量。 */
+function transferSize(bytes: number): string {
+  const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  return value.toLocaleString('zh-CN', { maximumFractionDigits: 1 }) + ' ' + units[unit];
+}
 const progressRestart = computed(() => {
   const candidate = status.value?.prepared_candidate;
   const operation = progress.value;
@@ -586,13 +597,18 @@ onUnmounted(() => { alive = false; clearTimeout(timer); controller?.abort(); rec
         </section>
 
         <section class="su-section su-progress">
-          <div class="su-head"><h4><Terminal />更新进度<span v-if="steps.total" class="su-mono">{{ steps.done }} / {{ steps.total }}</span></h4><span v-if="status.busy && !steps.outcome" class="su-live" :data-offline="failures > 0 || undefined">{{ failures ? '重新连接中' : '实时' }}</span></div>
+          <div class="su-head"><h4><Terminal />更新进度<span v-if="steps.total" class="su-mono">已完成 {{ steps.done }} / {{ steps.total }} 步</span></h4><span v-if="status.busy && !steps.outcome" class="su-live" :data-offline="failures > 0 || undefined">{{ failures ? '重新连接中' : '实时' }}</span></div>
           <div v-if="download" class="su-download-progress" data-update-download :data-state="download.state">
-            <div class="su-head"><b>{{ downloadComponents[download.component] }}</b><span>{{ downloadStates[download.state] }}</span></div>
-            <progress v-if="download.state === 'downloading' || downloadPercent !== undefined" :value="downloadPercent" max="100" aria-label="当前组件下载进度" />
-            <p v-if="download.downloaded_bytes != null || downloadPercent !== undefined" class="su-meta su-mono">
-              {{ download.downloaded_bytes == null ? '' : byteFormat.format(download.downloaded_bytes) + ' B' }}<template v-if="download.total_bytes != null"> / {{ byteFormat.format(download.total_bytes) }} B</template><template v-if="downloadPercent !== undefined"> · {{ downloadPercent }}%</template>
-            </p>
+            <div class="su-head"><b>{{ downloadComponents[download.component] }}</b><span class="su-download-state"><RefreshCw v-if="download.state === 'downloading' && downloadPercent === undefined" aria-hidden="true" class="animate-spin motion-reduce:animate-none" />{{ downloadStates[download.state] }}</span></div>
+            <div v-if="downloadPercent !== undefined" class="su-download-track" role="progressbar"
+              aria-label="当前组件下载进度" :aria-valuenow="downloadPercent">
+              <span :style="{ width: downloadPercent + '%' }"></span>
+            </div>
+            <details v-if="download.downloaded_bytes != null" class="su-meta su-mono su-byte-details">
+              <summary>已下载 {{ transferSize(download.downloaded_bytes) }}<template v-if="downloadPercent !== undefined"> / {{ transferSize(download.total_bytes!) }} · {{ downloadPercent }}%</template><template v-else-if="download.state === 'downloading'"> · 总大小待获取</template></summary>
+              <p>已下载 {{ byteFormat.format(download.downloaded_bytes) }} B<template v-if="download.total_bytes != null"> / {{ byteFormat.format(download.total_bytes) }} B</template></p>
+            </details>
+            <p v-else-if="download.state === 'downloading'" class="su-meta">总大小待获取</p>
           </div>
           <ol v-if="steps.rows.length" class="su-log">
             <li v-for="row in steps.rows" :key="row.phase" data-update-step :data-state="row.state">

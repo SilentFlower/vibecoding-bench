@@ -21,6 +21,8 @@
 
 ### 4. Validation & Error Matrix
 
+SSH 节点完成更新后，日志中的 `target_account_release` 来自实际准备回执的账号镜像发行。旧日志缺此键时，按原节点 ID、密钥标识、配置修订和目标控制发行匹配已准备回执，再比较账号镜像发行。显式空值或冲突值拒绝。控制镜像和账号镜像可以分批发行。
+
 | 条件 | 结果 |
 | --- | --- |
 | 外部管理写入缺少修订或修订已变更 | 返回缺少修订或并发冲突 |
@@ -37,6 +39,9 @@
 - 兼容：旧节点凭据回执按原模型完整字段比较。扩展字段登记在 V2 专用请求模型，保持凭据查询和身份回执可用。
 
 ### 6. Tests Required
+
+- `test_cluster_synchronization`、`test_tui_node_transition` 核对分批镜像和旧节点日志的原绑定证明，包括节点或发行错配时的拒绝。
+- 后台子代理首轮若比父 `Agent.prompt` 恰好多一个 LF，只有同一账号、环境代次、主体和会话的原工具启动回执匹配子代理 ID 才能接入。先来的子轮复用有界回执等待。仅比较签名时兼容这一个字符。`test_background_child_receipt_accepts_one_cli_line_feed` 覆盖回执晚到、额外空格、双换行、CRLF 和重复提交。
 
 - `verify_tui_sender_status.py` 核对管理详情只读、休眠双向切换、在途工具续轮和错误绑定。
 - `deploy/flower2api/verify_tui_guard.py` 验证私有配置、共享工作区、终端描述符及初始化失败。兼容性变更须在真实 ABI 2 与 ABI 3 或更高版本分别验证管理端切换、发送和重启后的原历史续写。

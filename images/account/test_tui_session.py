@@ -665,6 +665,37 @@ class SessionTests(unittest.TestCase):
             with self.assertRaises(SubagentBindingError):
                 driver.prepare(candidate, encode(child))
 
+    def test_background_child_receipt_accepts_one_cli_line_feed(self):
+        """启动回执与子 ID 配对后，仅兼容首轮业务文本多一个换行。@return 无。"""
+        body = self._body()
+        identity = self._identity("shared")
+        candidate = {**identity, "agent_hint": "child"}
+        offer = self._agent("offer", "原提示")
+
+        def request(text):
+            return encode({**body, "messages": [{"role": "user", "content": [
+                {"type": "text", "text": "<system-reminder>\n上下文\n</system-reminder>"},
+                {"type": "text", "text": text},
+            ]}]})
+
+        with closing(self._driver(1)) as driver, ThreadPoolExecutor(max_workers=1) as pool:
+            parent = self._offered(driver.prepare(identity, encode(body)), offer)
+            for text in ("原提示 ", "原提示\n\n", "原提示\r\n"):
+                with self.assertRaises(SubagentBindingError):
+                    driver.prepare(candidate, request(text))
+            pending = pool.submit(driver.prepare, candidate, request("原提示\n"))
+            end = time.monotonic() + 2
+            while not driver.waiters and not pending.done() and time.monotonic() < end:
+                time.sleep(0.01)
+            self.assertTrue(driver.waiters)
+            self._finish_background(parent, driver.prepare(
+                identity, self._background_returning(body, [offer], offer="child")))
+            with closing(pending.result(3)) as reserved:
+                self.assertEqual(reserved.actor.agent_offer.tool_digest, sha256(b"offer").digest())
+                reserved.send({})
+            with self.assertRaises(SubagentBindingError):
+                driver.prepare(candidate, request("原提示\n"))
+
     def test_same_prompt_siblings_wait_for_exact_background_ids(self):
         """相同提示不分配原工具，后到的回执精确拨给各 ID 所属分支。@return 无。"""
         body = self._body()

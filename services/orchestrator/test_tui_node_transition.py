@@ -144,6 +144,28 @@ class TuiNodeTransitionTests(unittest.TestCase):
                 with self.subTest(change=change):
                     self.assertEqual([], service.tui_transport_predecessors(account, runtime, binding))
 
+            # 真实旧同步日志只有控制镜像版本。账号版本必须取自同一节点安装回执。
+            legacy = {k: v for k, v in journal.items() if k != 'target_account_release'}
+            legacy.update(target_release='ci-102-1', revision=7)
+            runtime.release_id = legacy['target_release']
+            runtime.account_release_id = binding['release_id']
+            prepared = {'state': 'prepared', 'node_id': 2, 'node_key': node_key, 'revision': 7,
+                        'release': legacy['target_release'], 'account_release': binding['release_id']}
+            node.update(revision=7, preparation_json=json.dumps(prepared))
+            with patch.dict(os.environ, {'V3_UPDATE_GATE_DIR': str(private)}):
+                atomic_json(path, legacy)
+                self.assertEqual([proof], service.tui_transport_predecessors(account, runtime, binding))
+                for change in ({'state': 'preparing'}, {'node_key': 'c' * 32}, {'node_id': 9}, {'revision': 8},
+                               {'release': 'ci-103-1'}, {'account_release': 'ci-104-1'}, {'account_release': None}):
+                    node['preparation_json'] = json.dumps({**prepared, **change})
+                    with self.subTest(preparation=change):
+                        self.assertEqual([], service.tui_transport_predecessors(account, runtime, binding))
+                node['preparation_json'] = json.dumps(prepared)
+                for change in ({'revision': 8}, {'target_account_release': ''}, {'target_account_release': 'ci-104-1'}):
+                    atomic_json(path, {**legacy, **change})
+                    with self.subTest(journal=change):
+                        self.assertEqual([], service.tui_transport_predecessors(account, runtime, binding))
+
     def test_readonly_original_remote_binding_survives_control_upgrade(self) -> None:
         """旧远端只对原轮查询开放，常规查询与后续代次保持原校验。@return 无。"""
         with tempfile.TemporaryDirectory() as directory:

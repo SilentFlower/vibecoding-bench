@@ -401,16 +401,42 @@ async def verify(output: Path) -> dict:
             'downloaded_bytes': 1024, 'total_bytes': 4096}
         fixture.state['operation']['download_progress'] = readings
         transfer = progress.locator('[data-update-download]')
-        await expect(transfer).to_contain_text('1,024 B / 4,096 B · 25%', timeout=7000)
-        await expect(transfer.get_by_role('progressbar')).to_have_attribute('value', '25')
-        readings.update(component='account', downloaded_bytes=2048, total_bytes=None)
+        await expect(transfer).to_contain_text('已下载 1 KiB / 4 KiB · 25%', timeout=7000)
+        await expect(transfer.get_by_role('progressbar')).to_have_attribute('aria-valuenow', '25')
+        readings.update(component='account', downloaded_bytes=731439795, total_bytes=None)
         await page.reload()
-        await expect(transfer).to_contain_text('2,048 B')
-        await expect(transfer.get_by_role('progressbar')).not_to_have_attribute('value', '25')
-        assert await transfer.get_by_role('progressbar').get_attribute('value') is None
+        await expect(transfer).to_contain_text('已下载 697.6 MiB · 总大小待获取')
+        await transfer.locator('summary').click()
+        await expect(transfer.get_by_text('已下载 731,439,795 B', exact=True)).to_be_visible()
+        await transfer.locator('summary').press('Enter')
+        await expect(transfer.get_by_text('已下载 731,439,795 B', exact=True)).to_be_hidden()
+        await expect(transfer.get_by_role('progressbar')).to_have_count(0)
+        await page.emulate_media(reduced_motion='reduce')
+        await expect(transfer.locator('.su-download-state svg')).to_have_css('animation-name', 'none')
+        await page.screenshot(path=str(output / 'download-unknown-390.png'), full_page=True)
+        await page.set_viewport_size({'width': 1280, 'height': 900})
+        await page.evaluate("localStorage.setItem('flower2api.theme-mode','dark')")
+        readings.update(total_bytes=1073741824)
+        await page.reload()
+        track = transfer.get_by_role('progressbar')
+        await expect(track).to_be_visible()
+        await expect(page.locator('html')).to_have_attribute('data-ui-scheme', 'dark')
+        assert await track.evaluate('''track => {
+            const marker = document.createElement('i')
+            marker.style.backgroundColor = 'var(--ui-color-track)'
+            track.append(marker)
+            const matches = getComputedStyle(marker).backgroundColor === getComputedStyle(track).backgroundColor
+            marker.remove()
+            return matches
+        }''')
+        await expect(track).to_have_attribute('aria-valuenow', '68')
+        await page.screenshot(path=str(output / 'download-dark-1280.png'), full_page=True)
+        await page.set_viewport_size({'width': 390, 'height': 900})
+        await page.evaluate("localStorage.removeItem('flower2api.theme-mode')")
+        await page.reload()
         readings.update(source='bundle', component='bundle', state='verifying', downloaded_bytes=8192, total_bytes=8192)
         await expect(transfer).to_contain_text('正在校验', timeout=7000)
-        await expect(transfer).to_contain_text('8,192 B / 8,192 B · 100%')
+        await expect(transfer).to_contain_text('已下载 8 KiB / 8 KiB · 100%')
         fixture.state.update(busy=False, prepared_candidate={'operation_id': download['operation_id'],
             'target_release': download['target_release'], 'manifest_sha256': download['target_manifest_sha256'],
             'fast_transition': True})

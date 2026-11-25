@@ -699,6 +699,8 @@ print(json.dumps({'paused':valid,'environment':root.exists()}))
                     self._rollback_control(remote, node, name, job)
                     raise
                 self.status(node_id, revision, 'restoring', current_release=installer.release)
+                # 控制镜像和账号镜像可以属于不同发行，使用安装器实际核验的账号批次。
+                job['target_account_release'] = result['account_release']
                 job['phase'] = 'restoring'
                 self._save(job)
                 self._restore_accounts(node, name, job)

@@ -11,6 +11,17 @@ const ingressOnly = computed(() => props.snapshot.stage === 'agy_ingress'
   || (props.snapshot.stage === 'ingress_rejected' && props.snapshot.stages?.length === 1
     && props.snapshot.stages[0]?.stage === 'ingress'));
 const tuiProvider = computed(() => props.snapshot.stage === 'tui_provider_request');
+const submissionFormat = computed(() => props.snapshot.stages?.find(item => item.stage === 'tui_provider_request')?.representation);
+const oldTuiCapture = computed(() => tuiProvider.value && submissionFormat.value === 'http_request_to_local_provider');
+const tuiHeaderRows = computed(() => {
+  const snapshot = props.snapshot;
+  if (snapshot.stage !== 'tui_provider_request' || !snapshot.ingress) return [];
+  const incoming = new Set(snapshot.ingress.headers.map(([name]) => name.toLowerCase()));
+  const submitted = new Set(snapshot.headers.map(([name]) => name.toLowerCase()));
+  return [...new Set([...incoming, ...submitted])].sort().map(name => ({
+    name, incoming: incoming.has(name), submitted: submitted.has(name),
+  }));
+});
 const rawStage = ref<RawStage>(tuiProvider.value ? 'tui_provider_request'
   : ingressOnly.value || props.snapshot.stage === 'ingress_rejected' ? 'ingress' : props.snapshot.wire_final ? 'wire_final' : 'cc_prepared');
 const rawStages = computed<RawStage[]>(() => {
@@ -33,7 +44,7 @@ const preview = computed(() => {
   if (rawStage.value === 'wire_final') return snapshot.wire_final;
   return snapshot.stage === 'cc_prepared' || snapshot.stage === 'agy_prepared' || snapshot.stage === 'tui_provider_request' ? snapshot : undefined;
 });
-const missingStageNote = computed(() => props.snapshot.stages?.find(stage => stage.stage === rawStage.value)?.note);
+const missingStageNote = computed(() => stages.value.find(stage => stage.stage === rawStage.value)?.note);
 const finalReason = computed(() => {
   const reason = props.snapshot.wire_final?.reason;
   if (!reason) return '';
@@ -43,7 +54,14 @@ const finalReason = computed(() => {
     HTTP_PARTIAL: '本次只观察到部分HTTP实体', REQUEST_NOT_OBSERVED: '本次没有取得与请求ID匹配的HTTP实体',
     OBSERVER_START_TIMEOUT: '采集器启动等待超时', OBSERVER_FINISH_TIMEOUT: '采集器收口等待超时' } as Record<string, string>)[reason] ?? '本次原生TLS采集未完整收口';
 });
-const stages = computed<NativeCaptureStage[]>(() => props.snapshot.stages ?? [
+const stages = computed<NativeCaptureStage[]>(() => props.snapshot.stages?.map(stage => {
+  // 旧版把两种提交路径写成了同一个来源，历史快照只能说明提交阶段。
+  if (oldTuiCapture.value && stage.stage === 'tui_provider_request') return { ...stage, representation: '提交快照' };
+  if (oldTuiCapture.value && stage.stage === 'wire_final' && stage.status === 'unavailable') {
+    return { ...stage, note: '本次只保存到模型请求提交阶段。最终 TLS 写出未采集。' };
+  }
+  return stage;
+}) ?? [
   { stage: 'ingress', source: 'unavailable', representation: 'unavailable', status: 'unavailable', note: '历史记录未保存入口阶段' },
   { stage: 'header_policy', source: 'unavailable', representation: 'unavailable', status: 'unavailable', note: '历史记录未保存逐字段决策' },
   { stage: 'cc_prepared', source: '历史组装快照', representation: 'json_before_native_transport', status: props.snapshot.body_truncated || props.snapshot.headers_truncated ? 'truncated' : 'complete' },
@@ -57,7 +75,11 @@ function actionLabel(value: string): string {
 
 /** 展示阶段及证据完整性。@param value 持久状态或阶段。@return 中文标签。 */
 function label(value: string): string {
-  if (value === 'tui_provider_request') return 'Sender 提交给提供方';
+  if (value === 'tui_provider_request') {
+    if (submissionFormat.value === 'request_to_account_sender') return '提交给账号发送器';
+    if (submissionFormat.value === 'http_request_written_to_loopback_provider') return '提交给本地提供方';
+    return '模型请求提交';
+  }
   if(value==='cc_prepared' && props.snapshot.stage==='agy_prepared')return 'AGY原生提交';
   if(value==='wire_final' && props.snapshot.wire_final?.source==='agy_native_tls')return '最终 TLS 写出';
   if(value==='wire_final' && (props.snapshot.stage==='agy_prepared' || props.snapshot.stage==='agy_egress'))return '实际出站';
@@ -76,7 +98,14 @@ function bodyText(): string {
 <template>
   <div data-native-stages>
     <div class="request-stages"><article v-for="stage in stages" :key="stage.stage"><span>{{ label(stage.stage) }}</span><strong :class="{ready:stage.status==='complete'}">{{ label(stage.status) }}</strong><small>{{ stage.source }} · {{ stage.representation }}</small><small v-if="stage.note">{{ stage.note }}</small></article></div>
-    <section v-if="!ingressOnly && (!tuiProvider || snapshot.header_policy)" class="request-section"><div class="request-section-head"><h3>头部处理</h3><ChoiceSelect v-model="action" label="筛选头部处理动作" :options="[{value:'all',label:'全部动作'},{value:'drop',label:'只看删除'},{value:'runtime',label:'运行时处理'},{value:'context',label:'提取上下文'},{value:'keep',label:'保留'}]" /></div>
+    <section v-if="tuiProvider && snapshot.stage === 'tui_provider_request' && !snapshot.header_policy" class="request-section">
+      <h3>请求头对照</h3><p class="form-help">按字段名对照入口与提交时的快照。逐字段处理原因未采集。</p>
+      <p v-if="snapshot.ingress?.headers_truncated || snapshot.headers_truncated" class="form-help">请求头已截断，仅展示已记录的字段。</p>
+      <div v-if="tuiHeaderRows.length" class="request-evidence-table"><table><thead><tr><th>字段</th><th>入口</th><th>提交</th></tr></thead>
+        <tbody><tr v-for="row in tuiHeaderRows" :key="row.name"><td><code>{{ row.name }}</code></td><td>{{ row.incoming ? '已记录' : '—' }}</td><td>{{ row.submitted ? '已记录' : '—' }}</td></tr></tbody></table>
+      </div><p v-else class="form-help">本次没有可对照的请求头。</p>
+    </section>
+    <section v-else-if="!ingressOnly" class="request-section"><div class="request-section-head"><h3>头部处理</h3><ChoiceSelect v-model="action" label="筛选头部处理动作" :options="[{value:'all',label:'全部动作'},{value:'drop',label:'只看删除'},{value:'runtime',label:'运行时处理'},{value:'context',label:'提取上下文'},{value:'keep',label:'保留'}]" /></div>
       <template v-if="snapshot.header_policy && snapshot.header_policy.status!=='unavailable'">
         <p class="request-header-summary">{{ label(snapshot.header_policy.status) }} · 保存 {{ snapshot.header_policy.stored_count ?? '未观测' }} / 实际 {{ snapshot.header_policy.observed_count ?? '未观测' }} 项<span>删除 {{ snapshot.header_policy.decisions.filter(item=>item.action==='drop').length }} 项</span></p>
         <div class="request-evidence-table"><table><thead><tr><th>字段</th><th>动作</th><th v-if="agyWire">阶段</th><th>原因</th></tr></thead><tbody><tr v-for="(item,index) in decisions" :key="index" :class="['keep','drop','runtime','context'].includes(item.action)?'request-header-'+item.action:''"><td><code>{{ item.name }}</code></td><td><span class="request-header-badge">{{ actionLabel(item.action) }}</span></td><td v-if="agyWire">{{ item.stage === 'egress' ? '出站适配' : '网关入口' }}</td><td>{{ item.reason }}</td></tr><tr v-if="!decisions.length"><td :colspan="agyWire ? 4 : 3">当前筛选下没有已保存的处理项。</td></tr></tbody></table></div>

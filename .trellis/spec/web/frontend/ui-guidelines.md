@@ -162,6 +162,8 @@ import type { ChoiceOption } from '@/components/ui/controls';
 
 ### 请求列表与诊断详情
 
+- V2 的 `tui_provider_request` 按本次提交路径显示账号发送器或本地提供方。旧版共用的 `http_request_to_local_provider` 只显示「模型请求提交」。请求头按两份已保存快照列出字段名和出现位置，缺字段或脱敏值不能推出处理原因。最终 TLS 写出缺独立证据时显示未采集。`verify_request_detail_design.py` 核验旧记录、两种新路径、两侧独有字段和 TLS 缺口。
+
 - 既有请求页同时展示CC及AGY，平台与模型分别表达；AGY上的Claude模型保持Antigravity标记。高级筛选追加平台、协议、内核版本、请求模型和实际模型，沿用服务端计数与分页。账号选择器仅该入口显式platform=all并展示平台标记。
 - 四页签复用现有布局，展示源usageMetadata、冻结策略、工具前驱及独立控制收口。历史事实未知、真实0和采集缺口分别展示；已解码Gemini、Cortex提交与最终TLS阶段按来源区分。具体字段及权限沿网关settings-database的AGY请求记录合同。
 - 列表核心字段包括时间/请求ID、账号、模型/转发、持久结果/响应码、总耗时/首输出、Token及尝试数。模型、Token与首输出注明末次尝试口径；总耗时只按请求起止观测计算。
@@ -223,6 +225,8 @@ import type { ChoiceOption } from '@/components/ui/controls';
 - **登录页**：两列（深墨品牌区 + 表单），品牌区纹理为内联 SVG（第一版 canvas 几何），表单控件为组件库大号控件 44px。登录行为、错误文案、凭据存储（`localStorage['claude-code-gateway_auth']`，退出清除）不变。品牌区不显示版本号：版本接口需登录后访问。≤760px 隐藏品牌区，表单上方显示标志与名称。
 
 ### 系统更新弹窗
+
+- 下载区复用控制台 6px 圆角轨道、主题主色和等宽计数。可靠总量显示已下载容量、总容量和当前组件的百分比。总量未知显示已下载容量和「总大小待获取」，沿用下载状态图标并尊重减少动效设置。「已完成 n / m 步」按安装步骤计算。`verify_system_update_browser.py` 核对亮色窄屏、暗色桌面及精确字节提示。
 
 - **入口与路由**：`SystemUpdateDialog.vue`（基于 `ModalDialog`，宽 768，面板类名 `.system-update-dialog`）由 `Dashboard.vue` 在 `updatesOpen` 为真时挂载，关闭即卸载并停止轮询。`router.ts` 的 `updates` 子路由渲染 `Accounts.vue` 作背景；`route.fullPath` 变化时 `updatesOpen = route.name === 'updates'`。关闭时若仍在 `updates` 则 `router.replace({ name: 'accounts' })`，并刷新版本号角标。弹窗内 router-link 跳转后自然关闭。
 - **视图**：`[data-update-view=overview|progress|history|maintenance|details]`；未接入或更新服务不可用时为 `uninstalled`，始终显示「当前版本：x」。主视图规则：没有操作记录→概览；`busy`、`reconcile`、`succeeded_cleanup_pending`，或本次弹窗内观察到该操作在维护中（`followed`）→进度；其余已结束操作在概览显示一行「上次操作 · 阶段 · 版本 · 时间」，「查看记录」进入进度。版本记录、维护详情、操作详情是带「返回」的二级视图（返回栈）。
