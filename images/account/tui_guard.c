@@ -59,7 +59,26 @@ static void check(int result) {
     }
 }
 
-static void private_process(void) {
+static void abi2_file_policy(scmp_filter_ctx filter, uint32_t denied) {
+    /* 路径截短必须先取得 Landlock 授权的可写描述符。内核在处理写式打开的截短前检查写权限。 */
+    check(seccomp_rule_add(filter, denied, SCMP_SYS(truncate), 0));
+#ifdef __NR_truncate64
+    check(seccomp_rule_add(filter, denied, SCMP_SYS(truncate64), 0));
+#endif
+    /* seccomp 只能读取直接参数。通过 ENOSYS 保留运行库的常规打开回退。 */
+    check(seccomp_rule_add(filter, SCMP_ACT_ERRNO(ENOSYS), SCMP_SYS(openat2), 0));
+    const uint64_t mask = O_TRUNC | O_ACCMODE;
+    const uint64_t non_writable[] = {O_RDONLY, O_ACCMODE};
+    for (size_t i = 0; i < sizeof(non_writable) / sizeof(non_writable[0]); ++i) {
+        const uint64_t flags = O_TRUNC | non_writable[i];
+#ifdef __NR_open
+        check(seccomp_rule_add(filter, denied, SCMP_SYS(open), 1, SCMP_A1(SCMP_CMP_MASKED_EQ, mask, flags)));
+#endif
+        check(seccomp_rule_add(filter, denied, SCMP_SYS(openat), 1, SCMP_A2(SCMP_CMP_MASKED_EQ, mask, flags)));
+    }
+}
+
+static void private_process(int abi2) {
     scmp_filter_ctx filter = seccomp_init(SCMP_ACT_ALLOW);
     if (!filter) fail("创建 TUI 进程限制");
     const uint32_t denied = SCMP_ACT_ERRNO(EPERM);
@@ -85,6 +104,7 @@ static void private_process(void) {
     /* 会话 Mod 用带随机令牌的 TCP 回环。Linux ABI 3 不限制连接其他同 UID 的 Unix socket。 */
     check(seccomp_rule_add(filter, denied, SCMP_SYS(socket), 1, SCMP_A0(SCMP_CMP_MASKED_EQ, UINT32_MAX, AF_UNIX)));
     check(seccomp_rule_add(filter, denied, SCMP_SYS(socketpair), 1, SCMP_A0(SCMP_CMP_MASKED_EQ, UINT32_MAX, AF_UNIX)));
+    if (abi2) abi2_file_policy(filter, denied);
     check(seccomp_load(filter));
     seccomp_release(filter);
 }
@@ -94,22 +114,31 @@ static void private_process(void) {
  * @return 成功交付给原版进程；系统不支持隔离时返回 125。
  */
 int main(int argc, char **argv) {
-    if (syscall(SYS_landlock_create_ruleset, NULL, 0, LANDLOCK_CREATE_RULESET_VERSION) < 3)
-        return 125;
+    const long abi = syscall(SYS_landlock_create_ruleset, (struct landlock_ruleset_attr *)NULL,
+                             (size_t)0, LANDLOCK_CREATE_RULESET_VERSION);
+    if (abi < 2) return 125;
+    const int abi2 = abi == 2;
     int probe = argc == 2 && !strcmp(argv[1], "--check");
     if (!probe && (argc < 4 || argv[1][0] != '/' || argv[2][0] != '/' || argv[3][0] != '/'))
         return 125;
-    const struct landlock_ruleset_attr configuration = {.handled_access_fs = (1ULL << 15) - 1};
+    if (abi2 && !probe) {
+        /* ABI 2 保留已授权描述符的 ftruncate。继承的三个标准描述符必须是发送器分配的终端。 */
+        for (int fd = STDIN_FILENO; fd <= STDERR_FILENO; ++fd)
+            if (!isatty(fd)) fail("核验 TUI 终端描述符");
+    }
+    struct landlock_ruleset_attr configuration = {.handled_access_fs = (1ULL << 15) - 1};
+    if (abi2) configuration.handled_access_fs &= ~LANDLOCK_ACCESS_FS_TRUNCATE;
+    const uint64_t edit = EDIT & configuration.handled_access_fs;
     int rules = syscall(SYS_landlock_create_ruleset, &configuration, sizeof(configuration), 0);
     if (rules < 0) fail("创建 TUI 文件隔离");
     if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) fail("锁定 TUI 权限");
-    permit(rules, ".", EDIT, 0);
+    permit(rules, ".", edit, 0);
     if (probe) {
         if (syscall(SYS_landlock_restrict_self, rules, 0)) fail("核验 TUI 文件隔离");
-        private_process();
+        private_process(abi2);
         return 0;
     }
-    permit(rules, argv[1], EDIT, 0);
+    permit(rules, argv[1], edit, 0);
     permit(rules, argv[2], READ, 0);
     permit(rules, argv[3], RUN, 0);
     /* 受信 PreToolUse 拒绝钩子通过 shell 内建 printf 返回决定。 */
@@ -129,7 +158,7 @@ int main(int argc, char **argv) {
     if (syscall(SYS_landlock_restrict_self, rules, 0)) fail("启用 TUI 文件隔离");
     /* 原版程序用已核验的 FD 执行，exec 成功时一并关闭它和工作目录描述符。 */
     if (close_range(3, ~0U, CLOSE_RANGE_CLOEXEC)) fail("关闭 TUI 继承描述符");
-    private_process();
+    private_process(abi2);
     execv(argv[3], argv + 3);
     fail("启动官方交互 CLI");
 }

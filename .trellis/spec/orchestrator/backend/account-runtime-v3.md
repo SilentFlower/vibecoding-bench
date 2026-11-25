@@ -10,11 +10,13 @@
 
 - `PUT /admin/accounts/{id}` 单独提交 `request_backend` 与非负整数 `request_backend_revision`。管理视图返回生效值、待切目标、修订和 `tui_v2_available`。
 - `GET /internal/v3/transport/{account_id}?wake=false` 读取当前发送器。`NodeTransportInspection` 在节点 `inspect` 操作中携带正整数 `transport_gateway_account`。
+- 账号镜像以 `tui-guard --check` 核验当前节点，以同一程序在发送器分配的 PTY 上启动固定 CLI。探测成功返回 0，隔离初始化失败返回 125。
 
 ### 3. Contracts
 
 - 受管 Claude 账号有原生 `native293` 与交互 `tui_v2` 的账号级选择。管理读取只查现有绑定。保存涉及 V2 的切换时，编排确认无运行绑定后可以按需准备该账号。
 - 切换以实际 sender 状态、绑定代次及在途工具回执为准。活动轮按原绑定收尾。V2 新请求沿账号凭据解析获取当次 AT，通过单次私有提交交给目标账号 sender。
+- 隔离程序读取运行内核的 Landlock ABI。ABI 2 组合目录授权和进程过滤器保护私有文件，允许 CLI 通过本会话获准写入的文件描述符保存配置与历史。已授权的项目工作区可以共享。ABI 3 及以上使用内核的文件截短权限。
 - 原 `NodeInspection`、`BoundIdentityRead` 与 `CredentialStatusRead` 保持现有字段。节点 `inspect` 仅在收到 `transport_gateway_account` 时按 `NodeTransportInspection` 解析。其他请求使用各自原模型。
 
 ### 4. Validation & Error Matrix
@@ -25,16 +27,19 @@
 | 编排确认账号没有运行绑定 | 只读返回空。保存涉及 V2 的切换可以请求准备 |
 | 正在交付旧轮或等待旧工具回执 | 待切目标保留，原内核继续处理 |
 | 节点账号、环境、发行或代次证明不一致 | 拒绝该绑定 |
+| Landlock ABI 低于 2、规则加载失败或进程过滤器加载失败 | 发送器隔离探测失败。账号切换沿现有未就绪路径返回 |
 
 ### 5. Scenarios and Examples
 
 - 正常：在休眠账号保存 `{"request_backend":"tui_v2","request_backend_revision":0}`，编排准备同一账号后由 Gateway 登记已核验的绑定。
 - 边界：工具续轮进行时保存 `native293`，待原轮收尾后对账生效。
+- 在 ABI 2 节点更新账号镜像后，通过实时就绪检查即可保存 V2。仅凭镜像标签或宿主版本号判断可用会漏掉规则加载失败。
 - 兼容：旧节点凭据回执按原模型完整字段比较。扩展字段登记在 V2 专用请求模型，保持凭据查询和身份回执可用。
 
 ### 6. Tests Required
 
 - `verify_tui_sender_status.py` 核对管理详情只读、休眠双向切换、在途工具续轮和错误绑定。
+- `deploy/flower2api/verify_tui_guard.py` 验证私有配置、共享工作区、终端描述符及初始化失败。兼容性变更须在真实 ABI 2 与 ABI 3 或更高版本分别验证管理端切换、发送和重启后的原历史续写。
 - `test_cluster_credential_refresh`、`test_cluster_owner_runner` 核对旧节点凭据与身份回执。`test_cluster_transport` 核对排空时原 V2 路由可用和源隔离后的拒绝。
 
 ## Scenario: US 宿主管理工具继承既有口令例外
