@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/gateway/backend/settings-database.md", "reason": "请求详情、私有脱敏快照及最终 TLS 接受边界。"}
+{"file": ".trellis/spec/gateway/backend/service-architecture.md", "reason": "受管 V2 原预留、文件凭据、账号刷新及续轮合同。"}
+{"file": ".trellis/spec/orchestrator/backend/account-runtime-v3.md", "reason": "绑定、账号内容采集开关和私有环境所有权。"}
+{"file": ".trellis/spec/gateway/backend/testing-quality.md", "reason": "隔离账号、回环 TLS 与网关回归。"}
+{"file": ".trellis/spec/platform/deploy/platform-online-update.md", "reason": "合并发布候选与受信目录签发核验。"}

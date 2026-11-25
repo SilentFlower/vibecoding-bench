@@ -1,0 +1,41 @@
+{
+  "id": "tui-v2-final-tls-capture",
+  "name": "tui-v2-final-tls-capture",
+  "title": "受管 V2 账号最终 TLS 写出采集",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-25",
+  "completedAt": "2026-11-25",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-25T12:11:15Z",
+    "blockers": []
+  },
+  "branch": "feat/tui-v2-final-tls",
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "completedSteps": [
+      "完成受管 V2 两种凭据的最终 TLS 写出采集、脱敏展示与旧格式兼容验收。",
+      "完成 v1.38.0 合并发版，核对受信目录、签名清单、双镜像及八个历史版本的升级与回退证据。"
+    ],
+    "partialStep": null,
+    "nextStep": "发布验收完成，实例管理员可在系统更新页安装 v1.38.0。",
+    "notes": "网关库版本 15，平台库版本 6。",
+    "updatedAt": "2026-11-25T12:11:15Z"
+  }
+}
