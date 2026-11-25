@@ -1,0 +1,41 @@
+{
+  "id": "tui-v2-orphan-recovery",
+  "name": "tui-v2-orphan-recovery",
+  "title": "恢复 V2 孤儿工具回执并解耦平台滚动升级",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-25",
+  "completedAt": "2026-11-25",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-25T07:13:19Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-25T07:13:18+00:00",
+    "completedSteps": [
+      "已实现 V2 工具回执自动核对、单条恢复和单账号延期升级",
+      "已通过真实网关与发送器续轮、更新页按钮、旧宿主升级与双库回退验收"
+    ],
+    "partialStep": null,
+    "nextStep": "构建和签名发布 v1.37.0，核验发行附件及受信目录",
+    "notes": "美国节点的单条过期回执已处置。首次接入保留宿主源码刷新步骤。"
+  }
+}

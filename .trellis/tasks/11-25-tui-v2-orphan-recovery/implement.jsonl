@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/platform/deploy/platform-online-update.md", "reason": "核对旧宿主接入、控制快切及账号后台更新"}
+{"file": ".trellis/spec/orchestrator/backend/account-runtime-v3.md", "reason": "核对账号 sender、环境隔离及 SSH 节点归属"}
+{"file": ".trellis/spec/gateway/backend/service-architecture.md", "reason": "核对 V2 原会话、工具回执及模型单次投递"}
