@@ -1,0 +1,40 @@
+{
+  "id": "agy-refresh-recovery",
+  "name": "agy-refresh-recovery",
+  "title": "AGY 刷新自动对账与重授权并发恢复",
+  "description": "在原操作恢复已落盘凭据，保护授权归属并公开脱敏首因",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-25",
+  "completedAt": "2026-11-25",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-25T01:28:40Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-25-agy-recovery-update-progress",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "completedSteps": [
+      "合成账号已验证续期写盘后自动对账、重启恢复、慢刷新与重授权并发、维护与断连。"
+    ],
+    "partialStep": null,
+    "nextStep": "发布评审",
+    "notes": "真实受管账号的续期行为留待发布后验收。",
+    "updatedAt": "2026-11-25T01:28:40Z"
+  }
+}

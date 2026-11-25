@@ -1,0 +1,40 @@
+{
+  "id": "update-bytes-restart",
+  "name": "update-bytes-restart",
+  "title": "系统更新下载字节进度与就地重启",
+  "description": "在下载页显示真实进度，准备完成直接重启同一发行",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-25",
+  "completedAt": "2026-11-25",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-25T01:28:40Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-25-agy-recovery-update-progress",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "completedSteps": [
+      "真实 Docker 传输与浏览器已核对下载字节和百分比，进度页可直接重启，双击只产生一次安装请求。"
+    ],
+    "partialStep": null,
+    "nextStep": "发布评审",
+    "notes": "现有宿主升级更新器后，在后续下载中验收线上进度。",
+    "updatedAt": "2026-11-25T01:28:40Z"
+  }
+}
