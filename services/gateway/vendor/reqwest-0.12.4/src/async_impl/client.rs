@@ -1971,7 +1971,7 @@ impl Client {
     }
 
     pub(super) fn execute_request(&self, req: Request) -> Pending {
-        let (method, url, mut headers, body, timeout, version, header_case_map) = req.pieces();
+        let (method, url, mut headers, body, timeout, version, header_case_map, accepted_write) = req.pieces();
         if url.scheme() != "http" && url.scheme() != "https" {
             return Pending::new_err(error::url_bad_scheme(url));
         }
@@ -2040,6 +2040,9 @@ impl Client {
             _ => {
                 let mut req = builder.body(body).expect("valid request parts");
                 *req.headers_mut() = headers.clone();
+                if let Some(observer) = accepted_write {
+                    req.extensions_mut().insert(observer);
+                }
                 if let Some(map) = &header_case_map {
                     req.extensions_mut().insert(map.clone());
                 }

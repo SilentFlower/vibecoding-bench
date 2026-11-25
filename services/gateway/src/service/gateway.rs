@@ -2791,16 +2791,36 @@ impl GatewayService {
                 // 提交等待仅覆盖私有 HTTP 头。委托的 JSON 在收到头以后聚合。
                 let attempt_id = prepared.attempt_id.clone();
                 let capture_state = prepared.capture_state;
+                // 写出可能早于私有响应头。提前绑定尝试 ID，首包前断连也能查询已接受的字节。
+                let mut wire_attempt = if !fixture
+                    && prepared.wire_capture
+                    && prepared.managed_oauth
+                    && capture_state == Some("queued")
+                {
+                    diagnostics::prepare_tui_attempt(&account, &body_map)
+                } else {
+                    None
+                };
+                if let Some(trace) = &mut wire_attempt {
+                    trace.tui_capture(attempt_id.clone(), capture_state);
+                    trace.commit_native(started);
+                }
                 let response = prepared
                     .submit_with_account_credentials(ttfb_timeout, credentials)
-                    .await?;
-                if failed_token.is_some()
+                    .await
+                    .inspect_err(|_| {
+                        if let Some(trace) = &mut wire_attempt {
+                            trace.transport_error();
+                        }
+                    })?;
+                let file_rejected_before_model = failed_token.is_some()
                     && response.status() == StatusCode::SERVICE_UNAVAILABLE
                     && runtime_transport::tui_projection_marker(
                         response.headers(),
                         runtime_transport::TUI_ERROR_SOURCE,
                         "oauth_file_before_model",
-                    )
+                    );
+                if file_rejected_before_model
                     && let Some(turn) = &turn
                     && let Err(error) = turn.release_tui_before_model().await
                 {
@@ -2813,7 +2833,11 @@ impl GatewayService {
                     &response,
                 )
                 .await;
-                let capture_state = if capture_state == Some("queued") {
+                // 账号端在模型提交前终止时，这次预留不会再产生 TLS 快照。
+                let capture_state = if capture_state == Some("queued") && file_rejected_before_model
+                {
+                    Some("not_submitted")
+                } else if capture_state == Some("queued") {
                     match response
                         .headers()
                         .get(runtime_transport::TUI_CAPTURE)
@@ -2831,16 +2855,22 @@ impl GatewayService {
                     response,
                     (!fixture).then_some(account.id),
                 )
-                .await?;
+                .await
+                .inspect_err(|_| {
+                    if let Some(trace) = &mut wire_attempt {
+                        trace.transport_error();
+                    }
+                })?;
                 let projected = !fixture
                     && response
                         .extensions_mut()
                         .remove::<runtime_transport::TuiGatewayIds>()
                         .is_some();
                 let codings = response_content_codings(response.headers());
-                if projected {
+                if projected || wire_attempt.is_some() {
                     // HTTP 200 只代表已打开 SSE。账本和调度反馈必须等到正文终态。
-                    if let Some(mut attempt) = diagnostics::prepare_tui_attempt(&account, &body_map)
+                    if let Some(mut attempt) = wire_attempt
+                        .or_else(|| diagnostics::prepare_tui_attempt(&account, &body_map))
                     {
                         attempt.tui_capture(attempt_id, capture_state);
                         attempt.with_feedback(request.clone());

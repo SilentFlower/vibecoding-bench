@@ -11,7 +11,8 @@ const ingressOnly = computed(() => props.snapshot.stage === 'agy_ingress'
   || (props.snapshot.stage === 'ingress_rejected' && props.snapshot.stages?.length === 1
     && props.snapshot.stages[0]?.stage === 'ingress'));
 const tuiProvider = computed(() => props.snapshot.stage === 'tui_provider_request');
-const submissionFormat = computed(() => props.snapshot.stages?.find(item => item.stage === 'tui_provider_request')?.representation);
+const submissionStage = computed(() => props.snapshot.stages?.find(item => item.stage === 'tui_provider_request'));
+const submissionFormat = computed(() => submissionStage.value?.submission_format ?? submissionStage.value?.representation);
 const oldTuiCapture = computed(() => tuiProvider.value && submissionFormat.value === 'http_request_to_local_provider');
 const tuiHeaderRows = computed(() => {
   const snapshot = props.snapshot;
@@ -31,7 +32,10 @@ const rawStages = computed<RawStage[]>(() => {
   if (props.snapshot.stage !== 'agy_prepared') return ['ingress', 'cc_prepared', 'wire_final'];
   return props.snapshot.wire_final ? ['ingress', 'decoded_gemini', 'cc_prepared', 'wire_final'] : ['ingress', 'decoded_gemini', 'cc_prepared'];
 });
-const tlsWire = computed(() => props.snapshot.wire_final?.source === 'native_tls_uprobe' ? props.snapshot.wire_final : undefined);
+const tlsWire = computed(() => {
+  const wire = props.snapshot.wire_final;
+  return wire?.source === 'native_tls_uprobe' || wire?.source === 'tui_sender_tls' ? wire : undefined;
+});
 const agyWire = computed(() => {
   const wire = props.snapshot.wire_final;
   return wire?.source === 'agy_http_transport' || wire?.source === 'agy_native_tls' ? wire : undefined;
@@ -56,6 +60,7 @@ const finalReason = computed(() => {
 });
 const stages = computed<NativeCaptureStage[]>(() => props.snapshot.stages?.map(stage => {
   // 旧版把两种提交路径写成了同一个来源，历史快照只能说明提交阶段。
+  if (stage.stage === 'tui_provider_request' && stage.submission_format) return { ...stage, representation: stage.submission_format };
   if (oldTuiCapture.value && stage.stage === 'tui_provider_request') return { ...stage, representation: '提交快照' };
   if (oldTuiCapture.value && stage.stage === 'wire_final' && stage.status === 'unavailable') {
     return { ...stage, note: '本次只保存到模型请求提交阶段。最终 TLS 写出未采集。' };
@@ -114,23 +119,24 @@ function bodyText(): string {
     <section v-if="!ingressOnly && (!tuiProvider || snapshot.body_changes)" class="request-section"><h3>正文变化</h3>
       <template v-if="snapshot.body_changes && snapshot.body_changes.status!=='unavailable'"><p class="form-help">{{ label(snapshot.body_changes.status) }} · {{ tuiProvider ? '对比入口与提交给提供方的正文。' : '对比入口与组装后的正文。' }}路径使用 JSON Pointer。</p><dl class="request-definitions"><template v-for="(item,index) in snapshot.body_changes.items" :key="index"><dt><code>{{ item.path || '/' }}</code></dt><dd>{{ actionLabel(item.action) }} · {{ item.reason }}</dd></template></dl><p v-if="!snapshot.body_changes.items.length" class="form-help">本次观察到的正文内容保持一致。</p></template><p v-else class="form-help">{{ snapshot.body_changes?.note ?? '历史记录未保存正文变化证据。' }}</p>
     </section>
-    <details v-if="tlsWire" class="request-code-block request-wire-evidence" data-native-wire-final><summary>原生TLS接受证据</summary><div class="request-wire-content">
+    <details v-if="tlsWire" class="request-code-block request-wire-evidence" data-native-wire-final><summary>{{ tuiProvider ? '账号发送器 TLS 写出证据' : '原生TLS接受证据' }}</summary><div class="request-wire-content">
 
       <p>实体完整性：{{ label(tlsWire.status) }} · 网络刷出：未独立观测</p>
       <p v-if="finalReason" role="status" class="break-words request-wire-reason">{{ finalReason }}（{{ tlsWire.reason }}）</p>
-      <p class="break-all request-wire-note">进程 {{ tlsWire.worker_pid ?? '未观测' }} · 连接 {{ tlsWire.connection_id ?? '未观测' }} · 环境代次 {{ tlsWire.binding_generation ?? '未观测' }}</p>
+      <p v-if="tuiProvider" class="request-wire-note">受管账号发送器 · 环境代次 {{ tlsWire.binding_generation ?? '未观测' }}</p>
+      <p v-else class="break-all request-wire-note">进程 {{ tlsWire.worker_pid ?? '未观测' }} · 连接 {{ tlsWire.connection_id ?? '未观测' }} · 环境代次 {{ tlsWire.binding_generation ?? '未观测' }}</p>
       <p v-if="tlsWire.http_sha256" class="break-all request-wire-note">整体HTTP {{ tlsWire.observed_http_bytes }} 字节 · SHA256 {{ tlsWire.http_sha256 }}</p>
-      <p v-if="tlsWire.complete">正文与组装阶段的SHA256：{{ tlsWire.body_sha256 === snapshot.original_body_sha256 ? '一致' : '不同' }}。比较依据为同次实际观测摘要。</p>
+      <p v-if="tlsWire.complete">正文与{{ tuiProvider ? '提交' : '组装' }}阶段的SHA256：{{ tlsWire.body_sha256 === snapshot.original_body_sha256 ? '一致' : '不同' }}。比较依据为同次实际观测摘要。</p>
       <p class="request-wire-note">此处记录原生TLS接受的HTTP明文。上游接收与模型执行分别由对应响应证据说明。</p>
       <div v-if="snapshot.final_header_changes" class="overflow-auto">
         <p class="request-wire-note">头部变化分析：{{ label(snapshot.final_header_changes.status) }}</p>
-        <table class="w-full text-left"><thead><tr class="border-b"><th class="p-2">组装至TLS的头部变化</th><th class="p-2">动作</th></tr></thead><tbody>
+        <table class="w-full text-left"><thead><tr class="border-b"><th class="p-2">{{ tuiProvider ? '提交至 TLS 的头部变化' : '组装至TLS的头部变化' }}</th><th class="p-2">动作</th></tr></thead><tbody>
           <tr v-for="(item, index) in snapshot.final_header_changes.items" :key="index" class="border-b"><td class="p-2 break-all font-mono">{{ item.name }}</td><td class="p-2">{{ actionLabel(item.action) }}</td></tr>
         </tbody></table>
       </div>
       <div v-if="snapshot.final_body_changes" class="overflow-auto">
         <p class="request-wire-note">正文变化分析：{{ label(snapshot.final_body_changes.status) }}</p>
-        <table class="w-full text-left"><thead><tr class="border-b"><th class="p-2">组装至TLS的正文变化</th><th class="p-2">动作</th></tr></thead><tbody>
+        <table class="w-full text-left"><thead><tr class="border-b"><th class="p-2">{{ tuiProvider ? '提交至 TLS 的正文变化' : '组装至TLS的正文变化' }}</th><th class="p-2">动作</th></tr></thead><tbody>
           <tr v-for="(item, index) in snapshot.final_body_changes.items" :key="index" class="border-b"><td class="p-2 break-all font-mono">{{ item.path || '/' }}</td><td class="p-2">{{ actionLabel(item.action) }}</td></tr>
         </tbody></table>
         <p v-if="snapshot.final_body_changes.status === 'complete' && !snapshot.final_body_changes.items.length" class="request-wire-note">同次观察到的JSON字段保持一致。</p>

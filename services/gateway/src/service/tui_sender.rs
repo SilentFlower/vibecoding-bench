@@ -23,6 +23,7 @@ use tokio::time::{Instant, sleep_until, timeout, timeout_at};
 use uuid::Uuid;
 
 use crate::error::AppError;
+use crate::service::native_capture::tui_wire::CaptureJob;
 use crate::service::native_capture::{TuiCaptureInput, tui_writer};
 use crate::service::request_body_codec::REQUEST_BODY_LIMIT;
 use crate::service::request_session::valid_id;
@@ -33,7 +34,9 @@ use crate::service::runtime_transport::{
     TransportBinding, TuiBodyPolicy, TuiOAuthFile, now_ms, request_budget, tui_delegates_json,
     tui_input_rejection, tui_model_headers, tui_projection_marker, valid_tui_account_token,
 };
-use crate::service::runtime_transport::{TUI_CAPTURE, TUI_ERROR_SOURCE, TuiReceiptProbe};
+use crate::service::runtime_transport::{
+    TUI_CAPTURE, TUI_ERROR_SOURCE, TUI_FINAL_CAPTURE, TuiReceiptProbe,
+};
 use crate::service::tui_sender_response;
 use crate::service::tui_tool_history::SERVER_SESSION_PREFIX;
 use axum::http::header::RETRY_AFTER;
@@ -141,6 +144,7 @@ enum Phase {
 }
 
 struct Record {
+    wire_capture: Option<CaptureJob>,
     identity: Identity,
     agent_probe: bool,
     binding_proof: [u8; 32],
@@ -174,6 +178,7 @@ impl Drop for Slot {
                 book.remove(&self.id);
             } else {
                 record.phase = Phase::Closed;
+                record.wire_capture = None;
             }
         }
     }
@@ -383,6 +388,24 @@ async fn verify_source(
 }
 
 impl TuiSender {
+    /// 仅在已提交的原预留中取走一次写入观察。@param binding 当前已认证绑定。
+    /// @param id 内层模型请求的原预留 ID。@return 对应的后台快照作业。
+    pub(super) fn take_wire_capture(
+        &self,
+        binding: &TransportBinding,
+        id: &str,
+    ) -> Option<CaptureJob> {
+        let mut book = self.book.lock().unwrap();
+        let record = book.get_mut(id)?;
+        if record.wire_capture.is_some()
+            && matches!(record.phase, Phase::Submitted)
+            && record.binding_proof == binding_proof(binding)
+        {
+            record.wire_capture.take()
+        } else {
+            None
+        }
+    }
     /// 使用原预留的期限接收可选采集正文。@param binding 实际绑定。@param headers 私有头。@return 原截止。
     pub(super) fn capture_deadline(
         binding: &TransportBinding,
@@ -470,6 +493,7 @@ impl TuiSender {
             book.insert(
                 id.clone(),
                 Record {
+                    wire_capture: None,
                     identity,
                     agent_probe,
                     binding_proof: binding_proof(binding),
@@ -528,6 +552,7 @@ impl TuiSender {
             setting(config)?.max_reservations,
         )?;
         let capture_requested = tui_projection_marker(request.headers(), TUI_CAPTURE, "1");
+        let wire_protocol = tui_projection_marker(request.headers(), TUI_FINAL_CAPTURE, "1");
         let prepared = async {
             if submission_log::was_consumed(
                 &self.submission_storage,
@@ -755,6 +780,11 @@ impl TuiSender {
                 .insert(TUI_OAUTH_FILE, HeaderValue::from_static("1"));
         }
         if capture_requested && capture_http {
+            if wire_protocol {
+                response
+                    .headers_mut()
+                    .insert(TUI_FINAL_CAPTURE, HeaderValue::from_static("1"));
+            }
             response
                 .headers_mut()
                 .insert(TUI_CAPTURE, HeaderValue::from_static("1"));
@@ -898,12 +928,30 @@ impl TuiSender {
         }
         // 两种受管凭据都交给账号发送器。私有凭据帧不属于采集正文。
         let managed_capture = account_token.is_some() || oauth_file.is_some();
-        let capture = capture.and_then(|(directory, input)| {
+        let mut capture = capture.and_then(|(directory, input)| {
             let id = Uuid::parse_str(&identity.reservation_id).ok()?;
             Some((directory, input, identity.account_id, id, tui_writer()?))
         });
         let capturing = capture.is_some();
-        if capturing {
+        let wire_protocol = tui_projection_marker(headers, TUI_FINAL_CAPTURE, "1");
+        if managed_capture && wire_protocol {
+            if let Some((directory, input, _, _, permit)) = capture.take() {
+                if let Some(record) = self
+                    .book
+                    .lock()
+                    .unwrap()
+                    .get_mut(&identity.reservation_id)
+                    .filter(|record| record.ticket == slot.ticket)
+                {
+                    record.wire_capture = Some(CaptureJob {
+                        directory,
+                        input,
+                        permit,
+                    });
+                }
+            }
+        }
+        if capture.is_some() {
             command["capture_http"] = json!(true);
         }
         if let Some(candidate) = workspace {
@@ -967,13 +1015,20 @@ impl TuiSender {
                                     Ok(Ok((pairs, raw))) => {
                                         let written = tokio::task::spawn_blocking(move || {
                                             let _permit = permit;
+                                            let format = if managed_capture {
+                                                "request_to_account_sender"
+                                            } else {
+                                                "http_request_written_to_loopback_provider"
+                                            };
                                             input.save(
                                                 &directory,
                                                 account,
                                                 id,
                                                 pairs,
                                                 raw,
-                                                managed_capture,
+                                                format,
+                                                !wire_protocol,
+                                                None,
                                             )
                                         })
                                         .await;
@@ -1093,6 +1148,7 @@ impl TuiSender {
                 book.insert(
                     identity.reservation_id.clone(),
                     Record {
+                        wire_capture: None,
                         identity: identity.clone(),
                         agent_probe: false,
                         binding_proof: proof,
@@ -1532,6 +1588,10 @@ mod tests {
         let snapshot: Value = serde_json::from_str(&stored).unwrap();
         assert_eq!(
             snapshot["stages"][1]["representation"],
+            "http_request_to_local_provider"
+        );
+        assert_eq!(
+            snapshot["stages"][1]["submission_format"],
             "request_to_account_sender"
         );
         assert_eq!(snapshot["stages"][2]["status"], "unavailable");

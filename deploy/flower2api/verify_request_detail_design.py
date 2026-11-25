@@ -36,11 +36,15 @@ async def verify_tui_stages(page, dialog):
     await stages.get_by_role('button', name='最终TLS写出').click()
     await expect(stages.locator('.request-empty-capture')).to_contain_text('最终 TLS 写出未采集')
     await expect(stages.locator('pre')).to_have_count(0)
-    for representation, label, note in (
-        ('request_to_account_sender', '提交给账号发送器', '当前发送器未采集最终 TLS 写出。'),
-        ('http_request_written_to_loopback_provider', '提交给本地提供方', missing),
+    for representation, target, label, note in (
+        ('request_to_account_sender', None, '提交给账号发送器', '当前发送器未采集最终 TLS 写出。'),
+        ('http_request_written_to_loopback_provider', None, '提交给本地提供方', missing),
+        ('http_request_to_local_provider', 'request_to_account_sender', '提交给账号发送器', '本次只保存提交阶段。'),
+        ('http_request_to_local_provider', 'http_request_written_to_loopback_provider', '提交给本地提供方', missing),
     ):
         snapshot['stages'][1]['representation'] = representation
+        if target:
+            snapshot['stages'][1]['submission_format'] = target
         snapshot['stages'][2]['note'] = note
         await dialog.get_by_role('button', name='刷新阶段证据').click()
         await expect(stages.get_by_role('button', name=label)).to_be_visible()

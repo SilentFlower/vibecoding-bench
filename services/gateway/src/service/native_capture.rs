@@ -32,6 +32,9 @@ pub(super) const SNAPSHOT_LIMIT: usize = 6 * 1024 * 1024;
 // 完整入站只存一份正文，为脱敏替换、JSON 字符串转义及请求头预留空间。
 const REJECTED_SNAPSHOT_LIMIT: usize = 4 * GEMINI_BODY_LIMIT;
 const HEADER_LIMIT: usize = 128 * 1024;
+#[cfg(target_os = "linux")]
+#[path = "tui_wire_capture.rs"]
+pub(super) mod tui_wire;
 const STORAGE_LIMIT: u64 = 1024 * 1024 * 1024;
 const GATEWAY_RETENTION: Duration = Duration::from_secs(7 * 86400);
 static WRITERS: Semaphore = Semaphore::const_new(2);
@@ -447,7 +450,13 @@ fn snapshot_parts(
     };
     collect(&body_value, &mut secrets);
     if let Some(wire) = payload.get("_wire_final").filter(|_| !rejected) {
-        collect(&wire["headers"], &mut secrets);
+        if let Some(headers) = wire["headers"].as_array() {
+            for pair in headers {
+                if let (Some(name), Some(value)) = (pair[0].as_str(), pair[1].as_str()) {
+                    if sensitive(name) { add_secret(value, &mut secrets); }
+                }
+            }
+        }
         if let Some(body) = wire["body"]
             .as_str()
             .and_then(|body| serde_json::from_str::<Value>(body).ok())
@@ -595,10 +604,11 @@ fn snapshot_parts(
     if payload["type"] == "tui_provider_request" {
         value["stage"] = json!("tui_provider_request");
         value.as_object_mut().unwrap().remove("header_policy");
-        let managed = payload["managed_oauth"] == true;
+        let format = payload["submission_format"].as_str().unwrap_or("http_request_to_local_provider");
+        let managed = format == "request_to_account_sender";
         value["stages"] = json!([
             {"stage":"ingress","source":"gateway_http_ingress","representation":"http_logical_bytes","status":ingress_status},
-            {"stage":"tui_provider_request","source":"tui_sender_http","representation":if managed {"request_to_account_sender"} else {"http_request_written_to_loopback_provider"},
+            {"stage":"tui_provider_request","source":"tui_sender_http","representation":format,
                 "status":if truncated || headers_truncated {"truncated"} else {"complete"}},
             {"stage":"wire_final","source":"unavailable","representation":"unavailable","status":"unavailable",
                 "note":if managed {"已记录交给账号发送器的请求。当前发送器未采集最终 TLS 写出。"} else {"已记录回环 HTTP 请求。独立提供方的对外 TLS 写出尚未观测。"}}
@@ -697,7 +707,10 @@ fn append_wire(value: &mut Value, wire: &Value, secrets: &[String]) -> io::Resul
     let header_truncated = wire["headers_truncated"]
         .as_bool()
         .ok_or(io::ErrorKind::InvalidData)?;
-    if wire["source"] != "native_tls_uprobe"
+    let tui = value["stage"] == "tui_provider_request";
+    let source_name = if tui { "tui_sender_tls" } else { "native_tls_uprobe" };
+    if wire["source"] != source_name || (tui && (wire["request_id"] != value["attempt_id"]
+        || value["stages"][1]["representation"] != "request_to_account_sender"))
         || wire["representation"] != "http_entity_from_tls_accepted_write"
         || !matches!(status, "complete" | "incomplete" | "unavailable")
         || (status == "complete") != complete
@@ -783,7 +796,7 @@ fn append_wire(value: &mut Value, wire: &Value, secrets: &[String]) -> io::Resul
                 | "BODY_ENCODING"
         )
     });
-    let mut final_value = json!({"source":"native_tls_uprobe","representation":"http_entity_from_tls_accepted_write",
+    let mut final_value = json!({"source":source_name,"representation":"http_entity_from_tls_accepted_write",
         "status":status,"reason":reason.or(if complete { None } else { Some("OBSERVER_FAILED") }),
         "headers":headers,"body":body,"body_truncated":truncated || clipped || source.len() < original.len() || (unsafe_preview && !wire["body"].as_str().unwrap_or("").is_empty()),
         "headers_truncated":header_truncated || headers_clipped || (unsafe_preview && !pairs.is_empty()),
@@ -843,10 +856,10 @@ fn append_wire(value: &mut Value, wire: &Value, secrets: &[String]) -> io::Resul
         .ok_or(io::ErrorKind::InvalidData)?
     {
         if stage["stage"] == "wire_final" {
-            *stage = json!({"stage":"wire_final","source":"native_tls_uprobe","representation":"http_entity_from_tls_accepted_write",
+            *stage = json!({"stage":"wire_final","source":source_name,"representation":"http_entity_from_tls_accepted_write",
                 "status":if complete && (final_value["body_truncated"] == true || final_value["headers_truncated"] == true) {"truncated"} else {status},
-                "note":"原生TLS实际接受的HTTP明文；网络刷出与上游实收保持独立"});
-        } else if (stage["stage"] == "cc_prepared" && clipped_prepared)
+                "note":if tui {"账号发送器上游 TLS 实际接受的 HTTP 明文。"} else {"原生TLS实际接受的HTTP明文；网络刷出与上游实收保持独立"}});
+        } else if ((stage["stage"] == "cc_prepared" || stage["stage"] == "tui_provider_request") && clipped_prepared)
             || (stage["stage"] == "ingress" && ingress_clipped)
         {
             stage["status"] = json!("truncated");
@@ -905,7 +918,8 @@ impl TuiCaptureInput {
 
     /// 按实发回环观察落盘，复用账号采集的目录、脱敏、时间与容量合同。
     /// @param directory 账号私有目录。@param account 账号 ID。@param attempt 单次预留 UUID。
-    /// @param pairs 实际提交头。@param raw 已提交实体。@param managed 已核对的账号出站模式。@return 保存结果。
+    /// @param pairs 实际提交头。@param raw 已提交实体。@param format 已协商的提交表示。
+    /// @param legacy_reader 对旧读取器继续编码历史表示。@param wire 同一次尝试的最终写出。@return 保存结果。
     pub(super) fn save(
         self,
         directory: &Path,
@@ -913,20 +927,29 @@ impl TuiCaptureInput {
         attempt: Uuid,
         pairs: Vec<(String, String)>,
         raw: Vec<u8>,
-        managed: bool,
+        format: &'static str,
+        legacy_reader: bool,
+        wire: Option<Value>,
     ) -> io::Result<()> {
         let digest = hex::encode(Sha256::digest(&raw));
         let size = raw.len();
         let body = String::from_utf8(raw).map_err(|_| io::ErrorKind::InvalidData)?;
-        let payload = json!({"type":"tui_provider_request","headers":pairs,"body":body,
-            "body_bytes":size,"body_sha256":digest,"managed_oauth":managed});
-        let value = snapshot_parts(
+        let mut payload = json!({"type":"tui_provider_request","headers":pairs,"body":body,
+            "body_bytes":size,"body_sha256":digest,"submission_format":format});
+        if let Some(wire) = wire { payload["_wire_final"] = wire; }
+        let mut value = snapshot_parts(
             account,
             &attempt.to_string(),
             Some(&self.ingress),
             self.repeated,
             &payload,
         )?;
+        if legacy_reader {
+            // 旧控制端只接受历史表示。另存已确认的提交去向，供升级后读取同一份文件。
+            let stage = &mut value["stages"][1];
+            stage["submission_format"] = json!(format);
+            stage["representation"] = json!("http_request_to_local_provider");
+        }
         save_snapshot(directory, attempt, &value)
     }
 }
@@ -1333,7 +1356,7 @@ mod tests {
                     ),
                 ],
                 sent.to_vec(),
-                false,
+                "http_request_written_to_loopback_provider", false, None,
             )
             .unwrap();
         let stored = fs::read_to_string(root.join(format!("{attempt}.json"))).unwrap();
@@ -1374,7 +1397,7 @@ mod tests {
         let input = TuiCaptureInput::encode(&HeaderMap::new(), raw.as_bytes(), &parsed).unwrap();
         let input: TuiCaptureInput = serde_json::from_slice(&input).unwrap();
         assert!(input.ingress["body"].as_str().unwrap().ends_with(visibly_cut));
-        input.save(&root,7,attempt,vec![("Authorization".into(),format!("Bearer {secret}"))],b"{}".to_vec(),true).unwrap();
+        input.save(&root,7,attempt,vec![("Authorization".into(),format!("Bearer {secret}"))],b"{}".to_vec(),"request_to_account_sender",false,None).unwrap();
         let stored = fs::read_to_string(root.join(format!("{attempt}.json"))).unwrap();
         let snapshot: Value = serde_json::from_str(&stored).unwrap();
         assert_eq!(snapshot["stages"][1]["representation"], "request_to_account_sender");

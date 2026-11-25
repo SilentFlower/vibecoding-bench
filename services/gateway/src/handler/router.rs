@@ -3292,6 +3292,8 @@ async fn request_native_capture(
         .ok_or(AppError::NotFound)?;
     let value = if attempt.capture_status.as_deref() == Some("disabled") {
         serde_json::json!({"state":"disabled", "message":"本次请求发生时账号内容采集已关闭，设置对后续请求生效"})
+    } else if attempt.capture_status.as_deref() == Some("not_submitted") {
+        serde_json::json!({"state":"missing", "message":"账号凭据准备失败，本次请求在模型提交前结束"})
     } else if attempt.log_mode == Some(RequestLogMode::Info) {
         serde_json::json!({"state":"summary", "message":"本次请求仅保存摘要"})
     } else if attempt.context.as_ref().and_then(|c| c.platform.as_deref()) == Some("antigravity") {

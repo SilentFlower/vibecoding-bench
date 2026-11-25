@@ -644,6 +644,7 @@ export interface DiagnosticContext {
 
 /** 阶段证据的来源与完整性。 */
 export interface NativeCaptureStage {
+  submission_format?: 'request_to_account_sender' | 'http_request_written_to_loopback_provider'
   stage: string
   source: string
   representation: string
@@ -663,7 +664,7 @@ export interface NativeCapturePreview {
 
 /** 原生TLS实际接受的实体证据；未知范围与网络刷出单独表示。 */
 export interface NativeTlsCapture extends Omit<NativeCapturePreview, 'original_body_bytes' | 'original_body_sha256'> {
-  source: 'native_tls_uprobe'
+  source: 'native_tls_uprobe' | 'tui_sender_tls'
   representation: 'http_entity_from_tls_accepted_write'
   status: 'complete' | 'incomplete' | 'unavailable'
   reason: string | null

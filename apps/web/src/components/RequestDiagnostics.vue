@@ -251,7 +251,7 @@ function modeLabel(value?: string | null): string {
 
 /** 显示持久化的采集状态。@param status 尝试采集状态。@return 中文标签。 */
 function captureLabel(status?: string | null): string {
-  return ({ queued: '后台采集已排队', saved: '已采集', disabled: '采集已关闭', dropped: '采集繁忙，已丢弃', failed: '采集失败', timeout: '采集超时，保存结果待核对' } as Record<string, string>)[status ?? ''] ?? '采集状态缺失';
+  return ({ not_submitted: '模型提交前已结束', queued: '后台采集已排队', saved: '已采集', disabled: '采集已关闭', dropped: '采集繁忙，已丢弃', failed: '采集失败', timeout: '采集超时，保存结果待核对' } as Record<string, string>)[status ?? ''] ?? '采集状态缺失';
 }
 
 

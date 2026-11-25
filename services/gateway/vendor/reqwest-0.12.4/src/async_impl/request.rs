@@ -28,6 +28,7 @@ pub struct Request {
     timeout: Option<Duration>,
     version: Version,
     header_case_map: Option<HeaderCaseMap>,
+    accepted_write: Option<hyper::ext::AcceptedWrite>,
 }
 
 /// A builder to construct the properties of a `Request`.
@@ -51,6 +52,7 @@ impl Request {
             timeout: None,
             version: Version::default(),
             header_case_map: None,
+            accepted_write: None,
         }
     }
 
@@ -153,6 +155,7 @@ impl Request {
         Option<Duration>,
         Version,
         Option<HeaderCaseMap>,
+        Option<hyper::ext::AcceptedWrite>,
     ) {
         (
             self.method,
@@ -162,11 +165,22 @@ impl Request {
             self.timeout,
             self.version,
             self.header_case_map,
+            self.accepted_write,
         )
     }
 }
 
 impl RequestBuilder {
+    /// 观察本次 HTTPS 请求的 HTTP/1 写入。重定向和重试不继承此观察。
+    /// @param observer 绑定本次尝试的非阻塞观察。@return 原请求构建器。
+    pub fn https_accepted_write(mut self, observer: hyper::ext::AcceptedWrite) -> Self {
+        if let Ok(request) = &mut self.request {
+            if request.url.scheme() == "https" {
+                request.accepted_write = Some(observer);
+            }
+        }
+        self
+    }
     /// 为本请求显式指定 HTTP/1 名称大小写，不改变名称对应的值与 HTTP/2 行为。
     ///
     /// @param names 已校验画像的头名；也可指定发送层自动补入的 Content-Length。
@@ -646,6 +660,7 @@ where
             timeout: None,
             version,
             header_case_map: extensions.get::<HeaderCaseMap>().cloned(),
+            accepted_write: None,
         })
     }
 }

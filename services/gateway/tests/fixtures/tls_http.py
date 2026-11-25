@@ -44,9 +44,8 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
-def main():
-    """生成临时 CA/叶证书并启动服务，参数为私有临时目录，返回 None。"""
-    root = Path(sys.argv[1])
+def certificates(root):
+    """生成仅供回环请求验证的短期证书。@param root 临时目录。@return 无。"""
     commands = [
         ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-subj", "/CN=Local v3 Test CA", "-keyout", "ca.key", "-out", "ca.pem"],
         ["req", "-newkey", "rsa:2048", "-nodes", "-subj", "/CN=api.anthropic.com", "-keyout", "leaf.key", "-out", "leaf.csr"],
@@ -56,6 +55,12 @@ def main():
     (root / "leaf.ext").write_text("subjectAltName=DNS:api.anthropic.com\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\n")
     for command in commands:
         subprocess.run(["openssl", *command], cwd=root, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+
+
+def main():
+    """在临时目录启动回环服务。@return 无。"""
+    root = Path(sys.argv[1])
+    certificates(root)
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     server.root = root
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)

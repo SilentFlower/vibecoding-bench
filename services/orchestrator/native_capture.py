@@ -71,7 +71,8 @@ def _validate_stage_details(value: dict) -> None:
             raise ValueError('多阶段预览超出共同预算')
     if 'wire_final' in value:
         wire = value['wire_final']
-        if (not isinstance(wire, dict) or wire.get('source') != 'native_tls_uprobe'
+        wire_source = 'tui_sender_tls' if value['stage'] == 'tui_provider_request' else 'native_tls_uprobe'
+        if (not isinstance(wire, dict) or wire.get('source') != wire_source
                 or wire.get('representation') != 'http_entity_from_tls_accepted_write'
                 or wire.get('status') not in {'complete', 'incomplete', 'unavailable'}
                 or type(wire.get('complete')) is not bool or wire['complete'] != (wire['status'] == 'complete')
@@ -160,12 +161,27 @@ def _read(directory: int, account_id: int, attempt_id: str, now_ms: int) -> tupl
                 or not isinstance(pairs, list) or len(pairs) > 4096
                 or any(not isinstance(pair, list) or len(pair) != 2 or any(not isinstance(x, str) for x in pair)
                        for pair in pairs) or sum(len(x.encode()) for pair in pairs for x in pair) > 128*1024
-                or set(by_name) != {'ingress', 'tui_provider_request', 'wire_final'} or 'wire_final' in value
+                or set(by_name) != {'ingress', 'tui_provider_request', 'wire_final'}
                 or provider.get('source') != 'tui_sender_http'
-                or provider.get('representation') != 'http_request_to_local_provider'
-                or provider.get('status') not in {'complete', 'truncated'}
-                or wire.get('status') != 'unavailable' or wire.get('source') != 'unavailable'):
+                or provider.get('representation') not in {'http_request_to_local_provider',
+                    'request_to_account_sender', 'http_request_written_to_loopback_provider'}
+                or provider.get('status') not in {'complete', 'truncated'}):
             raise ValueError('V2 回环采集来源或 TLS 阶段无效')
+        if 'submission_format' in provider and (provider['representation'] != 'http_request_to_local_provider'
+                or provider['submission_format'] not in ('request_to_account_sender', 'http_request_written_to_loopback_provider')):
+            raise ValueError('V2 提交去向与兼容格式不匹配')
+        if 'wire_final' in value:
+            detail = value['wire_final']
+            if (provider['representation'] != 'request_to_account_sender' or not isinstance(detail, dict)
+                    or detail.get('request_id') != attempt_id or wire.get('source') != 'tui_sender_tls'
+                    or type(detail.get('binding_generation')) is not int or detail['binding_generation'] <= 0
+                    or detail.get('complete') and ('http_sha256' not in detail or 'observed_http_bytes' not in detail)
+                    or wire.get('representation') != 'http_entity_from_tls_accepted_write'
+                    or wire.get('status') != ('truncated' if detail.get('complete') and
+                        (detail.get('headers_truncated') or detail.get('body_truncated')) else detail.get('status'))):
+                raise ValueError('V2 写出证据归属或阶段无效')
+        elif wire.get('status') != 'unavailable' or wire.get('source') != 'unavailable':
+            raise ValueError('V2 缺少对应的 TLS 证据')
     if value['stage'] == 'ingress_rejected':
         # 拒绝证据只允许入口原文；空的组装预览不能被当作实际出站内容。
         stages = value.get('stages', [])

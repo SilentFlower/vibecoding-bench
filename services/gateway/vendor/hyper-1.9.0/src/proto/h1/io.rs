@@ -30,6 +30,7 @@ pub(crate) const DEFAULT_MAX_BUFFER_SIZE: usize = 8192 + 4096 * 100;
 const MAX_BUF_LIST_BUFFERS: usize = 16;
 
 pub(crate) struct Buffered<T, B> {
+    observer: Option<crate::ext::AcceptedWrite>,
     flush_pipeline: bool,
     io: T,
     partial_len: Option<usize>,
@@ -64,6 +65,7 @@ where
         };
         let write_buf = WriteBuf::new(strategy);
         Buffered {
+            observer: None,
             flush_pipeline: false,
             io,
             partial_len: None,
@@ -264,6 +266,11 @@ where
         self.read_blocked
     }
 
+    pub(crate) fn observe_request(&mut self, observer: Option<crate::ext::AcceptedWrite>) {
+        // 客户端复用连接时覆盖上次观察。混有前一请求待写字节时放弃本次观察。
+        self.observer = observer.filter(|_| self.write_buf.remaining() == 0);
+    }
+
     pub(crate) fn poll_flush(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         if self.flush_pipeline && !self.read_buf.is_empty() {
             Poll::Ready(Ok(()))
@@ -279,7 +286,17 @@ where
                 let n = {
                     let mut iovs = [IoSlice::new(&[]); MAX_WRITEV_BUFS];
                     let len = self.write_buf.chunks_vectored(&mut iovs);
-                    ready!(Pin::new(&mut self.io).poll_write_vectored(cx, &iovs[..len]))?
+                    let accepted = ready!(Pin::new(&mut self.io).poll_write_vectored(cx, &iovs[..len]))?;
+                    if let Some(observer) = &self.observer {
+                        let mut left = accepted;
+                        for buf in &iovs[..len] {
+                            if left == 0 { break; }
+                            let take = buf.len().min(left);
+                            observer.accepted(&buf[..take]);
+                            left -= take;
+                        }
+                    }
+                    accepted
                 };
                 // TODO(eliza): we have to do this manually because
                 // `poll_write_buf` doesn't exist in Tokio 0.3 yet...when
@@ -307,6 +324,9 @@ where
     fn poll_flush_flattened(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         loop {
             let n = ready!(Pin::new(&mut self.io).poll_write(cx, self.write_buf.headers.chunk()))?;
+            if let Some(observer) = &self.observer {
+                observer.accepted(&self.write_buf.headers.chunk()[..n]);
+            }
             debug!("flushed {} bytes", n);
             self.write_buf.headers.advance(n);
             if self.write_buf.headers.remaining() == 0 {

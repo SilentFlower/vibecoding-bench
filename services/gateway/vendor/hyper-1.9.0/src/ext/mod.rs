@@ -35,6 +35,27 @@
 //!
 //! See the documentation on each item for details about its usage and requirements.
 
+/// 单个 HTTP/1 客户端请求的写入观察；跟随请求扩展，不编码到网络。
+#[derive(Clone)]
+pub struct AcceptedWrite(std::sync::Arc<dyn Fn(&[u8]) + Send + Sync>);
+
+impl AcceptedWrite {
+    /// 注册非阻塞回调。@param observe 仅接收底层连接已接受的连续字节。@return 请求扩展。
+    pub fn new(observe: impl Fn(&[u8]) + Send + Sync + 'static) -> Self {
+        Self(std::sync::Arc::new(observe))
+    }
+
+    pub(crate) fn accepted(&self, bytes: &[u8]) {
+        (self.0)(bytes);
+    }
+}
+
+impl std::fmt::Debug for AcceptedWrite {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("AcceptedWrite")
+    }
+}
+
 #[cfg(all(any(feature = "client", feature = "server"), feature = "http1"))]
 use bytes::Bytes;
 #[cfg(any(

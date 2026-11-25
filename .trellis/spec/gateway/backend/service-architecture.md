@@ -134,7 +134,7 @@ src/tlsfp/
 - 文件模式的 CLI 禁止直接 TCP `connect` 与绕过 `connect` 的网络发送路径。可信事件源线程只连接该 actor 自己的 `127.0.0.1` 端口。CLI 发到会话回环的外部代理 `CONNECT` 返回 403。账号的 Rust Sender 和 Gateway 刷新路径保持正常出站。
 - 账号层独占 RT，沿账号刷新锁和五分钟临期窗口。发送前原子持久化 RT 摘要。已确认成功时，在同事务写入新凭据并清除原标记。结果未知时保留标记并停止使用同一 RT，包括旧账号和 Gateway 重启后的请求。
 - 结束或重建会话时清理运行副本。两个归档形态均排除原生会话的完整凭据文件及原子写盘残留。敏感私有字段仅把凭据交给已认领的事件源。日志、诊断和采集屏蔽凭据原文。
-- 单 AT 与完整文件这两种受管模式的采集都标记 `request_to_account_sender`。最终 TLS 写出保持 `unavailable`。
+- 新控制端和发送器协商最终写出采集后，单 AT 与完整文件两种受管模式均标记 `request_to_account_sender`。同次模型提交的最终 TLS 证据和缺口遵循 [V2 发送器最终写出](settings-database.md#v2-发送器最终写出)。旧快照继续按原来源读取。
 
 ### 4. Validation & Error Matrix
 

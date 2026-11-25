@@ -42,9 +42,7 @@ use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 
 use crate::error::AppError;
-use crate::model::account::Account;
-#[cfg(feature = "tui-v2-candidate")]
-use crate::model::account::AccountAuthType;
+use crate::model::account::{Account, AccountAuthType};
 use crate::model::request_diagnostics::{ExecutionLocation, RequestLogMode};
 use crate::service::account::{AccountService, CredentialActivity};
 use crate::service::agy_contract::{
@@ -78,6 +76,7 @@ pub(super) const TUI_V2_STATUS_PROTOCOL: u8 = 1;
 // 仅由已绑定 sender 的私有 HTTP 回包转递。公开响应白名单不会交付此头。
 pub(super) const TUI_GATEWAY_ID_HEADER: &str = "x-v3-tui-message-id-mode";
 pub(super) const TUI_CAPTURE: &str = "x-v3-tui-http-capture";
+pub(super) const TUI_FINAL_CAPTURE: &str = "x-v3-tui-final-capture";
 pub(super) const TUI_UPSTREAM_SESSION: &str = "x-v3-tui-upstream-session";
 pub(super) const TUI_MANAGED_OAUTH: &str = "x-v3-tui-managed-oauth";
 pub(super) const TUI_OAUTH_FILE: &str = "x-v3-tui-oauth-file";
@@ -421,9 +420,21 @@ async fn send_with_client(
     prepared: &PreparedRequest,
     body: impl Into<RequestBody>,
 ) -> Result<reqwest::Response, AppError> {
+    send_observed(client, prepared, body, None).await
+}
+
+async fn send_observed(
+    client: &Client,
+    prepared: &PreparedRequest,
+    body: impl Into<RequestBody>,
+    observer: Option<hyper::ext::AcceptedWrite>,
+) -> Result<reqwest::Response, AppError> {
     let method = Method::from_bytes(prepared.method.as_bytes())
         .map_err(|_| AppError::BadRequest("invalid upstream method".into()))?;
     let mut request = client.request(method, &prepared.target_url);
+    if let Some(observer) = observer {
+        request = request.https_accepted_write(observer);
+    }
     if prepared.preserve_header_casing {
         request = request.http1_header_casing(
             prepared
@@ -1393,6 +1404,7 @@ pub(super) struct TuiReservation {
     identity_header: String,
     pub(super) attempt_id: String,
     pub(super) capture_state: Option<&'static str>,
+    pub(super) wire_capture: bool,
     capture: Option<Bytes>,
     submission_started: bool,
     input_policy: bool,
@@ -1519,8 +1531,8 @@ impl TuiReservation {
             request
         };
         let request = if let Some(bytes) = self.capture.take() {
-            request
-                .header(TUI_CAPTURE, "1")
+            let request = if self.wire_capture { request.header(TUI_FINAL_CAPTURE, "1") } else { request };
+            request.header(TUI_CAPTURE, "1")
                 .body(reqwest::Body::wrap_stream(futures_util::stream::once(
                     async move { Ok::<_, IoError>(bytes) },
                 )))
@@ -1887,6 +1899,7 @@ pub(super) async fn prepare_tui(
         identity_header,
         attempt_id,
         capture_state: None,
+        wire_capture: false,
         capture: None,
         input_policy: false,
         session_mapping: false,
@@ -1903,7 +1916,7 @@ pub(super) async fn prepare_tui(
     }
     let observe = super::diagnostics::current_log_mode() == RequestLogMode::Debug;
     if observe {
-        prepare = prepare.header(TUI_CAPTURE, "1");
+        prepare = prepare.header(TUI_CAPTURE, "1").header(TUI_FINAL_CAPTURE, "1");
     }
     let apply_policy = input.body_policy != TuiBodyPolicy::default();
     if apply_policy {
@@ -1955,6 +1968,7 @@ pub(super) async fn prepare_tui(
             reservation.session_mapping =
                 tui_projection_marker(response.headers(), TUI_UPSTREAM_SESSION, "1");
             if observe {
+                reservation.wire_capture = tui_projection_marker(response.headers(), TUI_FINAL_CAPTURE, "1");
                 reservation.capture_state = match response
                     .headers()
                     .get(TUI_CAPTURE)
@@ -3315,6 +3329,18 @@ async fn forward(State(state): State<SenderState>, headers: HeaderMap, body: Byt
                     .push((CONTENT_LENGTH.as_str().into(), body.len().to_string()));
             }
             let deadline = validate_request(&prepared, &config)?;
+            #[cfg(target_os = "linux")]
+            let observer = if tui_account_model {
+                state.tui.take_wire_capture(&config.binding, &prepared.request_id).and_then(|job| {
+                    let attempt = Uuid::parse_str(&prepared.request_id).ok()?;
+                    // 还原本入口收到的提交头。该入口已验证 Content-Length 只能由本发送器添加。
+                    let submitted = prepared.headers.iter().filter(|(name, _)| !name.eq_ignore_ascii_case("content-length"))
+                        .cloned().collect();
+                    Some(job.start(prepared.account_id, attempt, prepared.generation, submitted, body.clone()))
+                })
+            } else { None };
+            #[cfg(not(target_os = "linux"))]
+            let observer = None;
             state.active.fetch_add(1, Ordering::SeqCst);
             let guard = ActiveRequest(state.active.clone());
             submitted = oauth_expiry.is_none();
@@ -3331,7 +3357,7 @@ async fn forward(State(state): State<SenderState>, headers: HeaderMap, body: Byt
                     }
                     submitted = true;
                     let stream = stream_once(async move { Ok::<_, IoError>(body) });
-                    send_with_client(&client, &prepared, RequestBody::wrap_stream(stream)).await
+                    send_observed(&client, &prepared, RequestBody::wrap_stream(stream), observer).await
                 } else if purpose.is_some() {
                     let client = get_background_request_client_for_profile(
                         &config.proxy_url,
@@ -4277,6 +4303,7 @@ mod tests {
             identity_header: id.into(),
             attempt_id: id.into(),
             capture_state: None,
+            wire_capture: false,
             capture: None,
             input_policy: false,
             session_mapping: false,

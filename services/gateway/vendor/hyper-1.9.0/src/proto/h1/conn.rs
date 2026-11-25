@@ -617,6 +617,10 @@ where
 
         self.enforce_version(&mut head);
 
+        if T::is_client() {
+            self.io.observe_request(head.extensions.remove::<crate::ext::AcceptedWrite>());
+        }
+
         let buf = self.io.headers_buf();
         match super::role::encode_headers::<T>(
             Encode {
@@ -826,7 +830,12 @@ where
     }
 
     pub(crate) fn poll_flush(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        ready!(Pin::new(&mut self.io).poll_flush(cx))?;
+        let flushed = Pin::new(&mut self.io).poll_flush(cx);
+        // 完整 HTTP 请求已交给传输即可收口观察，不必等加密记录刷出。
+        if T::is_client() && !matches!(self.state.writing, Writing::Body(_)) && self.io.write_buf().remaining() == 0 {
+            self.io.observe_request(None);
+        }
+        ready!(flushed)?;
         self.try_keep_alive(cx);
         trace!("flushed({}): {:?}", T::LOG, self.state);
         Poll::Ready(Ok(()))

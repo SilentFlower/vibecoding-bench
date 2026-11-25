@@ -34,8 +34,21 @@ class NativeCaptureTests(unittest.TestCase):
                                {'stage':'wire_final','status':'unavailable','source':'unavailable',
                                 'representation':'unavailable'}]}
             path = folder / (attempt + '.json')
+            for representation in ('http_request_to_local_provider', 'request_to_account_sender',
+                                   'http_request_written_to_loopback_provider'):
+                stage['representation'] = representation
+                path.write_text(json.dumps(item))
+                self.assertEqual(read_capture(root, 3, attempt), item)
+            stage['representation'] = 'http_request_to_local_provider'
+            for target in ('request_to_account_sender', 'http_request_written_to_loopback_provider'):
+                stage['submission_format'] = target
+                path.write_text(json.dumps(item))
+                self.assertEqual(read_capture(root, 3, attempt), item)
+            stage['submission_format'] = 'native_tls_uprobe'
             path.write_text(json.dumps(item))
-            self.assertEqual(read_capture(root, 3, attempt), item)
+            with self.assertRaises(ValueError):
+                read_capture(root, 3, attempt)
+            del stage['submission_format']
             with self.assertRaises(ValueError):
                 read_capture(root, 4, attempt)
             for key, value in [('source', 'native_tls_uprobe'), ('status','complete')]:
@@ -45,6 +58,30 @@ class NativeCaptureTests(unittest.TestCase):
                     path.write_text(json.dumps(changed))
                     with self.assertRaises(ValueError):
                         read_capture(root, 3, attempt)
+
+            wire = {'source':'tui_sender_tls', 'representation':'http_entity_from_tls_accepted_write',
+                    'status':'complete', 'request_id':attempt, 'binding_generation':1, 'complete':True,
+                    'flushed':None, 'reason':None, 'headers':[], 'body':'{}', 'body_truncated':False,
+                    'headers_truncated':False, 'observed_body_bytes':2, 'body_sha256':'1'*64,
+                    'observed_http_bytes':100, 'http_sha256':'2'*64,
+                    'original_body_bytes':2, 'original_body_sha256':'1'*64}
+            item['wire_final'] = wire
+            item['stages'][-1] = {key:wire[key] for key in ('source','representation','status')}
+            item['stages'][-1]['stage'] = 'wire_final'
+            stage['representation'] = 'request_to_account_sender'
+            path.write_text(json.dumps(item))
+            self.assertEqual(read_capture(root, 3, attempt), item)
+            for field, key, bad in ((stage, 'representation', 'http_request_written_to_loopback_provider'),
+                                    (stage, 'representation', 'http_request_to_local_provider'),
+                                    (wire, 'request_id', str(uuid.uuid4())),
+                                    (wire, 'source', 'native_tls_uprobe'),
+                                    (wire, 'binding_generation', 0)):
+                with self.subTest(key=key, bad=bad):
+                    field[key], saved = bad, field[key]
+                    path.write_text(json.dumps(item))
+                    with self.assertRaises(ValueError):
+                        read_capture(root, 3, attempt)
+                    field[key] = saved
 
     def test_protected_rejected_capture_is_readable_and_expires(self):
         """拒绝证据沿原归属与七天期限读取，后台清理识别独立文件名。@return None。"""
