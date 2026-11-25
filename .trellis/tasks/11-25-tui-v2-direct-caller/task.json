@@ -1,0 +1,42 @@
+{
+  "id": "tui-v2-direct-caller",
+  "name": "tui-v2-direct-caller",
+  "title": "V2 工具续轮兼容客户端省略直接调用的 caller",
+  "description": "让 V2 接受 Claude Code 回传直接工具调用时省略 caller 的正常续轮，并核对工具结果与实际调用的对应关系。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-25",
+  "completedAt": "2026-11-25",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-25T05:33:07Z",
+    "blockers": []
+  },
+  "branch": "fix/tui-v2-direct-caller",
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-25T05:33:07.075966+00:00",
+    "completedSteps": [
+      "完成直接工具调用回执省略 caller 的兼容修复",
+      "复验显式和缺省会话、流式和普通响应、两轮工具回填及缓存标记",
+      "推送已验收的修复分支并同步规范"
+    ],
+    "partialStep": null,
+    "nextStep": "进入 Flower2API 正式发行流程。",
+    "notes": "使用隔离回环模型进行公开接口验收。"
+  }
+}
