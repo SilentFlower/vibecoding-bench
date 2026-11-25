@@ -5,7 +5,7 @@ from io import BytesIO
 from unittest import TestCase
 
 from tui_message_json import MessageJSON, ModelError
-from tui_messages import WireStep, history_digest, tool_receipts, wire_events
+from tui_messages import WireStep, history_digest, input_message, tool_receipts, wire_events
 
 
 class MessageJSONTests(TestCase):
@@ -195,3 +195,71 @@ class MessageJSONTests(TestCase):
         answers = [{"type":"tool_result", "tool_use_id":name, "content":name} for name in ("tool_b","tool_a")]
         follow = [*previous, {"role":"assistant","content":blocks}, {"role":"user","content":answers}]
         self.assertEqual(set(tool_receipts(follow, history_digest(previous), step.blocks)), {"tool_a","tool_b"})
+
+    def test_tool_receipts_allow_missing_direct_caller_only(self):
+        """核对直接调用回执的兼容边界与冻结正文保真。@return 无。"""
+        direct = {"type": "direct"}
+        thinking = {"type": "thinking", "thinking": "核对回执", "signature": "opaque-signature"}
+        tools = [{"name": "Bash", "input_schema": {"type": "object"}}]
+        calls = [
+            {"type": "tool_use", "id": identifier, "name": "Bash",
+             "input": {"command": "true", "caller": "业务参数"}, "caller": caller}
+            for identifier, caller in (
+                ("tool_direct", direct),
+                ("tool_search", {"type": "server_tool", "tool_id": "srvtool_search"}),
+                ("tool_extended", {**direct, "extra": True}),
+            )
+        ]
+        step = WireStep(tools)
+        step.observe({"type": "message_start", "message": {}})
+        for index, block in enumerate([thinking, *calls]):
+            step.observe({"type": "content_block_start", "index": index, "content_block": block})
+            step.observe({"type": "content_block_stop", "index": index})
+        step.observe({"type": "message_delta", "delta": {"stop_reason": "tool_use"}})
+        step.observe({"type": "message_stop"})
+
+        cache = {"type": "ephemeral", "ttl": "5m"}
+        previous = [{"role": "user", "content": [{"type": "text", "text": "执行", "cache_control": cache}]}]
+        replies = [
+            {"type": "tool_result", "tool_use_id": call["id"], "content": "完成"}
+            for call in reversed(calls)
+        ]
+
+        def frozen(assistant):
+            """冻结与实际 sender 相同的请求正文。@return 正文及发送字节。"""
+            data = {
+                "model": "claude-sonnet-4-6", "stream": True, "max_tokens": 32, "tools": tools,
+                "messages": [*previous, {"role": "assistant", "content": assistant},
+                             {"role": "user", "content": replies}],
+            }
+            raw = json.dumps(data, ensure_ascii=False, indent=2).encode()
+            parsed, _, wire = input_message(raw, native=True)
+            self.assertEqual(wire, raw)
+            return parsed, wire
+
+        omitted = {key: value for key, value in calls[0].items() if key != "caller"}
+        for tool in (calls[0], omitted):
+            with self.subTest(caller_present="caller" in tool):
+                parsed, wire = frozen([thinking, {**tool, "cache_control": cache}, *calls[1:]])
+                results = tool_receipts(parsed["messages"], history_digest(previous), step.blocks)
+                self.assertEqual(results, {reply["tool_use_id"]: reply for reply in replies})
+                self.assertEqual(parsed, json.loads(wire))
+                self.assertEqual(step.blocks[1]["caller"], direct)
+
+        for index, replacement in (
+            (0, {**thinking, "signature": "other"}),
+            (1, {**omitted, "caller": None}),
+            (1, {**omitted, "caller": {**direct, "extra": True}}),
+            (1, {**omitted, "caller": calls[1]["caller"]}),
+            (1, {**omitted, "name": "Read"}),
+            (1, {**omitted, "id": "tool_foreign"}),
+            (1, {**omitted, "input": {"command": "true"}}),
+            (2, {key: value for key, value in calls[1].items() if key != "caller"}),
+            (3, {key: value for key, value in calls[2].items() if key != "caller"}),
+        ):
+            with self.subTest(offset=index, replacement=replacement):
+                changed = [thinking, *calls]
+                changed[index] = replacement
+                parsed, _ = frozen(changed)
+                with self.assertRaisesRegex(ValueError, "原轮助手内容或工具声明发生变化"):
+                    tool_receipts(parsed["messages"], history_digest(previous), step.blocks)

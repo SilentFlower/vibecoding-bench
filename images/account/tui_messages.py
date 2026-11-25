@@ -339,6 +339,11 @@ def tool_receipts(messages, previous, expected):
     ):
         raise ValueError("工具结果不属于原历史")
     offered = [_snapshot(b) for b in _blocks(messages[pos])]
+    for block, original in zip(offered, expected):
+        if (original.get("type") == "tool_use" and original.get("caller") == {"type": "direct"}
+                and "caller" not in block):
+            # 只在比较快照里补齐直接调用标记，向模型发送的历史仍沿用客户端正文。
+            block["caller"] = original["caller"]
     if offered != expected:
         raise ValueError("原轮助手内容或工具声明发生变化")
     ids = {b["id"] for b in expected if b["type"] == "tool_use"}
