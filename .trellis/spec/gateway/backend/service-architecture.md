@@ -114,6 +114,52 @@ src/tlsfp/
 - `native_real_gateway`：首次只读绑定503后的启动补偿、零模型预热、首次同PID、在途提示后绑定故障仍继续准备、准备完成时换代拒绝、凭据轮换旧PID退出、真实主/子会话映射与观察对应。使用隔离网络及合成 TLS，不触发真实账号模型。
 - `ownership_return_is_atomic_idempotent_and_old_reply_cannot_reopen`断言交接 finish 与同操作重放产生原生就绪通知；`test_account_runtime.py`覆盖只读休眠/缺失、绑定归属/代次及通知去重/失败补偿。分发体缓存覆盖同大小改写且恢复mtime、chmod及inode替换后拒绝/重验；取消覆盖提前登记、等待初始化与跨代次隔离。
 
+## Scenario: Claude V2 的会话 OAuth 文件与账号刷新
+
+### 1. Scope / Trigger
+
+- 适用于受管 Claude V2 的文件凭据、私有发送协议、账号级 OAuth 刷新、会话网络隔离和运行副本归档。
+
+### 2. Signatures
+
+- `GET /internal/v3/transport/:account_id?tui_oauth_profile=true` 使用原内部鉴权。编排可为同一唯一绑定的 OAuth 账号返回 `tui_oauth_profile`。
+- Gateway 向已鉴权 Sender 的 prepare 提供 `x-v3-tui-oauth-file: 1`。Sender 同其事件源协商后回显该能力。提交私有头使用相同名称和 Base64 JSON，事件源通过 `oauth_file_len` 与独立的最多 8192 字节 JSON 帧读取。
+- SQLite 迁移 `gateway.tui-oauth-refresh.15` 与 PostgreSQL 初始化创建 `tui_oauth_refresh(account_id, refresh_sha256, rejected_access_sha256, pending)`。账号主键外键级联删除，`pending` 为 0 或 1。
+- 文件模式启动 `tui-guard --oauth-loopback <port> <fd> <home> <mod> <program> ...`。`fd` 是当前事件源传入的一端 Unix `SOCK_SEQPACKET`。
+
+### 3. Contracts
+
+- 快照包含 `access_token`、`refresh_token`、`expires_at`，可选 `subscription_type`、`rate_limit_tier`、`profile`。令牌和毫秒到期时间来自同一持久账号版本。`profile` 保留原账号的 scope 与扩展元数据，排除该原档案的 `accessToken`、`refreshToken`、`expiresAt`。未保存原画像的账号使用 `user:inference`。
+- 账号、环境、代次、主体、会话和预留共同约束发放。事件源在原生 HOME 原子发布 0600 的 `.claude/.credentials.json`。有效快照完全相同时复用；工具回执只有文件可用后才交给原 PID。CLI 回环的实际 AT 要与快照一致，Sender 在真实发送前重验该快照到期时间。
+- 文件模式的 CLI 禁止直接 TCP `connect` 与绕过 `connect` 的网络发送路径。可信事件源线程只连接该 actor 自己的 `127.0.0.1` 端口。CLI 发到会话回环的外部代理 `CONNECT` 返回 403。账号的 Rust Sender 和 Gateway 刷新路径保持正常出站。
+- 账号层独占 RT，沿账号刷新锁和五分钟临期窗口。发送前原子持久化 RT 摘要。已确认成功时，在同事务写入新凭据并清除原标记。结果未知时保留标记并停止使用同一 RT，包括旧账号和 Gateway 重启后的请求。
+- 结束或重建会话时清理运行副本。两个归档形态均排除原生会话的完整凭据文件及原子写盘残留。敏感私有字段仅把凭据交给已认领的事件源。日志、诊断和采集屏蔽凭据原文。
+- 单 AT 与完整文件这两种受管模式的采集都标记 `request_to_account_sender`。最终 TLS 写出保持 `unavailable`。
+
+### 4. Validation & Error Matrix
+
+| 情况 | 行为 |
+| --- | --- |
+| 已协商的文件帧无效、错绑或与原工具进程模式冲突 | 提交前拒绝。原模式或原回执按现有生命周期收口 |
+| 本轮写盘失败，原工具尚未交给 CLI | Sender 返回 `oauth_file_before_model`，Gateway 可归还原工具回执 |
+| 本轮快照已经到期 | 真实模型发送前拒绝 |
+| 真实 Sender 确认受管模型 401 | 对同一 AT 持久记下拒绝后交付原 401，账号换票在后台完成 |
+| RT 交换结果未知 | 持久阻止重用该 RT。新授权可恢复同账号后续发送 |
+| CLI 连接到其它目标或回环代理通道已关闭 | 连接操作报错，现有会话期限继续有效 |
+
+### 5. Scenarios and Examples
+
+- 正常：两条会话同账号临期只交换一次 RT，各自以新凭据和原 PID 接续工具。独立账号分别持有自己的文件和发送代理。
+- 基础边界：旧组件协商不提供完整文件模式。原 AT 模式的活跃轮继续原协议，完整文件模式的活跃轮要求原协商条件。
+- 错误用法：收到 401 后重发已提交的模型轮，或者在结果未知时重用 RT。正确处理是交付原 401 并由账号层恢复后续轮次。
+
+### 6. Tests Required
+
+- 账号快照、Sender 私有帧和工具回执用例核对多账号绑定、AT/RT 一致性、时钟边界、文件复用与单次发送。
+- `deploy/flower2api/verify_tui_guard.py` 用原生和 ABI 2 兼容路径验证串联回环、直接连接失败、地址/端口错配和文件隔离。
+- 隔离的固定官方 CLI、真实 Gateway 和两个 Sender 用例覆盖临期、过期、后台慢换票、重启、混跑、旧 Gateway 回切和原进程两次续轮。分段记录首回包、真实刷新、文件写入和模型发送计数。
+- SQLite 与 PostgreSQL 迁移测试覆盖历史记录、同一 RT 重复发送保护和同 RT 刷新成功后的状态清理。
+
 ## Scenario: 原生持续预热、实时就绪与请求进程诊断
 
 ### 1. Scope / Trigger

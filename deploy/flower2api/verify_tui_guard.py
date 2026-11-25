@@ -2,10 +2,12 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
+from ctypes import CDLL, c_int, c_ushort
 import errno
 import os
 from pathlib import Path
 from shlex import split
+import socket
 import subprocess
 from tempfile import TemporaryDirectory
 from unittest import TestCase, main
@@ -13,6 +15,7 @@ from unittest import TestCase, main
 
 HERE = Path(__file__).resolve().parent
 GUARD_SOURCE = HERE.parents[1] / "images/account/tui_guard.c"
+CONNECT_SOURCE = GUARD_SOURCE.with_name("tui_connect.c")
 SESSION_PROGRAM = Path("/usr/bin/python3")
 SAVE = """
 import errno
@@ -55,6 +58,41 @@ else:
     sys.exit('继承的文件描述符意外保留')
 print('保存完成')
 """
+NETWORK = """
+import ctypes
+import errno
+import os
+import socket
+import struct
+import sys
+
+port = int(sys.argv[1])
+target = ('127.0.0.1', port)
+def denied(operation):
+    try:
+        operation()
+    except OSError as error:
+        assert error.errno == errno.EPERM, error
+    else:
+        raise AssertionError('未授权的套接字操作成功')
+
+denied(lambda: socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
+denied(lambda: socket.socket(socket.AF_INET6, socket.SOCK_STREAM))
+denied(lambda: socket.socket(socket.AF_UNIX, socket.SOCK_STREAM))
+with socket.socket() as tcp:
+    address = struct.pack('=H', socket.AF_INET) + struct.pack('!H', port) + socket.inet_aton(target[0]) + bytes(8)
+    connect_syscalls = {'x86_64': 42, 'aarch64': 203}
+    libc = ctypes.CDLL(None, use_errno=True)
+    assert libc.syscall(connect_syscalls[os.uname().machine], tcp.fileno(), address, len(address)) == -1
+    assert ctypes.get_errno() == errno.EPERM
+    denied(lambda: tcp.connect(('127.0.0.2', port)))
+    denied(lambda: tcp.connect(('127.0.0.1', int(sys.argv[2]))))
+    tcp.settimeout(2)
+    tcp.connect(target)
+    tcp.sendall(b'ok')
+    assert tcp.recv(2) == b'ok'
+print('回环隔离完成')
+"""
 
 
 class GuardTests(TestCase):
@@ -66,9 +104,12 @@ class GuardTests(TestCase):
         root = Path(cls.enterClassContext(TemporaryDirectory(prefix="flower-tui-guard-")))
         cls.native = root / "tui-guard"
         cls.probe = root / "tui-guard-probe"
+        cls.shim = root / "tui-connect.so"
         compiler = split(os.environ.get("CC", "cc"))
         compiler += split(os.environ.get("CPPFLAGS", ""))
-        compiler += ["-O2", "-Wall", "-Wextra", "-Werror", "-Wl,-z,relro,-z,now", str(GUARD_SOURCE)]
+        compiler += ["-O2", "-Wall", "-Wextra", "-Werror", "-Wl,-z,relro,-z,now"]
+        subprocess.run([*compiler, "-fPIC", "-shared", CONNECT_SOURCE, "-o", cls.shim], check=True)
+        compiler += [f'-DCONNECT_SHIM="{cls.shim}"', str(GUARD_SOURCE)]
         libraries = split(os.environ.get("LDLIBS", "-lseccomp"))
         subprocess.run([*compiler, "-o", cls.native, *libraries], check=True)
         subprocess.run(
@@ -170,6 +211,50 @@ class GuardTests(TestCase):
             )
             self.assertEqual(child.returncode, 125)
         self.assertEqual(self.runtime.read_bytes(), b"synthetic-sender-state")
+
+    def test_oauth_connections_stay_on_the_session_loopback(self):
+        """用真实连接和直接系统调用核验当前与 ABI 2 兼容分支。@return 无。"""
+        serve = CDLL(str(self.shim)).tui_run_loopback_broker
+        serve.argtypes = [c_int, c_ushort]
+        serve.restype = c_int
+        for guard, environment in ((self.native, os.environ),
+                                   (self.probe, {**os.environ, "TUI_GUARD_TEST_ABI": "2"})):
+            with self.subTest(guard=guard), ExitStack() as stack:
+                allowed = stack.enter_context(socket.socket())
+                peer = stack.enter_context(socket.socket())
+                for listener in (allowed, peer):
+                    listener.bind(("127.0.0.1", 0))
+                    listener.listen()
+                    listener.settimeout(5)
+                def echo():
+                    client, _ = allowed.accept()
+                    with client:
+                        client.settimeout(2)
+                        client.sendall(client.recv(2))
+                port = allowed.getsockname()[1]
+                client, broker = socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET)
+                stack.callback(broker.close)
+                pool = stack.enter_context(ThreadPoolExecutor(max_workers=2))
+                answering = pool.submit(echo)
+                running = pool.submit(serve, broker.fileno(), port)
+                master, terminal = os.openpty()
+                stack.callback(os.close, master)
+                try:
+                    child = subprocess.run(
+                        [guard, "--oauth-loopback", str(port), str(client.fileno()), self.first,
+                         self.mod, SESSION_PROGRAM, "-I", "-S", "-B", "-c", NETWORK,
+                         str(port), str(peer.getsockname()[1])],
+                        cwd=self.work, env=environment, stdin=terminal, stdout=terminal,
+                        stderr=terminal, pass_fds=(client.fileno(),), timeout=5,
+                    )
+                finally:
+                    os.close(terminal)
+                    client.close()
+                output = os.read(master, 4096).decode(errors="replace")
+                self.assertEqual(child.returncode, 0, output)
+                answering.result()
+                self.assertEqual(running.result(timeout=3), 0)
+                self.assertIn("回环隔离完成", output)
 
 
 if __name__ == "__main__":

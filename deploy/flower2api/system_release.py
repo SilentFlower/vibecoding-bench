@@ -33,6 +33,7 @@ BENCH_SCHEMA_SOURCES = {
 RECEIPT_SCHEMA_SOURCE = 'orchestrator/tui_tool_receipts_schema.py'
 RECEIPT_SCHEMA_V1_CHECKSUM = '788a8c34215042c6f6ab1a48a32ae37a004bc9d71b062e026d4a67aa68daeaa3'
 GATEWAY_SCHEMA_SOURCES = {
+    'gateway.tui-oauth-refresh.15': 'cc2api/src/store/tui_oauth_refresh_schema.rs',
     'gateway.usage-history.12': 'cc2api/src/store/usage_history_schema.rs',
     'gateway.agy-recovery.14': 'cc2api/src/store/agy_recovery_schema.rs',
     'gateway.tui-backend.13': 'cc2api/src/store/tui_backend_schema.rs',
@@ -121,7 +122,7 @@ def component_content(root: Path, role: str) -> str:
         'images/worker/entrypoint.sh', 'images/worker/task_followups.py', 'images/account/projects_cli.py'] if role == 'control'
         else common + ['images/account', 'images/sidecar', 'images/worker/task_followups.py',
             'images/v3/criu', 'images/v3/tls-observer',
-            'orchestrator/runtime_files.py', 'orchestrator/runtime_diagnostics.py',
+            'orchestrator/runtime_files.py', 'orchestrator/runtime_diagnostics.py', 'orchestrator/tui_workspace_launch.py',
             'orchestrator/cli_quota.py', 'orchestrator/process_metrics.py', 'orchestrator/native_sender.py', 'orchestrator/agy_auth.py',
             'orchestrator/requirements.txt', 'orchestrator/agy_runtime'])
     digest = hashlib.sha256()

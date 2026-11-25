@@ -14511,8 +14511,13 @@ def v3_agy_environment(account_id: int, prepare: bool = False) -> dict:
 
 
 @app.get("/internal/v3/transport/{account_id}")
-def v3_transport(account_id: int, wake: bool = True, tui_previous_release: bool = False):
-    """解析唯一绑定账号并返回受限发送实例，浏览器无法直接调用。"""
+def v3_transport(account_id: int, wake: bool = True, tui_previous_release: bool = False,
+                 tui_oauth_profile: bool = False):
+    """解析唯一绑定账号并返回受限发送实例。
+    :param account_id: Gateway 账号。:param wake: 是否唤醒环境。
+    :param tui_previous_release: 是否接受原版回执绑定。:param tui_oauth_profile: 是否读取 V2 OAuth 画像。
+    :return: 已核验的私有传输绑定或空值。
+    """
     if not account_runtime:
         raise HTTPException(404)
     configuration = account_runtime.gateway._request('GET', f'/admin/runtime/accounts/{account_id}/config')
@@ -14547,15 +14552,20 @@ def v3_transport(account_id: int, wake: bool = True, tui_previous_release: bool 
             binding = account_runtime.existing_transport(account, placement_check=placement)
         else:
             binding = account_runtime.transport(account, effective_claude_code_version())
-        if binding and cluster_service and configuration.get('request_backend') == 'tui_v2':
-            proofs = cluster_service.tui_transport_predecessors(account, account_runtime, binding)
-            if proofs:
-                return {**binding, 'tui_predecessors': proofs}
+        if binding and configuration.get('request_backend') == 'tui_v2':
+            if tui_oauth_profile and configuration.get('auth_type') == 'oauth':
+                profile = account_runtime.tui_oauth_profile(account)
+                if profile is not None:
+                    binding = {**binding, 'tui_oauth_profile': profile}
+            if cluster_service:
+                proofs = cluster_service.tui_transport_predecessors(account, account_runtime, binding)
+                if proofs:
+                    binding = {**binding, 'tui_predecessors': proofs}
         return binding
     except NativePreparationBlocked as error:
         raise HTTPException(503, "原生运行时资源预算不满足，请调整后重试",
             headers={'x-v3-runtime-reason': error.reason}) from None
-    except (ValueError, RuntimeError):
+    except (ValueError, RuntimeError, OSError):
         raise HTTPException(503, "账号环境未就绪或需要维护")
 
 

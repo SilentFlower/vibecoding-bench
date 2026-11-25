@@ -45,8 +45,9 @@ RUN python3 -c "import hashlib,json,os;from pathlib import Path;p=Path('/opt/ccr
 FROM debian:bookworm-slim AS tui-guard-build
 RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev libseccomp-dev \
     && rm -rf /var/lib/apt/lists/*
-COPY images/account/tui_guard.c /src/tui_guard.c
-RUN cc -O2 -Wall -Wextra -Werror -Wl,-z,relro,-z,now /src/tui_guard.c -lseccomp -o /tui-guard
+COPY images/account/tui_guard.c images/account/tui_connect.c /src/
+RUN cc -O2 -Wall -Wextra -Werror -Wl,-z,relro,-z,now /src/tui_guard.c -lseccomp -o /tui-guard \
+    && cc -O2 -Wall -Wextra -Werror -Wl,-z,relro,-z,now -fPIC -shared /src/tui_connect.c -o /tui-connect.so
 
 FROM python:3.12-slim-bookworm AS criu-build
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -161,6 +162,7 @@ COPY orchestrator/runtime_files.py orchestrator/tui_workspace_launch.py orchestr
 COPY images/account/tui_*.py /opt/flower/tui/
 COPY images/account/tui-mod /opt/flower/tui/tui-mod
 COPY --from=tui-guard-build /tui-guard /opt/flower/tui/tui-guard
+COPY --from=tui-guard-build /tui-connect.so /opt/flower/tui/tui-connect.so
 COPY images/account/cli-version.sh /usr/local/bin/v3-cli-version
 COPY images/account/passthrough.py /usr/local/bin/v3-passthrough
 COPY images/account/network-guard.py /usr/local/bin/v3-network-guard

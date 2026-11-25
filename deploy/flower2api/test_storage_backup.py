@@ -73,6 +73,25 @@ class EssentialBackupTests(unittest.TestCase):
         self.assertEqual({}, document['excluded'])
         self.assertEqual('full', document['mode'])
 
+    def test_full_backup_keeps_native_history_and_excludes_v2_oauth_files(self) -> None:
+        """完整备份保留原账号和原生历史，排除临时 RT 副本。@return 无。"""
+        home, credential = self._prepare()
+        session = home.parent / "runtime/native/tui-sessions/11111111-1111-4111-8111-111111111111/home/.claude"
+        session.mkdir(parents=True)
+        paths = (session / ".credentials.json", session / (".credentials.json." + "a" * 32))
+        for path in paths:
+            path.write_text("synthetic-transient-oauth")
+        history = session / "history.jsonl"
+        history.write_text("synthetic-history")
+        target = self.root.parent / "v2-backup"
+        self._backup(target, full=True)
+        restored = target / "data"
+        for path in paths:
+            self.assertTrue(path.is_file())
+            self.assertFalse((restored / path.relative_to(self.root)).exists())
+        self.assertEqual((restored / history.relative_to(self.root)).read_text(), history.read_text())
+        self.assertEqual((restored / credential.relative_to(self.root)).read_bytes(), credential.read_bytes())
+
     def test_restore_failure_preserves_previous_complete_backup(self) -> None:
         """隔离恢复失败必须保留原全量恢复点，不发布半成品。@return None。"""
         self._prepare()

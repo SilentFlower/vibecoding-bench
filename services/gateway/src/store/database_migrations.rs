@@ -15,7 +15,7 @@ use crate::store::{
     account_platform_schema, account_work_schema, agy_media_schema, agy_recovery_schema,
     agy_safety_schema, agy_system_reminder_schema, agy_tool_receipts_schema, proxy_schema,
     proxy_sync_schema, request_records_schema, session_policy_block_schema, tui_backend_schema,
-    usage_history_schema,
+    tui_oauth_refresh_schema, usage_history_schema,
 };
 
 /// 返回初始迁移源码摘要，测试代码不进入持久合同。
@@ -42,6 +42,11 @@ fn registry() -> Result<Value, sqlx::Error> {
         return Err(sqlx::Error::Protocol("迁移定义与登记不符".into()));
     }
     for (index, step) in steps.iter().enumerate() {
+        if step["id"] == "gateway.tui-oauth-refresh.15"
+            && step["checksum"] != tui_oauth_refresh_schema::checksum()
+        {
+            return Err(sqlx::Error::Protocol("V2 OAuth 迁移定义与登记不符".into()));
+        }
         if step["id"] == "gateway.agy-recovery.14"
             && step["checksum"] != agy_recovery_schema::checksum()
         {
@@ -326,6 +331,9 @@ pub async fn plan(pool: &AnyPool, target: Option<usize>) -> Result<Value, sqlx::
     if rows.len() >= 14 {
         agy_recovery_schema::verify(pool).await?;
     }
+    if rows.len() >= 15 {
+        tui_oauth_refresh_schema::verify(pool).await?;
+    }
     for step in &mut steps {
         step["state"] = json!(
             if step["version"].as_u64().unwrap_or(u64::MAX) <= rows.len() as u64 {
@@ -363,6 +371,7 @@ pub async fn migrate(pool: &AnyPool, driver: &str) -> Result<(), sqlx::Error> {
         usage_history_schema::apply(&mut transaction, driver).await?;
         tui_backend_schema::apply(&mut transaction).await?;
         agy_recovery_schema::apply(&mut transaction, driver).await?;
+        tui_oauth_refresh_schema::apply(&mut transaction).await?;
         transaction.commit().await?;
         return Ok(());
     }
@@ -410,7 +419,8 @@ pub async fn apply(
                 | "gateway.agy-tool-receipts.11"
                 | "gateway.usage-history.12"
                 | "gateway.tui-backend.13"
-                | "gateway.agy-recovery.14",
+                | "gateway.agy-recovery.14"
+                | "gateway.tui-oauth-refresh.15",
             ) => {}
             _ => return Err(sqlx::Error::Protocol("迁移实现尚未登记".into())),
         }
@@ -457,6 +467,10 @@ pub async fn apply(
         }
         if step["id"] == "gateway.agy-recovery.14" {
             agy_recovery_schema::apply(&mut transaction, "sqlite").await?;
+        }
+        if step["id"] == "gateway.tui-oauth-refresh.15" {
+            tui_oauth_refresh_schema::apply(&mut transaction).await?;
+            tui_oauth_refresh_schema::verify_connection(&mut transaction).await?;
         }
         sqlx::query("CREATE TABLE IF NOT EXISTS system_schema_migrations (migration_id TEXT PRIMARY KEY,version INTEGER NOT NULL UNIQUE,checksum TEXT NOT NULL,applied_at TEXT NOT NULL,operation_id TEXT NOT NULL)")
             .execute(&mut *transaction).await?;
@@ -553,7 +567,7 @@ mod tests {
             .execute(&database).await.unwrap();
         assert_eq!(
             apply(&database, &operation, None).await.unwrap()["current_version"],
-            14
+            15
         );
         let store = AccountStore::new(database.clone(), "sqlite".into());
         let account = store.get_by_id(41).await.unwrap();
@@ -578,7 +592,7 @@ mod tests {
             apply(&database, &Uuid::new_v4().to_string(), None)
                 .await
                 .unwrap()["current_version"],
-            14
+            15
         );
         assert_eq!(
             plan(&database, Some(13)).await.unwrap()["state"],
@@ -639,7 +653,7 @@ mod tests {
         let upgrade = apply(&database, &Uuid::new_v4().to_string(), None)
             .await
             .unwrap();
-        assert_eq!(upgrade["current_version"], 14);
+        assert_eq!(upgrade["current_version"], 15);
         let value: (i64, String, i32) = sqlx::query_as(
             "SELECT id,platform,agy_system_prompt_as_user_reminder FROM accounts WHERE id=17",
         )
@@ -741,7 +755,7 @@ mod tests {
         let result = apply(&database, &Uuid::new_v4().to_string(), None)
             .await
             .unwrap();
-        assert_eq!(result["current_version"], 14);
+        assert_eq!(result["current_version"], 15);
         let preserved: Vec<(String, String, String, String)> = sqlx::query_as(
             "SELECT migration_id,CAST(version AS TEXT),checksum,operation_id FROM system_schema_migrations WHERE version<=6 ORDER BY version",
         )
@@ -772,7 +786,7 @@ mod tests {
         let result = apply(&database, &Uuid::new_v4().to_string(), None)
             .await
             .unwrap();
-        assert_eq!(result["current_version"], 14);
+        assert_eq!(result["current_version"], 15);
         let duration: String = sqlx::query_scalar(
             "SELECT value FROM settings WHERE key='session_policy_block_duration_minutes'",
         )
@@ -810,7 +824,7 @@ mod tests {
         let result = apply(&database, &Uuid::new_v4().to_string(), None)
             .await
             .unwrap();
-        assert_eq!(result["current_version"], 14);
+        assert_eq!(result["current_version"], 15);
         let original: String =
             sqlx::query_scalar("SELECT operation_id FROM system_schema_migrations")
                 .fetch_one(&database)

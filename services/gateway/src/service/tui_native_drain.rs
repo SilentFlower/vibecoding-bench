@@ -650,23 +650,7 @@ impl Drop for NativeTurn {
                 self.previous_tools.take(),
             );
             runtime.spawn(async move {
-                let result = match previous {
-                    Some(tools) => {
-                        sqlx::query("UPDATE tui_native_turns SET tools=$1 WHERE id=$2 AND tools=$3")
-                            .bind(&tools)
-                            .bind(&id)
-                            .bind(format!("!{tools}"))
-                            .execute(&pool)
-                            .await
-                    }
-                    None => {
-                        sqlx::query("DELETE FROM tui_native_turns WHERE id=$1 AND tools=''")
-                            .bind(&id)
-                            .execute(&pool)
-                            .await
-                    }
-                };
-                if let Err(error) = result {
+                if let Err(error) = release_open_turn(&pool, &id, previous.as_deref()).await {
                     warn!(%error,"未提交的候选工具轮待对账");
                 }
             });
@@ -674,7 +658,33 @@ impl Drop for NativeTurn {
     }
 }
 
+async fn release_open_turn(
+    pool: &AnyPool,
+    id: &str,
+    previous: Option<&str>,
+) -> Result<(), AppError> {
+    if let Some(tools) = previous {
+        sqlx::query("UPDATE tui_native_turns SET tools=$1 WHERE id=$2 AND tools=$3")
+            .bind(tools)
+            .bind(id)
+            .bind(format!("!{tools}"))
+            .execute(pool)
+            .await?;
+    } else {
+        sqlx::query("DELETE FROM tui_native_turns WHERE id=$1 AND tools=''")
+            .bind(id)
+            .execute(pool)
+            .await?;
+    }
+    Ok(())
+}
+
 impl NativeTurn {
+    /// 在 Sender 确认工具尚未交付时归还原回执。@return 已条件恢复原可领状态。
+    pub(super) async fn release_tui_before_model(&self) -> Result<(), AppError> {
+        release_open_turn(&self.pool, &self.id, self.previous_tools.as_deref()).await
+    }
+
     /// 标记本次是否认领了旧工具组。@return 是否必须保留原账号。
     pub(super) fn owns_continuation(&self) -> bool {
         self.previous_tools.is_some()

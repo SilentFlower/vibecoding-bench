@@ -24,6 +24,8 @@ use crate::service::account_work::{AccountWorkAdmission, AccountWorkControls};
 use crate::service::rewriter::ClientType;
 use crate::service::runtime_bridge::agy_environment;
 use crate::service::runtime_lease::RuntimeGate;
+use crate::service::runtime_transport::TuiOAuthFile;
+use crate::service::tui_backend::TUI_V2;
 use crate::service::v3_scheduling::{
     PhaseCounts, SchedulingAccountSummary, SchedulingCandidate, SchedulingConfig,
     SchedulingRequest, V3Scheduler, now_ms, send_interval_ms,
@@ -32,7 +34,7 @@ use crate::service::version_profile::{
     apply_identity_to_env_json, default_profile, profile_for_key,
 };
 use crate::store::account_store::AccountStore;
-use crate::store::account_store::TuiBackendSnapshot;
+use crate::store::account_store::{TuiBackendSnapshot, TuiOAuthRefreshState};
 use crate::store::scheduling_store::SchedulingStore;
 
 #[path = "agy_account.rs"]
@@ -49,6 +51,7 @@ use credential_ownership::CredentialGate;
 const STICKY_SESSION_TTL: Duration = Duration::from_secs(60 * 60);
 const OAUTH_REFRESH_BUFFER_SECONDS: i64 = 5 * 60;
 const OAUTH_MISSING_REFRESH_TOKEN_REASON: &str = "OAuth refresh unavailable: missing refresh token";
+const TUI_OAUTH_REFRESH_UNKNOWN: &str = "OAuth 刷新结果未知，请核对或重新授权原账号";
 pub(super) const NATIVE_OAUTH_REVOKED_REASON: &str = "401 OAuth 访问令牌已撤销";
 const OAUTH_LOCK_TTL: Duration = Duration::from_secs(30);
 const OAUTH_WAIT_RETRY: Duration = Duration::from_millis(500);
@@ -681,6 +684,7 @@ struct OAuthResolvePolicy {
     min_validity_seconds: i64,
     force_refresh: bool,
     allow_still_valid_fallback: bool,
+    require_determinate_refresh: bool,
 }
 
 /// 生成导入/对账快照，不借机刷新或启用人工停用账号。
@@ -2222,6 +2226,60 @@ impl AccountService {
         Ok((bearer, activity))
     }
 
+    /// 在原账号活动期间取得同一版本的完整 V2 文件凭据。
+    /// @param id 已绑定的账号。@param original_tool 是否续接原工具。@return 完整快照与活动许可。
+    pub(super) async fn resolve_tui_oauth_file(
+        &self,
+        id: i64,
+        original_tool: bool,
+    ) -> Result<(TuiOAuthFile, CredentialActivity), AppError> {
+        let activity = self.upstream_tui_activity(id, original_tool).await?;
+        let account = self.store.get_by_id(id).await?;
+        if !account.is_claude_code() {
+            return Err(AppError::ServiceUnavailable(
+                "V2 OAuth 账号平台不匹配".into(),
+            ));
+        }
+        let resolved = self.resolve_claude_oauth(&account, true).await?;
+        validate_managed_oauth_account(&resolved)?;
+        let expires_at = resolved
+            .expires_at
+            .and_then(|expiry| u64::try_from(expiry.timestamp_millis()).ok())
+            .ok_or_else(|| AppError::ServiceUnavailable("V2 账号凭据缺少真实到期时间".into()))?;
+        let file = TuiOAuthFile {
+            access_token: resolved.access_token,
+            refresh_token: resolved.refresh_token,
+            expires_at,
+            subscription_type: resolved.subscription_type.filter(|value| !value.is_empty()),
+            rate_limit_tier: resolved.rate_limit_tier.filter(|value| !value.is_empty()),
+            profile: None,
+        };
+        if !file.valid() {
+            return Err(AppError::ServiceUnavailable(
+                "V2 账号凭据无效或已过期".into(),
+            ));
+        }
+        Ok((file, activity))
+    }
+
+    async fn resolve_claude_oauth(
+        &self,
+        account: &Account,
+        require_determinate_refresh: bool,
+    ) -> Result<Account, AppError> {
+        validate_managed_oauth_account(account)?;
+        self.resolve_oauth_account(
+            account,
+            OAuthResolvePolicy {
+                min_validity_seconds: OAUTH_REFRESH_BUFFER_SECONDS,
+                force_refresh: false,
+                allow_still_valid_fallback: true,
+                require_determinate_refresh,
+            },
+        )
+        .await
+    }
+
     async fn resolve_claude_bearer(&self, id: i64) -> Result<String, AppError> {
         let account = self.store.get_by_id(id).await?;
         if !account.is_claude_code() {
@@ -2236,21 +2294,28 @@ impl AccountService {
                 }
                 Ok(account.setup_token)
             }
-            AccountAuthType::Oauth => {
-                validate_managed_oauth_account(&account)?;
-                let resolved = self
-                    .resolve_oauth_account(
-                        &account,
-                        OAuthResolvePolicy {
-                            min_validity_seconds: OAUTH_REFRESH_BUFFER_SECONDS,
-                            force_refresh: false,
-                            allow_still_valid_fallback: true,
-                        },
-                    )
-                    .await?;
-                Ok(resolved.access_token)
-            }
+            AccountAuthType::Oauth => Ok(self
+                .resolve_claude_oauth(&account, false)
+                .await?
+                .access_token),
         }
+    }
+
+    /// 为仍在使用的文件 AT 持久登记拒绝。@param id 原账号。@param failed_token 已发送的 AT。
+    /// @return 该凭据是否首次被登记，供调用方启动后台恢复。
+    pub(super) async fn record_tui_oauth_rejection(
+        &self,
+        id: i64,
+        failed_token: &str,
+    ) -> Result<bool, AppError> {
+        let account = self.store.get_by_id(id).await?;
+        if account.auth_type != AccountAuthType::Oauth
+            || !account.is_claude_code()
+            || account.access_token != failed_token
+        {
+            return Ok(false);
+        }
+        self.store.record_tui_oauth_rejection(&account).await
     }
 
     /// 在上游返回 401 后恢复 OAuth Access Token。
@@ -2322,6 +2387,7 @@ impl AccountService {
                     min_validity_seconds: 0,
                     force_refresh: true,
                     allow_still_valid_fallback: false,
+                    require_determinate_refresh: false,
                 },
             )
             .await?;
@@ -2379,6 +2445,7 @@ impl AccountService {
                             min_validity_seconds,
                             force_refresh,
                             allow_still_valid_fallback: false,
+                            require_determinate_refresh: false,
                         },
                     )
                     .await
@@ -2653,7 +2720,8 @@ impl AccountService {
                 OAUTH_MISSING_REFRESH_TOKEN_REASON.into(),
             ));
         }
-        if policy.force_refresh
+        if self.store.tui_oauth_refresh_state(&account).await? != TuiOAuthRefreshState::Ready
+            || policy.force_refresh
             || !account.has_valid_oauth_access_token(policy.min_validity_seconds)
         {
             self.refresh_oauth_account(id, policy).await?;
@@ -2681,7 +2749,9 @@ impl AccountService {
                 OAUTH_MISSING_REFRESH_TOKEN_REASON.into(),
             ));
         }
-        if !policy.force_refresh
+        let state = self.store.tui_oauth_refresh_state(account).await?;
+        if state == TuiOAuthRefreshState::Ready
+            && !policy.force_refresh
             && account.has_valid_oauth_access_token(policy.min_validity_seconds)
         {
             return Ok(account.clone());
@@ -2700,14 +2770,14 @@ impl AccountService {
             return result;
         }
 
-        let initial_access_token = account.access_token.clone();
         for _ in 0..OAUTH_WAIT_ATTEMPTS {
             sleep(OAUTH_WAIT_RETRY).await;
             let latest = self.store.get_by_id(account.id).await?;
             let refreshed_by_owner =
-                !policy.force_refresh || latest.access_token != initial_access_token;
+                !policy.force_refresh || latest.access_token != account.access_token;
             if refreshed_by_owner
                 && latest.has_valid_oauth_access_token(policy.min_validity_seconds)
+                && self.store.tui_oauth_refresh_state(&latest).await? == TuiOAuthRefreshState::Ready
             {
                 return Ok(latest);
             }
@@ -2742,7 +2812,15 @@ impl AccountService {
                 OAUTH_MISSING_REFRESH_TOKEN_REASON.into(),
             ));
         }
-        if !policy.force_refresh && latest.has_valid_oauth_access_token(policy.min_validity_seconds)
+        let state = self.store.tui_oauth_refresh_state(&latest).await?;
+        if state == TuiOAuthRefreshState::Pending {
+            return Err(AppError::ServiceUnavailable(
+                TUI_OAUTH_REFRESH_UNKNOWN.into(),
+            ));
+        }
+        if state == TuiOAuthRefreshState::Ready
+            && !policy.force_refresh
+            && latest.has_valid_oauth_access_token(policy.min_validity_seconds)
         {
             return Ok(latest);
         }
@@ -2754,6 +2832,17 @@ impl AccountService {
             .unwrap_or(false);
 
         let ownership_restore = self.begin_owned_refresh(id).await?;
+        let guard_rt = policy.require_determinate_refresh
+            || latest.request_backend == TUI_V2
+            || state == TuiOAuthRefreshState::Rejected;
+        if guard_rt && !self.store.begin_tui_oauth_refresh(&latest).await? {
+            if let Some(change) = &ownership_restore {
+                self.finish_owned_refresh(change).await?;
+            }
+            return Err(AppError::ServiceUnavailable(
+                TUI_OAUTH_REFRESH_UNKNOWN.into(),
+            ));
+        }
 
         match crate::service::oauth::refresh_account_oauth_token_at(&latest, &self.oauth_token_url)
             .await
@@ -2774,21 +2863,26 @@ impl AccountService {
                 self.store.get_by_id(id).await
             }
             Err(err) => {
+                if matches!(&err, AppError::Internal(_))
+                    && (guard_rt || ownership_restore.is_some())
+                {
+                    // 结果未知时让持久记录跨 Gateway 重启继续保护同一份 RT。
+                    return Err(AppError::ServiceUnavailable(
+                        TUI_OAUTH_REFRESH_UNKNOWN.into(),
+                    ));
+                }
                 if let Some(change) = &ownership_restore {
-                    if matches!(&err, AppError::Internal(_)) {
-                        // 请求或响应结果未知：保留持久维护，不以旧 AT 降级成功或重试旧 RT。
-                        return Err(AppError::ServiceUnavailable(
-                            "OAuth 刷新结果未知，请核对或重新授权原账号".into(),
-                        ));
-                    }
                     self.finish_owned_refresh(change).await?;
                 }
                 let msg = err.to_string();
-                if !self
+                let error_is_current = self
                     .store
                     .update_auth_error_if_current(&latest, &msg)
-                    .await?
-                {
+                    .await?;
+                if guard_rt {
+                    self.store.finish_tui_oauth_refresh_failure(&latest).await?;
+                }
+                if !error_is_current {
                     // 锁 TTL 可能已到期；迟到失败不能停用或污染新登录凭据。
                     return self.store.get_by_id(id).await;
                 }
@@ -2797,6 +2891,7 @@ impl AccountService {
                     return Err(err);
                 }
                 if policy.allow_still_valid_fallback
+                    && state == TuiOAuthRefreshState::Ready
                     && fallback_is_still_valid
                     && !fallback_access_token.is_empty()
                 {
@@ -5363,6 +5458,92 @@ mod tests {
         assert_eq!(snapshot.access_token, "access-snapshot");
         assert_eq!(snapshot.refresh_token, "refresh-snapshot");
         assert!(snapshot.expires_at > Utc::now().timestamp_millis());
+    }
+
+    /// 完整文件从同一次账号版本读取，并保留真实订阅元数据。@return 无。
+    #[tokio::test]
+    async fn tui_oauth_file_uses_single_account_snapshot() {
+        let (store, svc) = setup_account_service().await;
+        let mut account = new_account_request("tui-file@example.com");
+        account.access_token = "first-access".into();
+        account.refresh_token = "first-refresh".into();
+        account.expires_at = Some(Utc::now() + ChronoDuration::hours(1));
+        account.subscription_type = Some("max".into());
+        account.rate_limit_tier = Some("verified-tier".into());
+        svc.create_account(&mut account).await.unwrap();
+
+        let (first, activity) = svc.resolve_tui_oauth_file(account.id, false).await.unwrap();
+        assert_eq!(first.access_token, "first-access");
+        assert_eq!(first.refresh_token, "first-refresh");
+        assert_eq!(first.subscription_type.as_deref(), Some("max"));
+        assert_eq!(first.rate_limit_tier.as_deref(), Some("verified-tier"));
+        drop(activity);
+
+        let expires_at = Utc::now() + ChronoDuration::hours(2);
+        store
+            .update_oauth_tokens(account.id, "second-access", "second-refresh", expires_at)
+            .await
+            .unwrap();
+        let (second, _activity) = svc.resolve_tui_oauth_file(account.id, false).await.unwrap();
+        assert_eq!(second.access_token, "second-access");
+        assert_eq!(second.refresh_token, "second-refresh");
+        assert_eq!(second.expires_at, (expires_at.timestamp() * 1000) as u64);
+    }
+
+    /// 覆盖无归属记录的旧账号，以及上游成功后沿用原 RT 的情况。@return 无。
+    #[tokio::test]
+    async fn tui_oauth_rejection_and_pending_guard_are_conditional_on_credentials() {
+        let (store, svc) = setup_account_service().await;
+        let mut account = new_account_request("tui-state@example.com");
+        account.access_token = "rejected-at".into();
+        account.refresh_token = "original-rt".into();
+        let expiry = Utc::now() + ChronoDuration::hours(1);
+        account.expires_at = Some(expiry);
+        svc.create_account(&mut account).await.unwrap();
+        assert!(
+            store
+                .credential_ownership(account.id)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            !svc.record_tui_oauth_rejection(account.id, "foreign-at")
+                .await
+                .unwrap()
+        );
+        assert!(
+            svc.record_tui_oauth_rejection(account.id, "rejected-at")
+                .await
+                .unwrap()
+        );
+        assert!(
+            !svc.record_tui_oauth_rejection(account.id, "rejected-at")
+                .await
+                .unwrap()
+        );
+        assert!(
+            store.tui_oauth_refresh_state(&account).await.unwrap()
+                == TuiOAuthRefreshState::Rejected
+        );
+        assert!(store.begin_tui_oauth_refresh(&account).await.unwrap());
+        assert!(!store.begin_tui_oauth_refresh(&account).await.unwrap());
+
+        let resolved = svc.resolve_tui_oauth_file(account.id, false).await;
+        assert!(
+            matches!(resolved, Err(AppError::ServiceUnavailable(message)) if message == TUI_OAUTH_REFRESH_UNKNOWN)
+        );
+
+        assert!(
+            store
+                .update_oauth_tokens_if_current(&account, "new-at", "original-rt", expiry)
+                .await
+                .unwrap()
+        );
+        assert!(!store.record_tui_oauth_rejection(&account).await.unwrap());
+        let (actual, _) = svc.resolve_tui_oauth_file(account.id, false).await.unwrap();
+        assert_eq!(actual.access_token, "new-at");
+        assert_eq!(actual.refresh_token, "original-rt");
     }
 
     #[tokio::test]

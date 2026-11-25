@@ -13,12 +13,23 @@ import tempfile
 import uuid
 import re
 
-from storage_maintenance import preserve_metadata, read_storage_json, tree_inventory
+from storage_maintenance import iter_tree_inventory, preserve_metadata, read_storage_json, tree_inventory
 from cluster_backup_index import cluster_backup_scope, verify_cluster_correspondence
 
 
 DATABASES = ('gateway/gateway.sqlite', 'bench/db.sqlite','node-execution.sqlite','node-execution-local.sqlite',
     'bench/node-execution-local.sqlite')
+
+
+_TUI_RUNTIME_CREDENTIAL = re.compile(
+    r"(?:.*/)?runtime/native/tui-sessions/"
+    r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/"
+    r"home/\.claude/\.credentials\.json(?:\.[0-9a-f]{32})?"
+)
+
+
+def _backed_up_path(name: str) -> bool:
+    return _TUI_RUNTIME_CREDENTIAL.fullmatch(name) is None
 
 
 def _database_digest(database: sqlite3.Connection) -> str:
@@ -56,15 +67,17 @@ def create_backup_data(root: Path, target: Path, *, excluded: dict[str, dict],
         raise ValueError('集群备份批次无效')
     ignored = set(excluded)
     database_paths = {relative + suffix for relative in DATABASES for suffix in ('', '-wal', '-shm')}
-    before = tree_inventory(root, ignored | database_paths)
+    source_inventory = lambda: dict(iter_tree_inventory(root, ignored | database_paths, include=_backed_up_path))
+    before = source_inventory()
 
     def ignore(directory: str, names: list[str]) -> list[str]:
-        """只排除明确路径与运行 socket，不跟随 HOME 中的链接。"""
+        """排除运行 socket、会话凭据暂存和清单指定路径。"""
         result = []
         for name in names:
             path = Path(directory) / name
             relative = str(path.relative_to(root))
-            if relative in ignored | database_paths or S_ISSOCK(path.lstat().st_mode):
+            if (relative in ignored | database_paths or not _backed_up_path(relative)
+                    or S_ISSOCK(path.lstat().st_mode)):
                 result.append(name)
         return result
 
@@ -95,7 +108,7 @@ def create_backup_data(root: Path, target: Path, *, excluded: dict[str, dict],
         output.chmod(0o600)
         os.chown(output, metadata.st_uid, metadata.st_gid, follow_symlinks=False)
         databases[relative] = expected
-    if tree_inventory(root, ignored | database_paths) != before:
+    if source_inventory() != before:
         raise ValueError('备份期间原始业务状态发生变化')
     config_root = target / 'config'
     if configuration:

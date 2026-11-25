@@ -966,6 +966,7 @@ impl PrimePollerService {
                     body: &bytes,
                     headers: &HeaderMap::new(),
                     native_cc: false,
+                    oauth_file: account.auth_type == AccountAuthType::Oauth,
                     body_policy: TuiBodyPolicy::default(),
                 },
                 deadline,
@@ -1008,15 +1009,9 @@ impl PrimePollerService {
             if !work.api_accepting || !work.work_enabled {
                 return Err(AppError::ServiceUnavailable("该账号已关闭 API 接单".into()));
             }
-            let account_token = if prepared.managed_oauth {
-                let (bearer, _resolution) = self
-                    .account_svc
-                    .resolve_tui_upstream_token(account.id, false)
-                    .await?;
-                Some(runtime_transport::tui_account_token_header(&bearer)?)
-            } else {
-                None
-            };
+            let (credentials, failed_token, _resolution) = prepared
+                .resolve_account_credentials(&self.account_svc, false)
+                .await?;
             let send = request.admit(&account).await?;
             let config = route
                 .allow_submit(&self.account_svc, account.id, &binding, false)
@@ -1024,11 +1019,19 @@ impl PrimePollerService {
             if !peak_prime_enabled(&self.settings_store.get_all().await?) {
                 return Err(AppError::ServiceUnavailable("V2 峰值预热已取消".into()));
             }
-            Ok::<_, AppError>((prepared, account_token, slot, activity, send, config))
+            Ok::<_, AppError>((
+                prepared,
+                credentials,
+                failed_token,
+                slot,
+                activity,
+                send,
+                config,
+            ))
         })
         .await
         .map_err(|_| timeout_error())??;
-        let (prepared, account_token, _slot, _activity, send, config) = prepared_run;
+        let (prepared, credentials, failed_token, _slot, _activity, send, config) = prepared_run;
         let remaining = deadline
             .checked_duration_since(TokioInstant::now())
             .filter(|duration| !duration.is_zero())
@@ -1037,8 +1040,15 @@ impl PrimePollerService {
         drop(config);
         // 发送开始后由 sender 持有单次预留。私有首包超时仍保留提交状态未知。
         let mut response = prepared
-            .submit_with_account_token(remaining, account_token)
+            .submit_with_account_credentials(remaining, credentials)
             .await?;
+        runtime_transport::recover_tui_oauth_after_response(
+            &self.account_svc,
+            account.id,
+            failed_token,
+            &response,
+        )
+        .await;
 
         let status = response.status();
         if !status.is_success() {

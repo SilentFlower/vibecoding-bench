@@ -25,6 +25,7 @@ from tui_input_policy import InputRejection
 from tui_message_json import MessageJSON
 from tui_messages import (
     ModelResponseError,
+    OAUTH_FILE_LIMIT,
     SubagentAmbiguousError,
     SubagentBindingError,
     SubagentCapacityError,
@@ -40,6 +41,34 @@ CHUNK_LIMIT = 64 * 1024
 IO_TIMEOUT = 120
 SOCKET = Path("/run/v3/tui-v2/events.sock")
 BINDING_FIELDS = ("account_id", "environment_id", "generation", "release_id")
+
+
+def _oauth_file(reader, size):
+    if type(size) is not int or not 0 < size <= OAUTH_FILE_LIMIT:
+        raise ValueError("V2 凭据帧长度无效")
+    data = reader.read(size)
+    if len(data) != size:
+        raise EOFError
+    document = json.loads(data)
+    expected = {"access_token", "refresh_token", "expires_at"}
+    optional = {"subscription_type", "rate_limit_tier"}
+    if (not isinstance(document, dict) or not expected <= document.keys()
+            or document.keys() - (expected | optional | {"profile"})
+            or type(document["expires_at"]) is not int or document["expires_at"] <= 0
+            or any(not isinstance(document[key], str) for key in document.keys() & optional)):
+        raise ValueError("V2 凭据文件结构无效")
+    if "profile" in document:
+        profile = document["profile"]
+        if (not isinstance(profile, dict) or profile.keys() & {"accessToken", "refreshToken", "expiresAt"}
+                or "scopes" in profile and (not isinstance(profile["scopes"], list)
+                                            or any(not isinstance(scope, str) or not scope for scope in profile["scopes"]))):
+            raise ValueError("V2 OAuth 画像结构无效")
+    for key in ("access_token", "refresh_token"):
+        token = document[key]
+        if (not isinstance(token, str) or not 0 < len(token) <= 2048
+                or not token.isascii() or not all(c.isalnum() or c in "-._~+/=" for c in token)):
+            raise ValueError("V2 凭据令牌无效")
+    return document
 
 
 def _control(stream):
@@ -151,6 +180,9 @@ class AccountSource:
         managed_oauth = getattr(driver, "managed_oauth", False)
         if managed_oauth:
             state["managed_oauth_protocol"] = 1
+        file_available = managed_oauth and getattr(driver, "oauth_file_available", False)
+        if file_available:
+            state["oauth_file_protocol"] = 1
         _reply(writer, state)
         if not ready or action == "status":
             return
@@ -158,6 +190,9 @@ class AccountSource:
         if prepared.get("action") != "prepare" or any(
             prepared.get(key) != value for key, value in proof.items()
         ):
+            return
+        file_offer = prepared.get("oauth_file_protocol")
+        if file_offer is not None and (not file_available or type(file_offer) is not int or file_offer != 1):
             return
         reservation = prepared["reservation"]
         if any(
@@ -237,12 +272,20 @@ class AccountSource:
             _reply(writer, {**state, "error": "capacity"})
             return
         with closing(handle):
+            existing_file = bool(getattr(getattr(handle, "actor", None), "oauth_file", False))
+            if handle.kind == "continuation" and existing_file and file_offer != 1:
+                # 旧网关须先沿当前文件模式收口原轮，不能用旧 AT 令牌接管活动进程。
+                _reply(writer, {**state, "error": "oauth_file_required"})
+                return
+            oauth_file = file_offer == 1 and (handle.kind == "new" or existing_file)
             reply = {
                 **state,
                 "kind": handle.kind,
                 "workspace_protocol": 1,
                 "workspace_resume": getattr(handle, "workspace_resume", False),
             }
+            if not oauth_file:
+                reply.pop("oauth_file_protocol", None)
             if reservation.get("agent_hint") is not None:
                 reply["agent_session"] = handle.actor.reservation["session_id"]
             if handle.kind not in ("new", "continuation") or (
@@ -259,8 +302,19 @@ class AccountSource:
                     or not isinstance(command.get("workspace"), dict)
                     or time.time() >= deadline or self._config()[2] != epoch):
                 return
+            if "oauth_file" in command:
+                return
             token = command.get("account_token")
-            if managed_oauth:
+            size = command.pop("oauth_file_len", None)
+            if oauth_file:
+                if "account_token" in command:
+                    return
+                command["oauth_file"] = _oauth_file(reader, size)
+                if time.time() >= deadline or self._config()[2] != epoch:
+                    return
+            elif size is not None:
+                return
+            elif managed_oauth:
                 if not isinstance(token, str) or not 0 < len(token) <= 2048 or any(not 33 <= ord(c) <= 126 for c in token):
                     return
             elif "account_token" in command:
@@ -438,6 +492,7 @@ def main():
     """在受管账号内启动内置事件源。@return 无。"""
     # 解释器以 -I 运行，只在安装目录加载随镜像交付的会话驱动。
     from tui_session import SessionDriver
+    from tui_sender_launch import purge_oauth_files
 
     os.umask(0o077)
     def stop(signum, frame):
@@ -446,6 +501,7 @@ def main():
     signal.signal(signal.SIGTERM, stop)
     with closing(AccountSource(Path(sys.argv[1]), SessionDriver)) as source:
         with listen(SOCKET, source, os.getppid()) as server:
+            purge_oauth_files()
             # sender 意外退出时也收回原会话；Linux 会将孤儿重挂给其他父进程。
             server.timeout = 1.0
             while os.getppid() == server.sender_pid:

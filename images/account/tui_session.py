@@ -172,15 +172,22 @@ class _Callback(BaseHTTPRequestHandler):
     def log_message(self, *_):
         """省略可能包含客户数据的访问日志。@return 无。"""
 
+    def do_CONNECT(self):
+        """终止官方子进程发起的外部代理连接。@return 无。"""
+        self.send_error(403)
+
     def do_POST(self):
         """按会话令牌校验并分发结构化事件。@return 无。"""
+        target = urlsplit(self.path)
+        if target.scheme or target.netloc:
+            self.send_error(403)
+            return
         actor = self.server.actor
-        model = urlsplit(self.path).path == actor.model_path + "/v1/messages"
-        bearer = actor.bearer
-        if model:
-            bearer = actor.launch_token if actor.model_path else actor.model_bearer
-        if not hmac.compare_digest(
-            self.headers.get("Authorization", ""), "Bearer " + bearer
+        model = target.path == actor.model_path + "/v1/messages"
+        bearer = actor.model_authorization() if model else actor.bearer
+        authorization = self.headers.get("Authorization", "")
+        if bearer is None or not authorization.isascii() or not hmac.compare_digest(
+            authorization, "Bearer " + bearer
         ):
             self.send_error(403)
             return
@@ -244,6 +251,8 @@ class _Actor:
         self.model_bearer = secrets.token_urlsafe(32)
         self.model_path = "/model/" + self.model_bearer if driver.managed_oauth else ""
         self.launch_token = None
+        self.oauth_file = False
+        self.credential_dir = None
         self.guard_text = "Flower2API 会话 " + uuid4().hex
         self.changed = Condition()
         self.ready = Event()
@@ -263,6 +272,13 @@ class _Actor:
         self.claim = None
         self.port = None
         self.worker = None
+
+    def model_authorization(self):
+        """读取当前模型回环的账号授权。@return 当前回合 AT 或原会话口令。"""
+        with self.changed:
+            if self.oauth_file:
+                return self.claim.account_token if self.claim is not None else None
+            return self.launch_token if self.model_path else self.model_bearer
 
     def abort(self, failure=None):
         """立即唤醒全部等待者；监护线程负责回收进程。@return 无。"""
@@ -359,6 +375,7 @@ class _Actor:
                         terminal_fd=slave,
                         mod_dir=plugin,
                         model_endpoint=(endpoint + self.model_path, self.launch_token or self.model_bearer),
+                        **({"oauth_file": True} if self.oauth_file else {}),
                     )
                     os.close(slave)
                     slave = None
@@ -639,9 +656,18 @@ class _Actor:
                 or handle is None
                 or step.native is None
                 or step.claimed
+                or (self.oauth_file and (
+                    not handle.account_token or not hmac.compare_digest(
+                        http.headers.get("Authorization", ""), "Bearer " + handle.account_token
+                    )
+                ))
                 or not self._main_request(native, handle)
             )
             if pending:
+                if self.oauth_file and handle.expires_at <= time.time_ns() // 1_000_000:
+                    raise ModelResponseError(503, _json({"type": "error", "error": {
+                        "type": "api_error", "message": "V2 账号凭据已过期",
+                    }}).encode())
                 if (
                     handle.kind == "new"
                     and self.agent_offer is not None
@@ -662,7 +688,7 @@ class _Actor:
         if not pending:
             http.send_error(409, "No pending model step")
             return
-        # 原进程的回环鉴权与本次上游 AT 独立，换代后仍可把工具交给原进程。
+        # 旧进程仍校验启动 AT。文件模式的令牌已经与原生步骤绑定。
         headers = handle.model_headers
         if handle.api_context is not None:
             offered = {v.strip() for v in http.headers.get("anthropic-beta", "").split(",")}
@@ -692,6 +718,8 @@ class _Actor:
                 **{name: http.headers[name] for name in ("user-agent", "x-app", "anthropic-beta")
                    if name not in headers and http.headers.get(name)},
             }
+            if handle.expires_at is not None:
+                options["expires_at"] = handle.expires_at
             model_response = self.driver.launcher.managed_model_response(
                 raw, account_token=account_token, reservation=handle.reservation, **options
             )
@@ -755,7 +783,7 @@ class _Actor:
             self.wait_until = None
             self.changed.notify_all()
             if handle.kind == "new":
-                self.launch_token = handle.account_token
+                self.launch_token = None if self.oauth_file else handle.account_token
                 self.start(command)
         while True:
             with self.changed:
@@ -789,6 +817,7 @@ class _Reserved:
         self.upstream_session_id = None
         self.reservation = reservation
         self.account_token = None
+        self.expires_at = None
         # 原生请求已声明完整的协议上下文。普通 API 的历史管理需要本次实际 CLI 提供能力。
         self.api_context = body.get("context_management") if "metadata" not in body else None
         self.thinking = body.get("thinking")
@@ -797,15 +826,39 @@ class _Reserved:
     def send(self, command):
         """实际启动或恢复一个模型步骤。@param command 已核验工作区。@return 逐帧输出。"""
         actor = self.actor
+        token = command.pop("account_token", None)
+        file = command.pop("oauth_file", None)
+        with actor.changed:
+            if self.sent or actor.claim is not self or actor.dead.is_set():
+                raise ValueError("原预留已提交或已取消")
+            if self.kind == "continuation" and actor.oauth_file != (file is not None):
+                raise ValueError("原工具回执的凭据模式已变化")
+            if file is not None:
+                home, _ = actor.driver.launcher.session_paths(command)
+                directory = home / ".claude"
+                if actor.credential_dir is not None and actor.credential_dir != directory:
+                    raise ValueError("本轮凭据文件与原会话目录不符")
+                actor.credential_dir = directory
+                try:
+                    actor.driver.launcher.publish_oauth_file(directory, file)
+                except (OSError, ValueError):
+                    # 此时本轮工具凭据尚未交给 CLI，网关可归还原工具回执。
+                    raise ModelResponseError(503, _json({"type": "error", "error": {
+                        "type": "api_error", "message": "V2 完整账号凭据不可用",
+                    }}).encode(), source="oauth_file_before_model") from None
+                token = file["access_token"]
+                self.expires_at = file["expires_at"]
         with actor.driver.lock, actor.changed:
-            if self.sent or actor.dead.is_set():
+            if self.sent or actor.claim is not self or actor.dead.is_set():
                 raise ValueError("原预留已提交或已取消")
             if self.kind == "new" and actor.agent_offer is not None:
                 if not actor.driver._valid_agent(actor.agent_offer, actor.identity[-1]):
                     raise SubagentBindingError("子代理所属原轮已结束或取消")
                 actor.agent_offer.submitted = True
             self.upstream_session_id = command.get("upstream_session_id")
-            self.account_token = command.pop("account_token", None)
+            if self.kind == "new":
+                actor.oauth_file = file is not None
+            self.account_token = token
             self.sent = True
             actor.driver._acknowledge_agents(actor, self.answers)
         return self.actor.events(self, command)
@@ -843,6 +896,7 @@ class SessionDriver:
             import tui_sender_launch as launcher
         self.launcher = launcher
         self.managed_oauth = getattr(launcher, "managed_oauth_enabled", lambda: False)()
+        self.oauth_file_available = getattr(launcher, "file_oauth_enabled", lambda: False)()
         # 编排每个 HTTP 并发配置两个预留。等待新 TUI 的队列必须留下至少一个传输名额还工具。
         limit = max(1, config["max_reservations"] // 2)
         if capacity is None:
@@ -898,6 +952,14 @@ class SessionDriver:
                         or any(waiter.actor_key[:5] == identity for waiter in self.waiters))
 
     def _retire(self, actor):
+        with actor.changed:
+            directory, actor.credential_dir = actor.credential_dir, None
+            if directory is not None:
+                try:
+                    self.launcher.clear_oauth_file(directory)
+                except OSError:
+                    # 下次事件源取得独占监听锁后定向回收；处理错误仍归还当前进程名额。
+                    pass
         with self.lock:
             if self.sessions.get(actor.identity) is actor:
                 del self.sessions[actor.identity]

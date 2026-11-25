@@ -3,6 +3,8 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/landlock.h>
+#include <limits.h>
+#include <netinet/in.h>
 #include <seccomp.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -13,6 +15,10 @@
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+
+#ifndef CONNECT_SHIM
+#define CONNECT_SHIM "/opt/flower/tui/tui-connect.so"
+#endif
 
 /* ABI 3 才限制既有文件截断。旧发行版头文件可能尚未命名此位。 */
 #ifndef LANDLOCK_ACCESS_FS_TRUNCATE
@@ -78,7 +84,46 @@ static void abi2_file_policy(scmp_filter_ctx filter, uint32_t denied) {
     }
 }
 
-static void private_process(int abi2) {
+static void loopback_policy(scmp_filter_ctx filter, uint32_t denied) {
+    const unsigned int socket_type = ~(SOCK_CLOEXEC | SOCK_NONBLOCK);
+    check(seccomp_rule_add(filter, denied, SCMP_SYS(socket), 1, SCMP_A0(SCMP_CMP_NE, AF_INET, 0)));
+    /* 只允许 TCP stream。标志位独立于套接字类型。 */
+    for (unsigned int type = 0; type <= 15; ++type) {
+        if (type != SOCK_STREAM)
+            check(seccomp_rule_add(filter, denied, SCMP_SYS(socket), 1,
+                SCMP_A1(SCMP_CMP_MASKED_EQ, socket_type, type)));
+    }
+    check(seccomp_rule_add(filter, denied, SCMP_SYS(socketpair), 1, SCMP_A0(SCMP_CMP_NE, AF_UNIX, 0)));
+    check(seccomp_rule_add(filter, denied, SCMP_SYS(connect), 0));
+    check(seccomp_rule_add(filter, denied, SCMP_SYS(bind), 0));
+    check(seccomp_rule_add(filter, denied, SCMP_SYS(listen), 0));
+    /* 快速打开允许在未连接 socket 上附带目的地址，须与 connect 一并约束。 */
+    check(seccomp_rule_add(filter, denied, SCMP_SYS(sendto), 1,
+        SCMP_A3(SCMP_CMP_MASKED_EQ, MSG_FASTOPEN, MSG_FASTOPEN)));
+    check(seccomp_rule_add(filter, denied, SCMP_SYS(sendmsg), 1,
+        SCMP_A2(SCMP_CMP_MASKED_EQ, MSG_FASTOPEN, MSG_FASTOPEN)));
+    check(seccomp_rule_add(filter, denied, SCMP_SYS(sendmmsg), 1,
+        SCMP_A3(SCMP_CMP_MASKED_EQ, MSG_FASTOPEN, MSG_FASTOPEN)));
+}
+
+static void retain_loopback_channel(int channel, unsigned short port) {
+    int domain, type;
+    socklen_t length = sizeof(int);
+    if (getsockopt(channel, SOL_SOCKET, SO_DOMAIN, &domain, &length) < 0 || domain != AF_UNIX
+        || getsockopt(channel, SOL_SOCKET, SO_TYPE, &type, &length) < 0 || type != SOCK_SEQPACKET) {
+        errno = EINVAL;
+        fail("核验 TUI 回环连接通道");
+    }
+    if (fcntl(channel, F_SETFD, 0) < 0) fail("保留 TUI 回环连接通道");
+    char descriptor[16], port_text[8];
+    snprintf(descriptor, sizeof(descriptor), "%d", channel);
+    snprintf(port_text, sizeof(port_text), "%u", (unsigned int)port);
+    if (setenv("FLOWER_TUI_CONNECT_FD", descriptor, 1)
+        || setenv("FLOWER_TUI_LOOPBACK_PORT", port_text, 1) || setenv("LD_PRELOAD", CONNECT_SHIM, 1))
+        fail("发布 TUI 回环连接通道");
+}
+
+static void private_process(int abi2, int oauth) {
     scmp_filter_ctx filter = seccomp_init(SCMP_ACT_ALLOW);
     if (!filter) fail("创建 TUI 进程限制");
     const uint32_t denied = SCMP_ACT_ERRNO(EPERM);
@@ -102,8 +147,11 @@ static void private_process(int abi2) {
     check(seccomp_rule_add(filter, denied, SCMP_SYS(kill), 1, SCMP_A0(SCMP_CMP_NE, pid, 0)));
     check(seccomp_rule_add(filter, denied, SCMP_SYS(tgkill), 1, SCMP_A0(SCMP_CMP_NE, pid, 0)));
     /* 会话 Mod 用带随机令牌的 TCP 回环。Linux ABI 3 不限制连接其他同 UID 的 Unix socket。 */
-    check(seccomp_rule_add(filter, denied, SCMP_SYS(socket), 1, SCMP_A0(SCMP_CMP_MASKED_EQ, UINT32_MAX, AF_UNIX)));
-    check(seccomp_rule_add(filter, denied, SCMP_SYS(socketpair), 1, SCMP_A0(SCMP_CMP_MASKED_EQ, UINT32_MAX, AF_UNIX)));
+    if (oauth) loopback_policy(filter, denied);
+    else {
+        check(seccomp_rule_add(filter, denied, SCMP_SYS(socket), 1, SCMP_A0(SCMP_CMP_MASKED_EQ, UINT32_MAX, AF_UNIX)));
+        check(seccomp_rule_add(filter, denied, SCMP_SYS(socketpair), 1, SCMP_A0(SCMP_CMP_MASKED_EQ, UINT32_MAX, AF_UNIX)));
+    }
     if (abi2) abi2_file_policy(filter, denied);
     check(seccomp_load(filter));
     seccomp_release(filter);
@@ -118,7 +166,22 @@ int main(int argc, char **argv) {
                              (size_t)0, LANDLOCK_CREATE_RULESET_VERSION);
     if (abi < 2) return 125;
     const int abi2 = abi == 2;
-    int probe = argc == 2 && !strcmp(argv[1], "--check");
+    int oauth_probe = argc == 2 && !strcmp(argv[1], "--check-oauth");
+    int probe = oauth_probe || (argc == 2 && !strcmp(argv[1], "--check"));
+    unsigned short port = 0;
+    int channel = -1;
+    if (argc >= 7 && !strcmp(argv[1], "--oauth-loopback")) {
+        char *end;
+        unsigned long parsed = strtoul(argv[2], &end, 10);
+        if (*end || parsed == 0 || parsed > UINT16_MAX) return 125;
+        port = (unsigned short)parsed;
+        parsed = strtoul(argv[3], &end, 10);
+        if (*end || parsed < 3 || parsed > INT_MAX) return 125;
+        channel = (int)parsed;
+        argv += 3;
+        argc -= 3;
+    }
+    const int oauth = oauth_probe || port != 0;
     if (!probe && (argc < 4 || argv[1][0] != '/' || argv[2][0] != '/' || argv[3][0] != '/'))
         return 125;
     if (abi2 && !probe) {
@@ -133,9 +196,10 @@ int main(int argc, char **argv) {
     if (rules < 0) fail("创建 TUI 文件隔离");
     if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) fail("锁定 TUI 权限");
     permit(rules, ".", edit, 0);
+    if (oauth) permit(rules, CONNECT_SHIM, RUN, 0);
     if (probe) {
         if (syscall(SYS_landlock_restrict_self, rules, 0)) fail("核验 TUI 文件隔离");
-        private_process(abi2);
+        private_process(abi2, oauth);
         return 0;
     }
     permit(rules, argv[1], edit, 0);
@@ -155,10 +219,11 @@ int main(int argc, char **argv) {
         permit(rules, system[i], READ, 1);
     permit(rules, "/dev/null", LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_WRITE_FILE, 0);
     permit(rules, "/dev/tty", LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_WRITE_FILE, 0);
-    if (syscall(SYS_landlock_restrict_self, rules, 0)) fail("启用 TUI 文件隔离");
     /* 原版程序用已核验的 FD 执行，exec 成功时一并关闭它和工作目录描述符。 */
     if (close_range(3, ~0U, CLOSE_RANGE_CLOEXEC)) fail("关闭 TUI 继承描述符");
-    private_process(abi2);
+    if (port) retain_loopback_channel(channel, port);
+    if (syscall(SYS_landlock_restrict_self, rules, 0)) fail("启用 TUI 文件隔离");
+    private_process(abi2, oauth);
     execv(argv[3], argv + 3);
     fail("启动官方交互 CLI");
 }

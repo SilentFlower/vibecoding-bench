@@ -8,8 +8,8 @@ use std::iter::once;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 use std::sync::Arc;
-use std::sync::{LazyLock, Mutex};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::net::TcpListener;
 #[cfg(unix)]
@@ -37,7 +37,7 @@ use regex::Regex;
 use reqwest::redirect::Policy;
 use reqwest::{Body as RequestBody, Client, StatusCode};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 
@@ -46,6 +46,7 @@ use crate::model::account::Account;
 #[cfg(feature = "tui-v2-candidate")]
 use crate::model::account::AccountAuthType;
 use crate::model::request_diagnostics::{ExecutionLocation, RequestLogMode};
+use crate::service::account::{AccountService, CredentialActivity};
 use crate::service::agy_contract::{
     AGY_REQUEST_SECONDS, AgyAccessSnapshot, AgyModelId, AgyOperation, AgySenderConfig,
     AgySubmission, AgySystemPromptPolicy, AgyToolCompletion, AgyToolContinuationMode,
@@ -63,6 +64,7 @@ use crate::service::native_runtime::{NativePool, NativeSenderConfig, NativeSubmi
 use crate::service::request_session::valid_id;
 use crate::service::rewriter::{CacheControlTtlRewrite, MessageCacheControlRewrite};
 use crate::service::runtime_background::{BACKGROUND_HEADER, BackgroundPurpose};
+use crate::service::tui_backend::TUI_V2;
 #[cfg(target_os = "linux")]
 use crate::service::tui_sender::TuiSender;
 use crate::service::tui_sender_response;
@@ -78,6 +80,8 @@ pub(super) const TUI_GATEWAY_ID_HEADER: &str = "x-v3-tui-message-id-mode";
 pub(super) const TUI_CAPTURE: &str = "x-v3-tui-http-capture";
 pub(super) const TUI_UPSTREAM_SESSION: &str = "x-v3-tui-upstream-session";
 pub(super) const TUI_MANAGED_OAUTH: &str = "x-v3-tui-managed-oauth";
+pub(super) const TUI_OAUTH_FILE: &str = "x-v3-tui-oauth-file";
+pub(super) const TUI_ACCOUNT_EXPIRY: &str = "x-v3-tui-account-expiry";
 const TUI_ACCOUNT_MODEL: &str = "x-v3-tui-account-model";
 pub(super) const TUI_ERROR_SOURCE: &str = "x-v3-tui-error-source";
 pub(super) const TUI_JSON_PROJECTION_V1: &str = "gateway-json-v1";
@@ -102,6 +106,73 @@ pub(super) fn tui_account_token_header(token: &str) -> Result<HeaderValue, AppEr
     let mut header = HeaderValue::from_str(token).map_err(|_| invalid())?;
     header.set_sensitive(true);
     Ok(header)
+}
+
+/// 按同一次账号读取冻结的完整 V2 OAuth 凭据，仅供已认证的账号发送链使用。
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct TuiOAuthFile {
+    pub(super) access_token: String,
+    pub(super) refresh_token: String,
+    pub(super) expires_at: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(super) subscription_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(super) rate_limit_tier: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(super) profile: Option<Map<String, Value>>,
+}
+
+// 两个既有 2048 字节的令牌及原始账号画像字段走独立帧，避免挤占旧的 4KiB 控制头。
+pub(super) const TUI_OAUTH_FILE_LIMIT: usize = 8192;
+
+impl TuiOAuthFile {
+    /// 校验本轮快照可以交付。@return 令牌与实际到期时间有效。
+    pub(super) fn valid(&self) -> bool {
+        self.valid_format() && self.expires_at > now_ms()
+    }
+
+    /// 在发送器边界验证线协议结构。@return 凭据字段和毫秒时间均可读取。
+    pub(super) fn valid_format(&self) -> bool {
+        valid_tui_account_token(&self.access_token)
+            && valid_tui_account_token(&self.refresh_token)
+            && self.expires_at > 0
+            && self
+                .subscription_type
+                .as_ref()
+                .is_none_or(|value| !value.is_empty())
+            && self
+                .rate_limit_tier
+                .as_ref()
+                .is_none_or(|value| !value.is_empty())
+            && self.profile.as_ref().is_none_or(|profile| {
+                !["accessToken", "refreshToken", "expiresAt"]
+                    .iter()
+                    .any(|key| profile.contains_key(*key))
+                    && profile.get("scopes").is_none_or(|scopes| {
+                        scopes.as_array().is_some_and(|scopes| {
+                            scopes
+                                .iter()
+                                .all(|value| value.as_str().is_some_and(|scope| !scope.is_empty()))
+                        })
+                    })
+            })
+    }
+
+    /// 编码协商后的私有提交头。@return 包含完整凭据的敏感头。
+    pub(super) fn header(&self) -> Result<HeaderValue, AppError> {
+        let invalid = || AppError::ServiceUnavailable("V2 账号凭据无效或已过期".into());
+        if !self.valid() {
+            return Err(invalid());
+        }
+        let payload = serde_json::to_vec(self).map_err(|_| invalid())?;
+        if payload.len() > TUI_OAUTH_FILE_LIMIT {
+            return Err(invalid());
+        }
+        let mut header = HeaderValue::from_str(&STANDARD.encode(payload)).map_err(|_| invalid())?;
+        header.set_sensitive(true);
+        Ok(header)
+    }
 }
 
 /// 核对已鉴权私有链路的 JSON 委托版本。@param headers 私有头。
@@ -161,6 +232,7 @@ struct RuntimeBinding {
     agy_generation_seconds: u64,
     #[serde(default)]
     tui_predecessors: Vec<TuiBindingProof>,
+    tui_oauth_profile: Option<Map<String, Value>>,
 }
 
 /// 编排器核对过的源位置，仅用于比较原绑定，不能访问源发送器。
@@ -385,6 +457,7 @@ pub struct PreparedTransport {
     tool_continuation_mode: AgyToolContinuationMode,
     long_agy_generation: bool,
     tui_predecessors: Vec<TuiBindingProof>,
+    tui_oauth_profile: Option<Map<String, Value>>,
 }
 
 impl PreparedTransport {
@@ -427,6 +500,7 @@ impl PreparedTransport {
             tool_continuation_mode: AgyToolContinuationMode::Claim,
             long_agy_generation: false,
             tui_predecessors: Vec::new(),
+            tui_oauth_profile: None,
         })
     }
 
@@ -736,6 +810,7 @@ pub async fn prepare(
             tool_continuation_mode: AgyToolContinuationMode::Claim,
             long_agy_generation: false,
             tui_predecessors: Vec::new(),
+            tui_oauth_profile: None,
         });
     }
     let secret = std::env::var("V3_INTERNAL_TOKEN").map_err(|_| {
@@ -967,11 +1042,20 @@ fn tui_status_snapshot(
     Ok(idle && active == 0)
 }
 
+struct TuiTransport {
+    client: Client,
+    binding: TransportBinding,
+    fixture: bool,
+    predecessors: Vec<String>,
+    tui_oauth_profile: Option<Map<String, Value>>,
+}
+
 async fn tui_transport(
     account: &Account,
     wake_wait: Option<Duration>,
     registered: Option<&str>,
-) -> Result<(Client, TransportBinding, bool, Vec<String>), TuiV2Unavailable> {
+    include_profile: bool,
+) -> Result<TuiTransport, TuiV2Unavailable> {
     if !tui_scope(account) {
         return Err(TuiV2Unavailable::NotConfigured);
     }
@@ -979,12 +1063,13 @@ async fn tui_transport(
     let transport = if let Some(wait) = wake_wait {
         prepare(account, wait).await.map(Some)
     } else {
-        prepare_existing_binding(account, registered).await
+        prepare_existing_binding(account, registered, include_profile).await
     }
     .map_err(|_| TuiV2Unavailable::BindingUnverified)?;
     let Some(PreparedTransport {
         route: PreparedRoute::V3 { client, binding },
         tui_predecessors,
+        tui_oauth_profile,
         ..
     }) = transport
     else {
@@ -1004,7 +1089,13 @@ async fn tui_transport(
     } else {
         tui_predecessor_keys(&binding, tui_predecessors)
     };
-    Ok((client, binding, fixture, predecessors))
+    Ok(TuiTransport {
+        client,
+        binding,
+        fixture,
+        predecessors,
+        tui_oauth_profile,
+    })
 }
 
 async fn probe_tui_account(
@@ -1014,8 +1105,13 @@ async fn probe_tui_account(
     probe: Option<&TuiReceiptProbe>,
 ) -> Result<TuiBindingStatus, TuiV2Unavailable> {
     timeout(budget, async {
-        let (client, binding, fixture, predecessors) =
-            tui_transport(account, None, registered).await?;
+        let TuiTransport {
+            client,
+            binding,
+            fixture,
+            predecessors,
+            ..
+        } = tui_transport(account, None, registered, false).await?;
         let idle = tui_status(&client, &binding, fixture, probe).await?;
         Ok(TuiBindingStatus {
             key: tui_sender_key(&binding, fixture),
@@ -1228,6 +1324,7 @@ pub(super) struct TuiReadySender {
     pub(super) key: String,
     pub(super) idle: bool,
     predecessors: Vec<String>,
+    tui_oauth_profile: Option<Map<String, Value>>,
 }
 
 impl TuiReadySender {
@@ -1257,15 +1354,27 @@ pub(super) async fn ready_tui_sender(
     let budget = deadline
         .checked_duration_since(Instant::now())
         .ok_or(AppError::AdmissionLimited { retry_after: 1 })?;
-    let (client, binding, fixture, idle, predecessors) = timeout(budget, async {
-        let (client, binding, fixture, predecessors) =
-            tui_transport(account, wake.then_some(budget), registered).await?;
-        let idle = tui_status(&client, &binding, fixture, None).await?;
-        Ok((client, binding, fixture, idle, predecessors))
+    let (transport, idle) = timeout(budget, async {
+        let transport = tui_transport(account, wake.then_some(budget), registered, true).await?;
+        let idle = tui_status(
+            &transport.client,
+            &transport.binding,
+            transport.fixture,
+            None,
+        )
+        .await?;
+        Ok((transport, idle))
     })
     .await
     .map_err(|_| AppError::AdmissionLimited { retry_after: 1 })?
     .map_err(|reason| reject_tui(account.id, reason))?;
+    let TuiTransport {
+        client,
+        binding,
+        fixture,
+        predecessors,
+        tui_oauth_profile,
+    } = transport;
     let key = tui_sender_key(&binding, fixture);
     Ok(TuiReadySender {
         client,
@@ -1273,6 +1382,7 @@ pub(super) async fn ready_tui_sender(
         key,
         idle,
         predecessors,
+        tui_oauth_profile,
     })
 }
 
@@ -1289,10 +1399,38 @@ pub(super) struct TuiReservation {
     session_mapping: bool,
     upstream_session: Option<String>,
     pub(super) managed_oauth: bool,
+    pub(super) oauth_file: bool,
+    tui_oauth_profile: Option<Map<String, Value>>,
     pub(super) continuation: bool,
 }
 
 impl TuiReservation {
+    /// 按原预留的账号和已协商模式取本轮凭据。
+    /// @param accounts 原账号服务。@param original_tool 是否交还原工具。
+    /// @return 私有头、供账号恢复比较的已发 AT，以及覆盖本轮的活动许可。
+    pub(super) async fn resolve_account_credentials(
+        &self,
+        accounts: &AccountService,
+        original_tool: bool,
+    ) -> Result<(Option<HeaderValue>, Option<String>, CredentialActivity), AppError> {
+        let id = self.binding.account_id;
+        if self.oauth_file {
+            let (mut file, activity) = accounts.resolve_tui_oauth_file(id, original_tool).await?;
+            file.profile = self.tui_oauth_profile.clone();
+            Ok((Some(file.header()?), Some(file.access_token), activity))
+        } else if self.managed_oauth {
+            let (bearer, activity) = accounts
+                .resolve_tui_upstream_token(id, original_tool)
+                .await?;
+            Ok((Some(tui_account_token_header(&bearer)?), None, activity))
+        } else {
+            Ok((
+                None,
+                None,
+                accounts.upstream_tui_activity(id, original_tool).await?,
+            ))
+        }
+    }
     /// 查询原来源是否确认出站会话映射协议。@return 是否支持本轮映射。
     pub(super) fn supports_session_mapping(&self) -> bool {
         self.session_mapping
@@ -1343,17 +1481,18 @@ impl TuiReservation {
         self,
         ttfb_timeout: Duration,
     ) -> Result<reqwest::Response, AppError> {
-        self.submit_with_account_token(ttfb_timeout, None).await
+        self.submit_with_account_credentials(ttfb_timeout, None)
+            .await
     }
 
-    /// 提交原预留，仅向确认过凭据协议的账号 sender 传递 AT。
-    /// @param ttfb_timeout 回包头期限。@param account_token 本轮账号 AT。@return 原 sender 响应。
-    pub(super) async fn submit_with_account_token(
+    /// 提交原预留，按原来源协商的凭据协议发放本轮凭据。
+    /// @param ttfb_timeout 回包头期限。@param credentials 敏感私有凭据头。@return 原 sender 响应。
+    pub(super) async fn submit_with_account_credentials(
         mut self,
         ttfb_timeout: Duration,
-        account_token: Option<HeaderValue>,
+        credentials: Option<HeaderValue>,
     ) -> Result<reqwest::Response, AppError> {
-        if self.managed_oauth != account_token.is_some() {
+        if self.managed_oauth != credentials.is_some() {
             return Err(AppError::ServiceUnavailable("V2 账号凭据协议未确认".into()));
         }
         // 发出请求后，断连或超时也可能已有 sender 接管。交由 sender 收尾，避免误取消原轮。
@@ -1364,8 +1503,13 @@ impl TuiReservation {
             .request("send")
             .header(TUI_GATEWAY_ID_HEADER, TUI_JSON_PROJECTION_V1)
             .header(TUI_SSE_PROJECTION_HEADER, TUI_SSE_PROJECTION_V1);
-        let request = if let Some(token) = account_token {
-            request.header(TUI_MANAGED_OAUTH, token)
+        let request = if let Some(credentials) = credentials {
+            let name = if self.oauth_file {
+                TUI_OAUTH_FILE
+            } else {
+                TUI_MANAGED_OAUTH
+            };
+            request.header(name, credentials)
         } else {
             request
         };
@@ -1414,6 +1558,43 @@ fn tui_retry_seconds(headers: &HeaderMap) -> Option<u64> {
     raw.parse().ok()
 }
 
+/// 仅将绑定 Sender 的真实上游认证拒绝交给原账号恢复。
+/// @param accounts 账号服务。@param id 原预留账号。@param failed_token 文件模式已发 AT。
+/// @param response 受信私有响应头。@return 恢复尝试的生命周期独立于原请求取消。
+pub(super) async fn recover_tui_oauth_after_response(
+    accounts: &Arc<AccountService>,
+    id: i64,
+    failed_token: Option<String>,
+    response: &reqwest::Response,
+) {
+    if let Some(token) = failed_token
+        && response.status() == StatusCode::UNAUTHORIZED
+        && tui_projection_marker(response.headers(), TUI_ERROR_SOURCE, "managed_oauth_http")
+    {
+        // 保证下一轮能看到拒绝。本轮只等待本地记账，上游刷新随后台任务继续。
+        let accounts = accounts.clone();
+        let (recorded, ready) = tokio::sync::oneshot::channel();
+        tokio::spawn(async move {
+            let state = accounts.record_tui_oauth_rejection(id, &token).await;
+            let _ = recorded.send(());
+            match state {
+                Ok(true) => {
+                    if accounts
+                        .recover_upstream_token_after_unauthorized(id, &token)
+                        .await
+                        .is_err()
+                    {
+                        tracing::warn!(account_id = id, "V2 账号凭据恢复待处理");
+                    }
+                }
+                Ok(false) => {}
+                Err(_) => tracing::warn!(account_id = id, "V2 账号凭据拒绝登记失败"),
+            }
+        });
+        let _ = ready.await;
+    }
+}
+
 /// 在 sender 回包头到达之后投影已委托的原始响应，按原始事件判断会话拒答。
 /// @param response 绑定且已鉴权的 sender HTTP 响应。@param account_id 正式账号。@return 公开 Messages 响应。
 pub(super) async fn tui_public_response(
@@ -1442,9 +1623,7 @@ pub(super) async fn tui_public_response(
             .is_some_and(|value| value == content_type)
             || response.headers().contains_key(CONTENT_ENCODING)
         {
-            return Err(AppError::BadGateway(
-                "V2 sender 的委托响应头无效".into(),
-            ));
+            return Err(AppError::BadGateway("V2 sender 的委托响应头无效".into()));
         }
         // 私有控制面故障与模型策略拒绝都可能返回 403，仅模型给出的错误触发封禁。
         let policy_account = account_id.filter(|_| {
@@ -1495,6 +1674,7 @@ pub(super) struct TuiMessagesInput<'a> {
     pub body: &'a Bytes,
     pub headers: &'a HeaderMap,
     pub native_cc: bool,
+    pub oauth_file: bool,
     pub body_policy: TuiBodyPolicy,
 }
 
@@ -1672,7 +1852,10 @@ pub(super) async fn prepare_tui(
             .ok_or_else(limited)
     };
     let TuiReadySender {
-        client, binding, ..
+        client,
+        binding,
+        tui_oauth_profile,
+        ..
     } = sender;
     let agent_hint = tui_agent_hint(&input)?;
     if agent_hint.is_some()
@@ -1709,10 +1892,15 @@ pub(super) async fn prepare_tui(
         session_mapping: false,
         upstream_session: None,
         managed_oauth: false,
+        oauth_file: false,
+        tui_oauth_profile,
         submission_started: false,
         continuation: false,
     };
     let mut prepare = reservation.request("prepare");
+    if input.oauth_file {
+        prepare = prepare.header(TUI_OAUTH_FILE, "1");
+    }
     let observe = super::diagnostics::current_log_mode() == RequestLogMode::Debug;
     if observe {
         prepare = prepare.header(TUI_CAPTURE, "1");
@@ -1758,7 +1946,12 @@ pub(super) async fn prepare_tui(
         StatusCode::NO_CONTENT => {
             reservation.managed_oauth =
                 tui_projection_marker(response.headers(), TUI_MANAGED_OAUTH, "1");
-            reservation.input_policy = tui_projection_marker(response.headers(), TUI_INPUT_POLICY, "1");
+            reservation.oauth_file = tui_projection_marker(response.headers(), TUI_OAUTH_FILE, "1");
+            if reservation.oauth_file && (!input.oauth_file || !reservation.managed_oauth) {
+                return Err(AppError::ServiceUnavailable("V2 文件凭据协议不匹配".into()));
+            }
+            reservation.input_policy =
+                tui_projection_marker(response.headers(), TUI_INPUT_POLICY, "1");
             reservation.session_mapping =
                 tui_projection_marker(response.headers(), TUI_UPSTREAM_SESSION, "1");
             if observe {
@@ -1869,12 +2062,17 @@ pub(super) fn tui_model_headers(
 pub(crate) async fn prepare_existing(
     account: &Account,
 ) -> Result<Option<PreparedTransport>, AppError> {
-    prepare_existing_binding(account, None).await
+    prepare_existing_binding(account, None, false).await
+}
+
+fn wants_tui_oauth_profile(account: &Account) -> bool {
+    account.request_backend == TUI_V2 && account.auth_type == AccountAuthType::Oauth
 }
 
 async fn prepare_existing_binding(
     account: &Account,
     registered: Option<&str>,
+    include_profile: bool,
 ) -> Result<Option<PreparedTransport>, AppError> {
     let base = std::env::var("V3_RUNTIME_URL").unwrap_or_default();
     if base.is_empty() {
@@ -1898,6 +2096,10 @@ async fn prepare_existing_binding(
             base.trim_end_matches('/'),
             account.id
         ))
+        .query(&[(
+            "tui_oauth_profile",
+            include_profile && wants_tui_oauth_profile(account),
+        )])
         .query(
             &registered
                 .map(|_| ("tui_previous_release", true))
@@ -1917,6 +2119,7 @@ async fn prepare_existing_binding(
     let Some(RuntimeBinding {
         binding,
         tui_predecessors,
+        tui_oauth_profile,
         ..
     }) = wire
     else {
@@ -1936,6 +2139,7 @@ async fn prepare_existing_binding(
         tool_continuation_mode: AgyToolContinuationMode::Claim,
         long_agy_generation: false,
         tui_predecessors,
+        tui_oauth_profile,
     }))
 }
 
@@ -1963,6 +2167,7 @@ async fn prepare_from_runtime(
             base.trim_end_matches('/'),
             account.id
         ))
+        .query(&[("tui_oauth_profile", wants_tui_oauth_profile(account))])
         .bearer_auth(secret)
         .timeout(preparation_timeout.min(Duration::from_secs(120)))
         .send()
@@ -1991,6 +2196,7 @@ async fn prepare_from_runtime(
         agy_tool_continuation_protocol,
         agy_generation_seconds,
         tui_predecessors,
+        tui_oauth_profile,
     } = response
         .json()
         .await
@@ -2010,6 +2216,7 @@ async fn prepare_from_runtime(
         tool_continuation_mode: agy_tool_continuation_mode,
         long_agy_generation: agy_generation_seconds == AGY_REQUEST_SECONDS as u64,
         tui_predecessors,
+        tui_oauth_profile,
     })
 }
 
@@ -3059,6 +3266,20 @@ async fn forward(State(state): State<SenderState>, headers: HeaderMap, body: Byt
             let mut prepared: PreparedRequest = serde_json::from_slice(&bytes)
                 .map_err(|_| AppError::BadRequest("invalid runtime request".into()))?;
             let tui_account_model = headers.contains_key(TUI_ACCOUNT_MODEL);
+            let oauth_expiry = headers
+                .get(TUI_ACCOUNT_EXPIRY)
+                .map(|value| {
+                    if !tui_account_model || headers.get_all(TUI_ACCOUNT_EXPIRY).iter().count() != 1
+                    {
+                        return Err(AppError::BadRequest("V2 账号到期时间的发送归属无效".into()));
+                    }
+                    value
+                        .to_str()
+                        .ok()
+                        .and_then(|value| value.parse::<u64>().ok())
+                        .ok_or_else(|| AppError::BadRequest("V2 账号到期时间无效".into()))
+                })
+                .transpose()?;
             let purpose = headers
                 .get(BACKGROUND_HEADER)
                 .map(|value| {
@@ -3085,7 +3306,9 @@ async fn forward(State(state): State<SenderState>, headers: HeaderMap, body: Byt
                         .iter()
                         .any(|(name, _)| name.eq_ignore_ascii_case(CONTENT_LENGTH.as_str()))
                 {
-                    return Err(AppError::BadRequest("V2 账号模型发送的目的或协议无效".into()));
+                    return Err(AppError::BadRequest(
+                        "V2 账号模型发送的目的或协议无效".into(),
+                    ));
                 }
                 prepared
                     .headers
@@ -3094,7 +3317,7 @@ async fn forward(State(state): State<SenderState>, headers: HeaderMap, body: Byt
             let deadline = validate_request(&prepared, &config)?;
             state.active.fetch_add(1, Ordering::SeqCst);
             let guard = ActiveRequest(state.active.clone());
-            submitted = true;
+            submitted = oauth_expiry.is_none();
             let upstream = timeout_at(deadline, async {
                 if tui_account_model {
                     // 固定目标和一次性正文同时防止重定向或客户端重放已认领的模型请求。
@@ -3103,6 +3326,10 @@ async fn forward(State(state): State<SenderState>, headers: HeaderMap, body: Byt
                         prepared.tls_profile,
                     )
                     .map_err(|_| AppError::BadGateway("V2 账号模型客户端不可用".into()))?;
+                    if oauth_expiry.is_some_and(|expiry| expiry <= now_ms()) {
+                        return Err(AppError::ServiceUnavailable("V2 账号凭据已过期".into()));
+                    }
+                    submitted = true;
                     let stream = stream_once(async move { Ok::<_, IoError>(body) });
                     send_with_client(&client, &prepared, RequestBody::wrap_stream(stream)).await
                 } else if purpose.is_some() {
@@ -4055,6 +4282,8 @@ mod tests {
             session_mapping: false,
             upstream_session: None,
             managed_oauth: false,
+            oauth_file: false,
+            tui_oauth_profile: None,
             submission_started: false,
             continuation: false,
         };
@@ -4371,6 +4600,7 @@ mod tests {
             tool_continuation_mode: AgyToolContinuationMode::Claim,
             long_agy_generation: false,
             tui_predecessors: Vec::new(),
+            tui_oauth_profile: None,
             account_id: 7,
             route: PreparedRoute::V3 {
                 client: Client::new(),
@@ -4435,6 +4665,7 @@ mod tests {
             tool_continuation_mode: AgyToolContinuationMode::Claim,
             long_agy_generation: false,
             tui_predecessors: Vec::new(),
+            tui_oauth_profile: None,
             account_id: 7,
             route: PreparedRoute::V3 {
                 client: Client::new(),
@@ -4470,6 +4701,7 @@ mod tests {
             tool_continuation_mode: AgyToolContinuationMode::Claim,
             long_agy_generation: false,
             tui_predecessors: Vec::new(),
+            tui_oauth_profile: None,
             account_id: 7,
             route: PreparedRoute::V3 {
                 client: Client::new(),
@@ -4522,6 +4754,7 @@ mod tests {
                 tool_continuation_mode: AgyToolContinuationMode::Claim,
                 long_agy_generation: false,
                 tui_predecessors: Vec::new(),
+                tui_oauth_profile: None,
                 account_id: 7,
                 route: PreparedRoute::V3 {
                     client: Client::builder().no_proxy().build().unwrap(),
@@ -4801,6 +5034,7 @@ mod tests {
             tool_continuation_mode: AgyToolContinuationMode::Claim,
             long_agy_generation: false,
             tui_predecessors: Vec::new(),
+            tui_oauth_profile: None,
             account_id: 7,
             route: PreparedRoute::V3 {
                 client: Client::new(),
@@ -4833,6 +5067,7 @@ mod tests {
                 tool_continuation_mode: AgyToolContinuationMode::Claim,
                 long_agy_generation: false,
                 tui_predecessors: Vec::new(),
+                tui_oauth_profile: None,
                 account_id: 7,
                 route: PreparedRoute::Direct(String::new())
             }
@@ -5462,11 +5697,13 @@ mod tests {
                 binding,
                 idle: true,
                 predecessors: Vec::new(),
+                tui_oauth_profile: None,
             };
             let input = TuiMessagesInput {
                 body: &body,
                 headers: &headers,
                 native_cc: false,
+                oauth_file: false,
                 body_policy,
             };
             let result = prepare_tui(
@@ -5491,11 +5728,18 @@ mod tests {
                 let old = result.unwrap();
                 let base = json!({"model":"m","messages":[{"role":"user","content":"x"}]});
                 old.verify_input_policy(&base).unwrap();
-                for (field, value) in [("metadata", json!({"private":123})), ("context_management", json!({})),
-                    ("mcp_servers", json!([])), ("top_p", json!(0.9))] {
+                for (field, value) in [
+                    ("metadata", json!({"private":123})),
+                    ("context_management", json!({})),
+                    ("mcp_servers", json!([])),
+                    ("top_p", json!(0.9)),
+                ] {
                     let mut changed = base.clone();
                     changed[field] = value;
-                    assert!(matches!(old.verify_input_policy(&changed), Err(AppError::ServiceUnavailable(_))));
+                    assert!(matches!(
+                        old.verify_input_policy(&changed),
+                        Err(AppError::ServiceUnavailable(_))
+                    ));
                 }
                 let mut extra = base.clone();
                 extra["messages"][0]["custom"] = json!(true);
@@ -5539,6 +5783,7 @@ mod tests {
                 body: &body,
                 headers: &headers,
                 native_cc: true,
+                oauth_file: false,
                 body_policy: TuiBodyPolicy::default(),
             })
             .unwrap(),
@@ -5549,6 +5794,7 @@ mod tests {
                 body: &body,
                 headers: &headers,
                 native_cc: false,
+                oauth_file: false,
                 body_policy: TuiBodyPolicy::default(),
             })
             .unwrap(),
@@ -5560,6 +5806,7 @@ mod tests {
                 body: &body,
                 headers: &headers,
                 native_cc: true,
+                oauth_file: false,
                 body_policy: TuiBodyPolicy::default(),
             })
             .is_err()

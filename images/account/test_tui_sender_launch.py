@@ -11,6 +11,7 @@ from email.utils import formatdate
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Event, Thread
+import time
 from unittest import TestCase, skipUnless
 from unittest.mock import patch
 
@@ -19,6 +20,41 @@ import tui_sender_launch as launch
 
 class ManagedOAuthTests(TestCase):
     """受管凭据只随匹配的账号模型请求走原 sender。"""
+
+    def test_complete_oauth_file_is_atomic_rotatable_and_idempotent(self):
+        """完整凭据同版替换，原快照重复发放复用文件。@return 无。"""
+        with TemporaryDirectory() as folder:
+            config = Path(folder)
+            path = config / ".credentials.json"
+            initial = {"access_token": "synthetic-a1", "refresh_token": "synthetic-r1",
+                       "expires_at": time.time_ns() // 1_000_000 + 60_000,
+                       "subscription_type": "gateway-tier", "rate_limit_tier": "recorded-tier",
+                       "profile": {"scopes": ["user:profile", "user:inference"], "subscriptionType": "max",
+                                   "futureProfileField": {"label": "fixture"}}}
+            self.assertTrue(launch.publish_oauth_file(config, initial))
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            inode = path.stat().st_ino
+            self.assertFalse(launch.publish_oauth_file(config, initial))
+            self.assertEqual(path.stat().st_ino, inode)
+            self.assertTrue(launch.publish_oauth_file(config, {
+                **initial, "access_token": "synthetic-a2", "refresh_token": "synthetic-r2",
+            }))
+            oauth = json.loads(path.read_bytes())["claudeAiOauth"]
+            self.assertEqual((oauth["accessToken"], oauth["refreshToken"], oauth["expiresAt"]),
+                             ("synthetic-a2", "synthetic-r2", initial["expires_at"]))
+            self.assertEqual((oauth["subscriptionType"], oauth["rateLimitTier"]), ("max", "recorded-tier"))
+            self.assertEqual(oauth["scopes"], ["user:profile", "user:inference"])
+            self.assertEqual(oauth["futureProfileField"], {"label": "fixture"})
+            self.assertNotEqual(path.stat().st_ino, inode)
+            with self.assertRaisesRegex(ValueError, "已过期"):
+                launch.publish_oauth_file(config, {**initial, "expires_at": 1})
+            self.assertEqual(json.loads(path.read_bytes())["claudeAiOauth"], oauth)
+            staged = config / (".credentials.json." + "a" * 32)
+            staged.write_text("synthetic fixture")
+            retained = config / ".claude.json"
+            retained.write_text("{}")
+            launch.clear_oauth_file(config)
+            self.assertEqual(set(config.iterdir()), {retained})
 
     def test_oauth_forward_uses_bound_sender_with_frozen_body(self):
         """实际 HTTP 验证对应的 AT、正文和脱敏采集。@return 无。"""

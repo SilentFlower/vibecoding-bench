@@ -69,6 +69,28 @@ class CredentialOwnershipTests(unittest.TestCase):
         with closing(main.get_db()) as database:
             return dict(database.execute('SELECT * FROM accounts WHERE id=1').fetchone())
 
+    def test_tui_transport_only_projects_native_metadata_for_the_bound_account(self) -> None:
+        """核对绑定、权限范围与凭据字段脱敏。@return 无。"""
+        profile = self.root / 'profiles/fixture/.credentials.json'
+        oauth = json.loads(profile.read_bytes())['claudeAiOauth']
+        metadata = {'scopes': ['user:inference', 'user:profile'], 'futureProfileField': {'value': 7}}
+        atomic_json(profile, {'claudeAiOauth': {**oauth, **metadata}, 'other': 'sensitive'})
+        self.remote['request_backend'] = 'tui_v2'
+        binding = {'account_id': 7, 'environment_id': self.row['environment_id'], 'generation': 1}
+        with (patch.object(main, 'account_runtime', self.runtime),
+              patch.object(main, 'cluster_service', None),
+              patch.object(self.runtime, 'existing_transport', return_value=binding)):
+            self.assertEqual(main.v3_transport(7, wake=False), binding)
+            offered = main.v3_transport(7, wake=False, tui_oauth_profile=True)
+            self.assertEqual(offered, {**binding, 'tui_oauth_profile': metadata})
+            self.assertEqual(json.loads(profile.read_bytes())['claudeAiOauth'], {**oauth, **metadata})
+            atomic_json(profile, {'claudeAiOauth': {**oauth, 'scopes': 'invalid'}})
+            with self.assertRaises(main.HTTPException) as result:
+                main.v3_transport(7, wake=False, tui_oauth_profile=True)
+            self.assertEqual(result.exception.status_code, 503)
+        with self.assertRaisesRegex(ValueError, '路径无效'):
+            self.runtime.tui_oauth_profile({**self.account(), 'profile_path': 'profiles/other'})
+
     def coordinator(self) -> CredentialOwnership:
         """重建协调器，模拟进程恢复。@return 使用同一数据库的新实例。"""
         identity = lambda account, version=None: {**self.runtime.read_cli_identity(self.row, version or '2.1.293'),

@@ -26,14 +26,14 @@ use crate::error::AppError;
 use crate::service::native_capture::{TuiCaptureInput, tui_writer};
 use crate::service::request_body_codec::REQUEST_BODY_LIMIT;
 use crate::service::request_session::valid_id;
-use crate::service::runtime_transport::{TUI_CAPTURE, TUI_ERROR_SOURCE, TuiReceiptProbe};
 use crate::service::runtime_transport::{
     REQUEST_BUDGET_MS, TUI_BODY_POLICY, TUI_GATEWAY_ID_HEADER, TUI_INPUT_FORMAT, TUI_INPUT_POLICY,
-    TUI_JSON_PROJECTION_V1, TUI_SSE_PROJECTION_HEADER, TUI_SSE_PROJECTION_V1, TUI_UPSTREAM_SESSION,
-    TUI_MANAGED_OAUTH, TUI_V2_STATUS_PROTOCOL, TransportBinding, TuiBodyPolicy, now_ms, request_budget,
-    tui_delegates_json, tui_input_rejection, tui_model_headers, tui_projection_marker,
-    valid_tui_account_token,
+    TUI_JSON_PROJECTION_V1, TUI_MANAGED_OAUTH, TUI_OAUTH_FILE, TUI_OAUTH_FILE_LIMIT,
+    TUI_SSE_PROJECTION_HEADER, TUI_SSE_PROJECTION_V1, TUI_UPSTREAM_SESSION, TUI_V2_STATUS_PROTOCOL,
+    TransportBinding, TuiBodyPolicy, TuiOAuthFile, now_ms, request_budget, tui_delegates_json,
+    tui_input_rejection, tui_model_headers, tui_projection_marker, valid_tui_account_token,
 };
+use crate::service::runtime_transport::{TUI_CAPTURE, TUI_ERROR_SOURCE, TuiReceiptProbe};
 use crate::service::tui_sender_response;
 use crate::service::tui_tool_history::SERVER_SESSION_PREFIX;
 use axum::http::header::RETRY_AFTER;
@@ -134,6 +134,7 @@ enum Phase {
         workspace: Option<workspace::Candidate>,
         session_mapping: bool,
         managed_oauth: bool,
+        oauth_file: bool,
     },
     Submitted,
     Closed,
@@ -311,6 +312,29 @@ fn verify_reply(reply: &Value, proof: &Value) -> io::Result<bool> {
     reply["idle"].as_bool().ok_or_else(source_error)
 }
 
+/// 解码仅用于已认领私有提交的完整 OAuth 文件帧。
+/// @param headers 受信账号发送头。@return 验证过的原始凭据字节或旧协议空值。
+fn oauth_file_payload(headers: &HeaderMap) -> Result<Option<Vec<u8>>, AppError> {
+    let mut values = headers.get_all(TUI_OAUTH_FILE).iter();
+    let Some(value) = values.next() else {
+        return Ok(None);
+    };
+    if values.next().is_some() || value.len() > TUI_OAUTH_FILE_LIMIT.div_ceil(3) * 4 {
+        return Err(invalid_identity());
+    }
+    let raw = STANDARD
+        .decode(value.as_bytes())
+        .map_err(|_| invalid_identity())?;
+    if raw.len() > TUI_OAUTH_FILE_LIMIT {
+        return Err(invalid_identity());
+    }
+    let file: TuiOAuthFile = serde_json::from_slice(&raw).map_err(|_| invalid_identity())?;
+    if !file.valid_format() {
+        return Err(invalid_identity());
+    }
+    Ok(Some(raw))
+}
+
 struct VerifiedSource {
     connection: BufReader<UnixStream>,
     proof: Value,
@@ -323,6 +347,7 @@ struct VerifiedSource {
     agent_scope: bool,
     session_mapping: bool,
     managed_oauth: bool,
+    oauth_file: bool,
 }
 
 async fn verify_source(
@@ -353,13 +378,19 @@ async fn verify_source(
         agent_scope: reply["agent_scope_protocol"].as_u64() == Some(1),
         session_mapping: reply["upstream_session_protocol"].as_u64() == Some(1),
         managed_oauth: reply["managed_oauth_protocol"].as_u64() == Some(1),
+        oauth_file: reply["oauth_file_protocol"].as_u64() == Some(1),
     })
 }
 
 impl TuiSender {
     /// 使用原预留的期限接收可选采集正文。@param binding 实际绑定。@param headers 私有头。@return 原截止。
-    pub(super) fn capture_deadline(binding: &TransportBinding, headers: &HeaderMap) -> Result<Instant, AppError> {
-        Ok(Identity::decode(headers, binding)?.deadlines(binding, now_ms())?.0)
+    pub(super) fn capture_deadline(
+        binding: &TransportBinding,
+        headers: &HeaderMap,
+    ) -> Result<Instant, AppError> {
+        Ok(Identity::decode(headers, binding)?
+            .deadlines(binding, now_ms())?
+            .0)
     }
 
     /// 统计仍占用 sender 的准备或发送。@return 当前本机预留数。
@@ -428,7 +459,9 @@ impl TuiSender {
                 && maximum > 1
                 && book
                     .values()
-                    .filter(|record| !record.agent_probe && matches!(record.phase, Phase::Preparing))
+                    .filter(|record| {
+                        !record.agent_probe && matches!(record.phase, Phase::Preparing)
+                    })
                     .count()
                     >= maximum - 1
             {
@@ -517,6 +550,7 @@ impl TuiSender {
                 agent_scope,
                 session_mapping,
                 managed_oauth,
+                oauth_file,
                 ..
             } = verify_source(&self.path, binding, "bind", None)
                 .await
@@ -542,6 +576,9 @@ impl TuiSender {
                     model_headers && matches!(*format, "claude_code" | "claude_code_280")
                 })
                 .map(str::to_owned);
+            let offer_oauth_file = managed_oauth
+                && oauth_file
+                && tui_projection_marker(request.headers(), TUI_OAUTH_FILE, "1");
             let body = to_bytes(request.into_body(), REQUEST_BODY_LIMIT)
                 .await
                 .map_err(|_| invalid_identity())?;
@@ -551,6 +588,9 @@ impl TuiSender {
             let mut control = proof.clone();
             control["action"] = json!("prepare");
             control["reservation"] = json!(identity);
+            if offer_oauth_file {
+                control["oauth_file_protocol"] = json!(1);
+            }
             control["body_len"] = json!(body.len());
             control["body_sha256"] = json!(hex::encode(Sha256::digest(&body)));
             if let Some(policy) = policy {
@@ -582,6 +622,10 @@ impl TuiSender {
                 .await
                 .map_err(|_| unavailable())?;
             verify_reply(&reply, &proof).map_err(|_| unavailable())?;
+            let oauth_file = reply["oauth_file_protocol"].as_u64() == Some(1);
+            if oauth_file && !offer_oauth_file {
+                return Err(unavailable());
+            }
             if reply["error"] == "input_rejected" {
                 return Err(reply["code"]
                     .as_str()
@@ -654,14 +698,23 @@ impl TuiSender {
                 input_policy,
                 session_mapping,
                 managed_oauth,
+                oauth_file,
             ))
         };
-        let (connection, kind, workspace, capture_http, input_policy, session_mapping, managed_oauth) =
-            tokio::select! {
-                biased;
-                _ = cancelled.changed() => return Err(consumed()),
-                result = timeout_at(deadline, prepared) => result.map_err(|_| limited())??,
-            };
+        let (
+            connection,
+            kind,
+            workspace,
+            capture_http,
+            input_policy,
+            session_mapping,
+            managed_oauth,
+            oauth_file,
+        ) = tokio::select! {
+            biased;
+            _ = cancelled.changed() => return Err(consumed()),
+            result = timeout_at(deadline, prepared) => result.map_err(|_| limited())??,
+        };
         let mut book = self.book.lock().unwrap();
         let record = book
             .get_mut(&slot.id)
@@ -677,11 +730,14 @@ impl TuiSender {
             workspace,
             session_mapping,
             managed_oauth,
+            oauth_file,
         };
         slot.armed = false;
         let mut response = (StatusCode::NO_CONTENT, [(HANDOFF_HEADER, kind)]).into_response();
         if input_policy {
-            response.headers_mut().insert(TUI_INPUT_POLICY, HeaderValue::from_static("1"));
+            response
+                .headers_mut()
+                .insert(TUI_INPUT_POLICY, HeaderValue::from_static("1"));
         }
         if session_mapping {
             response
@@ -693,8 +749,15 @@ impl TuiSender {
                 .headers_mut()
                 .insert(TUI_MANAGED_OAUTH, HeaderValue::from_static("1"));
         }
+        if oauth_file {
+            response
+                .headers_mut()
+                .insert(TUI_OAUTH_FILE, HeaderValue::from_static("1"));
+        }
         if capture_requested && capture_http {
-            response.headers_mut().insert(TUI_CAPTURE, HeaderValue::from_static("1"));
+            response
+                .headers_mut()
+                .insert(TUI_CAPTURE, HeaderValue::from_static("1"));
         }
         if policy.is_some() {
             response
@@ -710,6 +773,7 @@ impl TuiSender {
         identity: &Identity,
         requires_session_mapping: bool,
         has_account_token: bool,
+        has_oauth_file: bool,
     ) -> Result<(Slot, BufReader<UnixStream>, Option<workspace::Candidate>), AppError> {
         let mut book = self.book.lock().unwrap();
         prune(&mut book);
@@ -722,12 +786,17 @@ impl TuiSender {
         let Phase::Ready {
             session_mapping,
             managed_oauth,
+            oauth_file,
             ..
         } = &record.phase
         else {
             return Err(consumed());
         };
-        if (requires_session_mapping && !session_mapping) || *managed_oauth != has_account_token {
+        if (requires_session_mapping && !session_mapping)
+            || *managed_oauth != (has_account_token || has_oauth_file)
+            || *oauth_file != has_oauth_file
+            || (has_account_token && has_oauth_file)
+        {
             return Err(unavailable());
         }
         let Phase::Ready {
@@ -789,8 +858,14 @@ impl TuiSender {
                 Ok(token)
             })
             .transpose()?;
-        let (slot, mut connection, workspace) =
-            self.claim(binding, &identity, upstream_session.is_some(), account_token.is_some())?;
+        let oauth_file = oauth_file_payload(headers)?;
+        let (slot, mut connection, workspace) = self.claim(
+            binding,
+            &identity,
+            upstream_session.is_some(),
+            account_token.is_some(),
+            oauth_file.is_some(),
+        )?;
         // 先同步提交事实。进程退出或回包丢失后，重放的 prepare 与 send 仍无法触发第二次提交。
         let committed = timeout_at(
             deadline,
@@ -818,7 +893,11 @@ impl TuiSender {
         if let Some(token) = account_token {
             command["account_token"] = json!(token);
         }
-        let managed_capture = account_token.is_some();
+        if let Some(file) = &oauth_file {
+            command["oauth_file_len"] = json!(file.len());
+        }
+        // 两种受管凭据都交给账号发送器。私有凭据帧不属于采集正文。
+        let managed_capture = account_token.is_some() || oauth_file.is_some();
         let capture = capture.and_then(|(directory, input)| {
             let id = Uuid::parse_str(&identity.reservation_id).ok()?;
             Some((directory, input, identity.account_id, id, tui_writer()?))
@@ -840,6 +919,9 @@ impl TuiSender {
         }
         let head = timeout(IO_TIMEOUT, async {
             write_json(&mut connection, &command).await?;
+            if let Some(file) = &oauth_file {
+                connection.get_mut().write_all(file).await?;
+            }
             read_json(&mut connection).await
         })
         .await
@@ -885,7 +967,14 @@ impl TuiSender {
                                     Ok(Ok((pairs, raw))) => {
                                         let written = tokio::task::spawn_blocking(move || {
                                             let _permit = permit;
-                                            input.save(&directory, account, id, pairs, raw, managed_capture)
+                                            input.save(
+                                                &directory,
+                                                account,
+                                                id,
+                                                pairs,
+                                                raw,
+                                                managed_capture,
+                                            )
                                         })
                                         .await;
                                         if !matches!(written, Ok(Ok(()))) {
@@ -931,13 +1020,22 @@ impl TuiSender {
             .headers_mut()
             .insert(TUI_GATEWAY_ID_HEADER, HeaderValue::from_static(mode));
         if capturing {
-            response.headers_mut().insert(TUI_CAPTURE, HeaderValue::from_static("queued"));
+            response
+                .headers_mut()
+                .insert(TUI_CAPTURE, HeaderValue::from_static("queued"));
         }
         // 只采信已绑定源的私有控制帧；不从入站头、错误正文或任意模型扩展提取等待期。
         if !status.is_success() && content_type == "application/json" {
             let origin = match head["error_source"].as_str() {
                 Some("local_provider_http") => Some("local_provider_http"),
-                Some("managed_oauth_http") if account_token.is_some() => Some("managed_oauth_http"),
+                Some("managed_oauth_http") if account_token.is_some() || oauth_file.is_some() => {
+                    Some("managed_oauth_http")
+                }
+                Some("oauth_file_before_model")
+                    if oauth_file.is_some() && status == StatusCode::SERVICE_UNAVAILABLE =>
+                {
+                    Some("oauth_file_before_model")
+                }
                 Some("local_provider_backoff") if status == StatusCode::TOO_MANY_REQUESTS => {
                     Some("local_provider_backoff")
                 }
@@ -1274,17 +1372,172 @@ mod tests {
             let command = read_json(&mut socket).await.unwrap();
             assert_eq!(command["reservation_id"], identity.reservation_id);
             assert_eq!(command["account_token"], token);
-            write_json(&mut socket, &json!({"status":200, "content_type":"text/event-stream"}))
-                .await
-                .unwrap();
+            write_json(
+                &mut socket,
+                &json!({"status":200, "content_type":"text/event-stream"}),
+            )
+            .await
+            .unwrap();
             chunk(&mut socket, b"data: test\n\n").await;
             chunk(&mut socket, b"").await;
         });
         assert_eq!(
-            response.unwrap().into_body().collect().await.unwrap().to_bytes(),
+            response
+                .unwrap()
+                .into_body()
+                .collect()
+                .await
+                .unwrap()
+                .to_bytes(),
             "data: test\n\n"
         );
         assert!(send(&credential_headers).await.is_err());
+    }
+
+    /// 完整文件只交给原身份的私有帧，采集只保留已脱敏的账号发送阶段。@return 无。
+    #[tokio::test]
+    async fn oauth_file_requires_exact_reserved_protocol_and_owner() {
+        let source = Source::new();
+        let identity = source.identity();
+        let request = Request::builder()
+            .header(RESERVATION_HEADER, header(&identity))
+            .header(TUI_OAUTH_FILE, "1")
+            .header(TUI_CAPTURE, "1")
+            .body(Body::from("{}"))
+            .unwrap();
+        let (prepared, mut socket) = tokio::join!(
+            source
+                .sender
+                .prepare(&source.binding, Some(&source.config), request),
+            async {
+                let (socket, _) = source.listener.accept().await.unwrap();
+                let mut socket = BufReader::new(socket);
+                let mut proof = read_json(&mut socket).await.unwrap();
+                proof["ready"] = json!(true);
+                proof["idle"] = json!(false);
+                proof["managed_oauth_protocol"] = json!(1);
+                proof["oauth_file_protocol"] = json!(1);
+                proof["capture_http_protocol"] = json!(1);
+                write_json(&mut socket, &proof).await.unwrap();
+                let prepare = read_json(&mut socket).await.unwrap();
+                assert_eq!(prepare["oauth_file_protocol"], 1);
+                assert!(prepare.get("oauth_file_len").is_none());
+                socket.read_exact(&mut [0; 2]).await.unwrap();
+                proof["kind"] = json!("new");
+                write_json(&mut socket, &proof).await.unwrap();
+                socket
+            }
+        );
+        let prepared = prepared.unwrap();
+        assert_eq!(prepared.headers()[TUI_OAUTH_FILE], "1");
+        assert_eq!(prepared.headers()[TUI_CAPTURE], "1");
+        let mut legacy = headers(&identity);
+        let file = TuiOAuthFile {
+            access_token: "a".repeat(2048),
+            refresh_token: "r".repeat(2048),
+            expires_at: now_ms() + 20_000,
+            subscription_type: Some("max".into()),
+            rate_limit_tier: Some("verified-tier".into()),
+            profile: Some(serde_json::Map::from_iter([(
+                "scopes".into(),
+                json!(["user:inference", "user:profile"]),
+            )])),
+        };
+        let send = |headers| {
+            source
+                .sender
+                .send(&source.binding, Some(&source.config), headers, None)
+        };
+        legacy.insert(TUI_MANAGED_OAUTH, HeaderValue::from_static("legacy-at"));
+        assert!(send(&legacy).await.is_err());
+        let value = file.header().unwrap();
+        assert!(value.is_sensitive());
+        let mut both = legacy.clone();
+        both.insert(TUI_OAUTH_FILE, value.clone());
+        assert!(send(&both).await.is_err());
+        let mut private = headers(&identity);
+        private.insert(TUI_OAUTH_FILE, value);
+        private.insert(
+            TUI_SSE_PROJECTION_HEADER,
+            HeaderValue::from_static(TUI_SSE_PROJECTION_V1),
+        );
+        let mut another = identity.clone();
+        another.generation += 1;
+        let mut stale = headers(&another);
+        stale.insert(TUI_OAUTH_FILE, file.header().unwrap());
+        assert!(send(&stale).await.is_err());
+        let encoded = TuiCaptureInput::encode(&HeaderMap::new(), b"{}", &json!({})).unwrap();
+        let capture = serde_json::from_slice(&encoded).unwrap();
+        let capture_dir = source.sender.submission_storage.join("capture");
+        let sending = source.sender.send(
+            &source.binding,
+            Some(&source.config),
+            &private,
+            Some((capture_dir.clone(), capture)),
+        );
+        let (response, ()) = tokio::join!(sending, async {
+            let header = read_json(&mut socket).await.unwrap();
+            assert_eq!(header["reservation_id"], identity.reservation_id);
+            assert_eq!(header["capture_http"], true);
+            assert!(header.get("account_token").is_none());
+            let mut raw = vec![0; header["oauth_file_len"].as_u64().unwrap() as usize];
+            assert!(raw.len() > CONTROL_LIMIT);
+            socket.read_exact(&mut raw).await.unwrap();
+            let received: TuiOAuthFile = serde_json::from_slice(&raw).unwrap();
+            assert_eq!(
+                (
+                    &received.access_token,
+                    &received.refresh_token,
+                    received.expires_at
+                ),
+                (&file.access_token, &file.refresh_token, file.expires_at)
+            );
+            write_json(
+                &mut socket,
+                &json!({"status":200, "content_type":"text/event-stream", "message_id_mode":"gateway"}),
+            )
+            .await
+            .unwrap();
+            chunk(&mut socket, b"data: fixture\\n\\n").await;
+            chunk(&mut socket, b"").await;
+            let headers = serde_json::to_vec(&[(
+                "Authorization",
+                format!("Bearer {}", received.access_token),
+            )])
+            .unwrap();
+            let wire = socket.get_mut();
+            wire.write_u32(headers.len() as u32).await.unwrap();
+            wire.write_u32(2).await.unwrap();
+            wire.write_all(&headers).await.unwrap();
+            wire.write_all(b"{}").await.unwrap();
+        });
+        let response = response.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()[TUI_CAPTURE], "queued");
+        response.into_body().collect().await.unwrap();
+        let capture_path = capture_dir.join(format!("{}.json", identity.reservation_id));
+        let stored = timeout(Duration::from_secs(5), async {
+            loop {
+                match tokio::fs::read_to_string(&capture_path).await {
+                    Ok(stored) => break stored,
+                    Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                        tokio::time::sleep(Duration::from_millis(10)).await;
+                    }
+                    Err(error) => panic!("读取 V2 采集失败：{error}"),
+                }
+            }
+        })
+        .await
+        .unwrap();
+        let snapshot: Value = serde_json::from_str(&stored).unwrap();
+        assert_eq!(
+            snapshot["stages"][1]["representation"],
+            "request_to_account_sender"
+        );
+        assert_eq!(snapshot["stages"][2]["status"], "unavailable");
+        assert!(!stored.contains(&file.access_token));
+        assert!(!stored.contains(&file.refresh_token));
+        assert!(send(&private).await.is_err());
     }
 
     /// 只有来自绑定模型 HTTP 的 429 可将等待期带出私有 socket。@return 无。
@@ -1698,7 +1951,12 @@ mod tests {
         assert!(
             source
                 .sender
-                .send(&new_binding, Some(&source.config), &headers(&identity), None)
+                .send(
+                    &new_binding,
+                    Some(&source.config),
+                    &headers(&identity),
+                    None
+                )
                 .await
                 .is_err()
         );
@@ -1870,7 +2128,9 @@ mod tests {
                 );
             }
             let (reply, ()) = tokio::join!(
-                source.sender.send(&source.binding, Some(&source.config), &negotiated, None),
+                source
+                    .sender
+                    .send(&source.binding, Some(&source.config), &negotiated, None),
                 async {
                     assert_eq!(read_json(&mut socket).await.unwrap()["action"], "send");
                     write_json(&mut socket, &json!({
@@ -1881,10 +2141,17 @@ mod tests {
                 }
             );
             let reply = reply.unwrap();
-            let expected = if delegated { TUI_SSE_PROJECTION_V1 } else { "gateway" };
+            let expected = if delegated {
+                TUI_SSE_PROJECTION_V1
+            } else {
+                "gateway"
+            };
             assert_eq!(reply.headers()[TUI_GATEWAY_ID_HEADER], expected);
             let wire = reply.into_body().collect().await.unwrap().to_bytes();
-            assert_eq!(String::from_utf8_lossy(&wire).contains("cyber_policy"), delegated);
+            assert_eq!(
+                String::from_utf8_lossy(&wire).contains("cyber_policy"),
+                delegated
+            );
         }
     }
 

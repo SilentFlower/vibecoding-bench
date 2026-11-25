@@ -2684,6 +2684,7 @@ impl GatewayService {
                         body: &body_bytes,
                         headers: &native_header_map,
                         native_cc: client_type == ClientType::ClaudeCode,
+                        oauth_file: account.auth_type == AccountAuthType::Oauth,
                         body_policy: runtime_transport::TuiBodyPolicy::new(
                             native_message_cache,
                             tui_cache_ttl,
@@ -2715,25 +2716,11 @@ impl GatewayService {
                         GatewayAdmissionError::Rpm(error) => error,
                     })?;
                 let original_tool = owned_tool_group && prepared.continuation;
-                let (account_token, activity) = if prepared.managed_oauth {
-                    let (bearer, activity) = await_preparation(
-                        Some(request),
-                        self.account_svc
-                            .resolve_tui_upstream_token(account.id, original_tool),
-                    )
-                    .await??;
-                    (
-                        Some(runtime_transport::tui_account_token_header(&bearer)?),
-                        activity,
-                    )
-                } else {
-                    (
-                        None,
-                        self.account_svc
-                            .upstream_tui_activity(account.id, original_tool)
-                            .await?,
-                    )
-                };
+                let (credentials, failed_token, activity) = await_preparation(
+                    Some(request),
+                    prepared.resolve_account_credentials(&self.account_svc, original_tool),
+                )
+                .await??;
                 let mut guard =
                     SlotReleaseGuard::new(admission.permit.with_credential_activity(activity));
                 let send_permit = request.admit(&account).await?;
@@ -2780,7 +2767,11 @@ impl GatewayService {
                         }
                     }
                 }
-                diagnostics::session_context(account.id, original_session, rewrite.message.as_ref());
+                diagnostics::session_context(
+                    account.id,
+                    original_session,
+                    rewrite.message.as_ref(),
+                );
                 let configuration = route
                     .allow_submit(
                         &self.account_svc,
@@ -2801,8 +2792,27 @@ impl GatewayService {
                 let attempt_id = prepared.attempt_id.clone();
                 let capture_state = prepared.capture_state;
                 let response = prepared
-                    .submit_with_account_token(ttfb_timeout, account_token)
+                    .submit_with_account_credentials(ttfb_timeout, credentials)
                     .await?;
+                if failed_token.is_some()
+                    && response.status() == StatusCode::SERVICE_UNAVAILABLE
+                    && runtime_transport::tui_projection_marker(
+                        response.headers(),
+                        runtime_transport::TUI_ERROR_SOURCE,
+                        "oauth_file_before_model",
+                    )
+                    && let Some(turn) = &turn
+                    && let Err(error) = turn.release_tui_before_model().await
+                {
+                    warn!(account_id = account.id, %error, "V2 凭据拒绝后的回执待对账");
+                }
+                runtime_transport::recover_tui_oauth_after_response(
+                    &self.account_svc,
+                    account.id,
+                    failed_token,
+                    &response,
+                )
+                .await;
                 let capture_state = if capture_state == Some("queued") {
                     match response
                         .headers()
@@ -2817,8 +2827,11 @@ impl GatewayService {
                     capture_state
                 };
                 // 本轮结果可能已被模型接纳，V2 的授权错误随响应交付原请求和原工具轮。
-                let mut response =
-                    runtime_transport::tui_public_response(response, (!fixture).then_some(account.id)).await?;
+                let mut response = runtime_transport::tui_public_response(
+                    response,
+                    (!fixture).then_some(account.id),
+                )
+                .await?;
                 let projected = !fixture
                     && response
                         .extensions_mut()

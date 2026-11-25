@@ -118,7 +118,7 @@ class SourceTests(unittest.TestCase):
         stream.write(json.dumps(fields).encode() + b"\n")
         stream.flush()
 
-    def _prepare(self, proof, stream, body, *, headers=None, input_format=None, body_policy=None, send_body=True):
+    def _prepare(self, proof, stream, body, *, headers=None, input_format=None, body_policy=None, send_body=True, oauth_file=False):
         self.assertTrue(json.loads(stream.readline())["ready"])
         identity = {**self.binding, "reservation_id": str(uuid4()), "continuation_only": False,
                     "deadline_unix_ms": int(time.time() * 1000) + 5000}
@@ -126,6 +126,7 @@ class SourceTests(unittest.TestCase):
                              "body_sha256": hashlib.sha256(body).hexdigest(), "body_len": len(body),
                              **({"model_headers_len": len(headers)} if headers is not None else {}),
                              **({"input_format": input_format} if input_format is not None else {}),
+                             **({"oauth_file_protocol": 1} if oauth_file else {}),
                              **({"body_policy": body_policy} if body_policy is not None else {})})
         if send_body:
             stream.write(body)
@@ -159,6 +160,43 @@ class SourceTests(unittest.TestCase):
             with self._connect("status") as (_, stream):
                 if not stream.readline():
                     raise EOFError
+
+    def test_file_mode_is_selected_before_private_credential_delivery(self):
+        """旧组合只交付 AT，新组合另收完整快照。@return 无。"""
+        self.driver.managed_oauth = True
+        self.driver.oauth_file_available = True
+        send = self.driver.send
+        observed = []
+
+        def record(command):
+            observed.append(command)
+            return send(command)
+
+        self.driver.send = record
+        file = {"access_token": "synthetic-at", "refresh_token": "synthetic-rt",
+                "expires_at": time.time_ns() // 1_000_000 + 30_000}
+        for offer in (False, True):
+            with self._connect() as (proof, stream):
+                command = self._prepare(proof, stream, b"{}", oauth_file=offer)
+                ready = json.loads(stream.readline())
+                self.assertEqual(ready.get("oauth_file_protocol"), 1 if offer else None)
+                if offer:
+                    snapshot = json.dumps(file).encode()
+                    self._write(stream, {**command, "oauth_file_len": len(snapshot)})
+                    stream.write(snapshot)
+                    stream.flush()
+                else:
+                    self._write(stream, {**command, "account_token": "legacy-at"})
+                self.assertEqual(json.loads(stream.readline())["status"], 200)
+                while True:
+                    size, = struct.unpack("!I", stream.read(4))
+                    if not size:
+                        break
+                    stream.read(size)
+        self.assertEqual(observed[0]["account_token"], "legacy-at")
+        self.assertNotIn("oauth_file", observed[0])
+        self.assertEqual(observed[1]["oauth_file"], file)
+        self.assertNotIn("account_token", observed[1])
 
     def test_send_chunking_and_single_reservation(self):
         """准备后按原记录提交，大分片按线上协议分块并保留内容。@return 无。"""

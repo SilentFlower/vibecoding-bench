@@ -80,6 +80,7 @@ def launch_workspace_cli(
     terminal_fd: int,
     storage: Path = Path("/native"),
     program_fd: int | None = None,
+    inherited_fds: tuple[int, ...] = (),
     initialize_profile: Callable[[Path], None] | None = None,
 ) -> Popen:
     """在该账号发送器绑定的目录启动交互 CLI，继承事件源已分配的 PTY。
@@ -94,6 +95,7 @@ def launch_workspace_cli(
     @param terminal_fd 事件源持有的 PTY 从端。
     @param storage sender 与事件源共用的受控账号卷。
     @param program_fd 可选的已核验程序描述符，由同容器隔离入口在执行时关闭。
+    @param inherited_fds 受信启动器额外传入的同会话描述符。
     @param initialize_profile 可选，新会话由受信控制端为已核验目录初始化独立配置。
     @return 由事件源负责监督与回收的官方进程。
     """
@@ -144,10 +146,11 @@ def launch_workspace_cli(
             # 节点迁移只复制对话；首次在目标恢复时按同一私有 cwd 重建本机信任配置。
             initialize_profile(work)
         # 真实 cwd 由已核验的目录描述符确定，Windows 和远程路径始终留在原始 Messages 正文中。
+        descriptors = (cwd,) if program_fd is None else (cwd, program_fd)
         return Popen(
             ["/usr/bin/setsid", "--ctty", program, *arguments, *session_args],
             cwd=f"/proc/self/fd/{cwd}",
-            pass_fds=(cwd,) if program_fd is None else (cwd, program_fd),
+            pass_fds=(*descriptors, *inherited_fds),
             stdin=terminal_fd,
             stdout=terminal_fd,
             stderr=terminal_fd,

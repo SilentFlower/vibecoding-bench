@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use sqlx::Row;
 use sqlx::any::{AnyArguments, AnyRow};
 use sqlx::{AnyPool, Arguments};
@@ -34,7 +35,128 @@ pub(crate) struct TuiBackendSnapshot {
     pub binding: String,
 }
 
+/// 当前凭据对应的持久刷新状态。
+#[derive(PartialEq, Eq)]
+pub(crate) enum TuiOAuthRefreshState {
+    Ready,
+    Rejected,
+    Pending,
+}
+
+fn token_sha256(token: &str) -> String {
+    hex::encode(Sha256::digest(token.as_bytes()))
+}
+
 impl AccountStore {
+    /// 查询当前凭据是否已被拒绝或正在等待确定刷新结果。@param account 凭据快照。@return 刷新状态。
+    pub(crate) async fn tui_oauth_refresh_state(
+        &self,
+        account: &Account,
+    ) -> Result<TuiOAuthRefreshState, AppError> {
+        let row = sqlx::query(
+            "SELECT rejected_access_sha256,pending FROM tui_oauth_refresh
+             WHERE account_id=$1 AND refresh_sha256=$2",
+        )
+        .bind(account.id)
+        .bind(token_sha256(&account.refresh_token))
+        .fetch_optional(&self.pool)
+        .await?;
+        let Some(row) = row else {
+            return Ok(TuiOAuthRefreshState::Ready);
+        };
+        if row.try_get::<i32, _>("pending")? == 1 {
+            return Ok(TuiOAuthRefreshState::Pending);
+        }
+        let rejected: String = row.try_get("rejected_access_sha256")?;
+        Ok(if rejected == token_sha256(&account.access_token) {
+            TuiOAuthRefreshState::Rejected
+        } else {
+            TuiOAuthRefreshState::Ready
+        })
+    }
+
+    /// 只为仍在使用的 AT 记下真实上游 401。@param account 被拒绝的凭据。@return 是否新记下拒绝。
+    pub(crate) async fn record_tui_oauth_rejection(
+        &self,
+        account: &Account,
+    ) -> Result<bool, AppError> {
+        // PostgreSQL 中与换票提交共用账号行的锁顺序。SQLite 的写操作已串行。
+        let lock = if self.driver == "sqlite" {
+            ""
+        } else {
+            " FOR UPDATE"
+        };
+        let query = format!(
+            "INSERT INTO tui_oauth_refresh (account_id,refresh_sha256,rejected_access_sha256,pending)
+             SELECT id,$1,$2,0 FROM accounts
+             WHERE id=$3 AND auth_type='oauth' AND access_token=$4 AND refresh_token=$5{lock}
+             ON CONFLICT(account_id) DO UPDATE SET
+                 refresh_sha256=excluded.refresh_sha256,
+                 rejected_access_sha256=excluded.rejected_access_sha256,
+                 pending=CASE WHEN tui_oauth_refresh.refresh_sha256=excluded.refresh_sha256
+                              THEN tui_oauth_refresh.pending ELSE 0 END
+             WHERE tui_oauth_refresh.refresh_sha256<>excluded.refresh_sha256
+                OR tui_oauth_refresh.rejected_access_sha256<>excluded.rejected_access_sha256"
+        );
+        Ok(sqlx::query(&query)
+            .bind(token_sha256(&account.refresh_token))
+            .bind(token_sha256(&account.access_token))
+            .bind(account.id)
+            .bind(&account.access_token)
+            .bind(&account.refresh_token)
+            .execute(&self.pool)
+            .await?
+            .rows_affected()
+            == 1)
+    }
+
+    /// 在刷新发往上游之前独占当前 RT。@param account 当前凭据。@return 是否取得发送权。
+    pub(crate) async fn begin_tui_oauth_refresh(
+        &self,
+        account: &Account,
+    ) -> Result<bool, AppError> {
+        let lock = if self.driver == "sqlite" {
+            ""
+        } else {
+            " FOR UPDATE"
+        };
+        let query = format!(
+            "INSERT INTO tui_oauth_refresh (account_id,refresh_sha256,rejected_access_sha256,pending)
+             SELECT id,$1,'',1 FROM accounts
+             WHERE id=$2 AND auth_type='oauth' AND access_token=$3 AND refresh_token=$4{lock}
+             ON CONFLICT(account_id) DO UPDATE SET
+                 refresh_sha256=excluded.refresh_sha256,
+                 rejected_access_sha256=CASE WHEN tui_oauth_refresh.refresh_sha256=excluded.refresh_sha256
+                     THEN tui_oauth_refresh.rejected_access_sha256 ELSE '' END,
+                 pending=1
+             WHERE tui_oauth_refresh.refresh_sha256<>excluded.refresh_sha256 OR tui_oauth_refresh.pending=0"
+        );
+        Ok(sqlx::query(&query)
+            .bind(token_sha256(&account.refresh_token))
+            .bind(account.id)
+            .bind(&account.access_token)
+            .bind(&account.refresh_token)
+            .execute(&self.pool)
+            .await?
+            .rows_affected()
+            == 1)
+    }
+
+    /// 确定刷新失败后释放 RT 发送权，保留旧 AT 的拒绝。@param account 尝试的凭据。@return 写入结果。
+    pub(crate) async fn finish_tui_oauth_refresh_failure(
+        &self,
+        account: &Account,
+    ) -> Result<(), AppError> {
+        sqlx::query(
+            "UPDATE tui_oauth_refresh SET pending=0 WHERE account_id=$1 AND refresh_sha256=$2",
+        )
+        .bind(account.id)
+        .bind(token_sha256(&account.refresh_token))
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
     /// 同一次读取返回生效值和切换意向。@param id 账号。@return 持久快照。
     pub(crate) async fn tui_backend(&self, id: i64) -> Result<TuiBackendSnapshot, AppError> {
         let row = sqlx::query(
@@ -782,7 +904,8 @@ impl AccountStore {
             self.ts(4),
             self.now_expr()
         );
-        Ok(sqlx::query(&query)
+        let mut transaction = self.pool.begin().await?;
+        let changed = sqlx::query(&query)
             .bind(access_token)
             .bind(refresh_token)
             .bind(self.fmt_time(expires_at))
@@ -790,10 +913,20 @@ impl AccountStore {
             .bind(expected.id)
             .bind(&expected.access_token)
             .bind(&expected.refresh_token)
-            .execute(&self.pool)
+            .execute(&mut *transaction)
             .await?
             .rows_affected()
-            == 1)
+            == 1;
+        if changed {
+            // 与新凭据一起提交，覆盖上游刷新成功但复用同一 RT 的情况。
+            sqlx::query("DELETE FROM tui_oauth_refresh WHERE account_id=$1 AND refresh_sha256=$2")
+                .bind(expected.id)
+                .bind(token_sha256(&expected.refresh_token))
+                .execute(&mut *transaction)
+                .await?;
+        }
+        transaction.commit().await?;
+        Ok(changed)
     }
 
     /// 旧刷新失败不能污染已经重新授权的账号。
@@ -1478,11 +1611,33 @@ mod tests {
         dated.organization_uuid = Some("22222222-2222-4222-8222-222222222222".into());
         dated.subscription_type = Some("pro".into());
         dated.rate_limit_tier = Some("synthetic-tier".into());
+        dated.auth_type = AccountAuthType::Oauth;
+        dated.access_token = "synthetic-old-at".into();
+        dated.refresh_token = "synthetic-old-rt".into();
         store.create(&mut dated).await.unwrap();
         assert_eq!(
             store.get_by_id(dated.id).await.unwrap().expires_at,
             Some(timestamp)
         );
+        assert!(store.record_tui_oauth_rejection(&dated).await.unwrap());
+        assert!(store.begin_tui_oauth_refresh(&dated).await.unwrap());
+        assert!(!store.begin_tui_oauth_refresh(&dated).await.unwrap());
+        assert!(
+            store.tui_oauth_refresh_state(&dated).await.unwrap() == TuiOAuthRefreshState::Pending
+        );
+        assert!(
+            store
+                .update_oauth_tokens_if_current(
+                    &dated,
+                    "synthetic-new-at",
+                    "synthetic-old-rt",
+                    timestamp
+                )
+                .await
+                .unwrap()
+        );
+        let new = store.get_by_id(dated.id).await.unwrap();
+        assert!(store.tui_oauth_refresh_state(&new).await.unwrap() == TuiOAuthRefreshState::Ready);
         assert_eq!(
             store.get_by_id(native.id).await.unwrap().request_backend,
             "native293"

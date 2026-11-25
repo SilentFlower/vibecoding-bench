@@ -2,7 +2,8 @@
 
 from base64 import b64encode
 from collections.abc import Iterator
-from contextlib import closing, contextmanager
+from contextlib import closing, contextmanager, suppress
+from ctypes import CDLL, c_int, c_ushort
 from datetime import datetime, timezone
 import fcntl
 from functools import lru_cache
@@ -12,16 +13,16 @@ from ipaddress import ip_address
 import json
 import os
 from pathlib import Path
-from socket import create_connection
+from socket import AF_UNIX, SOCK_SEQPACKET, create_connection, socketpair
 from stat import S_IMODE, S_ISREG
 from subprocess import DEVNULL, Popen, run
-from threading import Lock
+from threading import Lock, Thread
 import time
 from urllib.parse import urlsplit
 from uuid import UUID
 
-from runtime_files import atomic_text, private_directory
-from tui_messages import BODY_LIMIT, ModelResponseError, encode
+from runtime_files import atomic_json, atomic_text, directory_fd, private_directory
+from tui_messages import BODY_LIMIT, OAUTH_FILE_LIMIT, ModelResponseError, encode
 from tui_workspace_launch import launch_workspace_cli
 
 
@@ -30,7 +31,9 @@ PROGRAM_SHA256 = "8968405e26db478af44eabc4635ab5ca557057b702a54460a59c13e1b253e9
 INSTALL = Path("/cli") / VERSION
 STORAGE = Path("/native")
 GUARD = Path("/opt/flower/tui/tui-guard")
+CONNECT_SHIM = GUARD.with_name("tui-connect.so")
 LOCAL_PROVIDER = Path("/run/v3/tui-local-provider.json")
+_OAUTH_FILE_NAME = ".credentials.json"
 ACCOUNT_ORIGIN = "https://api.anthropic.com"
 _program_lock = Lock()
 _verified_program = None
@@ -234,9 +237,10 @@ def local_model_response(raw: bytes, *, headers: dict[str, str] | None = None, c
 
 
 @contextmanager
-def managed_model_response(raw, *, account_token, reservation, headers, capture=None):
+def managed_model_response(raw, *, account_token, reservation, headers, capture=None, expires_at=None):
     """经原账号 sender 的固定 TLS 出站路径发送已认领的模型请求。
     @param raw 冻结的 Messages 正文。@param account_token 本轮账号 AT。
+    @param expires_at 文件模式的真实 UTC 毫秒有效期。
     @param reservation 受信预留。@param headers 已核对的模型头。@param capture 可选脱敏采集。
     @return 流式上游响应。
     """
@@ -266,12 +270,15 @@ def managed_model_response(raw, *, account_token, reservation, headers, capture=
         "method": "POST", "target_url": ACCOUNT_ORIGIN + "/v1/messages",
         "headers": list(model_headers.items()), "preserve_header_casing": False,
     }
+    transport_headers = {
+        "Authorization": "Bearer " + binding["secret"],
+        "x-v3-request": b64encode(encode(metadata)).decode("ascii"),
+        "x-v3-tui-account-model": "1",
+    }
+    if expires_at is not None:
+        transport_headers["x-v3-tui-account-expiry"] = str(expires_at)
     with closing(HTTPConnection("127.0.0.1", 8091, timeout=120)) as connection:
-        connection.request("POST", "/internal/send", raw, {
-            "Authorization": "Bearer " + binding["secret"],
-            "x-v3-request": b64encode(encode(metadata)).decode("ascii"),
-            "x-v3-tui-account-model": "1",
-        })
+        connection.request("POST", "/internal/send", raw, transport_headers)
         with closing(connection.getresponse()) as response:
             if response.status != 200:
                 try:
@@ -291,10 +298,41 @@ def managed_model_response(raw, *, account_token, reservation, headers, capture=
             yield response
 
 
-@lru_cache(maxsize=1)
-def _guard_usable(identity: tuple) -> bool:
+@lru_cache(maxsize=2)
+def _guard_usable(identity: tuple, oauth: bool = False) -> bool:
     # 不同镜像的程序有不同 inode；缺失内核权限或制品时保持未就绪。
-    return run([GUARD, "--check"], stdin=DEVNULL, stdout=DEVNULL, stderr=DEVNULL, check=False).returncode == 0
+    return run([GUARD, "--check-oauth" if oauth else "--check"], stdin=DEVNULL,
+               stdout=DEVNULL, stderr=DEVNULL, check=False).returncode == 0
+
+
+@lru_cache(maxsize=1)
+def _loopback_broker():
+    serve = CDLL(str(CONNECT_SHIM)).tui_run_loopback_broker
+    serve.argtypes = [c_int, c_ushort]
+    serve.restype = c_int
+    return serve
+
+
+@contextmanager
+def _loopback_channel(port: int | None):
+    if port is None:
+        yield [], ()
+        return
+    serve = _loopback_broker()
+    client, server = socketpair(AF_UNIX, SOCK_SEQPACKET)
+
+    def serve_current_session():
+        # CLI 退出后内核关闭其一端。受信线程随 Unix 通道结束，无需回收额外进程。
+        with server:
+            serve(server.fileno(), port)
+
+    with client:
+        try:
+            Thread(target=serve_current_session, daemon=True).start()
+        except BaseException:
+            server.close()
+            raise
+        yield ["--oauth-loopback", str(port), str(client.fileno())], (client.fileno(),)
 
 
 def account_ready() -> bool:
@@ -302,15 +340,17 @@ def account_ready() -> bool:
     try:
         official_program()
         info = GUARD.stat()
-        if not _guard_usable((info.st_dev, info.st_ino, info.st_ctime_ns)):
+        oauth = managed_oauth_enabled()
+        if not _guard_usable((info.st_dev, info.st_ino, info.st_ctime_ns), oauth):
             return False
-        if managed_oauth_enabled():
+        if oauth:
+            _loopback_broker()
             return True
         _, _, host, port = _loopback_provider()
         # Rust 的整个状态握手为一秒；探测本机监听器不投递推理请求。
         with create_connection((host, port), timeout=0.3):
             return True
-    except (KeyError, OSError, TypeError, ValueError):
+    except (AttributeError, KeyError, OSError, TypeError, ValueError):
         return False
 
 
@@ -328,8 +368,87 @@ def session_paths(command: dict) -> tuple[Path, Path]:
     return home, mod
 
 
+def file_oauth_enabled() -> bool:
+    """报告受管事件源支持完整凭据文件。@return 是否启用账号模式。"""
+    return managed_oauth_enabled()
+
+
+def publish_oauth_file(config_dir: Path, snapshot: dict) -> bool:
+    """按发放的同一账号快照原子更新官方文件。@param config_dir 会话配置目录。
+    @param snapshot 已认证的本轮完整快照。@return 是否进行了实际写入。
+    """
+    if snapshot["expires_at"] <= time.time_ns() // 1_000_000:
+        raise ValueError("V2 账号凭据已过期")
+    oauth = dict(snapshot.get("profile", {"scopes": ["user:inference"]}))
+    oauth.update({
+        "accessToken": snapshot["access_token"], "refreshToken": snapshot["refresh_token"],
+        "expiresAt": snapshot["expires_at"],
+    })
+    for source, target in (("subscription_type", "subscriptionType"), ("rate_limit_tier", "rateLimitTier")):
+        if source in snapshot:
+            oauth.setdefault(target, snapshot[source])
+    document = {"claudeAiOauth": oauth}
+    directory = directory_fd(config_dir)
+    try:
+        try:
+            fd = os.open(_OAUTH_FILE_NAME, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
+        except FileNotFoundError:
+            pass
+        else:
+            with os.fdopen(fd, "rb") as saved:
+                info = os.fstat(saved.fileno())
+                if not S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_nlink != 1:
+                    raise ValueError("V2 凭据文件归属无效")
+                if S_IMODE(info.st_mode) == 0o600 and info.st_size <= OAUTH_FILE_LIMIT:
+                    try:
+                        if json.load(saved) == document:
+                            return False
+                    except (ValueError, UnicodeError):
+                        pass
+    finally:
+        os.close(directory)
+    atomic_json(config_dir / _OAUTH_FILE_NAME, document)
+    return True
+
+
+def clear_oauth_file(config_dir: Path) -> None:
+    """只清理当前会话的凭据文件及其原子写入残留。@param config_dir 私有会话目录。@return 无。"""
+    try:
+        directory = directory_fd(config_dir)
+    except (FileNotFoundError, NotADirectoryError):
+        return
+    try:
+        for name in os.listdir(directory):
+            suffix = name.removeprefix(_OAUTH_FILE_NAME + ".")
+            if name == _OAUTH_FILE_NAME or (name != suffix and len(suffix) == 32
+                                           and all(c in "0123456789abcdef" for c in suffix)):
+                with suppress(FileNotFoundError):
+                    os.unlink(name, dir_fd=directory)
+    finally:
+        os.close(directory)
+
+
+def purge_oauth_files() -> None:
+    """持账号事件源独占锁回收异常退出的凭据。@return 无。"""
+    root = STORAGE / "tui-sessions"
+    try:
+        directory = directory_fd(root)
+    except FileNotFoundError:
+        return
+    try:
+        for name in os.listdir(directory):
+            try:
+                identifier = UUID(name)
+            except ValueError:
+                continue
+            if identifier.version == 4 and str(identifier) == name:
+                clear_oauth_file(root / name / "home" / ".claude")
+    finally:
+        os.close(directory)
+
+
 def _initialize_local_profile(config_dir: Path, work: Path) -> None:
-    # 仅标记本次 sender 核验过的私有目录。账号凭据从本轮进程环境获得。
+    # 仅标记本次 sender 核验过的私有目录，登录材料由本轮凭据模式提供。
     path = config_dir / ".claude.json"
     try:
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
@@ -344,6 +463,7 @@ def launch_session(
     reservation: dict, command: dict, *, arguments: list[str], config_dir: Path,
     environment: dict[str, str], resume: bool | None, terminal_fd: int, mod_dir: Path,
     model_endpoint: tuple[str, str] | None = None,
+    oauth_file: bool = False,
 ) -> Popen:
     """用账号内核限定工作区后，在真实 PTY 上运行固定版本。
 
@@ -356,6 +476,7 @@ def launch_session(
     @param terminal_fd 驱动持有的 PTY 从端。
     @param mod_dir 只属于本原生会话的受信任 Mod 目录。
     @param model_endpoint 会话回环端点与本次使用的账号凭据或开发口令。
+    @param oauth_file 是否启用独占账号刷新与完整文件。
     @return 直属交互进程，退出由账号执行器回收。
     """
     home, mod = session_paths(command)
@@ -366,16 +487,27 @@ def launch_session(
         target = urlsplit(url)
         if target.scheme != "http" or target.hostname != "127.0.0.1" or not target.path.startswith("/model/"):
             raise ValueError("受管交互模型回环地址无效")
-        auth = {"CLAUDE_CODE_OAUTH_TOKEN": bearer, "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"}
+        auth = {"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"}
+        if oauth_file:
+            if target.port is None or target.username is not None or target.password is not None:
+                raise ValueError("完整凭据需要受信的本机代理入口")
+            # 模型与 Mod 走原回环。外部 OAuth 连接在当前回环监听的 CONNECT 入口终止。
+            proxy = f"http://127.0.0.1:{target.port}"
+            auth.update(HTTP_PROXY=proxy, HTTPS_PROXY=proxy, NO_PROXY="127.0.0.1,localhost")
+        else:
+            auth["CLAUDE_CODE_OAUTH_TOKEN"] = bearer
     else:
+        if oauth_file:
+            raise ValueError("本机开发提供方不接受账号凭据文件")
         url, bearer, _, _ = _loopback_provider()
         if model_endpoint is not None:
             url, bearer, _, _ = _loopback_endpoint(*model_endpoint)
         auth = {"ANTHROPIC_AUTH_TOKEN": bearer}
-    with _open_program() as (_, fd):
+    with (_open_program() as (_, fd),
+          _loopback_channel(target.port if oauth_file else None) as (network_guard, network_fds)):
         return launch_workspace_cli(
             reservation, command, program=GUARD,
-            arguments=[str(home), str(mod), f"/proc/self/fd/{fd}", *arguments],
+            arguments=[*network_guard, str(home), str(mod), f"/proc/self/fd/{fd}", *arguments],
             config_dir=config_dir, environment={
                 **{k: environment[k] for k in ("CLAUDE_CODE_MAX_OUTPUT_TOKENS", "MAX_THINKING_TOKENS")
                    if k in environment},
@@ -383,5 +515,6 @@ def launch_session(
                 "SHELL": "/bin/bash", "LANG": "C.UTF-8", "TERM": "xterm-256color",
                 "ANTHROPIC_BASE_URL": url, **auth,
             }, resume=resume, terminal_fd=terminal_fd, storage=STORAGE, program_fd=fd,
+            inherited_fds=network_fds,
             initialize_profile=lambda work: _initialize_local_profile(config_dir, work),
         )

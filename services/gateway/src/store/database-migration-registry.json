@@ -127,6 +127,15 @@
       "predecessor": 13,
       "rollback_mode": "compatible",
       "version": 14
+    },
+    {
+      "checksum": "aac6fd6f73a60792787a99e4a67dfeac2dbb9e1d95d633b1af22f466a52e618a",
+      "engine": "sqlite",
+      "id": "gateway.tui-oauth-refresh.15",
+      "kind": "schema",
+      "predecessor": 14,
+      "rollback_mode": "compatible",
+      "version": 15
     }
   ]
 }

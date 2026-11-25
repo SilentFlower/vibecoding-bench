@@ -11,6 +11,7 @@ from tui_input_policy import InputRejection, native_input, validate_api, validat
 
 
 BODY_LIMIT = 10 * 1024 * 1024
+OAUTH_FILE_LIMIT = 8192
 # 这三项与 V1 parseInput 一致，客户端设置永远不进入受管进程或本机提供方。
 _CLIENT_SETTINGS = {"settings", "env", "claude_settings"}
 _HOST_FIELDS = {

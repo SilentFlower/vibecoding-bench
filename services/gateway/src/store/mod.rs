@@ -21,6 +21,7 @@ pub mod scheduling_store;
 pub mod settings_store;
 pub mod token_store;
 pub mod tui_backend_schema;
+pub mod tui_oauth_refresh_schema;
 pub mod usage_history_schema;
 pub mod usage_store;
 

@@ -344,6 +344,27 @@ class AccountRuntime:
         with self.credential_locks_guard:
             return self.credential_locks.setdefault(account_name, threading.RLock())
 
+    def tui_oauth_profile(self, account: dict) -> dict | None:
+        """读取当前绑定账号的原生 OAuth 画像。:param account: 已定位的管理账号。
+        :return: 仅用于文件凭据的元数据，没有保存过文件时返回空值。
+        """
+        name = account["name"]
+        if name in ("", ".", "..") or Path(name).name != name or account["profile_path"] != f"profiles/{name}":
+            raise ValueError("V2 OAuth 画像的账号路径无效")
+        try:
+            with self._credential_lock(name):
+                document = _read_json(self.data / "profiles" / name / ".credentials.json")
+        except FileNotFoundError:
+            return None
+        oauth = document.get("claudeAiOauth") if isinstance(document, dict) else None
+        if not isinstance(oauth, dict):
+            raise ValueError("V2 OAuth 画像格式无效")
+        if "scopes" in oauth and (not isinstance(oauth["scopes"], list)
+                                  or any(not isinstance(scope, str) or not scope for scope in oauth["scopes"])):
+            raise ValueError("V2 OAuth 画像权限范围无效")
+        # 令牌和到期时间以 Gateway 刷新后的同次账号快照为准。
+        return {key: value for key, value in oauth.items() if key not in ("accessToken", "refreshToken", "expiresAt")}
+
     @staticmethod
     def execution_token(container_id: str, source: str) -> str:
         """生成绑定执行来源的句柄，固定容器 ID 不能单独用于清理。
