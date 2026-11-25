@@ -1,0 +1,42 @@
+{
+  "id": "tui-v2-landlock-abi2",
+  "name": "tui-v2-landlock-abi2",
+  "title": "V2 发送器兼容 Landlock ABI 2",
+  "description": "让 ABI 2 节点完成 V2 切换、发送与会话恢复，同时保留现有会话文件隔离。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-25",
+  "completedAt": "2026-11-25",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-25T04:49:20Z",
+    "blockers": []
+  },
+  "branch": "feat/tui-v2-landlock-abi2",
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "completedSteps": [
+      "完成 Landlock ABI 2 发送器适配和隔离回归",
+      "验证真实 ABI 2 和 ABI 3 的账号切换、消息续轮和重启恢复",
+      "同步功能分支及项目规范"
+    ],
+    "partialStep": null,
+    "nextStep": "开发验收完成，发布按独立流程处理。",
+    "notes": "测试账号使用回环模型服务。",
+    "updatedAt": "2026-11-25T04:49:20.502575+00:00"
+  }
+}
