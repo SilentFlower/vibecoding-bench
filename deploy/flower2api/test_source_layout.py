@@ -24,6 +24,7 @@ class SourceLayoutTests(unittest.TestCase):
                 'cc2api/src/main.rs', 'cc2api/Cargo.toml',
                 'cc2api/Cargo.lock', 'cc2api/vendor/dependency.rs', 'cc2api/craftls/lib.rs',
                 'orchestrator/runtime_files.py', 'orchestrator/runtime_diagnostics.py',
+                'orchestrator/tui_workspace_launch.py',
                 'orchestrator/cli_quota.py', 'orchestrator/process_metrics.py',
                 'orchestrator/native_sender.py', 'orchestrator/agy_auth.py', 'orchestrator/requirements.txt',
                 'orchestrator/agy_runtime/__init__.py', 'webui/index.html', 'cc2api/web/src/main.ts',
