@@ -28,8 +28,9 @@ async def verify_tui_stages(page, dialog):
     await dialog.get_by_role('button', name='阶段证据', exact=True).click()
     stages = dialog.locator('[data-native-stages]')
     await expect(stages.get_by_role('button', name='模型请求提交')).to_have_attribute('aria-pressed', 'true')
-    await expect(stages.get_by_role('row', name='accept — 已记录')).to_be_visible()
-    await expect(stages.get_by_role('row', name='x-trace 已记录 —')).to_be_visible()
+    await expect(stages.get_by_role('columnheader', name='最终 TLS', exact=True)).to_be_visible()
+    await expect(stages.get_by_role('row').filter(has_text='accept').first).to_contain_text('未知')
+    await expect(stages.get_by_role('row').filter(has_text='x-trace')).to_contain_text('逐字段处理原因未记录')
     await expect(stages.locator('pre').last).to_contain_text('"model"')
     await stages.get_by_role('button', name='入口原文').click()
     await expect(stages.locator('pre').last).to_contain_text('audit_label')
@@ -50,6 +51,28 @@ async def verify_tui_stages(page, dialog):
         await expect(stages.get_by_role('button', name=label)).to_be_visible()
         await stages.get_by_role('button', name='最终TLS写出').click()
         await expect(stages.locator('.request-empty-capture')).to_contain_text(note)
+
+    snapshot['header_policy'] = {
+        'source': 'native_header_policy', 'status': 'complete', 'observed_count': 2, 'stored_count': 2,
+        'decisions': [{'name': 'accept', 'action': 'runtime', 'reason': '由账号发送器生成'},
+                      {'name': 'x-trace', 'action': 'drop', 'reason': '网关未转交该头'}],
+    }
+    snapshot['wire_final'] = {**preview, 'headers': [['Host', 'fixture.test']], 'body': '{}',
+                              'complete': True, 'status': 'complete', 'source': 'tui_sender_tls'}
+    snapshot['ingress']['headers_truncated'] = True
+    await dialog.get_by_role('button', name='刷新阶段证据').click()
+    await expect(stages.locator('.request-header-runtime')).to_contain_text('由账号发送器生成')
+    host = stages.get_by_role('row').filter(has=page.get_by_text('host', exact=True))
+    await expect(host).to_contain_text('未知')
+    await expect(host).to_contain_text('已记录')
+    for width in (1440, 720, 390):
+        await page.set_viewport_size({'width': width, 'height': 1000})
+        assert await dialog.evaluate('e => e.scrollWidth <= e.clientWidth')
+        await expect(stages.get_by_role('columnheader', name='最终 TLS')).to_be_visible()
+    await stages.get_by_role('combobox', name='筛选头部处理动作').click()
+    await page.get_by_role('option', name='只看删除', exact=True).click()
+    await expect(stages.locator('.request-evidence-table tbody tr')).to_have_count(1)
+    await expect(stages.locator('.request-header-drop')).to_contain_text('x-trace')
 
 
 async def main():

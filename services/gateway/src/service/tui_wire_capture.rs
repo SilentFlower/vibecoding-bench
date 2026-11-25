@@ -25,12 +25,13 @@ impl CaptureJob {
     /// @param generation 环境代次。@param submitted 提交头。@param body 实际提交正文。
     /// @return 仅随本次 HTTPS 请求交给 HTTP/1 连接的观察句柄。
     pub(crate) fn start(
-        self,
+        mut self,
         account: i64,
         attempt: Uuid,
         generation: u64,
         submitted: Vec<(String, String)>,
         body: Bytes,
+        assembly: Option<bool>,
     ) -> AcceptedWrite {
         // 复用单快照字节预算。只在队列有空间时复制，拥塞不阻塞业务。
         let (tx, mut rx) = mpsc::channel::<Bytes>(SNAPSHOT_LIMIT / CHUNK);
@@ -53,6 +54,7 @@ impl CaptureJob {
             let mut wire = observation.finish(reason);
             wire["request_id"] = json!(attempt.to_string());
             wire["binding_generation"] = json!(generation);
+            self.input.assembly = assembly;
             if self
                 .input
                 .save(

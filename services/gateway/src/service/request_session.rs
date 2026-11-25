@@ -15,6 +15,7 @@ pub(super) struct RequestSession {
     original: Option<String>,
     key: Option<String>,
     from_content: bool,
+    pub(super) source_header: Option<&'static str>,
 }
 
 impl RequestSession {
@@ -22,12 +23,17 @@ impl RequestSession {
     /// @param token_id 启用 V3 调度时的入口令牌 ID。@param headers 原始头。@param body 已解码正文。
     /// @return 在账号选择、改写和重试间共用的会话。
     pub(super) fn claude(token_id: Option<i64>, headers: &HeaderMap, body: &Value) -> Self {
+        let from_header = |name| header_id(headers, name).map(|id| (id, Some(name)));
         let explicit = extract_session_id_from_body(body)
-            .or_else(|| header_id(headers, "x-claude-code-session-id"))
-            .or_else(|| token_id.and_then(|_| header_id(headers, SESSION_HEADER)));
-        if let Some(id) = explicit {
+            .map(|id| (id, None))
+            .or_else(|| from_header("x-claude-code-session-id"))
+            .or_else(|| token_id.and_then(|_| from_header(SESSION_HEADER)));
+        if let Some((id, source_header)) = explicit {
             let key = token_id.map(|token_id| claude_explicit_key(token_id, &id));
-            return Self::explicit(id, key);
+            return Self {
+                source_header,
+                ..Self::explicit(id, key)
+            };
         }
 
         Self::from_content(token_id.and_then(|token_id| {
@@ -99,6 +105,7 @@ impl RequestSession {
             original: Some(id).filter(|id| valid_id(id)),
             key,
             from_content: false,
+            source_header: None,
         }
     }
 
@@ -107,6 +114,7 @@ impl RequestSession {
             original: None,
             key,
             from_content: true,
+            source_header: None,
         }
     }
 
@@ -328,6 +336,11 @@ mod tests {
         let body = json!({"metadata":{"user_id":"fixture_session_claude-body"}});
         let claude = RequestSession::claude(Some(1), &headers, &body);
         assert_eq!(claude.original(), Some("claude-body"));
+        assert_eq!(claude.source_header, None);
+        assert_eq!(
+            RequestSession::claude(Some(1), &headers, &json!({})).source_header,
+            Some("x-claude-code-session-id")
+        );
         assert_eq!(
             claude.key(),
             Some(claude_explicit_key(1, "claude-body").as_str())
@@ -340,6 +353,10 @@ mod tests {
         assert_eq!(gemini.original(), Some("shared"));
         assert!(gemini.derived().is_none());
         headers.remove("x-claude-code-session-id");
+        assert_eq!(
+            RequestSession::claude(Some(1), &headers, &json!({})).source_header,
+            Some(SESSION_HEADER)
+        );
         assert_ne!(
             RequestSession::claude(Some(1), &headers, &json!({})).key(),
             gemini.key()

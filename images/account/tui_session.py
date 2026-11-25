@@ -1,8 +1,8 @@
 """把同一 sender 内的官方交互会话绑定到一次次受权的客户端工具往返。"""
 
-from collections import deque
+from collections import Counter, deque
 from contextlib import closing, suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import fcntl
 import gzip
 from hashlib import sha256
@@ -43,7 +43,7 @@ from tui_messages import (
 
 # 与网关的 BINDING_TTL_MS 一致，客户端确认工具时原进程和资源名额仍随会话保留。
 _RECEIPT_SECONDS = 60 * 60
-# 2.1.293 的后台启动回执与子请求近同时到达，给它一个短的交接窗口。同步父轮本身无法释放名额。
+# 同步父链占满物理进程时，给在途回执留出短暂释放机会。后台配对使用原请求期限。
 _AGENT_HANDOFF_SECONDS = 2.0
 # 只在原工具有效期内留历史配对，耗尽时不再发放后台认领权限。
 _BACKGROUND_AGENT_LIMIT = 1024
@@ -56,6 +56,7 @@ class _AgentOffer:
     """记录父工具允许启动的一个子代理。原进程退出后保留有期限的身份和摘要。"""
 
     parent: "_Actor | None"
+    group: object
     tool_digest: bytes
     prompt: bytes
     until: float
@@ -64,6 +65,8 @@ class _AgentOffer:
     receipt_received: bool = False
     background_id: str | None = None
     conflicted: bool = False
+    asynchronous: bool = False
+    messages: Counter = field(default_factory=Counter)
 
     def waiting_ancestors(self):
         """枚举因本次同步依赖驻留的进程。@return 尚未收到回执的父链。"""
@@ -85,6 +88,7 @@ class _Waiting:
     actor_key: tuple
     offer: _AgentOffer | None = None
     exact_receipt_only: bool = False
+    groups: frozenset | None = None
 
 
 def _background_agent_id(receipt):
@@ -133,7 +137,7 @@ def _agent_prompt(messages):
             break
         content = row["content"]
         if isinstance(content, str) and content:
-            return content
+            return content, Counter()
         if isinstance(content, list) and all(
             block["type"] == "text" and isinstance(block.get("text"), str)
             for block in content
@@ -149,8 +153,15 @@ def _agent_prompt(messages):
                         and text.rstrip().endswith("</system-reminder>")
                     )
                 ]
-            if len(texts) == 1 and texts[0]:
-                return texts[0]
+            if texts and texts[0]:
+                extras = Counter()
+                prefix = "The coordinator sent a message while you were working:\n"
+                suffix = "\n\nAddress this before completing your current task."
+                for text in texts[1:]:
+                    if not text.startswith(prefix) or not text.endswith(suffix):
+                        raise SubagentBindingError("追加消息缺少原生定向投递标记")
+                    extras[sha256(text[len(prefix):-len(suffix)].encode()).digest()] += 1
+                return texts[0], extras
         break
     raise SubagentBindingError("子代理首轮缺少可核对的输入")
 
@@ -241,6 +252,7 @@ class _Actor:
         self.identity = identity
         self.reservation = reservation
         self.agent_offer = agent_offer
+        self.agent_messages = Counter()
         self.agent_offers = {}
         self.completed_normally = False
         self.settings = settings
@@ -531,30 +543,39 @@ class _Actor:
                 raise ValueError("非法原生步骤状态")
         return {}
 
+    def _observe(self, step, event):
+        with self.changed:
+            block = step.observe(event)
+        if block is None or block["type"] != "tool_use" or block["name"] not in ("Agent", "Task", "SendMessage"):
+            if step.stopped:
+                with self.driver.lock:
+                    self.driver.lock.notify_all()
+            return
+        # 在公开关闭帧之前发布完整工具；等待方和提交方都按 driver → actor 顺序获取锁。
+        with self.driver.lock, self.changed:
+            arguments = block.get("input")
+            if not isinstance(arguments, dict):
+                return
+            if block["name"] in ("Agent", "Task"):
+                prompt = arguments.get("prompt")
+                if isinstance(prompt, str) and prompt:
+                    self.agent_offers[block["id"]] = _AgentOffer(
+                        self, step.offer_group, sha256(block["id"].encode()).digest(), sha256(prompt.encode()).digest(),
+                        time.monotonic() + _RECEIPT_SECONDS,
+                        asynchronous=arguments.get("run_in_background") is True,
+                    )
+            elif block["name"] == "SendMessage":
+                self.driver._record_message(self, arguments)
+            self.driver.lock.notify_all()
+
     def _finish_step(self):
         self._publish(self.step.final)
         self.finished = True
         self.expected = self.step.blocks if self.step.reason == "tool_use" else None
         if self.expected:
             self.wait_until = time.monotonic() + _RECEIPT_SECONDS
-            self.agent_offers = {}
-            for block in self.expected:
-                if block["type"] != "tool_use" or block["name"] not in (
-                    "Agent",
-                    "Task",
-                ):
-                    continue
-                arguments = block.get("input")
-                prompt = (
-                    arguments.get("prompt") if isinstance(arguments, dict) else None
-                )
-                if isinstance(prompt, str) and prompt:
-                    self.agent_offers[block["id"]] = _AgentOffer(
-                        self,
-                        sha256(block["id"].encode()).digest(),
-                        sha256(prompt.encode()).digest(),
-                        self.wait_until,
-                    )
+            for offer in self.agent_offers.values():
+                offer.until = self.wait_until
         self.changed.notify_all()
 
     def _publish(self, batch):
@@ -672,11 +693,14 @@ class _Actor:
                     handle.kind == "new"
                     and self.agent_offer is not None
                     and not self.driver._valid_agent(
-                        self.agent_offer, self.identity[-1]
+                        self.agent_offer, self.identity[-1], self.agent_messages
                     )
                 ):
                     # sender 已允许启动终端时，父工具仍可能拒绝。提交模型前再核对一次。
                     raise SubagentBindingError("子代理的原工具已拒绝或取消")
+                if handle.kind == "new" and self.agent_offer is not None:
+                    self.agent_offer.messages.clear()
+                    self.agent_messages.clear()
                 step.claimed = True
                 raw, handle.raw = handle.raw, None
                 account_token = handle.account_token
@@ -718,6 +742,8 @@ class _Actor:
                 **{name: http.headers[name] for name in ("user-agent", "x-app", "anthropic-beta")
                    if name not in headers and http.headers.get(name)},
             }
+            if handle.capture_assembly:
+                options["capture_assembly"] = True
             if handle.expires_at is not None:
                 options["expires_at"] = handle.expires_at
             model_response = self.driver.launcher.managed_model_response(
@@ -756,7 +782,8 @@ class _Actor:
                         http.wfile.write(wire)
                         http.wfile.flush()
                         return
-                    step.observe(event)
+                self._observe(step, event)
+                with self.changed:
                     if step.stopped:
                         if len(tail) + len(wire) > BODY_LIMIT:
                             raise ValueError("模型终态后的数据超限")
@@ -777,6 +804,7 @@ class _Actor:
             if self.claim is not handle or self.dead.is_set():
                 raise RuntimeError("交互会话已失效")
             self.finished = False
+            self.agent_offers = {}
             self.step = WireStep(handle.tools)
             self.history = handle.history
             self.answers = handle.answers
@@ -821,6 +849,7 @@ class _Reserved:
         # 原生请求已声明完整的协议上下文。普通 API 的历史管理需要本次实际 CLI 提供能力。
         self.api_context = body.get("context_management") if "metadata" not in body else None
         self.thinking = body.get("thinking")
+        self.capture_assembly = False
         self.sent = self.completed = False
 
     def send(self, command):
@@ -852,9 +881,10 @@ class _Reserved:
             if self.sent or actor.claim is not self or actor.dead.is_set():
                 raise ValueError("原预留已提交或已取消")
             if self.kind == "new" and actor.agent_offer is not None:
-                if not actor.driver._valid_agent(actor.agent_offer, actor.identity[-1]):
+                if not actor.driver._valid_agent(actor.agent_offer, actor.identity[-1], actor.agent_messages):
                     raise SubagentBindingError("子代理所属原轮已结束或取消")
                 actor.agent_offer.submitted = True
+            self.capture_assembly = command.get("capture_assembly") is True
             self.upstream_session_id = command.get("upstream_session_id")
             if self.kind == "new":
                 actor.oauth_file = file is not None
@@ -991,8 +1021,25 @@ class SessionDriver:
         ]:
             del self.background_agents[key]
 
+    def _record_message(self, actor, arguments, *, failed=False):
+        recipient, message = arguments.get("to"), arguments.get("message")
+        if not isinstance(recipient, str) or not isinstance(message, str):
+            return
+        offer = self.background_agents.get((*actor.identity[:5], recipient))
+        if offer is None or offer.parent is not actor or time.monotonic() >= offer.until:
+            return
+        digest = sha256(message.encode()).digest()
+        if failed:
+            if offer.messages[digest] > 1:
+                offer.messages[digest] -= 1
+            else:
+                offer.messages.pop(digest, None)
+        elif not offer.submitted:
+            offer.messages[digest] += 1
+
     def _acknowledge_agents(self, actor, answers):
         self._prune_background()
+        newly_bound = set()
         for tool_id in answers.keys() & actor.agent_offers.keys():
             offer = actor.agent_offers[tool_id]
             if offer.receipt_received:
@@ -1014,22 +1061,36 @@ class SessionDriver:
                 or len(self.background_agents) < _BACKGROUND_AGENT_LIMIT
             ):
                 self.background_agents[key] = offer
+                newly_bound.add(hint)
+        # 同一父轮可以同时发出启动与追加消息。收到启动回执才有可核对的收件人。
+        for block in actor.expected or ():
+            if block["type"] != "tool_use" or block["name"] != "SendMessage" or block["id"] not in answers:
+                continue
+            arguments = block.get("input")
+            if not isinstance(arguments, dict) or not isinstance(arguments.get("to"), str):
+                continue
+            failed = answers[block["id"]].get("is_error") is True
+            if arguments["to"] in newly_bound:
+                if not failed:
+                    self._record_message(actor, arguments)
+            elif failed:
+                self._record_message(actor, arguments, failed=True)
         self.lock.notify_all()
 
-    def _claim_agent(self, identity, hint, prompts, *, exact_receipt_only):
+    def _claim_agent(self, identity, hint, prompts, extras, ticket):
         self._prune_background()
         matched = self.background_agents.get((*identity, hint))
         if matched is not None:
             if (
                 matched.prompt not in prompts
+                or (ticket.groups is not None and matched.group not in ticket.groups)
                 or matched.claimed is not None
                 or matched.conflicted
+                or not extras <= matched.messages
             ):
                 raise SubagentBindingError("子代理与已登记的后台启动回执不符")
             matched.claimed = hint
             return matched
-        if exact_receipt_only:
-            return None
         matching = []
         for actor in self.sessions.values():
             if actor.identity[:5] != identity or actor.dead.is_set():
@@ -1041,17 +1102,33 @@ class SessionDriver:
                     if not offer.receipt_received and offer.prompt in prompts
                 )
         # CLI 有时在后台首轮多附一个 LF。这种匹配必须等原工具的启动回执核对子 ID。
-        if len(matching) > 1 or matching and matching[0].prompt != prompts[0]:
+        if not matching:
+            raise SubagentBindingError("子代理缺少原父轮的派工")
+        groups = frozenset(offer.group for offer in matching)
+        if ticket.groups is None:
+            ticket.groups = groups
+        elif ticket.groups.isdisjoint(groups):
+            raise SubagentBindingError("等待的原父轮已结束或取消")
+        # 其它父轮的同提示工具也会造成歧义，但不能成为本次等待的归属。
+        if len(matching) > 1 or matching[0].prompt != prompts[0] or extras:
+            ticket.exact_receipt_only = True
+        if ticket.exact_receipt_only:
             return None
-        if not matching or matching[0].claimed is not None:
+        if matching[0].claimed is not None:
             raise SubagentBindingError("子代理需要同一会话中唯一待交接的 Agent 工具")
         (offer,) = matching
+        # 流还可能给出同提示兄弟。只在原模型已封闭该组时按唯一完整提示认领。
+        with offer.parent.changed:
+            if not offer.parent.step.stopped:
+                return None
+            if offer.parent.step.reason != "tool_use":
+                raise SubagentBindingError("父轮没有完成该工具组")
         offer.claimed = hint
         return offer
 
     @staticmethod
-    def _valid_agent(offer, hint):
-        if offer.conflicted or time.monotonic() >= offer.until:
+    def _valid_agent(offer, hint, messages):
+        if offer.conflicted or time.monotonic() >= offer.until or not messages <= offer.messages:
             return False
         parent = offer.parent
         if offer.receipt_received:
@@ -1143,7 +1220,8 @@ class SessionDriver:
                     or actor.claim is not None
                 ):
                     raise ValueError("原会话未准备接收该工具结果")
-                answers = tool_receipts(messages, actor.history, actor.expected)
+                answers = tool_receipts(messages, actor.history, actor.expected,
+                                        input_format=reservation.get("input_format"))
                 handle = _Reserved(
                     actor,
                     "continuation",
@@ -1165,7 +1243,7 @@ class SessionDriver:
             ):
                 raise SubagentBindingError("此子代理已持有独立进程，工具回执须返回原轮")
             if agent_hint is not None:
-                child_text = _agent_prompt(messages)
+                child_text, extras = _agent_prompt(messages)
                 prompts = [sha256(child_text.encode()).digest()]
                 if child_text.endswith("\n"):
                     prompts.append(sha256(child_text[:-1].encode()).digest())
@@ -1176,7 +1254,12 @@ class SessionDriver:
                 while True:
                     if self.closed:
                         raise RuntimeError("当前账号事件源已关闭")
-                    timeout = remaining()
+                    try:
+                        timeout = remaining()
+                    except TimeoutError:
+                        if ticket.exact_receipt_only and not (cancel_event and cancel_event.is_set()):
+                            raise SubagentAmbiguousError("本次预留结束前未收到对应启动回执") from None
+                        raise
                     capacity = self.capacity.snapshot()
                     if agent_hint is not None and offer is None:
                         # 两个相同提示在收到启动回执前无法区分，挂起握手而不占进程。
@@ -1184,22 +1267,15 @@ class SessionDriver:
                             identity,
                             agent_hint,
                             prompts,
-                            exact_receipt_only=ticket.exact_receipt_only,
+                            extras,
+                            ticket,
                         )
-                        if offer is None:
-                            # 先前已观察到歧义；另一个工具退场也不能证明本请求属于幸存工具。
-                            ticket.exact_receipt_only = True
-                            left = handoff_limit - time.monotonic()
-                            if left <= 0:
-                                raise SubagentAmbiguousError(
-                                    "同提示子代理在交接期内缺少唯一启动回执"
-                                )
-                            timeout = min(timeout, left)
                     if offer is not None:
-                        if not self._valid_agent(offer, agent_hint):
+                        if not self._valid_agent(offer, agent_hint, extras):
                             raise SubagentBindingError("子代理所属原轮已结束或取消")
                         if (
                             capacity.in_use >= capacity.limit
+                            and not offer.asynchronous
                             and self._blocked_dependency(ticket)
                         ):
                             left = handoff_limit - time.monotonic()
@@ -1250,6 +1326,8 @@ class SessionDriver:
                             slot,
                             offer,
                         )
+                        if offer is not None:
+                            actor.agent_messages = extras
                         self.sessions[actor_key] = actor
                         handle = _Reserved(
                             actor,

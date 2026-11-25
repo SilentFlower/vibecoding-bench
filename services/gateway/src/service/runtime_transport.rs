@@ -1406,6 +1406,7 @@ pub(super) struct TuiReservation {
     pub(super) capture_state: Option<&'static str>,
     pub(super) wire_capture: bool,
     capture: Option<Bytes>,
+    agent_header_used: bool,
     submission_started: bool,
     input_policy: bool,
     session_mapping: bool,
@@ -1476,9 +1477,20 @@ impl TuiReservation {
     }
 
     /// 只为已协商并启用采集的账号生成本轮入站观察。@param headers 原始入站头。@param raw 解码实体。@param parsed 正文对象。
-    pub(super) fn observe_ingress(&mut self, headers: &HeaderMap, raw: &[u8], parsed: &Value) {
+    pub(super) fn observe_ingress(
+        &mut self,
+        headers: &HeaderMap,
+        raw: &[u8],
+        parsed: &Value,
+        session_header: Option<&str>,
+    ) {
         if self.capture_state == Some("available") {
-            self.capture = super::native_capture::TuiCaptureInput::encode(headers, raw, parsed);
+            let context = [
+                self.agent_header_used.then_some("x-claude-code-agent-id"),
+                session_header,
+            ];
+            self.capture =
+                super::native_capture::TuiCaptureInput::encode(headers, raw, parsed, &context);
             self.capture_state = Some(if self.capture.is_some() {
                 "queued"
             } else {
@@ -1898,6 +1910,7 @@ pub(super) async fn prepare_tui(
         binding,
         identity_header,
         attempt_id,
+        agent_header_used: agent_hint.is_some(),
         capture_state: None,
         wire_capture: false,
         capture: None,
@@ -3331,14 +3344,38 @@ async fn forward(State(state): State<SenderState>, headers: HeaderMap, body: Byt
             let deadline = validate_request(&prepared, &config)?;
             #[cfg(target_os = "linux")]
             let observer = if tui_account_model {
-                state.tui.take_wire_capture(&config.binding, &prepared.request_id).and_then(|job| {
-                    let attempt = Uuid::parse_str(&prepared.request_id).ok()?;
-                    // 还原本入口收到的提交头。该入口已验证 Content-Length 只能由本发送器添加。
-                    let submitted = prepared.headers.iter().filter(|(name, _)| !name.eq_ignore_ascii_case("content-length"))
-                        .cloned().collect();
-                    Some(job.start(prepared.account_id, attempt, prepared.generation, submitted, body.clone()))
-                })
-            } else { None };
+                state
+                    .tui
+                    .take_wire_capture(&config.binding, &prepared.request_id)
+                    .and_then(|job| {
+                        let attempt = Uuid::parse_str(&prepared.request_id).ok()?;
+                        // 还原本入口收到的提交头。该入口已验证 Content-Length 只能由本发送器添加。
+                        let submitted = prepared
+                            .headers
+                            .iter()
+                            .filter(|(name, _)| !name.eq_ignore_ascii_case("content-length"))
+                            .cloned()
+                            .collect();
+                        let assembly = match headers
+                            .get("x-v3-tui-assembly")
+                            .and_then(|v| v.to_str().ok())
+                        {
+                            Some("explicit-version") => Some(true),
+                            Some("default-version") => Some(false),
+                            _ => None,
+                        };
+                        Some(job.start(
+                            prepared.account_id,
+                            attempt,
+                            prepared.generation,
+                            submitted,
+                            body.clone(),
+                            assembly,
+                        ))
+                    })
+            } else {
+                None
+            };
             #[cfg(not(target_os = "linux"))]
             let observer = None;
             state.active.fetch_add(1, Ordering::SeqCst);
@@ -4302,6 +4339,7 @@ mod tests {
             },
             identity_header: id.into(),
             attempt_id: id.into(),
+            agent_header_used: false,
             capture_state: None,
             wire_capture: false,
             capture: None,

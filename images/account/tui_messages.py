@@ -328,9 +328,9 @@ def _snapshot(block):
     return record
 
 
-def tool_receipts(messages, previous, expected):
+def tool_receipts(messages, previous, expected, *, input_format=None):
     """完整校验原轮和终端所等待的结果。@param messages 本轮正文。@param previous 原历史摘要。
-    @param expected 实际响应块摘要。@return 原 ID 到未改写结果的映射。
+    @param expected 实际响应块摘要。@param input_format 本轮已识别的客户端布局。@return 原 ID 到未改写结果的映射。
     """
     pos, returned = split_reply(messages)
     if (
@@ -340,6 +340,13 @@ def tool_receipts(messages, previous, expected):
     ):
         raise ValueError("工具结果不属于原历史")
     offered = [_snapshot(b) for b in _blocks(messages[pos])]
+    if (input_format == "claude_code" and any(b.get("name") in ("Agent", "Task") for b in expected)
+            and all(b["type"] in ("text", "tool_use") for b in expected)
+            and [b["type"] for b in offered] != [b["type"] for b in expected]):
+        # 2.1.293 把并发工具之间的文本放到工具组前。只重建比较顺序，逐块继续核对。
+        expected = [b for b in expected if b["type"] == "text"] + [
+            b for b in expected if b["type"] == "tool_use"
+        ]
     for block, original in zip(offered, expected):
         if (original.get("type") == "tool_use" and original.get("caller") == {"type": "direct"}
                 and "caller" not in block):
@@ -411,6 +418,8 @@ class WireStep:
         self.terminal_seen = False
         self.final = None
         self.tool_ids = set()
+        # 后台回执可晚于进程退出，只保留原步骤标识即可核对等待归属。
+        self.offer_group = object()
 
     @property
     def blocks(self):
@@ -418,7 +427,7 @@ class WireStep:
         return [block for block in self._records if block is not None]
 
     def observe(self, event):
-        """只解析验证与续轮所需字段；原始事件独立交付给两端。@param event SSE 的 JSON。@return 无。"""
+        """只解析验证与续轮所需字段；原始事件独立交付给两端。@param event SSE 的 JSON。@return 本次完整关闭的块。"""
         if event is None or event.get("type") == "ping":
             return
         kind = event.get("type")
@@ -496,6 +505,7 @@ class WireStep:
             for key, digest in hashes.items():
                 active[key] = digest.hexdigest()
             self._records[index] = active
+            return active
         elif kind == "message_delta" and not self._open:
             self.reason = event.get("delta", {}).get("stop_reason", self.reason)
         elif kind == "message_stop" and not self._open and self.reason:

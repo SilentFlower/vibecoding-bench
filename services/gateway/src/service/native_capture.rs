@@ -588,7 +588,11 @@ fn snapshot_parts(
         let observed = policy["observed_count"].clone();
         let previous_truncated = policy["status"] == "truncated";
         let mut bounded = header_policy(policy["decisions"].as_array().unwrap());
-        bounded["observed_count"] = observed;
+        if observed.is_number() {
+            bounded["observed_count"] = observed;
+        } else {
+            bounded.as_object_mut().unwrap().remove("observed_count");
+        }
         if previous_truncated {
             bounded["status"] = json!("truncated");
         }
@@ -603,8 +607,12 @@ fn snapshot_parts(
     ]);
     if payload["type"] == "tui_provider_request" {
         value["stage"] = json!("tui_provider_request");
-        value.as_object_mut().unwrap().remove("header_policy");
-        let format = payload["submission_format"].as_str().unwrap_or("http_request_to_local_provider");
+        if !observed_policy {
+            value.as_object_mut().unwrap().remove("header_policy");
+        }
+        let format = payload["submission_format"]
+            .as_str()
+            .unwrap_or("http_request_to_local_provider");
         let managed = format == "request_to_account_sender";
         value["stages"] = json!([
             {"stage":"ingress","source":"gateway_http_ingress","representation":"http_logical_bytes","status":ingress_status},
@@ -875,12 +883,20 @@ fn append_wire(value: &mut Value, wire: &Value, secrets: &[String]) -> io::Resul
 pub(super) struct TuiCaptureInput {
     ingress: Value,
     repeated: Vec<String>,
+    // 只接受本次内部账号发送入口提供的组装标记。
+    #[serde(skip)]
+    assembly: Option<bool>,
 }
 
 impl TuiCaptureInput {
     /// 生成本轮采集旁路数据。@param headers 原入站头。@param raw 入站实体。@param parsed 原正文。
     /// @return 有界的私有信封，无法采集时业务继续。
-    pub(super) fn encode(headers: &HeaderMap, raw: &[u8], parsed: &Value) -> Option<Bytes> {
+    pub(super) fn encode(
+        headers: &HeaderMap,
+        raw: &[u8],
+        parsed: &Value,
+        context: &[Option<&str>],
+    ) -> Option<Bytes> {
         let pairs: Vec<_> = headers
             .iter()
             .map(|(name, value)| {
@@ -890,7 +906,18 @@ impl TuiCaptureInput {
                 )
             })
             .collect();
-        let ingress = ingress_snapshot(&pairs, raw, parsed, "", false)?;
+        let mut ingress = ingress_snapshot(&pairs, raw, parsed, "", false)?;
+        let selected = super::runtime_transport::tui_model_headers(headers).ok()?;
+        // 旧 sender 仅读取 ingress 的既有字段。记录真正被协议选择器接纳的名称，不保存值。
+        ingress["_tui_context"] = json!(context.iter().flatten().collect::<Vec<_>>());
+        ingress["_tui_options"] = json!(selected.keys().collect::<Vec<_>>());
+        ingress["_version_preserved"] =
+            json!(selected.get("anthropic-version").is_some_and(|version| {
+                headers.get_all("anthropic-version").iter().count() == 1
+                    && headers
+                        .get("anthropic-version")
+                        .is_some_and(|raw| raw.as_bytes() == version.as_bytes())
+            }));
         let mut repeated = Vec::new();
         collect(parsed, &mut repeated);
         let body = std::str::from_utf8(raw).ok()?;
@@ -912,8 +939,110 @@ impl TuiCaptureInput {
         }
         repeated.sort_unstable();
         repeated.dedup();
-        let bytes = serde_json::to_vec(&Self { ingress, repeated }).ok()?;
+        let bytes = serde_json::to_vec(&Self {
+            ingress,
+            repeated,
+            assembly: None,
+        })
+        .ok()?;
         (bytes.len() <= SNAPSHOT_LIMIT).then(|| Bytes::from(bytes))
+    }
+
+    /// 合并网关实际选项与受管发送器组装声明。@param pairs 本次提交头。
+    /// @param wire 同次传输证据。@return 有来源的逐名称决策；旧组件缺失的来源保持未知。
+    fn decisions(&self, pairs: &[(String, String)], wire: Option<&Value>) -> Option<Value> {
+        let mut rows = BTreeMap::new();
+        if let Some(selected) = self.ingress["_tui_options"].as_array() {
+            for pair in self.ingress["headers"].as_array()? {
+                let name = pair[0].as_str()?.to_ascii_lowercase();
+                let extracted = self.ingress["_tui_context"]
+                    .as_array()
+                    .is_some_and(|names| names.iter().any(|key| key.as_str() == Some(&name)));
+                let entry = if extracted {
+                    if name == "x-claude-code-agent-id" {
+                        ("context", "网关读取子代理标识，用于核对本轮派工")
+                    } else {
+                        ("context", "网关读取本次请求的会话归属")
+                    }
+                } else if selected.iter().any(|key| key.as_str() == Some(&name)) {
+                    if name == "anthropic-version" && self.ingress["_version_preserved"] == true {
+                        ("keep", "网关保留调用方的协议版本")
+                    } else {
+                        ("runtime", "网关规范化并汇总本轮协议声明")
+                    }
+                } else {
+                    ("drop", "网关未将调用方该头转交给模型组装器")
+                };
+                rows.insert(name, entry);
+            }
+        }
+        if let Some(explicit_version) = self.assembly {
+            for (name, _) in pairs {
+                let reason = match name.as_str() {
+                    "authorization" => "由本轮账号授权生成",
+                    "content-type" | "accept" | "accept-encoding" => "受管组装器按模型流式请求设置",
+                    "anthropic-version" if !explicit_version => "受管组装器采用默认协议版本",
+                    "anthropic-version" => {
+                        rows.entry(name.clone())
+                            .or_insert(("runtime", "受管组装器使用本轮协议版本"));
+                        continue;
+                    }
+                    "anthropic-beta" => "受管组装器合并功能声明与账号必需的 OAuth 声明",
+                    "user-agent" | "x-app" => "取自当前原生进程的模型回调",
+                    "x-claude-code-session-id"
+                        if rows
+                            .get(name)
+                            .is_some_and(|(action, _)| *action == "context") =>
+                    {
+                        rows.insert(
+                            name.clone(),
+                            (
+                                "context",
+                                "网关读取入站会话归属，发送器按本轮绑定设置出站会话",
+                            ),
+                        );
+                        continue;
+                    }
+                    "x-claude-code-session-id" => "按本轮绑定设置出站会话",
+                    _ => continue,
+                };
+                rows.insert(name.clone(), ("runtime", reason));
+            }
+        }
+        if let Some(wire) = wire {
+            rows.insert(
+                "content-length".into(),
+                ("runtime", "账号发送器按本次提交的正文字节数生成"),
+            );
+            if wire["headers"].as_array().is_some_and(|headers| {
+                headers.iter().any(|pair| {
+                    pair[0]
+                        .as_str()
+                        .is_some_and(|name| name.eq_ignore_ascii_case("host"))
+                })
+            }) && !pairs
+                .iter()
+                .any(|(name, _)| name.eq_ignore_ascii_case("host"))
+            {
+                rows.insert(
+                    "host".into(),
+                    ("runtime", "HTTP 客户端按目标地址补入，已在最终写出观测到"),
+                );
+            }
+        }
+        if rows.is_empty() {
+            return None;
+        }
+        let decisions: Vec<_> = rows
+            .into_iter()
+            .map(|(name, (action, reason))| json!({"name":name, "action":action, "reason":reason}))
+            .collect();
+        let mut policy = header_policy(&decisions);
+        if self.ingress["headers_truncated"] == true {
+            policy["status"] = json!("truncated");
+            policy.as_object_mut()?.remove("observed_count");
+        }
+        Some(policy)
     }
 
     /// 按实发回环观察落盘，复用账号采集的目录、脱敏、时间与容量合同。
@@ -934,9 +1063,15 @@ impl TuiCaptureInput {
         let digest = hex::encode(Sha256::digest(&raw));
         let size = raw.len();
         let body = String::from_utf8(raw).map_err(|_| io::ErrorKind::InvalidData)?;
+        let policy = self.decisions(&pairs, wire.as_ref());
         let mut payload = json!({"type":"tui_provider_request","headers":pairs,"body":body,
             "body_bytes":size,"body_sha256":digest,"submission_format":format});
-        if let Some(wire) = wire { payload["_wire_final"] = wire; }
+        if let Some(policy) = policy {
+            payload["_header_policy"] = policy;
+        }
+        if let Some(wire) = wire {
+            payload["_wire_final"] = wire;
+        }
         let mut value = snapshot_parts(
             account,
             &attempt.to_string(),
@@ -1325,6 +1460,43 @@ pub(crate) async fn record(
 mod tests {
     use super::*;
 
+    /// 相同入口头只在实际选为归属线索时标记为上下文，代理来头仍按实际选择记录。
+    #[test]
+    fn tui_capture_records_only_consumed_context_headers() {
+        let mut headers = HeaderMap::new();
+        for name in [
+            "x-claude-code-agent-id",
+            "x-session-id",
+            "cloudfront-forwarded-proto",
+        ] {
+            headers.insert(name, "fixture".parse().unwrap());
+        }
+        for used in [true, false] {
+            let context = [
+                used.then_some("x-claude-code-agent-id"),
+                used.then_some("x-session-id"),
+            ];
+            let bytes = TuiCaptureInput::encode(&headers, b"{}", &json!({}), &context).unwrap();
+            let input: TuiCaptureInput = serde_json::from_slice(&bytes).unwrap();
+            let policy = input.decisions(&[], None).unwrap();
+            let rows = policy["decisions"].as_array().unwrap();
+            let action = |name: &str| {
+                rows.iter().find(|row| row["name"] == name).unwrap()["action"]
+                    .as_str()
+                    .unwrap()
+            };
+            assert_eq!(
+                action("x-claude-code-agent-id"),
+                if used { "context" } else { "drop" }
+            );
+            assert_eq!(
+                action("x-session-id"),
+                if used { "context" } else { "drop" }
+            );
+            assert_eq!(action("cloudfront-forwarded-proto"), "drop");
+        }
+    }
+
     /// 真实回环提交使用独立阶段；两端凭据在任意头、正文副本中均脱敏。
     #[test]
     fn tui_provider_capture_keeps_actual_stage_and_redacts_both_ends() {
@@ -1335,7 +1507,7 @@ mod tests {
         headers.insert("cookie", "strictly-header-only".parse().unwrap());
         let raw = br#"{"metadata":{"secret":"inside-metadata"},"messages":[{"role":"user","content":"outside-only-key inside-metadata provided-locally"}]}"#;
         let parsed = serde_json::from_slice(raw).unwrap();
-        let input = TuiCaptureInput::encode(&headers, raw, &parsed).unwrap();
+        let input = TuiCaptureInput::encode(&headers, raw, &parsed, &[]).unwrap();
         assert!(
             !std::str::from_utf8(&input)
                 .unwrap()
@@ -1394,7 +1566,8 @@ mod tests {
         let visibly_cut = "unique-CANARY";
         let raw = format!("{start}{}{secret}\"}}}}", "x".repeat(INGRESS_PREVIEW_LIMIT-start.len()-visibly_cut.len()));
         let parsed = serde_json::from_str(&raw).unwrap();
-        let input = TuiCaptureInput::encode(&HeaderMap::new(), raw.as_bytes(), &parsed).unwrap();
+        let input =
+            TuiCaptureInput::encode(&HeaderMap::new(), raw.as_bytes(), &parsed, &[]).unwrap();
         let input: TuiCaptureInput = serde_json::from_slice(&input).unwrap();
         assert!(input.ingress["body"].as_str().unwrap().ends_with(visibly_cut));
         input.save(&root,7,attempt,vec![("Authorization".into(),format!("Bearer {secret}"))],b"{}".to_vec(),"request_to_account_sender",false,None).unwrap();

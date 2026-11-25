@@ -47,6 +47,32 @@ SSH 节点完成更新后，日志中的 `target_account_release` 来自实际�
 - `deploy/flower2api/verify_tui_guard.py` 验证私有配置、共享工作区、终端描述符及初始化失败。兼容性变更须在真实 ABI 2 与 ABI 3 或更高版本分别验证管理端切换、发送和重启后的原历史续写。
 - `test_cluster_credential_refresh`、`test_cluster_owner_runner` 核对旧节点凭据与身份回执。`test_cluster_transport` 核对排空时原 V2 路由可用和源隔离后的拒绝。
 
+## V2 后台派工的流式交接
+
+### 1. 适用范围
+
+Claude Code 在父模型响应仍打开时，可能已为完整的 `Agent` 或 `Task` 工具块发起子请求。
+
+### 2. 接口
+
+`WireStep.observe(event)` 在 `content_block_stop` 返回已校验的完整块。`SessionDriver.prepare` 使用原预留截止和取消信号等待归属。回执由 `tool_receipts(messages, previous, expected, *, input_format=None)` 核对。
+
+### 3. 数据合同
+
+派工在公开工具关闭帧前登记。等待首次匹配时冻结所属模型步骤，后续启动回执也须属于这些步骤。同一账号绑定、主体及会话内，已封闭工具组中的唯一精确提示可以认领。多一个 LF、同提示歧义或携带额外协调消息时，以原工具的成功启动回执核对子 ID。协调消息另需匹配原父代理发给该收件人的 `SendMessage` 内容。模型接收完整的原始消息。
+
+### 4. 异常
+
+等待中的原步骤取消，后来另一父轮发出相同提示时，旧等待按归属错误退出。新派工保留其启动资格。重复认领和不匹配的准备请求在提交模型前结束。
+
+### 5. 场景
+
+固定版 2.1.293 的父续轮可以把交错的文本归到工具组前。对已识别的该版 Agent/Task 纯文本与工具组合，比较时保持各自的原序，逐块核对文本、工具 ID、名称和参数。含签名或思考块的序列沿原顺序核对。
+
+### 6. 验证
+
+`test_open_group_waits_until_tool_order_is_known`、`test_cancelled_parent_waiter_cannot_move_to_replacement_step` 和 `test_closed_agent_block_and_late_directed_message` 分别覆盖组封闭、同提示替代派工、晚到回执与追加消息。`test_cli_groups_agent_text_without_changing_tools_or_signatures` 覆盖父续轮分组及内容改动。
+
 ## V2 直接工具调用的客户端回执
 
 - `tool_receipts(messages, previous, expected)` 在原会话的历史和完整工具组匹配后，按工具 ID 交付结果。

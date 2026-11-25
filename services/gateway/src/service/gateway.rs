@@ -2697,7 +2697,12 @@ impl GatewayService {
                 .await?;
                 prepared.verify_input_policy(&body_map)?;
                 if let Some(headers) = &tui_ingress_headers {
-                    prepared.observe_ingress(headers, &body_bytes, &body_map);
+                    prepared.observe_ingress(
+                        headers,
+                        &body_bytes,
+                        &body_map,
+                        session.as_ref().and_then(|s| s.source_header),
+                    );
                 }
                 if turn.is_some() && owned_tool_group != prepared.continuation {
                     return Err(AppError::ServiceUnavailable(

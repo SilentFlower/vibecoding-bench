@@ -573,16 +573,21 @@ let observed = capture.observation(complete);
 
 Gateway 与发送器在已鉴权的 prepare 和 send 上协商 `x-v3-tui-final-capture: 1`。发送器按已提交预留的账号绑定和尝试 UUID 一次性取走观察作业。文件凭据的私有控制帧在观察范围之外。
 
+`TuiReservation::observe_ingress` 向 `TuiCaptureInput::encode` 提供网关实际采用的归属头名称。`header_policy` 复用已有的动作、原因和数量结构。受管组装声明只走已认证的账号内控制请求。
+
 ### 3. 数据合同
 
 - 受管提交阶段为 `request_to_account_sender`。最终写出的 `source=tui_sender_tls`、`representation=http_entity_from_tls_accepted_write` 和 `request_id` 必须同时匹配。HTTP 和正文的计数与 SHA-256 针对完整原始字节。预览沿账号快照共享的 2 MiB 预算脱敏裁剪。
 - 普通写和向量写只复制本次成功接受的前缀。发送线程尝试向有界队列入队，后台解析、计算摘要、脱敏并保存。受管模型沿用原 TLS 配置和连接池，`flushed` 保持空值。
 - 显式本地提供方使用 `http_request_written_to_loopback_provider`。向旧控制端写入时保留其接受的 `http_request_to_local_provider`，在同一阶段用可选 `submission_format` 保留真实提交去向。历史记录缺少该字段时显示通用「提交快照」。两个提交阶段均可读取，最终 TLS 按实际证据呈现。
 
+- 请求详情使用 V1 的动作筛选、统计和徽标，逐字段列出入口、提交及最终 TLS。动作以实际选项、提取的上下文、受管组装及发送器决策为依据。旧记录只有阶段预览时显示「逐字段处理原因未记录」。
+
 ### 4. 异常
 
 | 情况 | 管理员看到的结果 |
 | --- | --- |
+| 阶段缺失或头预览截断，指定字段未被记录 | 该阶段显示「未知」；完整列表中缺少的字段显示「未出现」 |
 | 写入前 TLS 失败 | `REQUEST_NOT_OBSERVED`，无完整摘要 |
 | 短写后提前终止，或后台队列丢失副本 | `HTTP_PARTIAL` 或 `EVENT_LOSS`，不完整证据清空正文与完整摘要 |
 | 完整写出后上游返回 429，或者调用方先断开 | 按原尝试保留完整写出，独立记录业务结果 |
@@ -592,9 +597,13 @@ Gateway 与发送器在已鉴权的 prepare 和 send 上协商 `x-v3-tui-final-c
 
 同一个账号以文件凭据或旧令牌发起请求，均使用各自预留的实际模型写出。下一次复用连接时重新绑定观察。关闭采集后该次模型请求按原通道发送。
 
+子请求实际采用 `x-claude-code-agent-id` 时显示「提取上下文」。会话头按本轮会话选择优先级记录。普通代理头若被网关丢弃，显示「删除」。同名出站身份头由组装器生成时，记录其运行时来源。
+
 ### 6. 验证
 
 `deploy/flower2api/verify_tui_final_tls.py` 使用真实网关、发送器、合成账号、回环 HTTPS、私有读取器与浏览器，核对两种凭据、开关、ClientHello、HTTP 摘要、连接复用、并发、取消、证书失败、上游 429 和大正文。Rust 的 `tui_wire` 用例覆盖分段、队列拥塞和不完整实体。编排的 `test_native_capture` 覆盖新旧格式及归属。
+
+`tui_capture_records_only_consumed_context_headers` 覆盖相同入站字段被采用与被跳过的两条路径。`verify_request_detail_design.py` 验证新旧快照、动作筛选、三阶段状态和三个屏宽。
 
 ## Scenario: 原生额外空闲进程回收时间热配置
 

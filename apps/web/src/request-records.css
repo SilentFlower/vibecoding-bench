@@ -136,6 +136,7 @@
   .request-header-summary > span { color: var(--ui-color-danger-text); }
   .request-evidence-table { overflow: auto; border-radius: var(--ui-radius-control); background: var(--ui-color-surface); box-shadow: inset 0 0 0 1px var(--ui-color-line); }
   .request-evidence-table table { width: 100%; border-collapse: collapse; text-align: left; }
+  .request-tui-headers table { min-width: 40rem; }
   .request-evidence-table th, .request-evidence-table td { padding: calc(var(--ui-space-unit) * 2.5) calc(var(--ui-space-unit) * 3); font-size: var(--ui-font-size-sm); white-space: normal; overflow-wrap: anywhere; }
   .request-evidence-table th { background: var(--ui-color-table-head); color: var(--ui-color-text-2); font-weight: 700; }
   .request-evidence-table td { color: var(--ui-color-text); }

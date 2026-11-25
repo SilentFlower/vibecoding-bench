@@ -943,6 +943,7 @@ impl TuiSender {
                     .get_mut(&identity.reservation_id)
                     .filter(|record| record.ticket == slot.ticket)
                 {
+                    command["capture_assembly"] = json!(true);
                     record.wire_capture = Some(CaptureJob {
                         directory,
                         input,
@@ -1522,7 +1523,7 @@ mod tests {
         let mut stale = headers(&another);
         stale.insert(TUI_OAUTH_FILE, file.header().unwrap());
         assert!(send(&stale).await.is_err());
-        let encoded = TuiCaptureInput::encode(&HeaderMap::new(), b"{}", &json!({})).unwrap();
+        let encoded = TuiCaptureInput::encode(&HeaderMap::new(), b"{}", &json!({}), &[]).unwrap();
         let capture = serde_json::from_slice(&encoded).unwrap();
         let capture_dir = source.sender.submission_storage.join("capture");
         let sending = source.sender.send(

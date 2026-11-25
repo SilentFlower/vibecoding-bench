@@ -237,7 +237,7 @@ def local_model_response(raw: bytes, *, headers: dict[str, str] | None = None, c
 
 
 @contextmanager
-def managed_model_response(raw, *, account_token, reservation, headers, capture=None, expires_at=None):
+def managed_model_response(raw, *, account_token, reservation, headers, capture=None, expires_at=None, capture_assembly=False):
     """经原账号 sender 的固定 TLS 出站路径发送已认领的模型请求。
     @param raw 冻结的 Messages 正文。@param account_token 本轮账号 AT。
     @param expires_at 文件模式的真实 UTC 毫秒有效期。
@@ -275,6 +275,9 @@ def managed_model_response(raw, *, account_token, reservation, headers, capture=
         "x-v3-request": b64encode(encode(metadata)).decode("ascii"),
         "x-v3-tui-account-model": "1",
     }
+    if capture_assembly:
+        # 标记只走已认证的回环控制头；远端模型头仍来自独立的 model_headers。
+        transport_headers["x-v3-tui-assembly"] = "explicit-version" if "anthropic-version" in headers else "default-version"
     if expires_at is not None:
         transport_headers["x-v3-tui-account-expiry"] = str(expires_at)
     with closing(HTTPConnection("127.0.0.1", 8091, timeout=120)) as connection:

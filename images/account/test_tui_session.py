@@ -206,6 +206,11 @@ class SessionTests(unittest.TestCase):
     @staticmethod
     def _offered(handle, *group):
         actor = handle.actor
+        stage = WireStep([{"name": b["name"]} for b in group if b["type"] == "tool_use"])
+        stage.observe({"type": "message_start", "message": {}})
+        for index, block in enumerate(group):
+            stage.observe({"type": "content_block_start", "index": index, "content_block": block})
+            actor._observe(stage, {"type": "content_block_stop", "index": index})
         with actor.changed:
             actor.history = handle.history
             actor.step = SimpleNamespace(
@@ -695,6 +700,150 @@ class SessionTests(unittest.TestCase):
                 reserved.send({})
             with self.assertRaises(SubagentBindingError):
                 driver.prepare(candidate, request("原提示\n"))
+
+    def test_cli_groups_agent_text_without_changing_tools_or_signatures(self):
+        """原版 CC 按同类原序交还文本及工具，比较后仍保留客户端原文。@return 无。"""
+        body = self._body()
+        first, second = self._agent("a", "一"), self._agent("b", "二")
+        text = {"type": "text", "text": "进度"}
+        expected = [first, {"type": "text", "text": sha256("进度".encode()).hexdigest()}, second]
+        messages = json.loads(self._returning(body, [text, first, second], "a", "b"))["messages"]
+        history = history_digest(body["messages"])
+        self.assertEqual(set(tool_receipts(messages, history, expected, input_format="claude_code")), {"a", "b"})
+        with self.assertRaises(ValueError):
+            tool_receipts(messages, history, expected)
+        for blocks in ([text, second, first], [{**text, "text": "变化"}, first, second],
+                       [text, first, {**second, "input": first["input"]}]):
+            messages[-2]["content"] = blocks
+            with self.assertRaises(ValueError):
+                tool_receipts(messages, history, expected, input_format="claude_code")
+        signed = {"type": "thinking", "thinking": "推理", "signature": "签名"}
+        messages[-2]["content"] = [text, signed, first, second]
+        with self.assertRaises(ValueError):
+            tool_receipts(messages, history, [signed, *expected], input_format="claude_code")
+
+    def test_open_group_waits_until_tool_order_is_known(self):
+        """同提示兄弟仍可能到达；组封闭且唯一时早于父终态认领。@return 无。"""
+        identity, body = self._identity("streaming"), self._body()
+        child = encode({**body, "messages": [{"role": "user", "content": "相同提示"}]})
+        for sibling in (False, True):
+            with self.subTest(sibling=sibling), closing(self._driver(3)) as driver, ThreadPoolExecutor(1) as pool:
+                parent = driver.prepare(identity, encode(body))
+                actor = parent.actor
+                step = actor.step = WireStep([{"name": "Agent"}])
+                step.observe({"type": "message_start", "message": {}})
+                def dispatch(index):
+                    block = self._agent(str(index), "相同提示")
+                    actor._observe(step, {"type": "content_block_start", "index": index, "content_block": block})
+                    actor._observe(step, {"type": "content_block_stop", "index": index})
+                dispatch(0)
+                pending = pool.submit(driver.prepare, {**identity, "agent_hint": "child"}, child)
+                limit = time.monotonic() + 1
+                while not driver.waiters and not pending.done() and time.monotonic() < limit:
+                    time.sleep(.005)
+                self.assertTrue(driver.waiters)
+                if sibling:
+                    dispatch(1)
+                step.observe({"type": "message_delta", "delta": {"stop_reason": "tool_use"}})
+                actor._observe(step, {"type": "message_stop"})
+                self.assertFalse(actor.finished)
+                if sibling:
+                    parent.close()
+                    with self.assertRaises(SubagentBindingError):
+                        pending.result(1)
+                else:
+                    with closing(pending.result(1)) as early:
+                        self.assertIs(early.actor.agent_offer, actor.agent_offers["0"])
+
+    def test_cancelled_parent_waiter_cannot_move_to_replacement_step(self):
+        """取消父轮后，迟到的唤醒和同文新回执都不能将旧等待转入新派工。@return 无。"""
+        body = self._body()
+        identity = self._identity("same-session")
+        candidate = {**identity, "agent_hint": "child"}
+        child = encode({**body, "messages": [{"role": "user", "content": "相同任务"}]})
+        for with_receipt in (False, True):
+            with self.subTest(receipt=with_receipt), closing(self._driver(3)) as driver, ThreadPoolExecutor(1) as pool:
+                original = driver.prepare(identity, encode(body))
+                actor = original.actor
+                step = actor.step = WireStep([{"name": "Agent"}])
+                step.observe({"type": "message_start", "message": {}})
+                step.observe({"type": "content_block_start", "index": 0,
+                              "content_block": self._agent("old", "相同任务")})
+                actor._observe(step, {"type": "content_block_stop", "index": 0})
+                waiting = Event()
+                claim = driver._claim_agent
+
+                def observe_claim(*args):
+                    result = claim(*args)
+                    if result is None:
+                        waiting.set()
+                    return result
+
+                with patch.object(driver, "_claim_agent", side_effect=observe_claim):
+                    pending = pool.submit(driver.prepare, candidate, child)
+                    self.assertTrue(waiting.wait(1))
+                    # 控制原等待再次获取锁的顺序，覆盖替代派工比唤醒先就绪的情况。
+                    with driver.lock:
+                        original.close()
+                        block = self._agent("replacement", "相同任务")
+                        parent = self._offered(driver.prepare(identity, encode(body)), block)
+                        if with_receipt:
+                            self._finish_background(parent, driver.prepare(identity,
+                                self._background_returning(body, [block], replacement="child")))
+                    with self.assertRaises(SubagentBindingError):
+                        pending.result(1)
+                with closing(driver.prepare(candidate, child)) as fresh:
+                    self.assertEqual(fresh.actor.agent_offer.tool_digest, sha256(b"replacement").digest())
+
+    def test_closed_agent_block_and_late_directed_message(self):
+        """父轮仍在输出时接纳等待者，随后用回执确认换行和定向消息。@return 无。"""
+        body = self._body()
+        identity = self._identity("streaming")
+        hint = "child01"
+        offer = self._agent("first", "合成任务")
+        message = {"type": "tool_use", "name": "SendMessage", "id": "follow",
+                   "input": {"to": hint, "message": "追加要求"}}
+        text = "The coordinator sent a message while you were working:\n追加要求\n\nAddress this before completing your current task."
+        def child(extra):
+            return encode({**body, "messages": [{"role": "user", "content": [
+                {"type": "text", "text": "合成任务\n"}, {"type": "text", "text": extra}]}]})
+        with closing(self._driver(3)) as driver, ThreadPoolExecutor(1) as pool:
+            handle = driver.prepare(identity, encode(body))
+            actor = handle.actor
+            actor.history = handle.history
+            step = actor.step = WireStep([{"name": "Agent"}, {"name": "SendMessage"}])
+            step.observe({"type": "message_start", "message": {}})
+            for index, block in enumerate((offer, message)):
+                step.observe({"type": "content_block_start", "index": index, "content_block": block})
+                actor._observe(step, {"type": "content_block_stop", "index": index})
+            candidate = {**identity, "agent_hint": hint}
+            with patch("tui_session._AGENT_HANDOFF_SECONDS", 0.01):
+                pending = pool.submit(driver.prepare, candidate, child(text))
+                end = time.monotonic() + 1
+                while not driver.waiters and not pending.done() and time.monotonic() < end:
+                    time.sleep(0.005)
+                self.assertTrue(driver.waiters)
+                time.sleep(0.04)
+                self.assertFalse(pending.done())
+                step.observe({"type": "message_delta", "delta": {"stop_reason": "tool_use"}})
+                actor._observe(step, {"type": "message_stop"})
+                step.final = [b"finished"]
+                with actor.changed:
+                    actor._finish_step()
+                    actor.frame_batch = []
+                    handle.sent = handle.completed = True
+                handle.close()
+                receipt = json.loads(self._background_returning(body, [offer, message], first=hint, follow="unused"))
+                receipt["messages"][-1]["content"][1]["content"] = "delivered"
+                self._finish_background(actor, driver.prepare(identity, encode(receipt)))
+                with closing(pending.result(1)) as reserved:
+                    self.assertEqual(reserved.raw, child(text))
+                with self.assertRaises(SubagentBindingError):
+                    driver.prepare(candidate, child(text.replace("追加要求", "其他要求")))
+                with closing(driver.prepare(candidate, child(text))) as retry:
+                    retry.send({})
+                with self.assertRaises(SubagentBindingError):
+                    driver.prepare(candidate, child(text))
 
     def test_same_prompt_siblings_wait_for_exact_background_ids(self):
         """相同提示不分配原工具，后到的回执精确拨给各 ID 所属分支。@return 无。"""

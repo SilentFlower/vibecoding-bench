@@ -14,15 +14,11 @@ const tuiProvider = computed(() => props.snapshot.stage === 'tui_provider_reques
 const submissionStage = computed(() => props.snapshot.stages?.find(item => item.stage === 'tui_provider_request'));
 const submissionFormat = computed(() => submissionStage.value?.submission_format ?? submissionStage.value?.representation);
 const oldTuiCapture = computed(() => tuiProvider.value && submissionFormat.value === 'http_request_to_local_provider');
-const tuiHeaderRows = computed(() => {
-  const snapshot = props.snapshot;
-  if (snapshot.stage !== 'tui_provider_request' || !snapshot.ingress) return [];
-  const incoming = new Set(snapshot.ingress.headers.map(([name]) => name.toLowerCase()));
-  const submitted = new Set(snapshot.headers.map(([name]) => name.toLowerCase()));
-  return [...new Set([...incoming, ...submitted])].sort().map(name => ({
-    name, incoming: incoming.has(name), submitted: submitted.has(name),
-  }));
-});
+const actionOptions = computed(() => [
+  { value: 'all', label: '全部动作' }, { value: 'drop', label: '只看删除' },
+  { value: 'runtime', label: '运行时处理' }, { value: 'context', label: '提取上下文' },
+  { value: 'keep', label: '保留' }, ...(tuiProvider.value ? [{ value: 'observed', label: '仅有阶段记录' }] : []),
+]);
 const rawStage = ref<RawStage>(tuiProvider.value ? 'tui_provider_request'
   : ingressOnly.value || props.snapshot.stage === 'ingress_rejected' ? 'ingress' : props.snapshot.wire_final ? 'wire_final' : 'cc_prepared');
 const rawStages = computed<RawStage[]>(() => {
@@ -40,7 +36,32 @@ const agyWire = computed(() => {
   const wire = props.snapshot.wire_final;
   return wire?.source === 'agy_http_transport' || wire?.source === 'agy_native_tls' ? wire : undefined;
 });
-const decisions = computed(() => (props.snapshot.header_policy?.decisions ?? []).filter(item => action.value === 'all' || item.action === action.value));
+/** 区分已观测、完整列表内缺席和证据不足。@param stage 阶段快照。@return 逐字段查询。 */
+function headerPresence(stage?: { headers: [string, string][]; headers_truncated: boolean }, complete = true) {
+  const names = new Set(stage?.headers.map(([name]) => name.toLowerCase()));
+  return { names, get: (name: string) => names.has(name) ? '已记录' : stage && complete && !stage.headers_truncated ? '未出现' : '未知' };
+}
+const headerRows = computed(() => {
+  const snapshot = props.snapshot;
+  const policy = snapshot.header_policy?.decisions ?? [];
+  if (snapshot.stage !== 'tui_provider_request') return policy.map(item => ({ ...item, presence: [] as string[] }));
+  const wire = snapshot.wire_final;
+  const readable = (stage: string) => {
+    const evidence = snapshot.stages?.find(item => item.stage === stage);
+    return !evidence || ['complete', 'truncated'].includes(evidence.status);
+  };
+  const views = [headerPresence(snapshot.ingress, readable('ingress')),
+    headerPresence(snapshot, readable('tui_provider_request')), headerPresence(wire, wire?.complete === true)];
+  const known = new Map(policy.map(item => [item.name.toLowerCase(), item]));
+  const names = new Set([...known.keys(), ...views.flatMap(view => [...view.names])]);
+  return [...names].sort().map(name => {
+    const presence = views.map(view => view.get(name));
+    const decision = known.get(name);
+    return { name, action: decision?.action ?? 'observed', stage: decision?.stage, presence,
+      reason: decision?.reason ?? '逐字段处理原因未记录' };
+  });
+});
+const decisions = computed(() => headerRows.value.filter(item => action.value === 'all' || item.action === action.value));
 const preview = computed(() => {
   const snapshot = props.snapshot;
   if (rawStage.value === 'ingress') return snapshot.ingress;
@@ -58,7 +79,13 @@ const finalReason = computed(() => {
     HTTP_PARTIAL: '本次只观察到部分HTTP实体', REQUEST_NOT_OBSERVED: '本次没有取得与请求ID匹配的HTTP实体',
     OBSERVER_START_TIMEOUT: '采集器启动等待超时', OBSERVER_FINISH_TIMEOUT: '采集器收口等待超时' } as Record<string, string>)[reason] ?? '本次原生TLS采集未完整收口';
 });
-const stages = computed<NativeCaptureStage[]>(() => props.snapshot.stages?.map(stage => {
+const stages = computed<NativeCaptureStage[]>(() => {
+  const recorded = [...(props.snapshot.stages ?? [])];
+  if (tuiProvider.value && props.snapshot.header_policy && !recorded.some(item => item.stage === 'header_policy')) {
+    recorded.splice(1, 0, { stage: 'header_policy', source: props.snapshot.header_policy.source, representation: 'json',
+      status: props.snapshot.header_policy.status, note: '网关与发送器已记录的逐字段处理动作' });
+  }
+  return recorded.length ? recorded.map(stage => {
   // 旧版把两种提交路径写成了同一个来源，历史快照只能说明提交阶段。
   if (stage.stage === 'tui_provider_request' && stage.submission_format) return { ...stage, representation: stage.submission_format };
   if (oldTuiCapture.value && stage.stage === 'tui_provider_request') return { ...stage, representation: '提交快照' };
@@ -66,16 +93,17 @@ const stages = computed<NativeCaptureStage[]>(() => props.snapshot.stages?.map(s
     return { ...stage, note: '本次只保存到模型请求提交阶段。最终 TLS 写出未采集。' };
   }
   return stage;
-}) ?? [
+}) : [
   { stage: 'ingress', source: 'unavailable', representation: 'unavailable', status: 'unavailable', note: '历史记录未保存入口阶段' },
   { stage: 'header_policy', source: 'unavailable', representation: 'unavailable', status: 'unavailable', note: '历史记录未保存逐字段决策' },
   { stage: 'cc_prepared', source: '历史组装快照', representation: 'json_before_native_transport', status: props.snapshot.body_truncated || props.snapshot.headers_truncated ? 'truncated' : 'complete' },
   { stage: 'wire_final', source: 'unavailable', representation: 'unavailable', status: 'unavailable', note: '本次未采集独立最终TLS写出' },
-]);
+  ];
+});
 
 /** 展示实际处理动作。@param value 持久动作。@return 中文标签。 */
 function actionLabel(value: string): string {
-  return ({ keep: '保留', drop: '删除', runtime: '运行时处理', context: '提取上下文', added: '新增', removed: '删除', changed: '改写' } as Record<string, string>)[value] ?? value;
+  return ({ observed: '阶段对照', keep: '保留', drop: '删除', runtime: '运行时处理', context: '提取上下文', added: '新增', removed: '删除', changed: '改写' } as Record<string, string>)[value] ?? value;
 }
 
 /** 展示阶段及证据完整性。@param value 持久状态或阶段。@return 中文标签。 */
@@ -103,17 +131,18 @@ function bodyText(): string {
 <template>
   <div data-native-stages>
     <div class="request-stages"><article v-for="stage in stages" :key="stage.stage"><span>{{ label(stage.stage) }}</span><strong :class="{ready:stage.status==='complete'}">{{ label(stage.status) }}</strong><small>{{ stage.source }} · {{ stage.representation }}</small><small v-if="stage.note">{{ stage.note }}</small></article></div>
-    <section v-if="tuiProvider && snapshot.stage === 'tui_provider_request' && !snapshot.header_policy" class="request-section">
-      <h3>请求头对照</h3><p class="form-help">按字段名对照入口与提交时的快照。逐字段处理原因未采集。</p>
-      <p v-if="snapshot.ingress?.headers_truncated || snapshot.headers_truncated" class="form-help">请求头已截断，仅展示已记录的字段。</p>
-      <div v-if="tuiHeaderRows.length" class="request-evidence-table"><table><thead><tr><th>字段</th><th>入口</th><th>提交</th></tr></thead>
-        <tbody><tr v-for="row in tuiHeaderRows" :key="row.name"><td><code>{{ row.name }}</code></td><td>{{ row.incoming ? '已记录' : '—' }}</td><td>{{ row.submitted ? '已记录' : '—' }}</td></tr></tbody></table>
-      </div><p v-else class="form-help">本次没有可对照的请求头。</p>
-    </section>
-    <section v-else-if="!ingressOnly" class="request-section"><div class="request-section-head"><h3>头部处理</h3><ChoiceSelect v-model="action" label="筛选头部处理动作" :options="[{value:'all',label:'全部动作'},{value:'drop',label:'只看删除'},{value:'runtime',label:'运行时处理'},{value:'context',label:'提取上下文'},{value:'keep',label:'保留'}]" /></div>
-      <template v-if="snapshot.header_policy && snapshot.header_policy.status!=='unavailable'">
-        <p class="request-header-summary">{{ label(snapshot.header_policy.status) }} · 保存 {{ snapshot.header_policy.stored_count ?? '未观测' }} / 实际 {{ snapshot.header_policy.observed_count ?? '未观测' }} 项<span>删除 {{ snapshot.header_policy.decisions.filter(item=>item.action==='drop').length }} 项</span></p>
-        <div class="request-evidence-table"><table><thead><tr><th>字段</th><th>动作</th><th v-if="agyWire">阶段</th><th>原因</th></tr></thead><tbody><tr v-for="(item,index) in decisions" :key="index" :class="['keep','drop','runtime','context'].includes(item.action)?'request-header-'+item.action:''"><td><code>{{ item.name }}</code></td><td><span class="request-header-badge">{{ actionLabel(item.action) }}</span></td><td v-if="agyWire">{{ item.stage === 'egress' ? '出站适配' : '网关入口' }}</td><td>{{ item.reason }}</td></tr><tr v-if="!decisions.length"><td :colspan="agyWire ? 4 : 3">当前筛选下没有已保存的处理项。</td></tr></tbody></table></div>
+    <section v-if="!ingressOnly" class="request-section">
+      <div class="request-section-head"><h3>头部处理</h3><ChoiceSelect v-model="action" label="筛选头部处理动作" :options="actionOptions" /></div>
+      <template v-if="tuiProvider || (snapshot.header_policy && snapshot.header_policy.status !== 'unavailable')">
+        <p v-if="snapshot.header_policy" class="request-header-summary">{{ label(snapshot.header_policy.status) }} · 保存 {{ snapshot.header_policy.stored_count ?? '未观测' }} / 实际 {{ snapshot.header_policy.observed_count ?? '未观测' }} 项<span>删除 {{ snapshot.header_policy.decisions.filter(item=>item.action==='drop').length }} 项</span></p>
+        <p v-else class="request-header-summary">已观测 {{ headerRows.length }} 个字段 · 逐字段处理原因未记录</p>
+        <div class="request-evidence-table" :class="{ 'request-tui-headers': tuiProvider }"><table><thead><tr><th>字段</th><th>动作</th><th v-if="agyWire">阶段</th><template v-if="tuiProvider"><th>入口</th><th>提交</th><th>最终 TLS</th></template><th>原因</th></tr></thead>
+          <tbody><tr v-for="(item,index) in decisions" :key="index" :class="['keep','drop','runtime','context'].includes(item.action)?'request-header-'+item.action:''">
+            <td><code>{{ item.name }}</code></td><td><span class="request-header-badge">{{ actionLabel(item.action) }}</span></td>
+            <td v-if="agyWire">{{ item.stage === 'egress' ? '出站适配' : '网关入口' }}</td>
+            <td v-for="(state, column) in item.presence" :key="column">{{ state }}</td><td>{{ item.reason }}</td>
+          </tr><tr v-if="!decisions.length"><td :colspan="tuiProvider ? 6 : agyWire ? 4 : 3">当前筛选下没有已保存的处理项。</td></tr></tbody>
+        </table></div>
       </template><p v-else class="form-help">{{ snapshot.header_policy?.note ?? '历史记录未保存逐字段处理明细。' }}</p>
     </section>
     <section v-if="!ingressOnly && (!tuiProvider || snapshot.body_changes)" class="request-section"><h3>正文变化</h3>

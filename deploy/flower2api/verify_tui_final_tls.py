@@ -306,6 +306,7 @@ def verify(folder, gateway, sender):
                     account_token=bearer,
                     reservation=prepare['reservation'],
                     headers=headers,
+                    capture_assembly=command.get('capture_assembly') is True,
                 ) as response:
                     result = response.read()
                 status = 200
@@ -582,6 +583,10 @@ def verify(folder, gateway, sender):
                 ) from exc
             api = manage('GET', 'request-diagnostics/' + row[0] + '/captures/' + path.stem)
             assert api['snapshot'] == snapshot
+            decisions = {entry['name']: entry for entry in snapshot['header_policy']['decisions']}
+            assert decisions['authorization']['action'] == 'runtime'
+            assert decisions['anthropic-version']['action'] == 'keep'
+            assert decisions['content-length']['action'] == 'runtime'
             wire = snapshot['wire_final']
             assert wire['request_id'] == path.stem and wire['source'] == 'tui_sender_tls'
             saved = path.read_bytes()
