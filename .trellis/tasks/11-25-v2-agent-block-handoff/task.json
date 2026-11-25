@@ -1,0 +1,42 @@
+{
+  "id": "v2-agent-block-handoff",
+  "name": "v2-agent-block-handoff",
+  "title": "V2 后台 Agent 完整工具块交接与合法重试",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-25",
+  "completedAt": "2026-11-25",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-25T14:55:09Z",
+    "blockers": []
+  },
+  "branch": "fix/tui-streaming-handoff-header-details",
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-25-tui-streaming-agent-handoff",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "completedSteps": [
+      "完成后台派工、原步骤等待绑定及定向追加消息处理",
+      "在真实父首轮、后台子轮及父续轮核对成功响应与单次提交",
+      "验证取消、同提示替代派工及晚到回执"
+    ],
+    "partialStep": null,
+    "nextStep": "进入联合修复的正式发布流程。",
+    "notes": "真实链路和候选镜像验收已完成。",
+    "updatedAt": "2026-11-25T14:55:09Z"
+  }
+}

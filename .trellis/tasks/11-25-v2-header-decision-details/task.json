@@ -1,0 +1,42 @@
+{
+  "id": "v2-header-decision-details",
+  "name": "v2-header-decision-details",
+  "title": "V2 请求详情的三阶段请求头与处理原因",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-25",
+  "completedAt": "2026-11-25",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-25T14:55:09Z",
+    "blockers": []
+  },
+  "branch": "fix/tui-streaming-handoff-header-details",
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-25-tui-streaming-agent-handoff",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "completedSteps": [
+      "贯通入口、提交和最终 TLS 三阶段请求头详情",
+      "验证实际读取的代理标识显示为提取上下文，旧记录信息可读",
+      "完成真实子请求快照、动作筛选及三种屏宽的浏览器验收"
+    ],
+    "partialStep": null,
+    "nextStep": "进入联合修复的正式发布流程。",
+    "notes": "真实链路和候选镜像验收已完成。",
+    "updatedAt": "2026-11-25T14:55:09Z"
+  }
+}

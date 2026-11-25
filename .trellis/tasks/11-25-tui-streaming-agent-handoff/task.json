@@ -1,0 +1,45 @@
+{
+  "id": "tui-streaming-agent-handoff",
+  "name": "tui-streaming-agent-handoff",
+  "title": "修复 V2 后台子代理并发交接并统一请求头详情",
+  "description": "同步交付后台子代理流式启动、合法重试，以及 V2 请求详情的三阶段请求头与逐字段处理说明。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-25",
+  "completedAt": "2026-11-25",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-25T14:55:09Z",
+    "blockers": []
+  },
+  "branch": "fix/tui-streaming-handoff-header-details",
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "11-25-v2-agent-block-handoff",
+    "11-25-v2-header-decision-details"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "completedSteps": [
+      "完成 V2 流式后台派工及三阶段请求头详情的联合交付",
+      "完成真实 CC 往返、取消与追加消息、两个候选镜像及网关和页面回归",
+      "修复分支已推送，两个子任务的验收记录已收口"
+    ],
+    "partialStep": null,
+    "nextStep": "进入联合修复的正式发布流程。",
+    "notes": "真实链路和候选镜像验收已完成。",
+    "updatedAt": "2026-11-25T14:55:09Z"
+  }
+}

@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/orchestrator/backend/account-runtime-v3.md", "reason": "账号绑定、原工具回执、受管提交和滚动兼容。"}
+{"file": ".trellis/spec/gateway/backend/settings-database.md", "reason": "私有请求快照、最终写出、预算与历史格式。"}
+{"file": ".trellis/spec/gateway/backend/testing-quality.md", "reason": "合成凭据与隔离网关回归。"}
+{"file": ".trellis/spec/web/frontend/frontend-guidelines.md", "reason": "管理页请求详情行为与布局。"}
+{"file": ".trellis/spec/web/frontend/ui-guidelines.md", "reason": "管理控制台表格、颜色令牌、选择器和既有控件。"}
