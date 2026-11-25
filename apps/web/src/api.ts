@@ -417,11 +417,27 @@ export interface SystemAccountRollout {
   target_release: string
   accounts: Array<{
     environment_id: string
+    gateway_account_id?: number | null
     name: string
     state: 'queued' | 'updating' | 'updated' | 'stopped' | 'waiting' | 'needs_check'
     error?: string | null
     retryable?: boolean
   }>
+}
+
+/** 系统更新页可核对的 V2 回执。 */
+export interface SystemTuiReceipt {
+  id: string
+  account_id: number
+  account_name: string
+  revision: string
+  state: 'waiting' | 'recoverable' | 'deferred' | 'binding_changed' | 'recovered' | 'recovered_delivery_unknown'
+}
+
+/** 待核对的 V2 回执页及下一页游标。 */
+export interface SystemTuiReceiptPage {
+  items: SystemTuiReceipt[]
+  next: string | null
 }
 
 /** 已安装底座的实际组件及恢复入口。 */
@@ -761,6 +777,10 @@ export const api = {
   /** 读取当前控制端版本，独立于宿主更新器。@param signal 取消信号。@return 版本或未知值。 */
   systemPlatformVersion: (signal?: AbortSignal) => request<SystemPlatformVersion>('GET', '/runtime/api/system-updates/version', undefined, signal),
   systemUpdateStatus: (signal?: AbortSignal) => request<SystemUpdateStatus>('GET', '/runtime/api/system-updates/status', undefined, signal),
+  /** 读取可单条恢复的回执。@param after 页游标。@param signal 取消信号。@return 脱敏记录。 */
+  systemTuiReceipts: (after: string, signal: AbortSignal) => request<SystemTuiReceiptPage>('GET', `/admin/runtime/system-update/tui-receipts?after=${encodeURIComponent(after)}`, undefined, signal),
+  /** 核对并恢复原记录。@param receipt 当前记录。@return 单条核对结果。 */
+  systemTuiReceiptRecover: (receipt: SystemTuiReceipt) => request<SystemTuiReceipt>('POST', `/admin/runtime/system-update/tui-receipts/${receipt.account_id}/${encodeURIComponent(receipt.id)}`, { revision: receipt.revision }),
   /** 读取已验证目录。@param signal 取消信号。@return 版本缓存。 */
   systemUpdateReleases: (signal?: AbortSignal) => request<SystemUpdateCatalog>('GET', '/runtime/api/system-updates/releases', undefined, signal),
   /** 请求后台检查，安装由独立操作触发。@return 检查状态。 */

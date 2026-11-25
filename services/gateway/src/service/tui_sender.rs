@@ -23,10 +23,10 @@ use tokio::time::{Instant, sleep_until, timeout, timeout_at};
 use uuid::Uuid;
 
 use crate::error::AppError;
+use crate::service::native_capture::{TuiCaptureInput, tui_writer};
 use crate::service::request_body_codec::REQUEST_BODY_LIMIT;
 use crate::service::request_session::valid_id;
-use crate::service::native_capture::{TuiCaptureInput, tui_writer};
-use crate::service::runtime_transport::{TUI_CAPTURE, TUI_ERROR_SOURCE};
+use crate::service::runtime_transport::{TUI_CAPTURE, TUI_ERROR_SOURCE, TuiReceiptProbe};
 use crate::service::runtime_transport::{
     REQUEST_BUDGET_MS, TUI_BODY_POLICY, TUI_GATEWAY_ID_HEADER, TUI_INPUT_FORMAT, TUI_INPUT_POLICY,
     TUI_JSON_PROJECTION_V1, TUI_SSE_PROJECTION_HEADER, TUI_SSE_PROJECTION_V1, TUI_UPSTREAM_SESSION,
@@ -315,6 +315,7 @@ struct VerifiedSource {
     connection: BufReader<UnixStream>,
     proof: Value,
     idle: bool,
+    receipt_idle: Option<bool>,
     model_headers: bool,
     capture_http: bool,
     body_policy: bool,
@@ -328,11 +329,15 @@ async fn verify_source(
     path: &Path,
     binding: &TransportBinding,
     action: &str,
+    receipt: Option<&TuiReceiptProbe>,
 ) -> io::Result<VerifiedSource> {
     let mut connection = open(path).await?;
     let proof = handshake(binding);
     let mut control = proof.clone();
     control["action"] = json!(action);
+    if let Some(receipt) = receipt {
+        control["receipt"] = json!(receipt);
+    }
     write_json(&mut connection, &control).await?;
     let reply = read_json(&mut connection).await?;
     let idle = verify_reply(&reply, &proof)?;
@@ -340,6 +345,7 @@ async fn verify_source(
         connection,
         proof,
         idle,
+        receipt_idle: reply["receipt_idle"].as_bool(),
         capture_http: reply["capture_http_protocol"].as_u64() == Some(1),
         model_headers: reply["model_headers_protocol"].as_u64() == Some(1),
         body_policy: reply["body_policy_protocol"].as_u64() == Some(1),
@@ -364,23 +370,26 @@ impl TuiSender {
     }
 
     /// 探测受授权的本机事件源。@param binding 已鉴权账号。@param config 私有源配置。
-    /// @return 当前源可用时的空闲状态。
+    /// @param receipt 可选的原回执会话。@return 当前源可验证的账号及单轮空闲状态。
     pub(super) async fn status(
         &self,
         binding: &TransportBinding,
         config: Option<&Value>,
-    ) -> Option<bool> {
+        receipt: Option<&TuiReceiptProbe>,
+    ) -> Option<(bool, Option<bool>)> {
         setting(config).ok()?;
-        let idle = timeout(Duration::from_secs(1), async {
+        let source = timeout(Duration::from_secs(1), async {
             submission_log::was_consumed(&self.submission_storage, binding, None).await?;
-            verify_source(&self.path, binding, "status")
-                .await
-                .map(|source| source.idle)
+            verify_source(&self.path, binding, "status", receipt).await
         })
         .await
         .ok()?
         .ok()?;
-        Some(idle && self.active() == 0)
+        let inactive = self.active() == 0;
+        Some((
+            source.idle && inactive,
+            source.receipt_idle.map(|idle| idle && inactive),
+        ))
     }
 
     fn reserve(
@@ -509,7 +518,7 @@ impl TuiSender {
                 session_mapping,
                 managed_oauth,
                 ..
-            } = verify_source(&self.path, binding, "bind")
+            } = verify_source(&self.path, binding, "bind", None)
                 .await
                 .map_err(|_| unavailable())?;
             if identity.agent_hint.is_some() && !agent_scope {
@@ -1611,19 +1620,47 @@ mod tests {
     }
 
     /// 同一预留在发送前占用名额，响应按源字节逐段返回，发送后仍可安全重放取消。@return 无。
+    /// 测试单轮证明可在另一个会话驻留时独立返回。@return 无。
+    #[tokio::test]
+    async fn source_status_returns_exact_receipt_idle_independently() {
+        let source = Source::new();
+        let probe = TuiReceiptProbe {
+            principal_id: 1,
+            session_id: "original".into(),
+        };
+        let (status, ()) = tokio::join!(
+            source
+                .sender
+                .status(&source.binding, Some(&source.config), Some(&probe)),
+            async {
+                let (mut socket, mut reply) = source.receive("status").await;
+                assert_eq!(
+                    reply["receipt"],
+                    json!({"principal_id":1,"session_id":"original"})
+                );
+                reply["idle"] = json!(false);
+                reply["receipt_idle"] = json!(true);
+                write_json(&mut socket, &reply).await.unwrap();
+            }
+        );
+        assert_eq!(status, Some((false, Some(true))));
+    }
+
     #[tokio::test]
     async fn accepted_socket_delivers_original_frames_once() {
         let source = Source::new();
         let body = "{\n \"text\":\"一\"\n}".as_bytes();
         let (idle, ()) = tokio::join!(
-            source.sender.status(&source.binding, Some(&source.config)),
+            source
+                .sender
+                .status(&source.binding, Some(&source.config), None),
             async {
                 let (mut socket, mut reply) = source.receive("status").await;
                 reply["idle"] = json!(true);
                 write_json(&mut socket, &reply).await.unwrap();
             }
         );
-        assert_eq!(idle, Some(true));
+        assert_eq!(idle, Some((true, None)));
         let mut identity = source.identity();
         identity.continuation_only = true;
         let (prepared, mut socket) = tokio::join!(source.prepare(&identity, body), async {
@@ -2028,9 +2065,14 @@ mod tests {
     #[tokio::test]
     async fn bad_source_proof_and_truncated_stream_are_rejected() {
         let source = Source::new();
-        assert_eq!(source.sender.status(&source.binding, None).await, None);
+        assert_eq!(
+            source.sender.status(&source.binding, None, None).await,
+            None
+        );
         let (idle, ()) = tokio::join!(
-            source.sender.status(&source.binding, Some(&source.config)),
+            source
+                .sender
+                .status(&source.binding, Some(&source.config), None),
             async {
                 let (mut socket, mut reply) = source.receive("status").await;
                 reply["generation"] = json!(0);

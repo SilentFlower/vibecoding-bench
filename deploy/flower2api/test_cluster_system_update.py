@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import unittest
+from io import BytesIO
+from urllib.error import HTTPError
 from hashlib import sha256
 from unittest.mock import Mock, patch
 
@@ -74,6 +76,39 @@ class ClusterHostUpdateTests(unittest.TestCase):
         self.host.request = Mock(side_effect=[runtime, gate])
         with self.assertRaisesRegex(ValueError, '重试移除后再更新平台：隔离节点'):
             self.host.drained(self.operation)
+
+    def test_tui_receipts_allow_rolling_and_preserve_nonrolling_guard(self) -> None:
+        """旧网关待回执走自然排空，真实活动与同代约束均保留。@return 无。"""
+        gate = {'phase': 'blocked', 'operation_id': 'original', 'epoch': 'epoch', 'active': 0}
+        original = {**gate, 'tui_tool_pending': True}
+        runtime = {**gate, 'scope': 'control', 'ready': True, 'environments': []}
+        self.host.request = Mock(side_effect=[original, runtime, original])
+        operation = {**self.operation, 'rolling_accounts': True}
+        self.assertFalse(self.host.cancel_inference(operation))
+        self.assertTrue(self.host.drained(operation)['ready'])
+        self.assertNotIn('/admin/runtime/system-update/cutover', [call.args[1] for call in self.host.request.call_args_list])
+        self.host.request = Mock(side_effect=[runtime, {**original, 'active': 1}])
+        self.assertFalse(self.host.drained(operation)['ready'])
+        self.host.request = Mock(side_effect=[runtime, original])
+        with self.assertRaisesRegex(ValueError, '原 V2 工具轮'):
+            self.host.drained(self.operation)
+        self.host.request = Mock(return_value={**original, 'epoch': 'wrong'})
+        with self.assertRaisesRegex(ValueError, '代次'):
+            self.host.cancel_inference(operation)
+
+    def test_raced_legacy_receipt_and_scoped_gateway_cutover(self) -> None:
+        """旧版只识别确切门禁拒绝，新版受证取消无关推理。@return 无。"""
+        operation = {**self.operation, 'rolling_accounts': True}
+        gate = {'phase': 'blocked', 'operation_id': 'original', 'epoch': 'epoch', 'active': 0}
+        error = HTTPError('http://fixture', 503, '待工具回执', None, BytesIO(
+            '{"error":"service unavailable: 请先完成原 V2 工具轮，再切换服务"}'.encode()))
+        self.host.request = Mock(side_effect=[{**gate, 'tui_tool_pending': False}, error, {**gate, 'tui_tool_pending': True}])
+        self.assertFalse(self.host.cancel_inference(operation))
+        self.host.request = Mock(side_effect=[{**gate, 'tui_tool_pending': True, 'tui_receipt_cutover': True},
+            {**gate, 'accepted': True, 'preserve_tui': True}])
+        self.assertFalse(self.host.cancel_inference(operation))
+        self.assertEqual(self.host.request.call_args.args[2], {
+            'operation_id': 'original', 'epoch': 'epoch', 'preserve_tui': True})
 
     def test_abandon_before_node_backup_leaves_other_nodes_untouched(self) -> None:
         """移除阻止排空时，仅释放本次平台门禁。:return: 无。"""

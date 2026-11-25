@@ -16,8 +16,10 @@ use uuid::Uuid;
 
 use crate::error::AppError;
 use crate::service::request_session::valid_id;
+use crate::service::system_update::InferenceCutover;
 use crate::service::tui_tool_history::{
-    continuation_proof, has_result, history_key, preceding_tool_ids, result_ids,
+    SERVER_SESSION_PREFIX, continuation_proof, has_result, history_key, preceding_tool_ids,
+    result_ids,
 };
 use crate::service::usage::UsageCapture;
 use crate::service::v3_scheduling::now_ms;
@@ -27,6 +29,9 @@ pub(super) const TUI_V2_RECEIPT_VERSION: &str = "tui-v2:2.1.293:1";
 const BACKGROUND_AGENT_LIMIT: usize = 1024;
 const RECEIPT_MISMATCH: &str = "工具回执与登记轮次不符，请使用原入口令牌、原会话和完整工具组继续";
 const RECEIPT_COMPLETE: &str = "该工具组的回执已处理，请从上一条响应继续";
+const RECEIPT_ORPHANED: &str = "原 V2 工具会话已退出，无法继续本组回执，请开启新会话";
+const ORPHANED_WAITING: &str = "tui-v2:orphan:waiting";
+const ORPHANED_UNKNOWN: &str = "tui-v2:orphan:delivery_unknown";
 
 /// 一次已登记的公开请求。提交未知时保留原记录供对账。
 pub(super) struct NativeTurn {
@@ -73,6 +78,138 @@ pub(super) async fn awaiting_v2_tools(pool: AnyPool) -> Result<bool, AppError> {
     .fetch_optional(&pool)
     .await?;
     Ok(found.is_some())
+}
+
+/// 逐条冻结原回执身份，原工具组只在服务内参与对账。
+#[derive(sqlx::FromRow)]
+pub(super) struct ReceiptRow {
+    pub(super) id: String,
+    pub(super) account_id: i64,
+    principal_id: i64,
+    session_id: String,
+    pub(super) binding: String,
+    version: String,
+    tools: String,
+    stateless: i64,
+}
+
+const RECEIPT_COLUMNS: &str =
+    "t.id,t.account_id,t.principal_id,t.session_id,t.binding,t.version,t.tools,
+    CAST(CASE WHEN p.turn_id IS NULL THEN 0 ELSE 1 END AS BIGINT) AS stateless";
+
+impl ReceiptRow {
+    /// 生成原记录的比较凭据。@return 当前阶段与归属的摘要。
+    pub(super) fn revision(&self) -> String {
+        let (group, claimed) = if let Some(unknown) = self.recovered() {
+            let digest = self.tools.get(22..).unwrap_or("").to_owned();
+            let claimed = unknown && digest != tool_digest("");
+            (digest, claimed)
+        } else {
+            (
+                tool_digest(self.tools.strip_prefix('!').unwrap_or(&self.tools)),
+                self.tools.starts_with('!'),
+            )
+        };
+        let mut hash = Sha256::new();
+        for field in [&self.id, &self.binding, &self.session_id, &group] {
+            hash.update((field.len() as u64).to_be_bytes());
+            hash.update(field);
+        }
+        hash.update(self.account_id.to_be_bytes());
+        hash.update(self.principal_id.to_be_bytes());
+        hash.update(self.stateless.to_be_bytes());
+        hash.update([u8::from(claimed)]);
+        format!("{:x}", hash.finalize())
+    }
+
+    /// 读取已恢复结果。@return 确认退出时是否存在未知投递。
+    pub(super) fn recovered(&self) -> Option<bool> {
+        match self.version.as_str() {
+            ORPHANED_WAITING => Some(false),
+            ORPHANED_UNKNOWN => Some(true),
+            _ => None,
+        }
+    }
+
+    /// 读取 sender 中使用的账号内会话身份。@return 原主体和精确的传输会话。
+    pub(super) fn sender_identity(&self) -> (i64, String) {
+        let session = if self.stateless == 0 {
+            self.session_id.clone()
+        } else {
+            format!("{SERVER_SESSION_PREFIX}{}", self.session_id)
+        };
+        (self.principal_id, session)
+    }
+
+    /// 核对当前回执可进入恢复过程。@return 是否仍登记在 V2 原轮。
+    pub(super) fn is_open(&self) -> bool {
+        self.version == TUI_V2_RECEIPT_VERSION && !self.tools.starts_with('#')
+    }
+
+    /// 原领用已开始或未知提交，终态需保留相应结论。@return 是否可能有过派发。
+    pub(super) fn delivery_unknown(&self) -> bool {
+        self.tools.is_empty() || self.tools.starts_with('!')
+    }
+}
+
+/// 分页读取待核对的 V2 轮。@param pool 数据库。@param after 上页的末条标识。
+/// @param limit 读取条数。@return 原记录。
+pub(super) async fn receipt_page(
+    pool: &AnyPool,
+    after: &str,
+    limit: i64,
+) -> Result<Vec<ReceiptRow>, AppError> {
+    Ok(sqlx::query_as(&format!(
+        "SELECT {RECEIPT_COLUMNS} FROM tui_native_turns t
+         LEFT JOIN tui_stateless_turn_proofs p ON p.turn_id=t.id
+         WHERE t.version=$1 AND t.tools NOT LIKE '#%' AND t.id>$2 ORDER BY t.id LIMIT $3"
+    ))
+    .bind(TUI_V2_RECEIPT_VERSION)
+    .bind(after)
+    .bind(limit)
+    .fetch_all(pool)
+    .await?)
+}
+
+/// 读取指定账号的精确记录。@param pool 数据库。@param account 账号。@param id 原记录。
+/// @return 原轮或保留的恢复结果。
+pub(super) async fn receipt_row(
+    pool: &AnyPool,
+    account: i64,
+    id: &str,
+) -> Result<Option<ReceiptRow>, AppError> {
+    Ok(sqlx::query_as(&format!(
+        "SELECT {RECEIPT_COLUMNS} FROM tui_native_turns t
+         LEFT JOIN tui_stateless_turn_proofs p ON p.turn_id=t.id
+         WHERE t.account_id=$1 AND t.id=$2"
+    ))
+    .bind(account)
+    .bind(id)
+    .fetch_optional(pool)
+    .await?)
+}
+
+/// 在原 sender 已证实退出后收口原回执。@param pool 数据库。@param row 核对过的原记录。
+/// @return 是否成功保留防重放终态。
+pub(super) async fn retire_orphan(pool: &AnyPool, row: &ReceiptRow) -> Result<bool, AppError> {
+    let group = row.tools.strip_prefix('!').unwrap_or(&row.tools);
+    let until = now_ms().saturating_add(BINDING_TTL_MS);
+    let separator = if row.stateless == 0 { 'E' } else { ':' };
+    let marker = format!("#{until:020}{separator}{}", tool_digest(group));
+    let version = if row.delivery_unknown() {
+        ORPHANED_UNKNOWN
+    } else {
+        ORPHANED_WAITING
+    };
+    // 旧网关继续按固定位置识别期限和工具组摘要。条件写入与正常认领共用同一阶段字段。
+    let changed = sqlx::query(
+        "UPDATE tui_native_turns SET tools=$1,version=$2 WHERE id=$3 AND account_id=$4 AND principal_id=$5
+         AND session_id=$6 AND binding=$7 AND version=$8 AND tools=$9",
+    )
+    .bind(marker).bind(version).bind(&row.id).bind(row.account_id).bind(row.principal_id)
+    .bind(&row.session_id).bind(&row.binding).bind(TUI_V2_RECEIPT_VERSION).bind(&row.tools)
+    .execute(pool).await?;
+    Ok(changed.rows_affected() == 1)
 }
 
 /// 回收已过会话闲置时限的终态摘要。@param pool 账号数据库。@return 清理结果。
@@ -213,18 +350,20 @@ fn background_agent_hashes(body: &Value) -> Vec<String> {
     agents.into_iter().take(BACKGROUND_AGENT_LIMIT).collect()
 }
 
-/// 有匹配的待处理轮时，只校验该归属可能重放的终态。缺少匹配时仍全局阻止历史重新导入。
-async fn terminal_exists(
+/// 查询待拒绝的历史回执。@param pool 网关数据库。@param tools 规范工具组。
+/// @param owner 已验证的候选归属。@return 匹配回执的安全续接提示。
+async fn terminal_receipt(
     pool: &AnyPool,
     tools: &str,
     owner: Option<(i64, Option<&str>)>,
-) -> Result<bool, AppError> {
-    let count = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM tui_native_turns WHERE tools LIKE '#%'
+) -> Result<Option<&'static str>, AppError> {
+    let found = sqlx::query_scalar::<_, i64>(
+        "SELECT CAST(CASE WHEN version IN ($6,$7) THEN 1 ELSE 0 END AS BIGINT)
+         FROM tui_native_turns WHERE tools LIKE '#%'
          AND substr(tools,2,20)>$1 AND substr(tools,23)=$2
          AND substr(tools,22,1)<>'A'
          AND principal_id=COALESCE($3,principal_id) AND session_id=COALESCE($4,session_id)
-         AND ($5=0 OR substr(tools,22,1)<>'E')",
+         AND ($5=0 OR substr(tools,22,1)<>'E') ORDER BY 1 DESC LIMIT 1",
     )
     .bind(format!("{:020}", now_ms()))
     .bind(tool_digest(tools))
@@ -232,9 +371,17 @@ async fn terminal_exists(
     .bind(owner.and_then(|(_, session)| session))
     // 已核验的无头候选只排除明确属于显式会话的终态。旧记录和无头重放仍保守拒绝。
     .bind(i64::from(matches!(owner, Some((_, None)))))
-    .fetch_one(pool)
+    .bind(ORPHANED_WAITING)
+    .bind(ORPHANED_UNKNOWN)
+    .fetch_optional(pool)
     .await?;
-    Ok(count != 0)
+    Ok(found.map(|orphaned| {
+        if orphaned == 1 {
+            RECEIPT_ORPHANED
+        } else {
+            RECEIPT_COMPLETE
+        }
+    }))
 }
 
 async fn has_registered_group(
@@ -273,7 +420,7 @@ pub(super) async fn continuation_account(
         // 部分或重复回传也不能使已登记的整组工具走普通 V1 历史导入。
         for group in [Some(&declared), returned.as_ref()].into_iter().flatten() {
             let tools = serde_json::to_string(group).expect("纯字符串集合可编码");
-            if terminal_exists(&pool, &tools, None).await?
+            if terminal_receipt(&pool, &tools, None).await?.is_some()
                 || has_registered_group(&pool, &tools, "").await?
             {
                 return Err(rejected());
@@ -302,8 +449,10 @@ pub(super) async fn continuation_account(
     .bind(explicit.unwrap_or(""))
     .fetch_all(&pool)
     .await?;
-    if terminal_exists(&pool, &tools, (!candidates.is_empty()).then_some(owner)).await? {
-        return Err(AppError::BadRequest(RECEIPT_COMPLETE.into()));
+    if let Some(message) =
+        terminal_receipt(&pool, &tools, (!candidates.is_empty()).then_some(owner)).await?
+    {
+        return Err(AppError::BadRequest(message.into()));
     }
     match candidates.as_slice() {
         [] => {
@@ -387,8 +536,10 @@ pub(super) async fn claim(
              LIMIT 2",
         ).bind(account).bind(principal).bind(&binding).bind(version).bind(&tools).bind(explicit.unwrap_or(""))
             .fetch_all(&pool).await?;
-        if terminal_exists(&pool, &tools, (!candidates.is_empty()).then_some(owner)).await? {
-            return Err(AppError::BadRequest(RECEIPT_COMPLETE.into()));
+        if let Some(message) =
+            terminal_receipt(&pool, &tools, (!candidates.is_empty()).then_some(owner)).await?
+        {
+            return Err(AppError::BadRequest(message.into()));
         }
         if let [row] = candidates.as_slice() {
             if explicit.is_none() {
@@ -641,6 +792,17 @@ impl NativeTurn {
     /// 在转交原响应终态前落下原工具组或关闭轮次。@param response sender 原 HTTP 响应。
     /// @param codings 原压缩编码。@return 保留原网络帧内容的流。
     pub(super) fn observe_response(self, response: Response, codings: &[String]) -> Response {
+        self.observe_v2_response(response, codings, None)
+    }
+
+    /// 在已开始交付 V2 工具的流上登记切换保护。@param response 原响应。@param codings 原编码。
+    /// @param cutover 本次公开请求的切换信号。@return 原样输出的受观察响应。
+    pub(super) fn observe_v2_response(
+        self,
+        response: Response,
+        codings: &[String],
+        cutover: Option<InferenceCutover>,
+    ) -> Response {
         if !self.submitted.load(Ordering::Acquire) || !response.status().is_success() {
             return response;
         }
@@ -648,8 +810,8 @@ impl NativeTurn {
         let mut capture = UsageCapture::native_turn(self.stateless_history.is_some());
         capture.configure_codings(codings);
         let stream = unfold(
-            (body, Some((self, capture))),
-            |(mut body, mut info)| async move {
+            (body, Some((self, capture)), cutover),
+            |(mut body, mut info, cutover)| async move {
                 let frame = body.frame().await;
                 if let Some((_, capture)) = info.as_mut()
                     && let Some(Ok(frame)) = frame.as_ref()
@@ -658,6 +820,14 @@ impl NativeTurn {
                 {
                     // 观察已不可恢复，释放解码状态和计量缓冲，原响应帧继续交付。
                     info = None;
+                }
+                if let Some(signal) = cutover.as_ref()
+                    && info
+                        .as_mut()
+                        .is_some_and(|(_, capture)| capture.native_tools_started())
+                {
+                    // 先登记保护再转发首个工具事件，避免维护只交付半个工具组。
+                    signal.protect_tui();
                 }
                 let finished = match &frame {
                     Some(Ok(_)) => {
@@ -677,9 +847,9 @@ impl NativeTurn {
                     && let Some((turn, capture)) = info.take()
                     && let Err(error) = turn.finish(capture.native_terminal()).await
                 {
-                    return Some((Err(axum::Error::new(error)), (body, None)));
+                    return Some((Err(axum::Error::new(error)), (body, None, cutover)));
                 }
-                frame.map(|frame| (frame, (body, info)))
+                frame.map(|frame| (frame, (body, info, cutover)))
             },
         );
         Response::from_parts(parts, Body::new(StreamBody::new(stream)))
@@ -743,6 +913,100 @@ mod tests {
                 .unwrap();
             assert_eq!(pending, awaiting_v2_tools(pool.clone()).await.unwrap());
         }
+    }
+
+    /// 过期回执只收口一条，原状态变化会拒绝旧证明。@return 无。
+    #[tokio::test]
+    async fn recovered_receipt_preserves_original_identity_and_blocks_replay() {
+        install_default_drivers();
+        let pool = AnyPoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        migrate(&pool, "sqlite").await.unwrap();
+        sqlx::query(
+            "INSERT INTO accounts(id,name,email,token,device_id) VALUES
+            (1,'first','first@test.invalid','synthetic','one'),
+            (2,'other','other@test.invalid','synthetic','two')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let tools = r#"["toolu_orphaned"]"#;
+        for (id, account, session, tools) in [
+            ("first", 1, "original", tools),
+            ("peer", 1, "still-running", r#"["toolu_waiting"]"#),
+            ("remote", 2, "other", r#"["toolu_remote"]"#),
+        ] {
+            sqlx::query("INSERT INTO tui_native_turns VALUES ($1,$2,20,$3,'same-binding',$4,$5)")
+                .bind(id)
+                .bind(account)
+                .bind(session)
+                .bind(TUI_V2_RECEIPT_VERSION)
+                .bind(tools)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+        let page = super::receipt_page(&pool, "first", 1).await.unwrap();
+        assert_eq!(page[0].id, "peer");
+        let original = super::receipt_row(&pool, 1, "first")
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(
+            super::receipt_row(&pool, 2, "first")
+                .await
+                .unwrap()
+                .is_none()
+        );
+        sqlx::query("UPDATE tui_native_turns SET tools=$1 WHERE id='first'")
+            .bind(format!("!{tools}"))
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(!super::retire_orphan(&pool, &original).await.unwrap());
+        let claimed = super::receipt_row(&pool, 1, "first")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_ne!(claimed.revision(), original.revision());
+        assert!(super::retire_orphan(&pool, &claimed).await.unwrap());
+        assert!(!super::retire_orphan(&pool, &claimed).await.unwrap());
+        let recovered = super::receipt_row(&pool, 1, "first")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(recovered.revision(), claimed.revision());
+        assert_eq!(recovered.recovered(), Some(true));
+        assert_eq!(
+            super::terminal_receipt(&pool, tools, Some((20, Some("original"))))
+                .await
+                .unwrap(),
+            Some(super::RECEIPT_ORPHANED)
+        );
+        assert!(
+            super::terminal_receipt(&pool, tools, Some((20, Some("still-running"))))
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            super::receipt_page(&pool, "", 5)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|record| record.id)
+                .collect::<Vec<_>>(),
+            ["peer", "remote"]
+        );
+        let late = json!({"messages":[{"role":"user","content":[
+            {"type":"tool_result", "tool_use_id":"toolu_orphaned", "content":"late"}]}]});
+        let error = continuation_account(pool.clone(), (20, Some("original")), &late)
+            .await
+            .unwrap_err();
+        assert!(error.to_string().contains(super::RECEIPT_ORPHANED));
     }
 
     /// 活动子轮不得选择另一账号，同一主体撞上两个原账号时拒绝。

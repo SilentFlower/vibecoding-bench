@@ -14511,7 +14511,7 @@ def v3_agy_environment(account_id: int, prepare: bool = False) -> dict:
 
 
 @app.get("/internal/v3/transport/{account_id}")
-def v3_transport(account_id: int, wake: bool = True):
+def v3_transport(account_id: int, wake: bool = True, tui_previous_release: bool = False):
     """解析唯一绑定账号并返回受限发送实例，浏览器无法直接调用。"""
     if not account_runtime:
         raise HTTPException(404)
@@ -14536,7 +14536,8 @@ def v3_transport(account_id: int, wake: bool = True):
     try:
         if cluster_service and cluster_service.store.assignment(account['id'])['kind'] == 'ssh':
             if not wake:
-                binding = cluster_service.existing_remote_transport(account, account_runtime)
+                binding = cluster_service.existing_remote_transport(account, account_runtime,
+                    allow_previous_release=tui_previous_release and configuration.get('request_backend') == 'tui_v2')
             else:
                 if credential_ownership:
                     credential_ownership.guard(account)

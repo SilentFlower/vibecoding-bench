@@ -35,6 +35,9 @@ pub enum AppError {
         message: &'static str,
         field: Option<String>,
     },
+    /// 管理视图已过期，刷新后才能继续同一记录。
+    #[error("{0}")]
+    Conflict(String),
     #[error("unauthorized")]
     Unauthorized,
     #[error("too many requests: {0}")]
@@ -137,6 +140,7 @@ impl IntoResponse for AppError {
             AppError::BadRequest(_) | AppError::AgyInput { .. } => (StatusCode::BAD_REQUEST, ""),
             AppError::TuiInputUnsupported => (StatusCode::UNPROCESSABLE_ENTITY, ""),
             AppError::TuiInput { .. } | AppError::TuiSubagentCapacity | AppError::TuiSubagentAmbiguous => unreachable!(),
+            AppError::Conflict(_) => (StatusCode::CONFLICT, ""),
             AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "unauthorized"),
             AppError::AdmissionLimited { .. } | AppError::TuiProviderBackoff { .. } => {
                 unreachable!()

@@ -774,12 +774,15 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 
 调整下载回执、立即重启、旧账号来源授权或单账号重试时适用。继续使用本文件的签名发行、数据库快照和失败恢复合同。
 
+V2 工具结果由原账号进程接收。修改滚动更新、待回执核对或更新页恢复按钮时，一并验证跨网关重启的原轮续接。
+
 ### 2. Signatures
 
 - `POST /runtime/api/system-updates/prepare` 沿原冻结更新请求。状态响应提供 `staged_updates`、`prepared_candidate`，回执含 `operation_id`、`target_release`、`manifest_sha256`、`fast_transition`。
 - `POST /runtime/api/system-updates/install` 接受可选规范 UUID `prepared_operation_id`。`POST /runtime/api/system-updates/operations/{id}/retry-account` 接受 `expected_revision` 与 `environment_id`。
 - 内部 `snapshot` 接受 `control_only=true`，返回 `scope=control`。内部 `environment` 接受 `action=rollout`，按原操作 UUID、epoch、环境身份与冻结代次执行。状态响应的 `account_rollout` 含生效目标发行、原操作 UUID 和各环境进度。
 - 准备操作可附带 `download_progress`。字段为 `source`、`component`、`state`、`downloaded_bytes`、`total_bytes`。兼容宿主允许缺少该对象。
+- 管理员分页读取 `GET /admin/runtime/system-update/tui-receipts?after=<id>`，响应为 `{items,next}`。按账号和行提交 `POST /admin/runtime/system-update/tui-receipts/:account/:id`，正文为 `{"revision":"<列表中的修订摘要>"}`。
 
 ### 3. Contracts
 
@@ -790,6 +793,8 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 - 后台进度使用 `queued/updating/updated/stopped/waiting/needs_check`。更新器重启继续本次生效发行的待处理事项。单环境重试固定原操作、当前修订和环境身份。重建尝试在环境私有目录保留原代次、下一代次、CPU 额度及完成标记。用户个人的整体启停及 API 准入依旧由账号开关控制。
 - 固定宿主交付包包含 `orchestrator/system_update_rollout.py`。现有 v2 安装沿同协议源码刷新。较旧宿主和组件组合使用其支持的安装入口。
 - 镜像传输按当前组件的压缩层累计，离线包按已读取的包字节计量。界面在总量可靠时显示当前组件的百分比。准备回执与当前操作、目标和目录清单匹配时，进度页直接显示「立即重启」。
+- 后台和「核对并恢复」使用同一归属、活动及修订校验。新 sender 可核对原主体和会话，旧 sender 使用原绑定的整体空闲证明。确认原进程退出后以条件写入保留防重放记录，区分等待结果与投递结果未知。
+- 滚动更新保留原账号环境。新版网关可关闭无关推理并保护在途 V2 工具交接。旧网关已有待回执时，刷新后的固定宿主等待同代真实活动排空，再执行双库快照和切换。后台账号等待工具时携带 `wait_reason=tui_receipt`。
 
 ### 4. Validation & Error Matrix
 
@@ -801,6 +806,9 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 | 账号仍有独立工作或租约 | 该账号等待空闲，其余事项继续 |
 | 已恢复接单后执行器中断 | 续接已生效发行的后台事项并保护后来业务写入 |
 | 总量未知、命中本地缓存或进入校验 | 分别显示可用字节、缓存或校验状态。安装资格由准备回执决定 |
+| 未通过管理员鉴权 | HTTP 401 |
+| 账号与记录不对应，或修订已变化 | HTTP 409，刷新后核对当前记录 |
+| 原节点暂时失联 | 返回 `deferred`，页面显示「该账号延期、平台可继续」 |
 
 ### 5. Scenarios and Examples
 
@@ -808,6 +816,7 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 - 边界。本地候选材料失效时重新下载。账号独立活动无法立即收尾时通过账号后台进度重试。
 - 错误用法。用最近一次下载回执替换其他目标的回执。正确处理。安装请求携带该目标与清单摘要对应的准备操作 UUID。
 - 例如，两个镜像层下载到约三分之一时，进度页显示字节及 33%。下载结束后仍须完成本地校验才能重启。把解包大小当网络传输分母会使百分比失真。
+- 同账号 A 的原进程已退出，B 仍在等待工具。支持逐会话核对时，只关闭 A。B 可在原网关被替换后继续交还结果。失联的探测只说明当前联系中断，恢复联系后重新核对。
 
 ### 6. Tests Required
 
@@ -815,6 +824,7 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 - `test_system_update_recovery`、`test_account_update_identity` 及网关绑定测试覆盖原排他许可、外来占用、跨账号、角色、环境和代次拒绝。
 - `verify_system_update.py --fast-transition` 覆盖旧账号请求、后台延迟、失败重试、运行环境代次、SSH 节点独立换版和中断恢复。`verify_system_update_browser.py` 覆盖下载后刷新、重启确认、恢复接单和单账号重试。
 - `FLOWER_TEST_LOCAL_DOCKER=1` 启用 `test_system_host` 的回环仓库用例。核对实际下载字节、离线包切换和缓存；浏览器验证同页重启、回执不匹配、重开以及双击幂等。
+- `recovered_receipt_preserves_original_identity_and_blocks_replay` 核对终态及迟到回执。`source_status_returns_exact_receipt_idle_independently` 核对逐会话证明。浏览器用例验证单条恢复、失联提示及对应账号续办。
 
 ## Scenario: 候选项目库准备与控制端验收
 

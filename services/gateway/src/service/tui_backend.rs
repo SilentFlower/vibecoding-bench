@@ -2,6 +2,7 @@
 
 use serde_json::{Value, json};
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 use tokio::sync::{MutexGuard, OwnedRwLockReadGuard, broadcast};
 use tokio::time::{MissedTickBehavior, interval};
@@ -156,6 +157,10 @@ impl TuiRequestRoute {
         } else {
             None
         };
+        // 与对账共用路由锁；探测期间开始的任何发送都必须使旧空闲证明失效。
+        self.queue
+            .tui_turn_generation
+            .fetch_add(1, Ordering::Relaxed);
         Ok((state.binding, turn, draining))
     }
 

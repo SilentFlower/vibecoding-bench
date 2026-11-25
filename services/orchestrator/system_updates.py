@@ -525,6 +525,10 @@ class AccountRolloutWaiting(ValueError):
     """账号当前有工作，保留原环境和准入。"""
 
 
+class AccountRolloutWaitingForReceipt(AccountRolloutWaiting):
+    """保留原工具轮，恢复后自动续办本账号。"""
+
+
 @contextmanager
 def _rollout_lease(runtime, gateway_id: int | None, owner: str):
     if gateway_id is None:
@@ -537,11 +541,16 @@ def _rollout_lease(runtime, gateway_id: int | None, owner: str):
     foreign = any(not previous or holder.get('owner') != owner or holder.get('generation') != previous['generation']
         for holder in snapshot.get('holders', []))
     if snapshot.get('active') or snapshot.get('importing') or foreign or (previous and previous['owner'] != owner):
+        # 原回执仍在时登记专属续办。其他活动先结束也不会丢失本账号的自动重试。
+        if snapshot.get('tui_pending') is True:
+            raise AccountRolloutWaitingForReceipt()
         raise AccountRolloutWaiting()
     # 环境锁保证只有本次尝试能收回同一维护所有者。进程重启后租约会进入对账。
     if previous:
         gateway._request('POST', path, {'operation': 'release', 'owner': owner, 'generation': previous['generation']})
-    if snapshot.get('waiting') or snapshot.get('tui_pending') is True:
+    if snapshot.get('tui_pending') is True:
+        raise AccountRolloutWaitingForReceipt()
+    if snapshot.get('waiting'):
         raise AccountRolloutWaiting()
     proof = gateway._request('POST', path, {'operation': 'prepare', 'owner': owner}).get('lease')
     if not proof or proof['owner'] != owner or not proof['exclusive']:
@@ -846,6 +855,8 @@ def system_updates_router(runtime_provider) -> APIRouter:
                     if not record or any(record.get(key) != getattr(body, key) for key in ('operation_id', 'epoch')):
                         raise HTTPException(409, '账号滚动更新归属已经变化')
                     state = rollout_account(runtime, body, record)
+            except AccountRolloutWaitingForReceipt:
+                return {'environment_id': body.environment_id, 'state': 'waiting', 'wait_reason': 'tui_receipt'}
             except AccountRolloutWaiting:
                 state = 'waiting'
             except (OSError, ValueError, RuntimeError, DockerException):

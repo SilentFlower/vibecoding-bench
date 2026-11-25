@@ -533,6 +533,7 @@ async fn maintenance_waits_without_failure_and_reopens_promptly() {
     system_update::cutover(
         gate["operation_id"].as_str().unwrap(),
         gate["epoch"].as_str().unwrap(),
+        false,
     )
     .unwrap();
     let status = wait_state(&prewarmer, account.id, "maintenance", None).await;

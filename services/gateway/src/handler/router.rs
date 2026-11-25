@@ -61,6 +61,7 @@ use crate::service::rewriter::{
 use crate::service::runtime_bridge::{self, RuntimeConfigPermit};
 use crate::service::system_update;
 use crate::service::telemetry::TelemetryService;
+use crate::service::tui_receipt_recovery::{self, ReceiptPage, ReceiptView};
 use crate::service::v3_scheduling::{PhaseCounts, SchedulingConfig, now_ms};
 use crate::service::version_profile::{
     ClaudeCodeProfileSelectionMode, all_profiles, profile_for_key,
@@ -189,6 +190,14 @@ pub fn build_router(
         .route(
             "/admin/runtime/system-update/cutover",
             post(system_update_cutover),
+        )
+        .route(
+            "/admin/runtime/system-update/tui-receipts",
+            get(system_update_tui_receipts),
+        )
+        .route(
+            "/admin/runtime/system-update/tui-receipts/:account/:id",
+            post(system_update_recover_tui_receipt),
         )
         .route("/admin/accounts", get(list_accounts).post(create_account))
         .route(
@@ -350,10 +359,46 @@ async fn system_update_status(State(state): State<AppState>) -> Result<Json<Valu
 }
 
 #[derive(Deserialize)]
+struct ReceiptPageQuery {
+    #[serde(default)]
+    after: String,
+}
+
+/// 读取公开回执状态。@param state 应用。@param query 页游标。@return 管理分页。
+async fn system_update_tui_receipts(
+    State(state): State<AppState>,
+    Query(query): Query<ReceiptPageQuery>,
+) -> Result<Json<ReceiptPage>, AppError> {
+    Ok(Json(
+        tui_receipt_recovery::list(&state.account_svc, &query.after).await?,
+    ))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReceiptRecoveryInput {
+    revision: String,
+}
+
+/// 立即恢复同一账号的原记录。@param state 应用。@param path 冻结的账号及回执。@param input 当前修订。
+/// @return 单条核对结果。
+async fn system_update_recover_tui_receipt(
+    State(state): State<AppState>,
+    Path((account, id)): Path<(i64, String)>,
+    Json(input): Json<ReceiptRecoveryInput>,
+) -> Result<Json<ReceiptView>, AppError> {
+    Ok(Json(
+        tui_receipt_recovery::recover(&state.account_svc, account, &id, &input.revision).await?,
+    ))
+}
+
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct SystemUpdateCutover {
     operation_id: String,
     epoch: String,
+    #[serde(default)]
+    preserve_tui: bool,
 }
 
 /// 通知本代网关结束普通推理，凭据事务继续沿原活动证明收口。
@@ -364,12 +409,12 @@ async fn system_update_cutover(
     Json(input): Json<SystemUpdateCutover>,
 ) -> Result<Json<Value>, AppError> {
     require_v3_credential_service(&headers)?;
-    if state.account_svc.awaiting_tui_tools().await? {
+    if !input.preserve_tui && state.account_svc.awaiting_tui_tools().await? {
         return Err(AppError::ServiceUnavailable(
             "请先完成原 V2 工具轮，再切换服务".into(),
         ));
     }
-    let receipt = system_update::cutover(&input.operation_id, &input.epoch)?;
+    let receipt = system_update::cutover(&input.operation_id, &input.epoch, input.preserve_tui)?;
     state.gemini_svc.release_tools_for_cutover();
     Ok(Json(receipt))
 }

@@ -134,6 +134,18 @@ class SourceTests(unittest.TestCase):
             stream.flush()
         return {"action": "send", "workspace": {}, "reservation_id": identity["reservation_id"]}
 
+    def test_status_returns_original_receipt_idle_with_busy_peer(self):
+        """源只验证同代原轮。旧驱动仅有全局空闲时保持原返回。@return 无。"""
+        with self._connect("status", receipt={"principal_id": 9, "session_id": "A"}) as (_, stream):
+            self.assertNotIn("receipt_idle", json.loads(stream.readline()))
+        self.driver.idle = lambda: False
+        self.driver.receipt_idle = lambda identity: identity == (1, "env", 2, 9, "A")
+        for session, expected in (("A", True), ("B", False)):
+            with self._connect("status", receipt={"principal_id": 9, "session_id": session}) as (_, stream):
+                reply = json.loads(stream.readline())
+                self.assertFalse(reply["idle"])
+                self.assertIs(reply["receipt_idle"], expected)
+
     def test_binding_before_body_and_real_readiness(self):
         """绑定或父进程不符时关闭，真实驱动未就绪时返回相应状态。@return 无。"""
         with self._connect(account_id=2) as (_, stream):

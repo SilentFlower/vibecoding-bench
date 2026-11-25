@@ -123,9 +123,10 @@ class AccountSource:
         if any(hello.get(key) != value for key, value in proof.items()):
             return
         with self._driver_for(epoch, maximum) as driver:
-            self._exchange_bound(reader, writer, connection, proof, hello["action"], driver, epoch)
+            self._exchange_bound(reader, writer, connection, proof, hello, driver, epoch)
 
-    def _exchange_bound(self, reader, writer, connection, proof, action, driver, epoch):
+    def _exchange_bound(self, reader, writer, connection, proof, hello, driver, epoch):
+        action = hello["action"]
         ready = driver.ready()
         state = {
             **proof,
@@ -138,6 +139,15 @@ class AccountSource:
             "agent_scope_protocol": 1,
             "upstream_session_protocol": 1,
         }
+        receipt = hello.get("receipt") if action == "status" else None
+        inspect = getattr(driver, "receipt_idle", None)
+        if ready and inspect is not None and isinstance(receipt, dict):
+            principal = receipt.get("principal_id")
+            session = receipt.get("session_id")
+            if type(principal) is int and principal >= 0 and isinstance(session, str) and session:
+                state["receipt_idle"] = inspect((
+                    proof["account_id"], proof["environment_id"], proof["generation"], principal, session,
+                ))
         managed_oauth = getattr(driver, "managed_oauth", False)
         if managed_oauth:
             state["managed_oauth_protocol"] = 1

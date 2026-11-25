@@ -45,6 +45,9 @@ class UpdateFixture:
         self.hold = None
         self.started = asyncio.Event()
         self.external = []
+        self.receipts = {}
+        self.receipt_writes = []
+        self.receipt_online = False
 
     async def route(self, route) -> None:
         """在网络前响应实际资源及全部合成接口。
@@ -68,6 +71,19 @@ class UpdateFixture:
         elif path == '/runtime/':
             await route.fulfill(content_type='text/html', body='<p>合成环境管理入口</p>')
             return
+        elif path == '/admin/runtime/system-update/tui-receipts':
+            payload = {'items': list(self.receipts.values()), 'next': None}
+        elif path.startswith('/admin/runtime/system-update/tui-receipts/') and request.method == 'POST':
+            account, record = path.rsplit('/', 2)[1:]
+            current = self.receipts.get(record)
+            body = json.loads(request.post_data or '{}')
+            self.receipt_writes.append((int(account), record, body))
+            if not current or int(account) != current['account_id'] or body.get('revision') != current['revision']:
+                status, payload = 409, {'error': '工具回执已经变化，请刷新更新页'}
+            elif self.receipt_online:
+                payload = {**self.receipts.pop(record), 'state': 'recovered_delivery_unknown'}
+            else:
+                payload = current
         elif path == '/runtime/api/system-updates/status':
             if self.unavailable:
                 status, payload = 503, {'detail': '平台切换中'}
@@ -530,6 +546,35 @@ async def verify(output: Path) -> dict:
         assert fixture.writes[0]['body'] == {'expected_revision': fixture.state['revision']}
         total_writes += len(fixture.writes)
         cases.append('等待对账直接显示进度，无步骤记录的旧操作正常，恢复窗口居中并沿用原操作身份')
+        await context.close()
+        # 单条 V2 回执离线提示、恢复联系、精确账号和修订，以及同账号后台续办。
+        fixture = UpdateFixture()
+        receipt, peer = str(uuid.uuid4()), str(uuid.uuid4())
+        fixture.receipts = {
+            receipt: {'id': receipt, 'account_id': 3, 'account_name': '离线节点账号', 'revision': 'a' * 64, 'state': 'deferred'},
+            peer: {'id': peer, 'account_id': 4, 'account_name': '另一账号', 'revision': 'b' * 64, 'state': 'waiting'},
+        }
+        fixture.state['account_rollout'] = {'operation_id': str(uuid.uuid4()), 'target_release': 'system-ci-100-1',
+            'accounts': [{'environment_id': 'matched', 'gateway_account_id': 3, 'name': '离线节点账号', 'state': 'waiting'},
+                         {'environment_id': 'other', 'gateway_account_id': 4, 'name': '另一账号', 'state': 'waiting'}]}
+        context, page, dialog = await page_for(fixture)
+        row = dialog.locator('[data-tui-receipt-state=deferred]')
+        await expect(row).to_contain_text('该账号延期、平台可继续')
+        await expect(dialog.get_by_role('button', name='安装更新', exact=True)).to_be_enabled()
+        await row.get_by_role('button', name='核对并恢复').click()
+        await expect(page.get_by_text('该账号延期、平台可继续', exact=True).last).to_be_visible()
+        assert fixture.receipt_writes == [(3, receipt, {'revision': 'a' * 64})]
+        assert not fixture.writes
+        fixture.receipt_online = True
+        await row.get_by_role('button', name='核对并恢复').click()
+        await expect(row).to_have_count(0)
+        await expect(dialog.locator('[data-tui-receipt-state=waiting]')).to_contain_text('另一账号')
+        await expect(dialog.locator('[data-rollout-state=updated]')).to_contain_text('离线节点账号')
+        assert fixture.writes[0]['body']['environment_id'] == 'matched'
+        assert fixture.writes[0]['path'].endswith('/retry-account')
+        assert fixture.receipt_writes == [(3, receipt, {'revision': 'a' * 64})] * 2
+        total_writes += len(fixture.writes) + len(fixture.receipt_writes)
+        cases.append('工具回执失联延期、恢复联系后单条核对及账号续办、其余回执保留')
         await context.close()
         await browser.close()
     if errors:

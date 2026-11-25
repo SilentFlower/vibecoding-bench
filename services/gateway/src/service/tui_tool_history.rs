@@ -302,6 +302,11 @@ impl ResponseTools {
         Some(())
     }
 
+    /// 判断公开响应已经开始交付工具。@return 有已观察的工具事件时为真。
+    pub(super) fn started(&self) -> bool {
+        !self.pending.is_empty() || !self.tools.is_empty()
+    }
+
     /// 完成后释放工具参数并返回原格式摘要。@return 可信 ID 与可选声明摘要。
     pub(super) fn complete(self) -> Option<(Vec<String>, Option<String>)> {
         if !self.pending.is_empty() {

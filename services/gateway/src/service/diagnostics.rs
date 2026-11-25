@@ -975,6 +975,7 @@ impl RequestTraceGuard {
             | AppError::SchedulingConflict
             | AppError::TuiSubagentCapacity => "admission",
             AppError::BadRequest(_)
+            | AppError::Conflict(_)
             | AppError::AgyInput { .. }
             | AppError::TuiInput { .. }
             | AppError::TuiInputUnsupported
@@ -1516,6 +1517,8 @@ mod tests {
     /// SSE 内错误、读取异常及客户端取消必须独立于 HTTP 200 判定。
     #[tokio::test]
     async fn diagnostics_record_stream_errors_and_cancellation_once() {
+        use crate::service::system_update::CutoverScope;
+
         let store = store().await;
         for end in ["sse_error", "read_error", "cancelled", "system_update"] {
             let (epoch, receiver) = tokio::sync::watch::channel(None);
@@ -1545,7 +1548,10 @@ mod tests {
             if matches!(end, "cancelled" | "system_update") {
                 assert!(body.frame().await.unwrap().is_ok());
                 if end == "system_update" {
-                    epoch.send_replace(Some(uuid::Uuid::new_v4()));
+                    epoch.send_replace(Some(CutoverScope {
+                        epoch: uuid::Uuid::new_v4(),
+                        preserve_tui: false,
+                    }));
                     cutover.interrupt().await;
                 }
                 drop(body);

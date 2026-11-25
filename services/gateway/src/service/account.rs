@@ -2,7 +2,7 @@ use chrono::Utc;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicI32, AtomicI64, Ordering};
+use std::sync::atomic::{AtomicI32, AtomicI64, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::{
@@ -262,6 +262,8 @@ pub struct AccountQueue {
     /// 候选路由判定跨越物理准入；写锁只在切换真正生效时取得。
     pub(crate) tui_route: Arc<RwLock<()>>,
     pub(crate) tui_config: Arc<AsyncMutex<()>>,
+    /// 只读 sender 探测期间的新 V2 登记使原证据失效。
+    pub(crate) tui_turn_generation: AtomicU64,
     /// 活跃槽位信号量。
     slots: Arc<Semaphore>,
     /// 等待位信号量，实际通过槽位和 CLI 门禁后归还。
@@ -386,6 +388,7 @@ impl AccountQueue {
             runtime_gate: RuntimeGate::new(active_requests.clone()),
             tui_route: Arc::new(RwLock::new(())),
             tui_config: Arc::new(AsyncMutex::new(())),
+            tui_turn_generation: AtomicU64::new(0),
             slots: Arc::new(Semaphore::new(cap as usize)),
             queue_cap: Arc::new(Semaphore::new(qc as usize)),
             slot_max: Arc::new(AtomicI32::new(cap)),
@@ -1195,6 +1198,7 @@ impl AccountService {
 
     /// 启动账号转发切换意向对账。@param self 同一 Gateway 账号服务。@return 无。
     pub fn start_tui_backend_reconciliation(self: &Arc<Self>) {
+        tokio::spawn(super::tui_receipt_recovery::reconcile(self.clone()));
         let service = self.clone();
         let retirements = self.tui_retirements.subscribe();
         tokio::spawn(crate::service::tui_backend::reconcile_intents(

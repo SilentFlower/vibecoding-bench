@@ -552,8 +552,10 @@ class ClusterService:
         deployment_key = hashlib.sha256(runtime.deployment.encode()).hexdigest()[:12]
         return f"{base}/cluster-transports/v2/{deployment_key}/{node_key}/{environment_id}/{revision}"
 
-    def existing_remote_transport(self, account: dict, runtime) -> dict | None:
-        """投影原已核对中继。@param account 固定绑定账号。@param runtime 权威环境。@return 不唤醒的绑定。"""
+    def existing_remote_transport(self, account: dict, runtime, *, allow_previous_release: bool = False) -> dict | None:
+        """投影原已核对中继。@param account 固定绑定账号。@param runtime 权威环境。
+        @param allow_previous_release 网关将比对已登记回执的完整旧绑定。@return 不唤醒的绑定。
+        """
         assignment = self.store.assignment(account['id'])
         if assignment['kind'] != 'ssh':
             return None
@@ -583,7 +585,8 @@ class ClusterService:
                 return None
             if (binding.get('account_id') != account['cc2api_account_id']
                     or binding.get('environment_id') != row['environment_id'] or binding.get('generation') != row['generation']
-                    or binding.get('release_id') != configured_release(runtime)
+                    or not isinstance(binding.get('release_id'), str) or not binding['release_id']
+                    or (not allow_previous_release and binding['release_id'] != configured_release(runtime))
                     or not isinstance(binding.get('secret'), str) or not 32 <= len(binding['secret']) <= 256):
                 raise ValueError('远程运行绑定没有通过原账号和代次核验')
             socket = node.sender_socket(row['environment_id'], str(ipaddress.ip_address(peer['sender_address'])))
@@ -593,10 +596,13 @@ class ClusterService:
                 self.transports.register(NodeTransport(assignment['node_id'], assignment['node_key'], account['id'],
                     row['environment_id'], assignment['revision'], row['generation'], socket, binding['secret'],
                     gateway_account_id=binding['account_id'], release_id=binding['release_id']))
-                entry = self.transports.existing_cc(assignment['node_key'], row['environment_id'],
-                    assignment['revision'], row['generation'], account['cc2api_account_id'])
+            # 读取会自己进入归属锁并复核分配，避免中央重启后的第一次恢复重入数据库写锁。
+            entry = self.transports.existing_cc(assignment['node_key'], row['environment_id'],
+                assignment['revision'], row['generation'], account['cc2api_account_id'])
             if not entry:
                 return None
+        if not allow_previous_release and entry.release_id != configured_release(runtime):
+            raise ValueError('远程运行绑定仍在原发行')
         return {'account_id': entry.gateway_account_id, 'environment_id': entry.environment_id,
                 'generation': entry.generation, 'release_id': entry.release_id, 'secret': entry.secret,
                 'endpoint': self._remote_transport_endpoint(runtime, entry.node_key, entry.environment_id,

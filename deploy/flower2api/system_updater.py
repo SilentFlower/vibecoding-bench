@@ -37,6 +37,7 @@ STATE_LIMIT = 8 * 1024 * 1024
 # 正常安装约 10 步；恢复反复进入阶段时只保留最近记录，避免操作文件无界增长。
 STEP_LIMIT = 64
 FAST_CUTOVER_SETTLE_SECONDS = 30
+TUI_ROLLOUT_RETRY_SECONDS = 15
 
 
 class UpdateConflict(ValueError):
@@ -83,6 +84,7 @@ class SystemUpdater:
         self.lock = threading.RLock()
         self.worker = None
         self.rollout_worker = None
+        self.rollout_retry = None
         self.checking = False
         self._verified = {}
         self.state = strict_json(safe_read(self.root / 'state.json', STATE_LIMIT, private=True), STATE_LIMIT)
@@ -278,9 +280,33 @@ class SystemUpdater:
             operation = self._current_rollout()
             if not operation or not operation.get('admission_reopened_at'):
                 return
-            if any(item['state'] in ('queued', 'updating') for item in operation['account_rollout'].values()):
+            accounts = operation['account_rollout'].values()
+            if any(item['state'] in ('queued', 'updating') for item in accounts):
                 self.rollout_worker = threading.Thread(target=self._run_rollout, daemon=True, name='v3-update-account-rollout')
                 self.rollout_worker.start()
+            elif self.rollout_retry is None and any(self._waiting_for_tui(item) for item in accounts):
+                self.rollout_retry = threading.Timer(TUI_ROLLOUT_RETRY_SECONDS, self._retry_tui_rollout,
+                    args=(operation['operation_id'],))
+                self.rollout_retry.daemon = True
+                self.rollout_retry.start()
+
+    @staticmethod
+    def _waiting_for_tui(item: dict) -> bool:
+        return item['state'] == 'waiting' and item.get('wait_reason') == 'tui_receipt'
+
+    def _retry_tui_rollout(self, identifier: str) -> None:
+        with self.lock:
+            self.rollout_retry = None
+            operation = self._current_rollout()
+            if (not self.state.get('active_operation') and operation and operation['operation_id'] == identifier
+                    and operation.get('admission_reopened_at')):
+                # 保留原操作与账号代次，正常业务和其他账号始终可前进。
+                waiting = [item for item in operation['account_rollout'].values() if self._waiting_for_tui(item)]
+                for item in waiting:
+                    item.update(state='queued', error=None)
+                if waiting:
+                    self._record(operation)
+            self._start_rollout()
 
     def _run_rollout(self) -> None:
         completed = False
@@ -298,18 +324,21 @@ class SystemUpdater:
                         return
                     item.update(state='updating', error=None)
                     self._record(operation)
+                wait_reason = None
                 try:
                     result = self.backend.rollout_environment(operation, item)
                     state = result.get('state')
                     if result.get('environment_id') != item['environment_id'] or state not in ('updated', 'stopped', 'waiting', 'needs_check'):
                         raise ValueError('账号更新回执无效')
                     error = {'waiting': '账号仍有活动或维护占用', 'needs_check': '账号归属或重建结果待核对'}.get(state)
+                    if state == 'waiting' and 'tui_receipt' in (result.get('wait_reason'), item.get('wait_reason')):
+                        wait_reason, error = 'tui_receipt', '等待原 V2 工具轮或账号活动收口，随后自动续办'
                 except Exception:
                     state, error = 'needs_check', '账号更新结果待核对，可重试'
                 with self.lock:
                     current = self._current_rollout()
                     if current and current['operation_id'] == operation['operation_id']:
-                        current['account_rollout'][item['environment_id']].update(state=state, error=error)
+                        current['account_rollout'][item['environment_id']].update(state=state, error=error, wait_reason=wait_reason)
                         self._record(current)
         finally:
             with self.lock:
@@ -543,10 +572,9 @@ class SystemUpdater:
             self.backend.block(operation)
             operation['admission_blocked_at'] = utc_now()
             self._record(operation)
-            timeout = FAST_CUTOVER_SETTLE_SECONDS if fast else operation['request']['drain_timeout_seconds']
+            quick_drain = fast and not self._cancelled(operation) and self.backend.cancel_inference(operation) is not False
+            timeout = FAST_CUTOVER_SETTLE_SECONDS if quick_drain else operation['request']['drain_timeout_seconds']
             deadline = time.monotonic() + timeout
-            if fast and not self._cancelled(operation):
-                self.backend.cancel_inference(operation)
             while True:
                 evidence = self.backend.drained(operation)
                 if self._cancelled(operation):
@@ -557,7 +585,7 @@ class SystemUpdater:
                     break
                 self._phase(operation, 'draining', blockers=evidence['blockers'])
                 if time.monotonic() >= deadline:
-                    raise TimeoutError('切换收尾超过时限' if fast else '在途工作排空超时')
+                    raise TimeoutError('切换收尾超过时限' if quick_drain else '在途工作排空超时')
                 time.sleep(0.5)
             # 以在途自然结束后的身份和环境为切换基线，接纳原工作合法完成的变化。
             operation['before'] = self.backend.capture(*capture_args, **capture_options)

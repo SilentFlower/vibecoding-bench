@@ -15,6 +15,7 @@ from unittest.mock import Mock, patch
 from account_isolation import tui_node_provider
 from cluster_service import ClusterService
 from cluster_store import ClusterStore
+from cluster_transport import NodeTransports
 from database_migrations import apply_migrations
 from runtime_files import atomic_json
 from runtime_names import account_container_prefix
@@ -142,6 +143,47 @@ class TuiNodeTransitionTests(unittest.TestCase):
                 atomic_json(path, {**journal, **change})
                 with self.subTest(change=change):
                     self.assertEqual([], service.tui_transport_predecessors(account, runtime, binding))
+
+    def test_readonly_original_remote_binding_survives_control_upgrade(self) -> None:
+        """旧远端只对原轮查询开放，常规查询与后续代次保持原校验。@return 无。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            environment, node_key = 'a' * 32, 'b' * 32
+            release, target = 'ci-100-1', 'ci-101-1'
+            assignment = {'phase': 'ready', 'enabled': True, 'kind': 'ssh',
+                'node_id': 2, 'node_key': node_key, 'revision': 4}
+
+            def database():
+                connection = sqlite3.connect(root / 'test.db')
+                connection.row_factory = sqlite3.Row
+                return connection
+
+            with closing(database()) as connection, connection:
+                connection.execute('CREATE TABLE account_environments (account_id,environment_id,generation,state)')
+                connection.execute('INSERT INTO account_environments VALUES (1,?,9,?)', (environment, 'ready'))
+            store = SimpleNamespace(database=database, assignment=lambda _: assignment, lock=Lock())
+            service = object.__new__(ClusterService)
+            service.store = store
+            service.transports = NodeTransports(store)
+            binding = {'account_id': 17, 'environment_id': environment, 'generation': 9,
+                'release_id': release, 'secret': 'synthetic-original-sender-secret-0123456789'}
+            node = SimpleNamespace(prepare_environment=Mock(return_value={'binding': binding, 'protocol': 1,
+                'node_key': node_key, 'assignment_revision': 4, 'sender_address': '127.0.0.1'}),
+                sender_socket=Mock(return_value=root / 'sender.sock'))
+            service.connection = lambda _: node
+            runtime = SimpleNamespace(deployment='synthetic', release_id=target)
+            account = {'id': 1, 'cc2api_account_id': 17}
+            with self.assertRaisesRegex(ValueError, '没有通过'):
+                service.existing_remote_transport(account, runtime)
+            result = service.existing_remote_transport(account, runtime, allow_previous_release=True)
+            self.assertEqual(binding, {key: result[key] for key in binding})
+            self.assertTrue(result['endpoint'].endswith(f'/{node_key}/{environment}/4'))
+            node.sender_socket.assert_called_once_with(environment, '127.0.0.1')
+            with self.assertRaisesRegex(ValueError, '仍在原发行'):
+                service.existing_remote_transport(account, runtime)
+            assignment['revision'] = 5
+            with self.assertRaisesRegex(ValueError, '归属不一致'):
+                service.existing_remote_transport(account, runtime, allow_previous_release=True)
 
     def test_formal_preflight_requires_only_installation_and_verifies_actual_sender_after_preparation(self) -> None:
         """空目标预检只看安装能力，准备后逐项验证同操作 sender。@return 无。"""

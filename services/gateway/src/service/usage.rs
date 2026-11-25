@@ -85,6 +85,16 @@ impl UsageCapture {
             .is_some_and(|parser| parser.native_tools.is_some())
     }
 
+    /// 查询响应是否已开始交付工具。@return 已观察到受信工具事件。
+    pub(super) fn native_tools_started(&mut self) -> bool {
+        self.decoder.sink_mut().is_some_and(|parser| {
+            parser
+                .native_tools
+                .as_ref()
+                .is_some_and(ResponseTools::started)
+        })
+    }
+
     /// 已完整派发 SSE 终态。@return 是否可以在转交最后一帧前落回执。
     pub(super) fn native_stopped(&mut self) -> bool {
         self.decoder

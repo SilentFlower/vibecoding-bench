@@ -226,6 +226,20 @@ class SessionTests(unittest.TestCase):
             "input": {"prompt": prompt},
         }
 
+    def test_exact_receipt_exit_while_other_session_waits(self):
+        """同一账号仍为 B 等工具时，已退出的 A 可以获得独立证明。@return 无。"""
+        driver = self._driver(limit=2)
+        primary, peer = (1, "environment", 2, 3, "first"), (1, "environment", 2, 3, "second")
+        driver.sessions[peer] = object()
+        self.assertFalse(driver.idle())
+        self.assertTrue(driver.receipt_idle(primary))
+        self.assertFalse(driver.receipt_idle(peer))
+        driver.sessions[(*primary, "active-agent")] = object()
+        self.assertFalse(driver.receipt_idle(primary))
+        del driver.sessions[(*primary, "active-agent")]
+        driver.waiters.append(SimpleNamespace(actor_key=primary))
+        self.assertFalse(driver.receipt_idle(primary))
+
     def test_agent_only_resident_slot_can_bypass_a_waiting_ordinary_request(self):
         """C1 仅给真正在等的父子多留一个过程，普通队列仍可取消。@return 无。"""
         parent = self._body()

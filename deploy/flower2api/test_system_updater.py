@@ -315,6 +315,61 @@ class SystemUpdaterTests(unittest.TestCase):
         self.assertEqual([item['state'] for item in self.engine.status()['account_rollout']['accounts']], ['updated', 'needs_check', 'updated'])
         self.assertEqual(attempts, ['a', 'b', 'c', 'a'])
 
+    def test_tui_account_retries_after_restart_without_queueing_other_failures(self) -> None:
+        """等回执的账号在底座重启后续办，已完成和待人工核对的账号保留状态。@return 无。"""
+        self.backend.fast_transition = self.backend.supports_local_rollout = lambda *_: True
+        self.backend.cancel_inference = lambda *_: False
+        self.backend.capture = lambda *_, **__: {'controls': {}, 'environments': [], 'metadata': {}}
+        self.backend.stage_local_rollout = lambda *_: {key: {
+            'environment_id': key, 'name': key, 'generation': 2, 'state': 'queued'} for key in ('original', 'healthy', 'unknown')}
+        attempts = []
+        original_online = False
+        temporarily_active = True
+        retried = threading.Event()
+
+        def rollout(_, item):
+            key = item['environment_id']
+            attempts.append(key)
+            if key == 'original' and not original_online:
+                return {'environment_id': key, 'state': 'waiting', 'wait_reason': 'tui_receipt'}
+            if key == 'unknown':
+                return {'environment_id': key, 'state': 'needs_check'}
+            if key == 'original' and temporarily_active:
+                return {'environment_id': key, 'state': 'waiting'}
+            if key == 'original':
+                retried.set()
+            return {'environment_id': key, 'state': 'updated'}
+
+        self.backend.rollout_environment = rollout
+        operation = self.request()
+        with patch('system_updater.threading.Timer') as timer:
+            self.engine.submit('install', operation)
+            status = self.join()
+            if self.engine.rollout_worker:
+                self.engine.rollout_worker.join(10)
+            self.assertFalse(status['busy'])
+            self.assertEqual([row['state'] for row in self.engine.status()['account_rollout']['accounts']],
+                ['waiting', 'updated', 'needs_check'])
+            self.engine = SystemUpdater(self.engine.policy, self.backend)
+            self.engine.resume()
+            delay, retry = timer.call_args.args
+            self.assertEqual(delay, system_updater.TUI_ROLLOUT_RETRY_SECONDS)
+            self.assertEqual(timer.call_args.kwargs['args'], (operation['operation_id'],))
+            original_online = True
+            retry(operation['operation_id'])
+            if self.engine.rollout_worker:
+                self.engine.rollout_worker.join(10)
+            waiting = self.engine.status()['account_rollout']['accounts'][0]
+            self.assertEqual((waiting['state'], waiting['wait_reason']), ('waiting', 'tui_receipt'))
+            temporarily_active = False
+            retry(operation['operation_id'])
+            self.assertTrue(retried.wait(10))
+            if self.engine.rollout_worker:
+                self.engine.rollout_worker.join(10)
+        self.assertEqual(attempts, ['original', 'healthy', 'unknown', 'original', 'original'])
+        self.assertEqual([row['state'] for row in self.engine.status()['account_rollout']['accounts']],
+            ['updated', 'updated', 'needs_check'])
+
     def test_retains_candidate_probe_results_after_restoring_original(self) -> None:
         """原版恢复后按操作保留候选和恢复的独立证据。@return 无。"""
         candidate = {'gateway': {'state': 'ready', 'http_status': 200, 'attempts': 3},

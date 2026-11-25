@@ -634,7 +634,7 @@ class HostDeployment:
         evidence = self._runtime_snapshot(central_only, control_only=True) if control_only else self._runtime_snapshot(central_only)
         if evidence.get('agy_update_blockers'):
             raise ValueError('。'.join(evidence['agy_update_blockers']))
-        if evidence.get('phase') != 'blocked':
+        if evidence.get('phase') != 'blocked' and not control_only:
             self._require_v2_tools_complete(self.request('gateway', '/admin/runtime/system-update/status'))
         deadline = time.monotonic() + 5
         while evidence.get('phase') == 'blocked' and evidence.get('ready') is not True:
@@ -643,6 +643,11 @@ class HostDeployment:
                 raise ValueError('维护冻结快照仍有未收口活动或未知证据')
             time.sleep(0.1)
             evidence = self._runtime_snapshot(central_only, control_only=True) if control_only else self._runtime_snapshot(central_only)
+        if control_only and evidence.get('phase') == 'blocked':
+            gateway = self.request('gateway', '/admin/runtime/system-update/status')
+            if (gateway.get('phase') != 'blocked' or gateway.get('epoch') != evidence.get('epoch')
+                    or gateway.get('operation_id') != evidence.get('operation_id') or gateway.get('active') != 0):
+                raise ValueError('控制切换前网关活动或维护代次发生变化')
         network = deployment_network_names(self.policy['deployment'])[0] if control_only else None
         return {'controls': {role: {'id': item['Id'], 'image_id': item['Image'],
             **({'management_address': item['NetworkSettings']['Networks'].get(network, {}).get('IPAddress')} if network else {})}
@@ -674,7 +679,8 @@ class HostDeployment:
         if runtime.get('agy_update_blockers'):
             raise ValueError('。'.join(runtime['agy_update_blockers']))
         gateway = self.request('gateway', '/admin/runtime/system-update/status')
-        self._require_v2_tools_complete(gateway)
+        if not rolling:
+            self._require_v2_tools_complete(gateway)
         if any(value.get('phase') != 'blocked' or value.get('epoch') != operation['epoch'] for value in (gateway, runtime)):
             raise ValueError('部署维护接管代次不一致')
         node_removals = [] if rolling else runtime.get('node_removals', [])
@@ -692,12 +698,42 @@ class HostDeployment:
         if gateway.get('tui_tool_pending') is True:
             raise ValueError('请先完成原 V2 工具轮，再更新或回退服务')
 
-    def cancel_inference(self, operation: dict) -> None:
-        """通知原网关关闭推理并核对接管归属。:param operation: 冻结的更新操作。:return: 无。"""
+    def _cutover_status(self, operation: dict) -> dict:
+        status = self.request('gateway', '/admin/runtime/system-update/status')
+        if (status.get('phase') != 'blocked' or status.get('operation_id') != operation['operation_id']
+                or status.get('epoch') != operation['epoch']):
+            raise ValueError('网关维护接管代次不一致')
+        return status
+
+    def cancel_inference(self, operation: dict) -> bool:
+        """通知原网关关闭推理，或保留待回执并等待实际流量排空。
+        :param operation: 冻结的更新操作。
+        :return: 全局快速取消已接受时为真，保护 V2 的路径继续使用原排空期限。
+        """
+        rolling = operation.get('rolling_accounts') is True
+        status = self._cutover_status(operation) if rolling else {}
+        scoped = status.get('tui_receipt_cutover') is True
+        # 旧网关只有全局取消。账号环境由滚动流程保留时，沿已关闭的准入自然排空。
+        if not scoped and status.get('tui_tool_pending') is True:
+            return False
         body = {key: operation[key] for key in ('operation_id', 'epoch')}
-        receipt = self.request('gateway', '/admin/runtime/system-update/cutover', body, timeout=5)
+        if scoped:
+            body['preserve_tui'] = True
+        try:
+            receipt = self.request('gateway', '/admin/runtime/system-update/cutover', body, timeout=5)
+        except HTTPError as error:
+            # 发起取消前可能刚登记回执。只有旧网关的精确拒绝及同代门禁才能转入自然排空。
+            if not rolling or scoped or error.code != 503:
+                raise
+            with error:
+                rejection = strict_json(error.read(4097), 4096)
+            if rejection.get('error') != 'service unavailable: 请先完成原 V2 工具轮，再切换服务':
+                raise
+            self._cutover_status(operation)
+            return False
         if receipt.get('accepted') is not True or any(receipt.get(key) != value for key, value in body.items()):
             raise ValueError('网关推理取消回执归属无效')
+        return not scoped
 
     def _archive_restored_node_jobs(self, operation: dict) -> None:
         """归档旧编排器不能重用的已恢复节点记录。"""
@@ -1437,7 +1473,8 @@ class HostDeployment:
                         and actual_origin.get('image_id') == target_id):
                     rebuilt_entries[identifier] = entry
                 continue
-            account = {'environment_id': identifier, 'name': item['name'], 'generation': item['generation'], 'state': 'queued'}
+            account = {'environment_id': identifier, 'name': item['name'], 'generation': item['generation'],
+                'gateway_account_id': item.get('gateway_account_id'), 'state': 'queued'}
             accounts[identifier] = account
             if not verified:
                 account.update(state='needs_check', error='旧环境镜像或账号归属待核对', retryable=False)

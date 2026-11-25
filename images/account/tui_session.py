@@ -890,6 +890,13 @@ class SessionDriver:
         with self.lock:
             return not self.sessions
 
+    def receipt_idle(self, identity):
+        """检查原轮和它的子进程。@param identity 已认证的原账号、代次、主体与会话。@return 原轮是否已退出。"""
+        with self.lock:
+            # 同一客户端会话的 Agent 可比父进程活得更久，须等待原会话的全部相关进程。
+            return not (any(key[:5] == identity for key in self.sessions)
+                        or any(waiter.actor_key[:5] == identity for waiter in self.waiters))
+
     def _retire(self, actor):
         with self.lock:
             if self.sessions.get(actor.identity) is actor:

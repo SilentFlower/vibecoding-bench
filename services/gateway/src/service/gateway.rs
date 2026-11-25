@@ -2642,12 +2642,22 @@ impl GatewayService {
                         "未找到可接续的工具轮，请用原入口令牌和会话提交原工具组。若原轮已结束，请发起新一轮".into(),
                     ));
                 }
+                if (returning_tool || agent_account == Some(account.id))
+                    && let Some(signal) = cutover.as_ref()
+                {
+                    signal.protect_tui();
+                }
                 request.phase(RequestPhase::Preparing);
                 let wake = route
                     .may_wake_v2(&self.account_svc, &account, returning_tool)
                     .await?;
-                let sender =
-                    runtime_transport::ready_tui_sender(&account, request.deadline(), wake).await?;
+                let sender = runtime_transport::ready_tui_sender(
+                    &account,
+                    request.deadline(),
+                    wake,
+                    (returning_tool && owner.is_some()).then_some(route.binding.as_str()),
+                )
+                .await?;
                 let (binding, mut turn, draining) = route
                     .begin_v2(
                         &self.account_svc,
@@ -2850,7 +2860,7 @@ impl GatewayService {
                     )
                 });
                 let response = match turn {
-                    Some(turn) => turn.observe_response(response, &codings),
+                    Some(turn) => turn.observe_v2_response(response, &codings, cutover.clone()),
                     None => response,
                 };
                 let (parts, body) = response.into_parts();
@@ -5458,6 +5468,9 @@ fn count_tokens_app_error_response(err: AppError) -> Response {
         ),
         AppError::BadRequest(message) => {
             anthropic_error_response(StatusCode::BAD_REQUEST, "invalid_request_error", &message)
+        }
+        AppError::Conflict(message) => {
+            anthropic_error_response(StatusCode::CONFLICT, "api_error", &message)
         }
         AppError::AgyInput { message, .. } => {
             anthropic_error_response(StatusCode::BAD_REQUEST, "invalid_request_error", message)

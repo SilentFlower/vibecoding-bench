@@ -29,21 +29,29 @@ use crate::error::AppError;
 use crate::service::runtime_bridge::{update_admitted, update_control_admitted};
 
 static ACTIVITIES: LazyLock<Mutex<usize>> = LazyLock::new(|| Mutex::new(0));
-static INFERENCE_CUTOVER: LazyLock<watch::Sender<Option<Uuid>>> =
+static INFERENCE_CUTOVER: LazyLock<watch::Sender<Option<CutoverScope>>> =
     LazyLock::new(|| watch::channel(None).0);
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct CutoverScope {
+    pub(super) epoch: Uuid,
+    pub(super) preserve_tui: bool,
+}
 
 /// 维护前接纳的推理和预热使用同一代关闭信号。
 #[derive(Clone, Debug)]
 pub(crate) struct InferenceCutover {
-    epoch: watch::Receiver<Option<Uuid>>,
+    epoch: watch::Receiver<Option<CutoverScope>>,
+    protected_tui: Arc<AtomicBool>,
     interrupted: Arc<AtomicBool>,
 }
 
 impl InferenceCutover {
     /// 将同一请求的切换订阅与实际中断标记绑定。@param epoch 切换代次订阅。@return 请求信号。
-    pub(super) fn new(epoch: watch::Receiver<Option<Uuid>>) -> Self {
+    pub(super) fn new(epoch: watch::Receiver<Option<CutoverScope>>) -> Self {
         Self {
             epoch,
+            protected_tui: Arc::new(AtomicBool::new(false)),
             interrupted: Arc::new(AtomicBool::new(false)),
         }
     }
@@ -53,14 +61,32 @@ impl InferenceCutover {
         Self::new(INFERENCE_CUTOVER.subscribe())
     }
 
-    /// 等待原请求之后发布的切换信号。@return 本次推理进入维护取消。
-    pub(crate) async fn cancelled(&mut self) {
-        let _ = self.epoch.changed().await;
+    /// 已接续或开始交付工具的 V2 工作在账号滚动时自然完成。@return 无。
+    pub(crate) fn protect_tui(&self) {
+        self.protected_tui.store(true, Ordering::Release);
     }
 
-    /// 核对是否已发布切换信号。@return 本次推理应当停止时为真。
+    fn should_cancel(&self, scope: Option<CutoverScope>) -> bool {
+        scope
+            .is_some_and(|scope| !scope.preserve_tui || !self.protected_tui.load(Ordering::Acquire))
+    }
+
+    /// 等待原请求之后发布的切换信号。@return 本次推理进入维护取消。
+    pub(crate) async fn cancelled(&mut self) {
+        while self.epoch.changed().await.is_ok() {
+            if self.should_cancel(*self.epoch.borrow()) {
+                return;
+            }
+        }
+    }
+
+    /// 核对是否已发布适用于本次请求的切换信号。@return 本次推理应当停止时为真。
     pub(crate) fn is_cancelled(&self) -> bool {
-        self.epoch.has_changed().unwrap_or(true)
+        match self.epoch.has_changed() {
+            Ok(true) => self.should_cancel(*self.epoch.borrow()),
+            Ok(false) => false,
+            Err(_) => true,
+        }
     }
 
     /// HTTP 边界实际选中切换时记录原因，普通断连继续沿原诊断。@return 已进入维护中断。
@@ -281,12 +307,13 @@ pub fn snapshot() -> Result<Value, AppError> {
     value["active"] = json!(*active);
     value["enabled"] = json!(true);
     value["inference_cutover"] = json!(true);
+    value["tui_receipt_cutover"] = json!(true);
     Ok(value)
 }
 
 /// 在宿主已经封闭准入的同一代发布推理关闭信号。
-/// @param operation 原维护操作。@param epoch 原维护代次。@return 同代接管证明。
-pub(crate) fn cutover(operation: &str, epoch: &str) -> Result<Value, AppError> {
+/// @param operation 原维护操作。@param epoch 原维护代次。@param preserve_tui 是否保留原 V2 活动。@return 同代接管证明。
+pub(crate) fn cutover(operation: &str, epoch: &str, preserve_tui: bool) -> Result<Value, AppError> {
     let _active = ACTIVITIES.lock().unwrap_or_else(|error| error.into_inner());
     let current = gate()?.ok_or_else(|| AppError::BadRequest("未启用平台更新门禁".into()))?;
     if current.phase != "blocked"
@@ -297,20 +324,37 @@ pub(crate) fn cutover(operation: &str, epoch: &str) -> Result<Value, AppError> {
     }
     let epoch_id =
         Uuid::parse_str(epoch).map_err(|_| AppError::BadRequest("更新代次无效".into()))?;
-    INFERENCE_CUTOVER.send_if_modified(|active_epoch| {
-        if *active_epoch == Some(epoch_id) {
+    if INFERENCE_CUTOVER
+        .borrow()
+        .is_some_and(|scope| scope.epoch == epoch_id && scope.preserve_tui != preserve_tui)
+    {
+        return Err(AppError::Conflict("本次更新已冻结推理切换范围".into()));
+    }
+    INFERENCE_CUTOVER.send_if_modified(|current| {
+        if current.is_some_and(|scope| scope.epoch == epoch_id) {
             return false;
         }
-        *active_epoch = Some(epoch_id);
+        *current = Some(CutoverScope {
+            epoch: epoch_id,
+            preserve_tui,
+        });
         true
     });
-    Ok(json!({"operation_id":operation,"epoch":epoch,"accepted":true}))
+    Ok(json!({"operation_id":operation,"epoch":epoch,"accepted":true,"preserve_tui":preserve_tui}))
 }
 
 fn exempt(method: &Method, path: &str) -> bool {
     path == "/admin/runtime/system-update/status"
         || path == "/admin/runtime/system-update/ack"
         || path == "/admin/runtime/system-update/cutover"
+        || (*method == Method::POST
+            && path
+                .strip_prefix("/admin/runtime/system-update/tui-receipts/")
+                .is_some_and(|suffix| {
+                    suffix.split_once('/').is_some_and(|(account, id)| {
+                        !account.is_empty() && !id.is_empty() && !id.contains('/')
+                    })
+                }))
         || path.starts_with("/runtime/api/system-updates/")
         || path == "/runtime/logout"
         || path == "/admin/runtime/session"
@@ -350,8 +394,8 @@ pub async fn middleware(mut request: Request, next: Next) -> Response {
             let closing_inference = inference
                 && gate().ok().flatten().is_some_and(|current| {
                     current.phase == "blocked"
-                        && Uuid::parse_str(&current.epoch).ok().as_ref()
-                            == INFERENCE_CUTOVER.borrow().as_ref()
+                        && Uuid::parse_str(&current.epoch).ok()
+                            == INFERENCE_CUTOVER.borrow().map(|scope| scope.epoch)
                 });
             let admission_id = request
                 .headers()
@@ -430,7 +474,9 @@ pub async fn middleware(mut request: Request, next: Next) -> Response {
 
 #[cfg(all(test, unix))]
 mod tests {
-    use super::{ACTIVITIES, InferenceCutover, TrackedBody, UpdateActivity, read_gate};
+    use super::{
+        ACTIVITIES, CutoverScope, InferenceCutover, TrackedBody, UpdateActivity, read_gate,
+    };
     use axum::body::{Body, Bytes};
     use futures_util::stream;
     use http_body_util::BodyExt;
@@ -495,13 +541,39 @@ mod tests {
                 .is_err()
         );
 
-        sender.send_replace(Some(uuid::Uuid::new_v4()));
+        sender.send_replace(Some(CutoverScope {
+            epoch: uuid::Uuid::new_v4(),
+            preserve_tui: false,
+        }));
         let result = tokio::time::timeout(Duration::from_secs(1), body.frame())
             .await
             .unwrap();
         assert!(result.unwrap().is_err());
         assert!(tx.is_closed());
         assert!(!InferenceCutover::new(sender.subscribe()).is_cancelled());
+    }
+
+    /// 账号滚动解除无关长流，原 V2 请求仍保留原响应及活动归还合同。@return 无。
+    #[tokio::test]
+    async fn scoped_cutover_keeps_v2_and_releases_ordinary_inference() {
+        let (sender, receiver) = watch::channel(None);
+        let mut ordinary = InferenceCutover::new(receiver.clone());
+        let mut v2 = InferenceCutover::new(receiver);
+        v2.protect_tui();
+        sender.send_replace(Some(CutoverScope {
+            epoch: uuid::Uuid::new_v4(),
+            preserve_tui: true,
+        }));
+        assert!(ordinary.is_cancelled());
+        assert!(!v2.is_cancelled());
+        tokio::time::timeout(Duration::from_secs(1), ordinary.cancelled())
+            .await
+            .unwrap();
+        assert!(
+            tokio::time::timeout(Duration::from_millis(20), v2.cancelled())
+                .await
+                .is_err()
+        );
     }
 
     #[test]

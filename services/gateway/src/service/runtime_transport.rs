@@ -59,6 +59,8 @@ use crate::service::native_contract::{
     NativeSourceVersion,
 };
 use crate::service::native_runtime::{NativePool, NativeSenderConfig, NativeSubmission};
+#[cfg(target_os = "linux")]
+use crate::service::request_session::valid_id;
 use crate::service::rewriter::{CacheControlTtlRewrite, MessageCacheControlRewrite};
 use crate::service::runtime_background::{BACKGROUND_HEADER, BackgroundPurpose};
 #[cfg(target_os = "linux")]
@@ -856,18 +858,54 @@ fn tui_candidate_client(binding: &TransportBinding) -> Result<Client, AppError> 
         .map_err(|_| AppError::ServiceUnavailable("候选 sender 通道不可用".into()))
 }
 
+const TUI_RECEIPT_PROBE_HEADER: &str = "x-v3-tui-receipt-probe";
+
+/// 只在原 sender 的内部状态请求中使用的会话身份。
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct TuiReceiptProbe {
+    pub(super) principal_id: i64,
+    pub(super) session_id: String,
+}
+
+impl TuiReceiptProbe {
+    #[cfg(target_os = "linux")]
+    fn from_headers(headers: &HeaderMap) -> Result<Option<Self>, AppError> {
+        let mut values = headers.get_all(TUI_RECEIPT_PROBE_HEADER).iter();
+        let Some(value) = values.next() else {
+            return Ok(None);
+        };
+        let invalid = || AppError::BadRequest("V2 回执探测身份无效".into());
+        if values.next().is_some() || value.len() > 2304 {
+            return Err(invalid());
+        }
+        let raw = STANDARD.decode(value.as_bytes()).map_err(|_| invalid())?;
+        let probe: Self = serde_json::from_slice(&raw).map_err(|_| invalid())?;
+        if probe.principal_id <= 0 || !valid_id(&probe.session_id) {
+            return Err(invalid());
+        }
+        Ok(Some(probe))
+    }
+}
+
 async fn tui_status(
     client: &Client,
     binding: &TransportBinding,
     fixture: bool,
+    probe: Option<&TuiReceiptProbe>,
 ) -> Result<bool, TuiV2Unavailable> {
-    let response = client
+    let mut request = client
         .get(format!(
             "{}/internal/status",
             binding.endpoint.trim_end_matches('/')
         ))
         .bearer_auth(&binding.secret)
-        .timeout(Duration::from_secs(2))
+        .timeout(Duration::from_secs(2));
+    if let Some(probe) = probe {
+        let value = serde_json::to_vec(probe).expect("纯会话身份可编码");
+        request = request.header(TUI_RECEIPT_PROBE_HEADER, STANDARD.encode(value));
+    }
+    let response = request
         .send()
         .await
         .map_err(|_| TuiV2Unavailable::ReadinessUnverified)?;
@@ -883,7 +921,15 @@ async fn tui_status(
         .json()
         .await
         .map_err(|_| TuiV2Unavailable::ReadinessUnverified)?;
-    tui_status_snapshot(binding, &status, fixture)
+    let idle = tui_status_snapshot(binding, &status, fixture)?;
+    if probe.is_some() {
+        if !fixture && status["evidence_ok"] != true {
+            return Err(TuiV2Unavailable::ReadinessUnverified);
+        }
+        // 旧 sender 没有逐轮报告，只有完全空闲才能证明原轮已退出。
+        return Ok(status["tui_v2"]["receipt_idle"].as_bool().unwrap_or(idle));
+    }
+    Ok(idle)
 }
 
 fn tui_status_snapshot(
@@ -924,6 +970,7 @@ fn tui_status_snapshot(
 async fn tui_transport(
     account: &Account,
     wake_wait: Option<Duration>,
+    registered: Option<&str>,
 ) -> Result<(Client, TransportBinding, bool, Vec<String>), TuiV2Unavailable> {
     if !tui_scope(account) {
         return Err(TuiV2Unavailable::NotConfigured);
@@ -932,7 +979,7 @@ async fn tui_transport(
     let transport = if let Some(wait) = wake_wait {
         prepare(account, wait).await.map(Some)
     } else {
-        prepare_existing(account).await
+        prepare_existing_binding(account, registered).await
     }
     .map_err(|_| TuiV2Unavailable::BindingUnverified)?;
     let Some(PreparedTransport {
@@ -963,10 +1010,13 @@ async fn tui_transport(
 async fn probe_tui_account(
     account: &Account,
     budget: Duration,
+    registered: Option<&str>,
+    probe: Option<&TuiReceiptProbe>,
 ) -> Result<TuiBindingStatus, TuiV2Unavailable> {
     timeout(budget, async {
-        let (client, binding, fixture, predecessors) = tui_transport(account, None).await?;
-        let idle = tui_status(&client, &binding, fixture).await?;
+        let (client, binding, fixture, predecessors) =
+            tui_transport(account, None, registered).await?;
+        let idle = tui_status(&client, &binding, fixture, probe).await?;
         Ok(TuiBindingStatus {
             key: tui_sender_key(&binding, fixture),
             idle,
@@ -979,7 +1029,7 @@ async fn probe_tui_account(
 
 /// 只探测已经登记的账号 sender。@param account 已授权账号。@return 可核验的绑定和空闲状态。
 pub(crate) async fn tui_account_status(account: &Account) -> Result<(String, bool), AppError> {
-    probe_tui_account(account, Duration::from_secs(2))
+    probe_tui_account(account, Duration::from_secs(2), None, None)
         .await
         .map(|status| (status.key, status.idle))
         .map_err(TuiV2Unavailable::into_error)
@@ -1007,7 +1057,19 @@ impl TuiBindingStatus {
 
 /// 只读查询可用于变更的同账号绑定证明。@param account 账号。@return 当前状态与前驱。
 pub(super) async fn tui_transition_status(account: &Account) -> Result<TuiBindingStatus, AppError> {
-    probe_tui_account(account, Duration::from_secs(2))
+    probe_tui_account(account, Duration::from_secs(2), None, None)
+        .await
+        .map_err(TuiV2Unavailable::into_error)
+}
+
+/// 只核对本轮登记过的实际 sender，包括滚动期间受限保留的旧远端。
+/// @param account 原账号。@param registered 回执绑定。@param probe 原轮身份。@return 已认证的 sender 状态。
+pub(super) async fn tui_receipt_status(
+    account: &Account,
+    registered: &str,
+    probe: Option<&TuiReceiptProbe>,
+) -> Result<TuiBindingStatus, AppError> {
+    probe_tui_account(account, Duration::from_secs(4), Some(registered), probe)
         .await
         .map_err(TuiV2Unavailable::into_error)
 }
@@ -1016,13 +1078,14 @@ pub(super) async fn tui_transition_status(account: &Account) -> Result<TuiBindin
 /// @param account 本次选择的账号。@return 同账号就绪状态。
 pub(super) async fn tui_switch_status(account: &Account) -> Result<TuiBindingStatus, AppError> {
     // 保存可以等待远端只读检查完成，列表和详情仍沿用短预算。
-    match probe_tui_account(account, Duration::from_secs(12)).await {
+    match probe_tui_account(account, Duration::from_secs(12), None, None).await {
         Err(TuiV2Unavailable::NotRunning) if !tui_fixture(account) => {
             // 查询结果为空只允许按需准备，提交切换仍需核对实际 sender 和原轮归属。
             let sender = ready_tui_sender(
                 account,
                 Instant::now() + Duration::from_millis(REQUEST_BUDGET_MS),
                 true,
+                None,
             )
             .await?;
             Ok(TuiBindingStatus {
@@ -1047,7 +1110,7 @@ fn reject_tui(account: i64, reason: TuiV2Unavailable) -> AppError {
 
 /// 诊断未由管理动作绑定的 V2 账号。@param account 已授权账号。@return 发送前的不可用原因。
 pub(super) async fn tui_unbound(account: &Account) -> AppError {
-    let reason = probe_tui_account(account, Duration::from_secs(2))
+    let reason = probe_tui_account(account, Duration::from_secs(2), None, None)
         .await
         .err()
         .unwrap_or(TuiV2Unavailable::BindingUnverified);
@@ -1183,19 +1246,21 @@ impl TuiReadySender {
 }
 
 /// 解析账号登记并核验 sender 的实际能力。@param account 已授权账号。
-/// @param deadline 请求的单调时钟截止。@param wake 是否允许沿编排合同唤醒。@return 原传输及其就绪证明。
+/// @param deadline 请求的单调时钟截止。@param wake 是否允许沿编排合同唤醒。
+/// @param registered 原回执已登记的绑定。@return 原传输及其就绪证明。
 pub(super) async fn ready_tui_sender(
     account: &Account,
     deadline: Instant,
     wake: bool,
+    registered: Option<&str>,
 ) -> Result<TuiReadySender, AppError> {
     let budget = deadline
         .checked_duration_since(Instant::now())
         .ok_or(AppError::AdmissionLimited { retry_after: 1 })?;
     let (client, binding, fixture, idle, predecessors) = timeout(budget, async {
         let (client, binding, fixture, predecessors) =
-            tui_transport(account, wake.then_some(budget)).await?;
-        let idle = tui_status(&client, &binding, fixture).await?;
+            tui_transport(account, wake.then_some(budget), registered).await?;
+        let idle = tui_status(&client, &binding, fixture, None).await?;
         Ok((client, binding, fixture, idle, predecessors))
     })
     .await
@@ -1804,6 +1869,13 @@ pub(super) fn tui_model_headers(
 pub(crate) async fn prepare_existing(
     account: &Account,
 ) -> Result<Option<PreparedTransport>, AppError> {
+    prepare_existing_binding(account, None).await
+}
+
+async fn prepare_existing_binding(
+    account: &Account,
+    registered: Option<&str>,
+) -> Result<Option<PreparedTransport>, AppError> {
     let base = std::env::var("V3_RUNTIME_URL").unwrap_or_default();
     if base.is_empty() {
         return Ok(None);
@@ -1826,6 +1898,12 @@ pub(crate) async fn prepare_existing(
             base.trim_end_matches('/'),
             account.id
         ))
+        .query(
+            &registered
+                .map(|_| ("tui_previous_release", true))
+                .into_iter()
+                .collect::<Vec<_>>(),
+        )
         .bearer_auth(&secret)
         .timeout(Duration::from_secs(10))
         .send()
@@ -1844,11 +1922,12 @@ pub(crate) async fn prepare_existing(
     else {
         return Ok(None);
     };
-    validate_binding(
+    validate_existing_binding(
         &binding,
         account.id,
         &std::env::var("V3_DEPLOYMENT_ID").unwrap_or_default(),
         &configured_account_release(),
+        registered,
     )?;
     let client = binding_client(client, &binding, &secret)?;
     Ok(Some(PreparedTransport {
@@ -2426,6 +2505,16 @@ fn validate_binding(
     deployment: &str,
     release: &str,
 ) -> Result<(), AppError> {
+    validate_existing_binding(binding, account_id, deployment, release, None)
+}
+
+fn validate_existing_binding(
+    binding: &TransportBinding,
+    account_id: i64,
+    deployment: &str,
+    release: &str,
+    registered: Option<&str>,
+) -> Result<(), AppError> {
     let endpoint = reqwest::Url::parse(&binding.endpoint)
         .map_err(|_| AppError::ServiceUnavailable("invalid sender endpoint".into()))?;
     let deployment_key = format!("{:x}", Sha256::digest(deployment.as_bytes()));
@@ -2459,6 +2548,9 @@ fn validate_binding(
                 &deployment_key[..12],
             )
         });
+    // 旧远端只用于已登记回执。摘要包含同一原账号、代次、发行和节点中继位置。
+    let retained_remote = remote_endpoint
+        && registered.is_some_and(|key| tui_same_binding(key, &tui_sender_key(binding, false)));
     if deployment.is_empty()
         || release.is_empty()
         || binding.environment_id.len() != 32
@@ -2474,7 +2566,8 @@ fn validate_binding(
         || endpoint.query().is_some()
         || endpoint.fragment().is_some()
         || (binding.release_id != release
-            && !(local_endpoint && authorized_previous_release(binding, deployment, release)))
+            && !(local_endpoint && authorized_previous_release(binding, deployment, release))
+            && !retained_remote)
     {
         return Err(AppError::ServiceUnavailable(
             "runtime binding mismatch".into(),
@@ -2777,6 +2870,8 @@ async fn status(
     let document = read_sender_document(&state.config_path)?;
     let config = &document.config;
     authenticate(&headers, config)?;
+    #[cfg(target_os = "linux")]
+    let receipt_probe = TuiReceiptProbe::from_headers(&headers)?;
     let tui_v2 = tui_v2_sender_status(config);
     let active = state
         .active
@@ -2789,10 +2884,17 @@ async fn status(
         if status["reason"] == json!(TuiV2Unavailable::MessagesToolAndUsageEventsUnavailable)
             && let Some(configuration) = document.tui_v2.as_ref()
         {
-            match state.tui.status(&config.binding, Some(configuration)).await {
-                Some(idle) => {
+            match state
+                .tui
+                .status(&config.binding, Some(configuration), receipt_probe.as_ref())
+                .await
+            {
+                Some((idle, receipt_idle)) => {
                     status["ready"] = json!(true);
                     status["idle"] = json!(idle);
+                    if let Some(receipt_idle) = receipt_idle {
+                        status["receipt_idle"] = json!(receipt_idle && active == 0);
+                    }
                     status["event_source"] = json!("local_unix");
                     status.as_object_mut().unwrap().remove("reason");
                     tui_active = state.tui.active().max(u64::from(!idle));

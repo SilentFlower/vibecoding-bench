@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { ApiError, api, type SystemUpdateCatalog, type SystemUpdateControlProbe, type SystemUpdateRelease, type SystemUpdateRequest, type SystemUpdateStatus } from '../api';
+import { ApiError, api, type SystemTuiReceipt, type SystemTuiReceiptPage, type SystemUpdateCatalog, type SystemUpdateControlProbe, type SystemUpdateRelease, type SystemUpdateRequest, type SystemUpdateStatus } from '../api';
 import { formatLocalClock, formatLocalShort, formatLocalTime } from '../lib/time';
 import { releaseNotes, releaseVersion } from '../lib/platformVersion';
 import { UPDATE_PHASE_LABELS, databaseLabel, migrationStateLabel, snapshotLabel, updateSteps } from '../lib/updateSteps';
@@ -31,6 +31,14 @@ const DEFAULT_DRAIN_MINUTES = 1;
 const NODE_PHASES: Record<string, string> = { registering: '等待同步', checking: '核对组件', draining: '等待原工作完成', fenced: '原环境已停止', stopping: '停止原组件', backing_up: '备份资料', backed_up: '已停止，等待切换', switching: '切换组件', restoring: '恢复账号', completed: '同步完成', rolled_back: '已恢复原组件', rolling_back_control: '恢复原组件', platform_restoring: '恢复原组件', platform_restored: '恢复完成', waiting: '等待重试', needs_check: '等待核对' };
 const ROLLOUT_STATES: Record<RolloutState, string> = { queued: '待更新', updating: '更新中', updated: '已更新', stopped: '保留启停状态', waiting: '等待空闲', needs_check: '待核对' };
 const ROLLOUT_TONES: Record<RolloutState, string> = { queued: 'info', updating: 'info', updated: 'success', stopped: 'neutral', waiting: 'warning', needs_check: 'warning' };
+const RECEIPT_STATES: Record<SystemTuiReceipt['state'], string> = {
+  waiting: '原 V2 会话仍有活动',
+  recoverable: '原会话已退出，可恢复',
+  deferred: '该账号延期、平台可继续',
+  binding_changed: '原账号或运行代次待核对',
+  recovered: '原会话已退出，工具回执已收口',
+  recovered_delivery_unknown: '工具回执已收口，原模型投递结果未知',
+};
 const CONTROL_CHECKS = { candidate: '新版本', restore: '恢复原版本' } as const;
 const CONTROL_SERVICES = { gateway: '网关', orchestrator: '调度器' } as const;
 const PROBE_STATES: Record<string, string> = { pending: '等待探测', ready: '就绪', timeout: '超时', http_error: '响应错误', connection_failed: '连接失败', invalid_response: '响应无效', request_failed: '探测失败' };
@@ -61,6 +69,11 @@ const trail = ref<View[]>([]);
 let alive = true;
 let timer: ReturnType<typeof setTimeout> | undefined;
 let controller: AbortController | undefined;
+const receipts = ref<SystemTuiReceiptPage | null>(null);
+const receiptAfter = ref('');
+const receiptWriting = ref('');
+const receiptError = ref('');
+let receiptController: AbortController | undefined;
 
 const progress = computed(() => status.value?.operation ?? null);
 const download = computed(() => progress.value?.phase === 'preparing' ? progress.value.download_progress : null);
@@ -258,6 +271,7 @@ async function refresh(): Promise<void> {
     if (!alive) return;
     status.value = current;
     catalog.value = available;
+    if (current.installed) void loadReceipts(receiptAfter.value);
     if (current.busy && current.operation) followed.value = current.operation.operation_id;
     error.value = '';
     failures.value = 0;
@@ -428,6 +442,47 @@ async function retryAccount(environmentId: string): Promise<void> {
   }
 }
 
+/** 独立读取回执，失联时版本状态和安装操作可以继续刷新。@param after 页游标。@param replace 操作完成后重新读取。@return 本轮读取结束。 */
+async function loadReceipts(after: string, replace = false): Promise<void> {
+  if (receiptController && after === receiptAfter.value && !replace) return;
+  receiptController?.abort();
+  const request = new AbortController();
+  receiptController = request;
+  receiptAfter.value = after;
+  try {
+    const page = await api.systemTuiReceipts(after, request.signal);
+    if (alive && !request.signal.aborted) {
+      receipts.value = page;
+      receiptError.value = '';
+    }
+  } catch (cause) {
+    if (alive && !request.signal.aborted) receiptError.value = '工具回执状态暂不可用';
+  } finally {
+    if (receiptController === request) receiptController = undefined;
+  }
+}
+
+/** 立即核对单条回执。@param receipt 当前可见回执。@return 操作结果已展示。 */
+async function recoverReceipt(receipt: SystemTuiReceipt): Promise<void> {
+  if (receiptWriting.value || status.value?.busy) return;
+  receiptWriting.value = receipt.id;
+  try {
+    const result = await api.systemTuiReceiptRecover(receipt);
+    if (!alive) return;
+    toast.show(RECEIPT_STATES[result.state]);
+    if (result.state === 'recovered' || result.state === 'recovered_delivery_unknown') {
+      const pending = rollout.value?.accounts.find(item => item.gateway_account_id === receipt.account_id
+        && item.state === 'waiting' && item.retryable !== false);
+      if (pending) await retryAccount(pending.environment_id);
+    }
+  } catch (cause) {
+    if (alive) toast.show(cause instanceof Error ? cause.message : '工具回执核对失败');
+  } finally {
+    receiptWriting.value = '';
+    if (alive) void loadReceipts(receiptAfter.value, true);
+  }
+}
+
 /** 恢复连接并读取当前现场。@return 初始化完成。 */
 async function connect(): Promise<void> {
   try {
@@ -442,7 +497,7 @@ async function connect(): Promise<void> {
 }
 
 onMounted(connect);
-onUnmounted(() => { alive = false; clearTimeout(timer); controller?.abort(); versionController.abort(); });
+onUnmounted(() => { alive = false; clearTimeout(timer); controller?.abort(); receiptController?.abort(); versionController.abort(); });
 </script>
 
 <template>
@@ -649,6 +704,22 @@ onUnmounted(() => { alive = false; clearTimeout(timer); controller?.abort(); ver
           <p v-for="(migration, database) in progress?.database_migrations ?? {}" :key="database" class="su-text">{{ databaseLabel(String(database)) }} · 目标版本 {{ migration.target_version }} · {{ migrationStateLabel(migration.state) }}</p>
         </section>
       </div>
+      <section v-if="(view === 'overview' || view === 'progress') && (receipts?.items.length || receiptAfter || receiptError)"
+        class="su-section su-rollout" aria-label="V2 工具回执">
+        <div class="su-head"><h4><RotateCcw />V2 工具回执</h4></div>
+        <NoticeStrip v-if="receiptError" tone="warning" role="status"><AlertCircle />{{ receiptError }}</NoticeStrip>
+        <ul v-if="receipts?.items.length" class="su-rollout-list">
+          <li v-for="item in receipts.items" :key="item.id" :data-tui-receipt-state="item.state">
+            <div><b>{{ item.account_name }}</b><p>{{ RECEIPT_STATES[item.state] }}</p></div>
+            <Button variant="outline" size="sm" :disabled="!!status.busy || !!receiptWriting || writing"
+              @click="recoverReceipt(item)">{{ receiptWriting === item.id ? '正在核对…' : '核对并恢复' }}</Button>
+          </li>
+        </ul>
+        <div v-if="receiptAfter || receipts?.next" class="su-head">
+          <Button v-if="receiptAfter" variant="ghost" size="sm" @click="loadReceipts('')">回到首页</Button>
+          <Button v-if="receipts?.next" variant="ghost" size="sm" @click="loadReceipts(receipts.next)">下一页</Button>
+        </div>
+      </section>
     </template>
 
     <template v-if="status?.installed && !loading" #footer>
