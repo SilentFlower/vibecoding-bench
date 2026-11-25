@@ -356,6 +356,36 @@ class SystemUpdaterTests(unittest.TestCase):
         self.assertEqual(state['components']['account']['reference'], target['account']['reference'])
         self.assertEqual(state['components']['account']['release'], 'ci-125-1')
 
+    def test_download_progress_is_visible_and_cannot_undo_cancel(self) -> None:
+        """实时读数沿同一操作公开，后到读数保留先发取消。@return 无。"""
+        visible = threading.Event()
+        release = threading.Event()
+        reading = {'source': 'registry', 'component': 'control', 'state': 'downloading',
+            'downloaded_bytes': 5, 'total_bytes': 10}
+
+        def prepare(_release, _selection, _folder, report):
+            report(reading)
+            visible.set()
+            if release.wait(10):
+                report({**reading, 'state': 'verifying', 'downloaded_bytes': 10})
+
+        self.backend.prepare = prepare
+        body = self.request()
+        operation = body['operation_id']
+        self.engine.submit('prepare', body)
+        try:
+            self.assertTrue(visible.wait(10))
+            self.assertEqual(reading, self.engine.status()['operation']['download_progress'])
+            self.assertEqual(reading, self.engine.operation(operation)['download_progress'])
+            self.engine.control(operation, 'cancel', {'expected_revision': self.engine.status()['revision']})
+        finally:
+            release.set()
+        final = self.join()
+        self.assertEqual('cancelled', final['operation']['phase'])
+        self.assertTrue(final['operation']['cancel_requested'])
+        self.assertIsNone(final['prepared_candidate'])
+        self.assertFalse(self.backend.blocked)
+
     def test_prepare_failure_keeps_current_and_gate_open(self) -> None:
         """准备失败保持原安装，维护副作用为零。
 

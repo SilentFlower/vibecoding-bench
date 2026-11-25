@@ -381,18 +381,36 @@ async def verify(output: Path) -> dict:
         assert len(fixture.writes) == 1 and fixture.writes[0]['path'].endswith('/prepare')
         download = fixture.writes[0]['body']
         assert download['drain_timeout_seconds'] == 60 and 'prepared_operation_id' not in download, download
+        readings = {'source': 'registry', 'component': 'control', 'state': 'downloading',
+            'downloaded_bytes': 1024, 'total_bytes': 4096}
+        fixture.state['operation']['download_progress'] = readings
+        transfer = progress.locator('[data-update-download]')
+        await expect(transfer).to_contain_text('1,024 B / 4,096 B · 25%', timeout=7000)
+        await expect(transfer.get_by_role('progressbar')).to_have_attribute('value', '25')
+        readings.update(component='account', downloaded_bytes=2048, total_bytes=None)
+        await page.reload()
+        await expect(transfer).to_contain_text('2,048 B')
+        await expect(transfer.get_by_role('progressbar')).not_to_have_attribute('value', '25')
+        assert await transfer.get_by_role('progressbar').get_attribute('value') is None
+        readings.update(source='bundle', component='bundle', state='verifying', downloaded_bytes=8192, total_bytes=8192)
+        await expect(transfer).to_contain_text('正在校验', timeout=7000)
+        await expect(transfer).to_contain_text('8,192 B / 8,192 B · 100%')
         fixture.state.update(busy=False, prepared_candidate={'operation_id': download['operation_id'],
             'target_release': download['target_release'], 'manifest_sha256': download['target_manifest_sha256'],
             'fast_transition': True})
         fixture.state['operation'].update(phase='prepared', fast_transition=True, blockers=[])
         await expect(progress.locator('.su-pill')).to_have_text('待重启', timeout=7000)
+        await expect(progress.get_by_text('重启会断开正在执行的推理。控制服务就绪后可重新请求。', exact=True)).to_be_visible()
+        fixture.state['prepared_candidate']['manifest_sha256'] = 'e' * 64
         await page.reload()
-        await expect(dialog.locator('[data-update-view=overview] .su-head .su-pill')).to_have_text('待重启')
-        await expect(plan).to_have_attribute('data-update-plan', 'restart')
-        await expect(plan).to_contain_text('重启会断开正在执行的推理。控制服务就绪后可重新请求。')
+        await expect(dialog.get_by_role('button', name='立即重启', exact=True)).to_have_count(0)
+        fixture.state['prepared_candidate']['manifest_sha256'] = download['target_manifest_sha256']
+        await page.reload()
+        await expect(progress.locator('.su-pill')).to_have_text('待重启')
         await expect(await install_plan(dialog)).to_have_count(0)
         await page.screenshot(path=str(output / 'restart-390.png'), full_page=True)
-        await dialog.get_by_role('button', name='立即重启', exact=True).click()
+        await dialog.get_by_role('button', name='立即重启', exact=True).evaluate('(button) => { button.click(); button.click(); }')
+        await expect(progress.locator('.su-pill')).not_to_have_text('待重启', timeout=7000)
         restart = fixture.writes[-1]
         assert len(fixture.writes) == 2 and restart['path'].endswith('/install'), fixture.writes
         assert restart['body']['prepared_operation_id'] == download['operation_id'] and restart['body']['drain_timeout_seconds'] == 60
@@ -450,6 +468,7 @@ async def verify(output: Path) -> dict:
             'target_release': download['target_release'], 'manifest_sha256': download['target_manifest_sha256'], 'fast_transition': True})
         fixture.state['operation'].update(phase='prepared', fast_transition=True, blockers=[])
         await page.reload()
+        await dialog.get_by_role('button', name='返回', exact=True).click()
         await dialog.get_by_role('button', name='版本记录与回退', exact=True).click()
         await latest_card.get_by_role('button', name='立即重启', exact=True).click()
         confirm = page.get_by_role('dialog', name='重启并切换版本')

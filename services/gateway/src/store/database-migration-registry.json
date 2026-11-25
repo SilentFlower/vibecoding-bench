@@ -118,6 +118,15 @@
       "predecessor": 12,
       "rollback_mode": "compatible",
       "version": 13
+    },
+    {
+      "checksum": "b13bcc5d8504ff8ff8e5d0369802d7a8a5d3bfd758702eeb171d5483d61cc1a6",
+      "engine": "sqlite",
+      "id": "gateway.agy-recovery.14",
+      "kind": "schema",
+      "predecessor": 13,
+      "rollback_mode": "compatible",
+      "version": 14
     }
   ]
 }

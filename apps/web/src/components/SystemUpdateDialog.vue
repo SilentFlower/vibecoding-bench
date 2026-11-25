@@ -55,6 +55,7 @@ const frozen = ref<Frozen | null>(null);
 const confirmOpen = ref(false);
 /** 本次弹窗里观察到处于维护中的操作；结束后停在结局，直到用户点「完成」。 */
 const followed = ref('');
+const dismissedPrepared = ref('');
 /** 二级视图的返回栈；为空时显示主视图。 */
 const trail = ref<View[]>([]);
 let alive = true;
@@ -62,6 +63,25 @@ let timer: ReturnType<typeof setTimeout> | undefined;
 let controller: AbortController | undefined;
 
 const progress = computed(() => status.value?.operation ?? null);
+const download = computed(() => progress.value?.phase === 'preparing' ? progress.value.download_progress : null);
+const downloadPercent = computed(() => {
+  const current = download.value?.downloaded_bytes;
+  const total = download.value?.total_bytes;
+  return current != null && total != null && Number.isSafeInteger(current) && Number.isSafeInteger(total)
+    && current >= 0 && total > 0 && current <= total ? Math.floor(current / total * 100) : undefined;
+});
+const downloadComponents = { control: '平台与网关镜像', account: '账号运行镜像', bundle: '离线镜像包' };
+const downloadStates = { downloading: '下载中', cached: '使用本地缓存', loading: '正在解包', verifying: '正在校验' };
+const byteFormat = new Intl.NumberFormat('zh-CN');
+const progressRestart = computed(() => {
+  const candidate = status.value?.prepared_candidate;
+  const operation = progress.value;
+  if (status.value?.busy || operation?.phase !== 'prepared' || candidate?.fast_transition !== true
+    || candidate.operation_id !== operation.operation_id || candidate.target_release !== operation.target_release) return null;
+  if (catalog.value?.fresh === false) return null;
+  return catalog.value?.releases.find(release => release.release === candidate.target_release
+    && release.manifest_sha256 === candidate.manifest_sha256 && release.data_compatible) ?? null;
+});
 const cancelAllowed = computed(() => !!status.value?.busy && ['preparing', 'draining'].includes(progress.value?.phase ?? ''));
 const recoveryAllowed = computed(() => ['reconcile', 'succeeded_cleanup_pending'].includes(progress.value?.phase ?? ''));
 const rollout = computed(() => status.value?.account_rollout ?? null);
@@ -69,7 +89,8 @@ const rolloutActive = computed(() => !!rollout.value?.accounts.some(item => item
 const mainView = computed<View>(() => {
   // 维护中与需要恢复的操作先于发布说明呈现；本次看着结束的操作停在结局。没有操作记录时只能显示概览。
   if (!progress.value) return 'overview';
-  return status.value?.busy || recoveryAllowed.value || followed.value === progress.value.operation_id ? 'progress' : 'overview';
+  return status.value?.busy || recoveryAllowed.value || followed.value === progress.value.operation_id
+    || (progressRestart.value && dismissedPrepared.value !== progress.value.operation_id) ? 'progress' : 'overview';
 });
 const view = computed<View>(() => trail.value[trail.value.length - 1] ?? mainView.value);
 const runningEnvironments = computed(() => status.value?.environments?.filter(item => item.running).length ?? 0);
@@ -206,6 +227,7 @@ function back(): void { trail.value = trail.value.slice(0, -1); }
 
 /** 结束结局展示回到概览。@return 无。 */
 function finish(): void {
+  if (progress.value?.phase === 'prepared') dismissedPrepared.value = progress.value.operation_id;
   followed.value = '';
   trail.value = [];
 }
@@ -331,6 +353,7 @@ async function submitDirect(release: SystemUpdateRelease): Promise<void> {
   const prepared = action === 'install' ? preparedFor(release) : null;
   const current = frozen.value;
   if (!current || current.confirm || current.action !== action || current.body.target_release !== release.release
+    || current.body.target_manifest_sha256 !== release.manifest_sha256
     || current.body.prepared_operation_id !== prepared?.operation_id) {
     frozen.value = freeze(action, release.release, release.manifest_sha256, release.account_changed, false);
   }
@@ -502,11 +525,20 @@ onUnmounted(() => { alive = false; clearTimeout(timer); controller?.abort(); ver
           </div>
           <NoticeStrip v-if="(status.busy && !steps.outcome) || progress.admission_reopened_at" :tone="progress.admission_reopened_at ? 'success' : 'neutral'" data-update-maintenance><Info />{{ maintenanceMessage }}</NoticeStrip>
           <NoticeStrip v-if="steps.outcome" :tone="outcomeTone" role="status"><component :is="steps.outcome === 'succeeded' ? Check : Info" />{{ phaseLabel(steps.outcome) }}</NoticeStrip>
+          <NoticeStrip v-if="progressRestart" tone="warning"><Info />{{ RESTART_NOTICE }}</NoticeStrip>
+          <NoticeStrip v-if="progressRestart && frozen?.conflicted" tone="warning" role="alert"><AlertCircle />现场版本已经变化，请关闭窗口并刷新后重新选择。</NoticeStrip>
           <NoticeStrip v-if="progress.error" tone="danger" role="alert"><AlertCircle />{{ progress.error }}</NoticeStrip>
         </section>
 
         <section class="su-section su-progress">
           <div class="su-head"><h4><Terminal />更新进度<span v-if="steps.total" class="su-mono">{{ steps.done }} / {{ steps.total }}</span></h4><span v-if="status.busy && !steps.outcome" class="su-live" :data-offline="failures > 0 || undefined">{{ failures ? '重新连接中' : '实时' }}</span></div>
+          <div v-if="download" class="su-download-progress" data-update-download :data-state="download.state">
+            <div class="su-head"><b>{{ downloadComponents[download.component] }}</b><span>{{ downloadStates[download.state] }}</span></div>
+            <progress v-if="download.state === 'downloading' || downloadPercent !== undefined" :value="downloadPercent" max="100" aria-label="当前组件下载进度" />
+            <p v-if="download.downloaded_bytes != null || downloadPercent !== undefined" class="su-meta su-mono">
+              {{ download.downloaded_bytes == null ? '' : byteFormat.format(download.downloaded_bytes) + ' B' }}<template v-if="download.total_bytes != null"> / {{ byteFormat.format(download.total_bytes) }} B</template><template v-if="downloadPercent !== undefined"> · {{ downloadPercent }}%</template>
+            </p>
+          </div>
           <ol v-if="steps.rows.length" class="su-log">
             <li v-for="row in steps.rows" :key="row.phase" data-update-step :data-state="row.state">
               <time :datetime="row.at ?? undefined" :title="row.at ? formatLocalTime(row.at) : undefined">{{ formatLocalClock(row.at) }}</time><i aria-hidden="true" /><b>{{ phaseLabel(row.phase) }}</b><em>{{ row.detail }}</em>
@@ -635,6 +667,10 @@ onUnmounted(() => { alive = false; clearTimeout(timer); controller?.abort(); ver
         <Button v-if="cancelAllowed" variant="outline" :disabled="writing || progress?.cancel_requested" @click="cancel">{{ progress?.cancel_requested ? '正在取消…' : '取消等待' }}</Button>
         <Button v-if="recoveryAllowed" variant="outline" :disabled="writing" @click="confirm('recover', progress!.target_release, '', true)">恢复操作</Button>
         <Button v-if="status.busy && !steps?.outcome" disabled><RefreshCw class="animate-spin motion-reduce:animate-none" />更新中…</Button>
+        <template v-else-if="progressRestart">
+          <Button variant="outline" :disabled="writing" @click="trail.length ? back() : finish()">返回</Button>
+          <Button :disabled="writing || !!frozen?.conflicted" @click="submitDirect(progressRestart)"><RotateCcw />立即重启</Button>
+        </template>
         <Button v-else-if="!recoveryAllowed" @click="trail.length ? back() : finish()">{{ trail.length ? '返回' : '完成' }}</Button>
       </template>
     </template>

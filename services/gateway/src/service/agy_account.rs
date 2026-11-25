@@ -1,8 +1,10 @@
 //! 在既有账号服务中按平台适配原生凭据，CC 调用保持原路径。
 use std::collections::{BTreeSet, HashMap, hash_map::Entry};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use chrono::{DateTime, Utc};
+use futures_util::{StreamExt, stream};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -17,9 +19,41 @@ use crate::model::api_token::ApiToken;
 use crate::model::proxy::ProxyConnection;
 use crate::model::request_diagnostics::DiagnosticParameters;
 use crate::service::agy_contract::{AGY_ACCESS_VALIDITY_SECONDS, AgyAccessSnapshot, AgyModelId};
-use crate::service::runtime_bridge::{agy_capacity, agy_request};
+use crate::service::runtime_bridge::{AGY_MANAGEMENT_TIMEOUT, agy_capacity, agy_request};
+use crate::service::system_update;
 use crate::service::v3_scheduling::{SchedulingCandidate, SchedulingRequest};
+use crate::store::account_store::AgyCredentialState;
+use crate::store::cache::CacheStore;
 use tokio::time::sleep;
+
+/// 重授权等待被取消时也归还本次缓存租约。
+struct AgyReauthLease {
+    cache: Arc<dyn CacheStore>,
+    identity: Option<(String, String)>,
+}
+
+impl AgyReauthLease {
+    async fn release(mut self) {
+        if let Some((key, owner)) = &self.identity {
+            self.cache.release_lock(key, owner).await;
+        }
+        self.identity = None;
+    }
+}
+
+impl Drop for AgyReauthLease {
+    fn drop(&mut self) {
+        if let Some((key, owner)) = self.identity.take() {
+            let cache = Arc::clone(&self.cache);
+            tokio::spawn(async move { cache.release_lock(&key, &owner).await });
+        }
+    }
+}
+
+enum AgyRecoveryAttempt {
+    InFlight,
+    Observed(Option<i64>),
+}
 
 /// 在网关提交期间持有本账号操作，丢失调用方或进程重启后可按已保存值收口。
 struct AgyCapacityEdit<'a> {
@@ -128,6 +162,31 @@ fn verify_retirement(
         return Err(AppError::ServiceUnavailable(
             "AGY 原操作终止证明无效".into(),
         ));
+    }
+    Ok(())
+}
+
+fn agy_failure_stage(result: &Value) -> &str {
+    match result["first_failure"].as_str() {
+        Some(
+            stage @ ("start_refresh" | "refresh" | "stop_refresh" | "credential_file"
+            | "credential_expiry" | "identity_check" | "receipt"),
+        ) => stage,
+        _ => "",
+    }
+}
+
+fn verify_recovery_scope(
+    id: i64,
+    operation: &str,
+    generation: i64,
+    result: &Value,
+) -> Result<(), AppError> {
+    if result["account_id"].as_i64() != Some(id)
+        || result["generation"].as_i64() != Some(generation)
+        || result["operation_id"].as_str() != Some(operation)
+    {
+        return Err(AppError::ServiceUnavailable("AGY 对账回执归属不符".into()));
     }
     Ok(())
 }
@@ -432,21 +491,131 @@ impl AccountService {
             .map_err(|_| AppError::ServiceUnavailable("AGY 状态读取失败".into()))
     }
 
-    /// 冻结原账号的重授权操作。@param id 账号。@param operation 原生会话。@return 冻结代次。
+    /// 等待原凭据操作收口后预占当前代次。@param id 原账号。@param operation 新预占 ID。@return 冻结代次。
     pub async fn begin_agy_reauth(&self, id: i64, operation: &str) -> Result<i64, AppError> {
+        let deadline = Instant::now() + AGY_MANAGEMENT_TIMEOUT;
+        let key = format!("oauth:refresh:account:{id}");
+        let owner = Uuid::new_v4().to_string();
+        loop {
+            {
+                let _update = system_update::admission()?;
+                let _account = self.upstream_activity(id).await?;
+                if self
+                    .cache
+                    .acquire_lock(&key, &owner, OAUTH_LOCK_TTL)
+                    .await?
+                {
+                    let lease = AgyReauthLease {
+                        cache: Arc::clone(&self.cache),
+                        identity: Some((key.clone(), owner.clone())),
+                    };
+                    match self.try_begin_agy_reauth(id, operation, deadline).await {
+                        Ok(Some(generation)) => {
+                            drop(lease);
+                            self.notify_native_change(id, true);
+                            return Ok(generation);
+                        }
+                        outcome => {
+                            lease.release().await;
+                            outcome?;
+                        }
+                    }
+                }
+            }
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                return Err(AppError::ServiceUnavailable(
+                    "AGY 原凭据操作仍在进行，请稍后核对".into(),
+                ));
+            }
+            sleep(OAUTH_WAIT_RETRY.min(remaining)).await;
+        }
+    }
+
+    async fn try_begin_agy_reauth(
+        &self,
+        id: i64,
+        operation: &str,
+        deadline: Instant,
+    ) -> Result<Option<i64>, AppError> {
+        let mut account = self.store.get_by_id(id).await?;
+        self.require_agy_configuration_open(&account).await?;
+        if !account.is_antigravity() {
+            return Err(AppError::BadRequest("该账号属于其他平台".into()));
+        }
+        let state = self.store.agy_credential_state(id).await?;
+        if matches!(state.phase.as_str(), "refresh_pending" | "reconcile") {
+            // 缓存租约可能早于原生请求到期。实际写者持锁时只等待同一操作。
+            let reconciliation = self.recover_agy_locked(&account, &state, true).await;
+            if matches!(reconciliation, Ok(AgyRecoveryAttempt::InFlight)) {
+                return Ok(None);
+            }
+            let current = self.store.agy_credential_state(id).await?;
+            let _update = system_update::admission()?;
+            if current.operation_id == state.operation_id
+                && current.generation == state.generation
+                && matches!(
+                    current.recovery_status.as_str(),
+                    "needs_check" | "reauthorization_required"
+                )
+            {
+                self.retire_agy_locked(id, &current).await?;
+            } else if current.phase != "ready" {
+                reconciliation?;
+                return Err(AppError::ServiceUnavailable("AGY 原凭据仍待核对".into()));
+            }
+            account = self.store.get_by_id(id).await?;
+        }
+        if Instant::now() >= deadline {
+            return Ok(None);
+        }
+        let _update = system_update::admission()?;
+        self.require_agy_configuration_open(&account).await?;
+        self.store
+            .reserve_agy_authorization(&account, operation)
+            .await
+            .map(Some)
+    }
+
+    /// 核对原链接仍对应本次预占，再对调用方交付。@param id 原账号。@param operation 预占 ID。@param generation 原代次。@return 链接确认结果。
+    pub async fn confirm_agy_authorization(
+        &self,
+        id: i64,
+        operation: &str,
+        generation: i64,
+    ) -> Result<(), AppError> {
+        self.store
+            .agy_authorization_phase(id, operation, generation, "starting", "authorizing")
+            .await
+    }
+
+    /// 只补偿本次起链预占。@param id 原账号。@param operation 预占 ID。@param generation 预占代次。@param start_attempted 是否已调用驱动。@return 补偿结果。
+    pub async fn abort_agy_reauth(
+        &self,
+        id: i64,
+        operation: &str,
+        generation: i64,
+        start_attempted: bool,
+    ) -> Result<(), AppError> {
         let (key, owner) = self.acquire_oauth_credential_lock(id).await?;
         let result = async {
-            let account = self.store.get_by_id(id).await?;
-            self.require_agy_configuration_open(&account).await?;
-            self.store
-                .begin_agy_credentials(&account, operation, "reauth")
-                .await
+            let state = self.store.agy_credential_state(id).await?;
+            if state.phase == "reauth"
+                && state.operation_id.as_deref() == Some(operation)
+                && state.generation == generation
+            {
+                if start_attempted {
+                    self.retire_agy_locked(id, &state).await?;
+                } else {
+                    // 尚未发送起链，维护门禁关闭时也能归还本地预占。
+                    self.store.cancel_agy_reauth(id, operation).await?;
+                    self.notify_native_change(id, true);
+                }
+            }
+            Ok(())
         }
         .await;
         self.cache.release_lock(&key, &owner).await;
-        if result.is_ok() {
-            self.notify_native_change(id, true);
-        }
         result
     }
 
@@ -509,49 +678,213 @@ impl AccountService {
         Ok(())
     }
 
-    /// 先取得同归属终止证明，再允许原账号重新授权。@param id 账号。@return 当前脱敏状态。
-    pub async fn retire_agy_operation(&self, id: i64) -> Result<Value, AppError> {
-        let (key, owner) = self.acquire_oauth_credential_lock(id).await?;
-        let result = async {
-            self.agy_state(id).await?;
-            let state = self.store.agy_credential_state(id).await?;
-            if state.phase != "ready" {
-                let operation = state.operation_id.ok_or_else(|| AppError::ServiceUnavailable("AGY 原操作缺失".into()))?;
-                let result = agy_request("retire", &json!({"operation_id":operation,"account_id":id,"generation":state.generation})).await?;
-                verify_retirement(id, &operation, state.generation, &result)?;
-                self.store.retire_agy_credentials(id, &operation, state.generation).await?;
-                self.notify_native_change(id, true);
-            }
-            self.agy_state(id).await
-        }.await;
-        self.cache.release_lock(&key, &owner).await;
-        result
+    async fn retire_agy_locked(&self, id: i64, state: &AgyCredentialState) -> Result<(), AppError> {
+        let operation = state
+            .operation_id
+            .as_deref()
+            .ok_or_else(|| AppError::ServiceUnavailable("AGY 原操作缺失".into()))?;
+        let result = agy_request(
+            "retire",
+            &json!({"operation_id":operation,"account_id":id,"generation":state.generation}),
+        )
+        .await?;
+        verify_retirement(id, operation, state.generation, &result)?;
+        self.store
+            .retire_agy_credentials(id, operation, state.generation)
+            .await?;
+        self.notify_native_change(id, true);
+        Ok(())
     }
 
     /// 按原操作恢复已有私有结果。@param id 账号。@return 当前脱敏状态。
     pub async fn recover_agy_operation(&self, id: i64) -> Result<Value, AppError> {
-        let state = self.store.agy_credential_state(id).await?;
-        if state.phase == "ready" {
-            return self.agy_state(id).await;
+        self.recover_agy(id, None).await?;
+        self.agy_state(id).await
+    }
+
+    async fn recover_agy(
+        &self,
+        id: i64,
+        expected_operation: Option<&str>,
+    ) -> Result<Option<i64>, AppError> {
+        let _activity = self.upstream_activity(id).await?;
+        let (key, owner) = self.acquire_oauth_credential_lock(id).await?;
+        let result = async {
+            let state = self.store.agy_credential_state(id).await?;
+            if state.phase == "ready"
+                || expected_operation
+                    .is_some_and(|operation| state.operation_id.as_deref() != Some(operation))
+            {
+                return Ok(None);
+            }
+            if state.phase == "reauth" && state.recovery_status == "starting" {
+                if expected_operation.is_none() {
+                    return Err(AppError::ServiceUnavailable("AGY 授权链接正在启动".into()));
+                }
+                // 巡检只会选中已经超过启动请求预算的预占，未确认的链接可以按原操作回收。
+                self.retire_agy_locked(id, &state).await?;
+                return Ok(None);
+            }
+            let account = self.store.get_by_id(id).await?;
+            let result = self
+                .recover_agy_locked(&account, &state, expected_operation.is_some())
+                .await?;
+            Ok(match result {
+                AgyRecoveryAttempt::Observed(expiry) => expiry,
+                AgyRecoveryAttempt::InFlight => None,
+            })
+        }
+        .await;
+        self.cache.release_lock(&key, &owner).await;
+        result
+    }
+
+    async fn recover_agy_locked(
+        &self,
+        account: &Account,
+        state: &AgyCredentialState,
+        automatic: bool,
+    ) -> Result<AgyRecoveryAttempt, AppError> {
+        let id = account.id;
+        if !account.is_antigravity() {
+            return Err(AppError::BadRequest("该账号属于其他平台".into()));
         }
         let operation = state
             .operation_id
+            .as_deref()
             .ok_or_else(|| AppError::ServiceUnavailable("AGY 对账操作缺失".into()))?;
         let result = agy_request(
-            "recover",
+            if automatic {
+                "recover-status"
+            } else {
+                "recover"
+            },
             &json!({"operation_id":operation,"account_id":id,"generation":state.generation}),
         )
         .await?;
+        verify_recovery_scope(id, operation, state.generation, &result)?;
+        if result["recovery_status"] == "in_flight" {
+            return Ok(AgyRecoveryAttempt::InFlight);
+        }
         if result["retired"] == true {
-            verify_retirement(id, &operation, state.generation, &result)?;
+            verify_retirement(id, operation, state.generation, &result)?;
             self.store
-                .retire_agy_credentials(id, &operation, state.generation)
+                .retire_agy_credentials(id, operation, state.generation)
                 .await?;
             self.notify_native_change(id, true);
-        } else {
-            self.finish_agy_operation(id, &operation, &result).await?;
+            return Ok(AgyRecoveryAttempt::Observed(None));
         }
-        self.agy_state(id).await
+        if let Some(
+            status @ ("retrying" | "needs_check" | "reauthorization_required" | "authorizing"),
+        ) = result["recovery_status"].as_str()
+        {
+            self.store
+                .record_agy_recovery(
+                    id,
+                    operation,
+                    state.generation,
+                    agy_failure_stage(&result),
+                    status,
+                )
+                .await?;
+            return Ok(AgyRecoveryAttempt::Observed(result["expires_at"].as_i64()));
+        }
+        let mut updated = account.clone();
+        if let Err(error) = apply_observation(&mut updated, &result) {
+            let stage = agy_failure_stage(&result);
+            self.store
+                .record_agy_recovery(
+                    id,
+                    operation,
+                    state.generation,
+                    if stage.is_empty() {
+                        "receipt_validation"
+                    } else {
+                        stage
+                    },
+                    "needs_check",
+                )
+                .await?;
+            return Err(error);
+        }
+        let stage = agy_failure_stage(&result);
+        self.store
+            .record_agy_recovery(
+                id,
+                operation,
+                state.generation,
+                if stage.is_empty() && state.recovery_status == "retrying" {
+                    "receive_receipt"
+                } else {
+                    stage
+                },
+                "retrying",
+            )
+            .await?;
+        self.store
+            .complete_agy_observation(account, operation, state.generation, &updated)
+            .await?;
+        self.notify_native_change(id, true);
+        Ok(AgyRecoveryAttempt::Observed(None))
+    }
+
+    /// 启动后立即巡检持久原操作，后续按有效期约束逐账号退避。@param self 网关账号服务。@return 无。
+    pub fn start_agy_reconciliation(self: &Arc<Self>) {
+        let service = Arc::clone(self);
+        tokio::spawn(async move {
+            let mut retry = HashMap::<String, (Instant, u64)>::new();
+            loop {
+                if let Ok(pending) = service.store.agy_recovery_candidates().await {
+                    let live: BTreeSet<&str> = pending
+                        .iter()
+                        .map(|(_, operation)| operation.as_str())
+                        .collect();
+                    retry.retain(|operation, _| live.contains(operation.as_str()));
+                    let due: Vec<_> = pending
+                        .into_iter()
+                        .filter(|(_, operation)| {
+                            !retry
+                                .get(operation)
+                                .is_some_and(|(at, _)| *at > Instant::now())
+                        })
+                        .collect();
+                    let completed = stream::iter(due)
+                        .map(|(id, operation)| {
+                            let service = Arc::clone(&service);
+                            async move {
+                                let expiry = match system_update::background_admission() {
+                                    Ok(Some(_activity)) => service
+                                        .recover_agy(id, Some(&operation))
+                                        .await
+                                        .ok()
+                                        .flatten(),
+                                    _ => None,
+                                };
+                                (operation, expiry)
+                            }
+                        })
+                        .buffer_unordered(4)
+                        .collect::<Vec<_>>()
+                        .await;
+                    for (operation, expiry) in completed {
+                        let delay = retry
+                            .get(&operation)
+                            .map_or(2, |(_, last)| (last * 2).min(30));
+                        let remaining = expiry.map_or(delay, |expiry| {
+                            (expiry - Utc::now().timestamp() - 60).max(1) as u64
+                        });
+                        retry.insert(
+                            operation,
+                            (
+                                Instant::now() + Duration::from_secs(delay.min(remaining)),
+                                delay,
+                            ),
+                        );
+                    }
+                }
+                sleep(Duration::from_secs(2)).await;
+            }
+        });
     }
     /// 使用原生状态核验 AGY 账号及平台能力。@param account 创建或编辑候选。@return 核验结果。
     pub async fn verify_agy_account(&self, account: &mut Account) -> Result<(), AppError> {
@@ -940,10 +1273,22 @@ impl AccountService {
             "generation":generation,"document":document,"proxy_url":account.proxy_url}),
         )
         .await;
+        let mut stage = "";
         let commit = async {
             let result = result?;
             let mut updated = account.clone();
+            stage = "receipt_validation";
+            self.store
+                .record_agy_recovery(
+                    account.id,
+                    &operation,
+                    generation,
+                    agy_failure_stage(&result),
+                    "retrying",
+                )
+                .await?;
             apply_observation(&mut updated, &result)?;
+            stage = "gateway_commit";
             self.store
                 .complete_agy_observation(account, &operation, generation, &updated)
                 .await?;
@@ -951,6 +1296,9 @@ impl AccountService {
         }
         .await;
         if commit.is_err() {
+            self.store
+                .record_agy_recovery(account.id, &operation, generation, stage, "retrying")
+                .await?;
             self.store
                 .reconcile_agy_credentials(account.id, &operation)
                 .await?;

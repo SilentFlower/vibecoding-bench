@@ -1,5 +1,6 @@
 """实际 SQLite 元数据与软件字段恢复的边界验证。"""
 import copy
+import base64
 import json
 import sqlite3
 import subprocess
@@ -7,18 +8,292 @@ import tempfile
 import unittest
 import uuid
 import gc
+import gzip
 import hashlib
 import io
+import os
+import platform
+import tarfile
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from socketserver import UnixStreamServer
+from threading import Event, Thread
 from contextlib import closing
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlsplit
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from system_update_host import ControlHealthTimeout, HostDeployment
+from system_update_host import ControlHealthTimeout, HostDeployment, pull_image
 from runtime_files import atomic_json, atomic_text
 from system_update_gate import read_gate
 from system_update_database import assert_quiescent, create_snapshot, restore_snapshot
 from runtime_names import account_container_prefix
+
+
+class DownloadProgressTests(unittest.TestCase):
+    """从实际本地 HTTP 流读取镜像和签名包字节。"""
+
+    def test_registry_tracks_parallel_layers_cache_retries_and_extraction(self) -> None:
+        """本机 Engine 流分批送达，验证实际字节、未知分母与解包隔离。@return 无。"""
+        received = Event()
+        resume = Event()
+        results, errors = [], []
+        lines = [
+            {'id': 'layer1', 'status': 'Pulling fs layer'},
+            {'id': 'shared', 'status': 'Waiting'},
+            {'id': 'layer2', 'status': 'Waiting'},
+            {'id': 'shared', 'status': 'Already exists'},
+            {'id': 'layer1', 'status': 'Downloading', 'progressDetail': {'current': 10, 'total': 50}},
+            {'id': 'layer2', 'status': 'Downloading', 'progressDetail': {'current': 20, 'total': 100}},
+            {'id': 'layer2', 'status': 'Downloading', 'progressDetail': {'current': 5, 'total': 100}},
+            {'id': 'layer1', 'status': 'Download complete'},
+            {'id': 'layer2', 'status': 'Download complete'},
+            {'id': 'layer2', 'status': 'Extracting', 'progressDetail': {'current': 950, 'total': 1000}},
+            {'status': 'Status: Downloaded newer image for synthetic'},
+        ]
+        encoded = [json.dumps(item).encode() + b'\n' for item in lines]
+        reference = 'registry.fixture/library/test@sha256:' + 'a' * 64
+
+        class Engine(BaseHTTPRequestHandler):
+            """受控 Docker 端点，第一批数据后等待读者确认。"""
+
+            def log_message(self, *_):
+                """隐藏本地请求日志。@return 无。"""
+
+            def do_HEAD(self):
+                """返回合成的 Engine API 版本。@return 无。"""
+                self.send_response(200)
+                self.send_header('Api-Version', '1.52')
+                self.end_headers()
+
+            def do_POST(self):
+                """写入分段 JSON 响应。@return 无。"""
+                try:
+                    auth = json.loads(base64.urlsafe_b64decode(self.headers['X-Registry-Auth']))
+                    if auth.get('username') != 'fixture' or 'fromImage=registry.fixture%2Flibrary%2Ftest%40sha256%3A' not in self.path:
+                        raise AssertionError('镜像未按冻结摘要和本地仓库鉴权拉取')
+                    self.send_response(200)
+                    self.send_header('Content-Length', str(sum(map(len, encoded))))
+                    self.end_headers()
+                    self.wfile.write(b''.join(encoded[:5]))
+                    if not resume.wait(5):
+                        raise AssertionError('首批字节没有实时送达')
+                    self.wfile.write(b''.join(encoded[5:]))
+                except Exception as error:
+                    errors.append(error)
+
+        def report(value):
+            results.append(value)
+            if value['downloaded_bytes'] == 10:
+                received.set()
+                resume.set()
+
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder)
+            (path / 'config.json').write_text(json.dumps({'auths': {'registry.fixture': {
+                'auth': base64.b64encode(b'fixture:fixture-password').decode()}}}))
+            with UnixStreamServer(str(path / 'socket'), Engine) as server, patch.dict(
+                    'os.environ', {'DOCKER_CONFIG': folder, 'DOCKER_AUTH_CONFIG': '', 'DOCKER_API_VERSION': ''}):
+                thread = Thread(target=server.serve_forever, daemon=True)
+                thread.start()
+                try:
+                    pull_image('unix://' + str(path / 'socket'), reference, 'control', report, timeout=10)
+                finally:
+                    server.shutdown()
+                    thread.join(5)
+        self.assertEqual([], errors)
+        self.assertTrue(received.is_set())
+        readings = [(item['downloaded_bytes'], item['total_bytes']) for item in results]
+        self.assertIn((10, None), readings)
+        self.assertIn((30, 150), readings)
+        self.assertIn((15, 150), readings)
+        self.assertEqual((150, 150), readings[-1])
+        self.assertIn('loading', [item['state'] for item in results])
+        self.assertEqual('verifying', results[-1]['state'])
+
+    def test_signed_bundle_streams_bytes_and_reports_cache(self) -> None:
+        """压缩包按实际读取进度与签名大小发布，命中本地包时无网络字节。@return 无。"""
+        first = b'a' * 32768
+        content = first + b'b' * 65536
+        resume = Event()
+        results = []
+
+        class Bundle(BaseHTTPRequestHandler):
+            """分段提供合成镜像包。"""
+
+            def log_message(self, *_):
+                """隐藏本地请求日志。@return 无。"""
+
+            def do_GET(self):
+                """写入两批包字节。@return 无。"""
+                self.send_response(200)
+                self.send_header('Content-Length', str(len(content)))
+                self.end_headers()
+                self.wfile.write(first)
+                if resume.wait(5):
+                    self.wfile.write(content[len(first):])
+
+        def report(value):
+            results.append(value)
+            if value['downloaded_bytes'] == len(first):
+                resume.set()
+
+        with tempfile.TemporaryDirectory() as folder, ThreadingHTTPServer(('127.0.0.1', 0), Bundle) as server:
+            root = Path(folder)
+            host = HostDeployment({'state_root': folder, 'data_root': folder, 'env_file': str(root / 'v3.env'),
+                'deployment': 'synthetic'})
+            release = {'release': 'fixture', 'build_manifests': {role: {'name': 'build.json'} for role in ('control', 'account')},
+                'bundle': {'name': 'images.tar.gz', 'size': len(content), 'sha256': hashlib.sha256(content).hexdigest()}}
+            thread = Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                with patch('system_update_host.DOWNLOAD_ROOT', 'http://127.0.0.1:' + str(server.server_port)), \
+                        patch('system_update_host.load_bundle') as load:
+                    host._load_release_bundle(release, root, report)
+                    self.assertEqual(content, (root / 'images.tar.gz').read_bytes())
+                    host._load_release_bundle(release, root, report)
+                    self.assertEqual(2, load.call_count)
+            finally:
+                server.shutdown()
+                thread.join(5)
+        self.assertIn(('downloading', len(first), len(content)),
+            [(item['state'], item['downloaded_bytes'], item['total_bytes']) for item in results])
+        self.assertEqual(('loading', len(content)), (results[-2]['state'], results[-2]['downloaded_bytes']))
+        self.assertEqual(('cached', 0, None),
+            (results[-1]['state'], results[-1]['downloaded_bytes'], results[-1]['total_bytes']))
+
+    def test_registry_failure_starts_bundle_with_its_own_byte_count(self) -> None:
+        """仓库中断后切换签名包，保留包独立的读数和校验状态。@return 无。"""
+        readings = []
+
+        def registry(_endpoint, _image, _role, report, **_options):
+            report({'source': 'registry', 'component': 'control', 'state': 'downloading',
+                'downloaded_bytes': 7, 'total_bytes': 20})
+            raise RuntimeError('合成仓库断流')
+
+        def bundle(_release, _folder, report):
+            report({'source': 'bundle', 'component': 'bundle', 'state': 'downloading',
+                'downloaded_bytes': 0, 'total_bytes': 30})
+            report({'source': 'bundle', 'component': 'bundle', 'state': 'loading',
+                'downloaded_bytes': 30, 'total_bytes': 30})
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            host = HostDeployment({'state_root': folder, 'data_root': folder, 'env_file': str(root / 'v3.env'),
+                'deployment': 'synthetic'})
+            entry = {'reference': 'fixture/release:v2', 'registry_digest': 'sha256:' + 'a' * 64,
+                'config_digest': 'sha256:' + 'b' * 64, 'unpacked_bytes': 30}
+            with patch.object(host, '_verify_build_manifests'), patch.object(host, '_load_release_bundle', side_effect=bundle), \
+                    patch.object(host, 'verify_images', side_effect=[{}, {'control': {'Id': 'synthetic'}}]), \
+                    patch.object(host, '_project_library_binding', return_value=None), \
+                    patch('system_update_host._check_local_reference'), patch('system_update_host.pull_image', side_effect=registry), \
+                    patch.dict(os.environ, {'DOCKER_CONTEXT': '', 'DOCKER_HOST': 'unix:///fixture.sock'}):
+                host.prepare({'bundle': {'size': 30}}, {role: entry for role in ('control', 'account')}, root, readings.append)
+        self.assertEqual([('registry', 7, 20), ('bundle', 0, 30), ('bundle', 30, 30), ('bundle', 30, 30)],
+            [(item['source'], item['downloaded_bytes'], item['total_bytes']) for item in readings])
+        self.assertEqual('verifying', readings[-1]['state'])
+
+    @unittest.skipUnless(os.environ.get('FLOWER_TEST_LOCAL_DOCKER') == '1', '需要可访问本机回环仓库的 Docker Engine')
+    def test_real_docker_pulls_from_loopback_registry(self) -> None:
+        """实际 Docker 拉取分段放行的镜像，下载字节与仓库实际发送量一致。@return 无。"""
+        architecture = {'x86_64': 'amd64', 'aarch64': 'arm64'}[platform.machine()]
+
+        def sha(content):
+            return 'sha256:' + hashlib.sha256(content).hexdigest()
+
+        def descriptor(media, content):
+            return {'mediaType': 'application/vnd.docker.' + media, 'size': len(content), 'digest': sha(content)}
+
+        data = os.urandom(2 * 1024 * 1024)
+        raw = io.BytesIO()
+        with tarfile.open(fileobj=raw, mode='w') as archive:
+            member = tarfile.TarInfo('transfer-fixture')
+            member.size = len(data)
+            archive.addfile(member, io.BytesIO(data))
+        layer = gzip.compress(raw.getvalue(), mtime=0)
+        config = json.dumps({'architecture': architecture, 'os': 'linux', 'config': {},
+            'rootfs': {'type': 'layers', 'diff_ids': [sha(raw.getvalue())]},
+            'history': [{'created_by': 'system-update-transfer-test'}]}).encode()
+        manifest_type = 'application/vnd.docker.distribution.manifest.v2+json'
+        manifest = json.dumps({'schemaVersion': 2, 'mediaType': manifest_type,
+            'config': descriptor('container.image.v1+json', config),
+            'layers': [descriptor('image.rootfs.diff.tar.gzip', layer)]}).encode()
+        responses = {'/v2/': (b'{}', 'application/json'),
+            '/v2/transfer-fixture/manifests/' + sha(manifest): (manifest, manifest_type),
+            '/v2/transfer-fixture/blobs/' + sha(config): (config, 'application/octet-stream'),
+            '/v2/transfer-fixture/blobs/' + sha(layer): (layer, 'application/octet-stream')}
+        release = Event()
+        sent, progress = [], []
+
+        class Registry(BaseHTTPRequestHandler):
+            """回环上游只提供本例唯一镜像。"""
+
+            def handle_one_request(self):
+                """让 Engine 对回环仓库从 TLS 探测回落到 HTTP。@return 无。"""
+                if self.rfile.peek(1).startswith(b'\x16'):
+                    self.wfile.write(b'HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n')
+                    self.close_connection = True
+                    return
+                super().handle_one_request()
+
+            def log_message(self, *_):
+                """隐藏本地请求日志。@return 无。"""
+
+            def do_HEAD(self):
+                """报告同摘要内容的固定大小。@return 无。"""
+                self._send(False)
+
+            def do_GET(self):
+                """提供制品及分段层。@return 无。"""
+                self._send(True)
+
+            def _send(self, include_body):
+                value = responses.get(urlsplit(self.path).path)
+                if value is None:
+                    self.send_error(404)
+                    return
+                content, media = value
+                self.send_response(200)
+                self.send_header('Content-Type', media)
+                self.send_header('Content-Length', str(len(content)))
+                self.send_header('Docker-Content-Digest', sha(content))
+                self.send_header('Docker-Distribution-Api-Version', 'registry/2.0')
+                self.end_headers()
+                if include_body:
+                    if content is layer:
+                        self.wfile.write(layer[:len(layer) // 2])
+                        release.wait(8)
+                        self.wfile.write(layer[len(layer) // 2:])
+                        sent.append(len(layer))
+                    else:
+                        self.wfile.write(content)
+
+        def report(value):
+            progress.append(value)
+            current = value['downloaded_bytes']
+            if current is not None and 0 < current < len(layer):
+                release.set()
+
+        with tempfile.TemporaryDirectory() as folder, ThreadingHTTPServer(('127.0.0.1', 0), Registry) as registry:
+            thread = Thread(target=registry.serve_forever, daemon=True)
+            thread.start()
+            reference = f'127.0.0.1:{registry.server_port}/transfer-fixture@{sha(manifest)}'
+            with patch.dict(os.environ, {'DOCKER_CONFIG': folder, 'DOCKER_AUTH_CONFIG': '', 'DOCKER_API_VERSION': ''}):
+                try:
+                    pull_image('unix:///var/run/docker.sock', reference, 'control', report, timeout=30)
+                    self.assertTrue(release.is_set(), progress)
+                    self.assertEqual([len(layer)], sent)
+                    self.assertEqual((len(layer), len(layer)),
+                        (progress[-1]['downloaded_bytes'], progress[-1]['total_bytes']))
+                    cached = []
+                    pull_image('unix:///var/run/docker.sock', reference, 'account', cached.append, timeout=30)
+                    self.assertEqual(('cached', 0), (cached[-1]['state'], cached[-1]['downloaded_bytes']))
+                    self.assertEqual([len(layer)], sent)
+                finally:
+                    subprocess.run(['docker', '-H', 'unix:///var/run/docker.sock', 'image', 'rm', reference],
+                        check=False, capture_output=True, timeout=20)
+                    registry.shutdown()
+                    thread.join(5)
 
 
 class HostNetworkNamesTests(unittest.TestCase):

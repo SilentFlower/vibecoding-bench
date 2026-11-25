@@ -3,6 +3,7 @@ import hashlib
 import fcntl
 import json
 import os
+import subprocess
 import unittest
 import uuid
 from pathlib import Path
@@ -81,7 +82,15 @@ class SystemInstallTests(unittest.TestCase):
         self.assertEqual(self.prepare(True)['status'], 'prepared')
         self.assertEqual(self.env.read_bytes(), before)
         self.assertEqual((self.root / 'socket/token').stat().st_mode & 0o777, 0o600)
-        self.assertTrue((self.root / 'source/deploy/v3/system_updater.py').is_file())
+        installed = self.root / 'source/deploy/v3'
+        self.assertTrue((installed / 'system_updater.py').is_file())
+        self.assertEqual((installed / 'system_update_host.py').read_bytes(),
+            (Path(__file__).parent / 'system_update_host.py').read_bytes())
+        # 用 systemd 相同的系统 Python 从固定副本导入，排除工作区或虚拟环境依赖。
+        subprocess.run(['/usr/bin/python3', '-I', '-B', '-c',
+            'import sys; sys.path.insert(0, sys.argv[1]); '
+            'from system_updater import SystemUpdater; from system_update_host import pull_image',
+            str(installed)], cwd=self.root, check=True, capture_output=True, timeout=10)
         self.assertTrue((self.root / 'source/orchestrator/system_update_gate.py').is_file())
         self.assertEqual(read_gate(self.root / 'gate', 'test')['phase'], 'blocked')
         preview = finalize_installation(self.root / 'policy.json', backend_type=BootstrapHost)

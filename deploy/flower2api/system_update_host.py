@@ -1,6 +1,7 @@
 """固定部署的宿主动作适配器：实际镜像核验、维护切换及恢复。"""
 from __future__ import annotations
 
+import base64
 import hashlib
 import ipaddress
 import json
@@ -8,14 +9,15 @@ import os
 import re
 import shlex
 import shutil
+import socket
 import sqlite3
 import subprocess
 import time
 import uuid
 from contextlib import closing
-from http.client import HTTPException
+from http.client import HTTPConnection, HTTPException
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlencode, urlsplit
 from urllib.error import HTTPError, URLError
 from urllib.request import ProxyHandler, Request, build_opener
 
@@ -55,6 +57,157 @@ def docker(*arguments: str, timeout: int = 120) -> str:
     if result.returncode:
         raise RuntimeError('Docker 部署动作失败，请核对私有运行记录')
     return result.stdout
+
+
+class DockerPullConnection(HTTPConnection):
+    """在 Docker CLI 选定的 Unix socket 上建立 HTTP 连接。"""
+
+    def __init__(self, path: str, timeout: float) -> None:
+        """保存本机连接参数。@param path Socket 路径。@param timeout 本次请求剩余时间。@return 无。"""
+        super().__init__('localhost', timeout=timeout)
+        self.path = path
+
+    def connect(self) -> None:
+        """连接本机 Docker。@return 无。"""
+        self.sock = socket.socket(socket.AF_UNIX)
+        self.sock.settimeout(self.timeout)
+        self.sock.connect(self.path)
+
+
+def _registry_auth(reference: str) -> str:
+    # 签名清单固定仓库身份，复用当前 Docker 配置和该仓库的凭据助手。
+    if os.environ.get('DOCKER_AUTH_CONFIG'):
+        raise ValueError('当前环境凭据由 Docker 命令解析')
+    registry = reference.split('/', 1)[0]
+    root = Path(os.environ['DOCKER_CONFIG']) if os.environ.get('DOCKER_CONFIG') else Path.home() / '.docker'
+    path = root / 'config.json'
+    config = json.loads(path.read_text()) if path.exists() else {}
+    if config.get('HttpHeaders') or os.environ.get('DOCKER_CUSTOM_HEADERS'):
+        raise ValueError('当前 Docker 请求头由命令解析')
+    auths = config.get('auths') or {}
+    credentials = auths.get(registry) or next((entry for key, entry in auths.items()
+        if urlsplit(key if '://' in key else '//' + key).netloc == registry), {})
+    if 'auth' in credentials:
+        decoded = base64.b64decode(credentials['auth'], validate=True).decode()
+        username, separator, password = decoded.partition(':')
+        if not separator:
+            raise ValueError('Docker 仓库凭据格式无效')
+        credentials = dict(credentials, username=username, password=password.rstrip('\x00'))
+    helper = (config.get('credHelpers') or {}).get(registry) or config.get('credsStore')
+    if not helper and not auths and not config.get('credHelpers'):
+        helper = next((name for name in ('pass', 'secretservice')
+            if shutil.which('docker-credential-' + name) and (name != 'pass' or shutil.which('pass'))), None)
+    if helper:
+        if not re.fullmatch(r'[a-zA-Z0-9_-]+', helper):
+            raise ValueError('Docker 凭据助手名称无效')
+        result = subprocess.run(['docker-credential-' + helper, 'get'], input=registry + '\n',
+            capture_output=True, text=True, check=False, timeout=30)
+        if result.returncode == 0:
+            value = json.loads(result.stdout)
+            credentials = ({'identitytoken': value['Secret']} if value['Username'] == '<token>'
+                else {'username': value['Username'], 'password': value['Secret']})
+        elif 'credentials not found in native keychain' not in (result.stdout + result.stderr).lower():
+            raise ValueError('Docker 凭据助手暂不可用')
+    body = {name: credentials[name] for name in ('username', 'password', 'identitytoken', 'registrytoken')
+        if isinstance(credentials.get(name), str)}
+    if body:
+        body['serveraddress'] = registry
+    return base64.urlsafe_b64encode(json.dumps(body).encode()).decode()
+
+
+def pull_image(endpoint: str, reference: str, component: str, report, *, timeout: int) -> None:
+    """按 Docker Engine 事件累计当前组件实际传输。@param endpoint Unix socket 地址。@param reference 固定摘要镜像。@param component 组件角色。@param report 进度回调。@param timeout 拉取预算秒数。@return 镜像拉取完成。"""
+    path = endpoint.removeprefix('unix://')
+    version = os.environ.get('DOCKER_API_VERSION', '')
+    if not endpoint.startswith('unix://') or not path.startswith('/') or (version and not re.fullmatch(r'1\.\d+', version)):
+        raise ValueError('当前 Docker 连接沿兼容拉取')
+    deadline = time.monotonic() + timeout
+    layers: dict[str, tuple[int, int | None]] = {}
+    # 仅统计 Downloading 的压缩网络字节。Extracting 的大小属于另一个计量口径。
+    def publish(state):
+        totals = [total for _, total in layers.values()]
+        report({'source': 'registry', 'component': component, 'state': state,
+            'downloaded_bytes': sum(current for current, _ in layers.values()) if layers or state == 'cached' else None,
+            'total_bytes': sum(totals) if totals and all(total is not None for total in totals) else None})
+
+    publish('downloading')
+    try:
+        auth = _registry_auth(reference)
+    except (OSError, ValueError, TypeError, KeyError, subprocess.SubprocessError):
+        raise ValueError('当前 Docker 凭据沿兼容拉取') from None
+    try:
+        with_connection = DockerPullConnection(path, max(0.001, deadline - time.monotonic()))
+        try:
+            if not version:
+                # 新版 daemon 提高了最小 API 版本；按当前 daemon 版本选择端点。
+                with_connection.request('HEAD', '/_ping')
+                with with_connection.getresponse() as probe:
+                    version = probe.getheader('Api-Version', '')
+                    if probe.status != 200 or not re.fullmatch(r'1\.\d+', version):
+                        raise RuntimeError('Docker Engine API 未就绪')
+                    probe.read()
+            with_connection.request('POST', '/v' + version + '/images/create?' + urlencode({'fromImage': reference}),
+                headers={'X-Registry-Auth': auth})
+            transport = with_connection.sock
+            with with_connection.getresponse() as response:
+                if response.status != 200:
+                    raise RuntimeError('Docker 镜像拉取失败')
+                summary = None
+                cached = False
+                while not response.isclosed():
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise RuntimeError('Docker 镜像拉取超时')
+                    transport.settimeout(remaining)
+                    line = response.readline(65537)
+                    if not line:
+                        break
+                    if len(line) > 65536:
+                        raise RuntimeError('Docker 拉取进度响应无效')
+                    event = json.loads(line)
+                    if not isinstance(event, dict) or event.get('error') or event.get('errorDetail'):
+                        raise RuntimeError('Docker 镜像拉取失败')
+                    identity = event.get('id')
+                    status = event.get('status')
+                    if isinstance(status, str) and status.startswith(
+                            ('Status: Downloaded newer image for ', 'Status: Image is up to date for ')):
+                        summary = status
+                    if not isinstance(identity, str) or not identity:
+                        continue
+                    if status in ('Pulling fs layer', 'Waiting'):
+                        layers.setdefault(identity, (0, None))
+                    elif status in ('Already exists', 'Exists'):
+                        layers.pop(identity, None)
+                        cached = True
+                    elif status == 'Downloading':
+                        detail = event.get('progressDetail')
+                        if not isinstance(detail, dict):
+                            detail = {}
+                        current, total = layers.get(identity, (0, None))
+                        observed, size = detail.get('current'), detail.get('total')
+                        if type(observed) is int and observed >= 0:
+                            if observed < current:
+                                # Engine 开始重传该层，采用本次尝试的计数。
+                                total = None
+                            current = observed
+                        if type(size) is int and size > 0:
+                            total = size
+                        layers[identity] = (current, total if total and total >= current else None)
+                    elif status in ('Download complete', 'Pull complete') and identity in layers:
+                        current, total = layers[identity]
+                        layers[identity] = (total if total is not None else current, total)
+                    elif status not in ('Verifying Checksum', 'Extracting', 'Pull complete'):
+                        continue
+                    publish('loading' if status in ('Extracting', 'Pull complete') and all(
+                        total is not None and current == total for current, total in layers.values()) else 'downloading')
+                if summary is None:
+                    raise RuntimeError('Docker 拉取未返回完成状态')
+                publish('cached' if not layers and (cached or summary.startswith('Status: Image is up to date for '))
+                    else 'verifying')
+        finally:
+            with_connection.close()
+    except (OSError, HTTPException, ValueError):
+        raise RuntimeError('Docker 镜像拉取未完整收口') from None
 
 
 class HostDeployment:
@@ -244,12 +397,13 @@ class HostDeployment:
                         raise ValueError('已有AGY环境，目标镜像需要支持同一平台运行协议')
         return result
 
-    def prepare(self, release: dict, selection: dict, folder: Path) -> None:
+    def prepare(self, release: dict, selection: dict, folder: Path, report=lambda _: None) -> None:
         """按签名固定来源拉取组件，原版持续运行。
 
         :param release: 已验签完整发行。
         :param selection: 实际拟使用组合。
         :param folder: 受控发行缓存目录。
+        :param report: 记录当前下载单位的进度。
         :return: None。
         """
         needed = sum(entry['unpacked_bytes'] for entry in selection.values()) + release['bundle']['size'] + 512 * 1024 ** 2
@@ -257,22 +411,49 @@ class HostDeployment:
             raise ValueError('磁盘空间不足以保留当前及恢复制品')
         self._verify_build_manifests(release, folder, download=True)
         existing = self.verify_images(selection, require_local=False)
+        progress = None
+
+        def publish(value):
+            nonlocal progress
+            progress = value
+            report(value)
+
+        endpoint = ''
+        if len(existing) < len(ROLES):
+            if not os.environ.get('DOCKER_CONTEXT') and os.environ.get('DOCKER_HOST'):
+                endpoint = os.environ['DOCKER_HOST']
+            else:
+                try:
+                    endpoint = docker('context', 'inspect', '--format', '{{.Endpoints.docker.Host}}').strip()
+                except RuntimeError:
+                    # 仍由旧 CLI 解析自定义 Docker 连接。
+                    pass
         for role in ROLES:
             if role in existing:
+                if progress is None:
+                    publish({'source': 'registry', 'component': role, 'state': 'cached',
+                        'downloaded_bytes': 0, 'total_bytes': None})
                 continue
             entry = selection[role]
             expected = {**entry, 'digest': entry['config_digest']}
             _check_local_reference(entry['reference'], expected)
             pinned = entry['reference'].rsplit(':', 1)[0] + '@' + entry['registry_digest']
             try:
-                docker('pull', pinned, timeout=1800)
+                try:
+                    pull_image(endpoint, pinned, role, publish, timeout=1800)
+                except ValueError:
+                    publish({'source': 'registry', 'component': role, 'state': 'downloading',
+                        'downloaded_bytes': None, 'total_bytes': None})
+                    docker('pull', pinned, timeout=1800)
             except RuntimeError:
-                self._load_release_bundle(release, folder)
+                self._load_release_bundle(release, folder, publish)
                 break
             image = json.loads(docker('image', 'inspect', pinned))[0]
             if not _local_image_matches(pinned, image, expected):
                 raise ValueError('拉取镜像内容不匹配')
             docker('tag', pinned, entry['reference'])
+        if progress is not None:
+            publish({**progress, 'state': 'verifying'})
         images = self.verify_images(selection)
         binding = self._project_library_binding(selection['control'], images['control'])
         if binding:
@@ -373,17 +554,23 @@ class HostDeployment:
         verify_prepared_metadata(bench, entry)
         atomic_json(self.root / 'socket' / project_library_receipt_name(binding['release']), {'binding': binding, 'entry': entry})
 
-    def _load_release_bundle(self, release: dict, folder: Path) -> None:
+    def _load_release_bundle(self, release: dict, folder: Path, report) -> None:
         if release['build_manifests']['control'] != release['build_manifests']['account']:
             raise ValueError('混合来源需按各自镜像摘要获取')
         bundle = release['bundle']
         destination = folder / bundle['name']
+
+        def publish(state, total):
+            report({'source': 'bundle', 'component': 'bundle', 'state': state,
+                'downloaded_bytes': total, 'total_bytes': bundle['size'] if state != 'cached' else None})
+
         if not destination.exists():
             temporary = folder / (bundle['name'] + '.partial')
             temporary.unlink(missing_ok=True)
             opener = build_opener(ProxyHandler({}), ReleaseRedirect())
             request = Request(f'{DOWNLOAD_ROOT}/{release["release"]}/{bundle["name"]}', headers={'User-Agent': 'vibebench-system-updater/1'})
             digest, total, deadline = hashlib.sha256(), 0, time.monotonic() + 1800
+            publish('downloading', total)
             try:
                 with opener.open(request, timeout=15) as response, temporary.open('xb') as output:
                     os.fchmod(output.fileno(), 0o600)
@@ -393,6 +580,7 @@ class HostDeployment:
                             raise ValueError('镜像包下载超过大小或时间限制')
                         digest.update(chunk)
                         output.write(chunk)
+                        publish('downloading', total)
                     output.flush()
                     os.fsync(output.fileno())
                 if total != bundle['size'] or digest.hexdigest() != bundle['sha256']:
@@ -400,6 +588,9 @@ class HostDeployment:
                 os.replace(temporary, destination)
             finally:
                 temporary.unlink(missing_ok=True)
+            publish('loading', total)
+        else:
+            publish('cached', 0)
         load_bundle(folder / release['build_manifests']['control']['name'], destination)
 
     def fast_transition(self, original: dict, selected: dict) -> bool:

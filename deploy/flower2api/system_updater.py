@@ -254,7 +254,7 @@ class SystemUpdater:
         return {key: copy.deepcopy(operation.get(key)) for key in ('operation_id', 'action', 'phase', 'created_at',
             'updated_at', 'target_release', 'error', 'blockers', 'cancel_requested', 'cleanup', 'environment_results',
             'database_snapshot', 'database_migrations', 'cluster_nodes', 'control_health',
-            'fast_transition', 'admission_blocked_at', 'admission_reopened_at', 'steps')}
+            'fast_transition', 'admission_blocked_at', 'admission_reopened_at', 'steps', 'download_progress')}
 
     def _current_rollout(self) -> dict | None:
         identifier = self.state.get('account_rollout_operation')
@@ -509,7 +509,19 @@ class SystemUpdater:
             if operation['request'].get('prepared_operation_id'):
                 self.backend.verify_prepared(operation['target'], selected['selection'], folder)
             else:
-                self.backend.prepare(operation['target'], selected['selection'], folder)
+                reported_at = 0.0
+                reported_unit = None
+
+                def report(value):
+                    nonlocal reported_at, reported_unit
+                    now = time.monotonic()
+                    unit = (value['source'], value['component'], value['state'])
+                    if unit == reported_unit and now - reported_at < 0.5:
+                        return
+                    self._phase(operation, 'preparing', download_progress=value)
+                    reported_at, reported_unit = now, unit
+
+                self.backend.prepare(operation['target'], selected['selection'], folder, report)
             if self._cancelled(operation):
                 self._finish(operation, 'cancelled')
                 return

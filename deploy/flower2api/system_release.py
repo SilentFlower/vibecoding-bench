@@ -34,6 +34,7 @@ RECEIPT_SCHEMA_SOURCE = 'orchestrator/tui_tool_receipts_schema.py'
 RECEIPT_SCHEMA_V1_CHECKSUM = '788a8c34215042c6f6ab1a48a32ae37a004bc9d71b062e026d4a67aa68daeaa3'
 GATEWAY_SCHEMA_SOURCES = {
     'gateway.usage-history.12': 'cc2api/src/store/usage_history_schema.rs',
+    'gateway.agy-recovery.14': 'cc2api/src/store/agy_recovery_schema.rs',
     'gateway.tui-backend.13': 'cc2api/src/store/tui_backend_schema.rs',
     'gateway.agy-tool-receipts.11': 'cc2api/src/store/agy_tool_receipts_schema.rs',
     'gateway.agy-system-reminder.10': 'cc2api/src/store/agy_system_reminder_schema.rs',

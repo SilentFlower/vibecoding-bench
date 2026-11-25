@@ -114,7 +114,7 @@ impl SessionStore {
 // ---------------------------------------------------------------------------
 
 /// 生成授权 URL 的请求。
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 pub struct GenerateAuthUrlRequest {
     pub platform: Option<String>,
     pub account_id: Option<i64>,
@@ -233,17 +233,20 @@ impl OAuthFlowService {
             .collect()
     }
 
-    /// 按可选平台复用原授权入口。@param req 平台、代理和目标。@return 既有链接与会话响应。
+    /// 按可选平台复用原授权入口。@param req 平台、代理和目标。@param reservation 重授权预占身份和代次。@return 链接与会话响应。
     pub async fn generate_platform_auth_url(
         &self,
         req: &GenerateAuthUrlRequest,
-        generation: Option<i64>,
+        reservation: Option<(&str, i64)>,
     ) -> Result<GenerateAuthUrlResponse, AppError> {
         match req.platform.as_deref().unwrap_or("claude_code") {
             "claude_code" => Ok(self.generate_auth_url(req)),
             "antigravity" => {
                 let mut input = json!({"proxy_url":req.proxy_url.as_deref().unwrap_or(""),
-                    "account_id":req.account_id,"generation":generation});
+                    "account_id":req.account_id,"generation":reservation.map(|(_, generation)| generation)});
+                if let Some((operation, _)) = reservation {
+                    input["operation_id"] = json!(operation);
+                }
                 if req.replace_proxy {
                     // 新选线需要原生端保存可供重启对账的线路回执。
                     input["replace_proxy"] = json!(true);
@@ -256,7 +259,9 @@ impl OAuthFlowService {
                 let session_id = result["session_id"]
                     .as_str()
                     .filter(|value| {
-                        value.len() == 32 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+                        value.len() == 32
+                            && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+                            && reservation.is_none_or(|(operation, _)| *value == operation)
                     })
                     .ok_or_else(|| AppError::ServiceUnavailable("AGY 原生会话身份无效".into()))?
                     .to_owned();

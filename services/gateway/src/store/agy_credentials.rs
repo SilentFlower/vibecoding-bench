@@ -13,6 +13,10 @@ pub struct AgyCredentialState {
     pub generation: i64,
     pub phase: String,
     pub operation_id: Option<String>,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub first_failure: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub recovery_status: String,
 }
 
 #[cfg(test)]
@@ -45,6 +49,85 @@ mod tests {
         account.expires_at = Some(Utc::now() + chrono::Duration::hours(1));
         store.create(&mut account).await.unwrap();
         (store, account)
+    }
+
+    /// 首因随原操作保存，旧回执与另一操作不能覆盖该诊断。@return 无。
+    #[tokio::test]
+    async fn agy_recovery_keeps_first_failure_and_filters_terminal_operations() {
+        let (store, account) = fixture().await;
+        let operation = "refresh-fixture";
+        let generation = store
+            .begin_agy_credentials(&account, operation, "refresh_pending")
+            .await
+            .unwrap();
+        store
+            .record_agy_recovery(
+                account.id,
+                operation,
+                generation,
+                "identity_check",
+                "retrying",
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            store.agy_recovery_candidates().await.unwrap(),
+            [(account.id, operation.into())]
+        );
+        store
+            .record_agy_recovery(
+                account.id,
+                "other",
+                generation,
+                "credential_file",
+                "needs_check",
+            )
+            .await
+            .unwrap();
+        store
+            .record_agy_recovery(
+                account.id,
+                operation,
+                generation + 1,
+                "credential_expiry",
+                "needs_check",
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            store
+                .agy_credential_state(account.id)
+                .await
+                .unwrap()
+                .recovery_status,
+            "retrying"
+        );
+        store
+            .record_agy_recovery(account.id, operation, generation, "receipt", "needs_check")
+            .await
+            .unwrap();
+        let state = store.agy_credential_state(account.id).await.unwrap();
+        assert_eq!(
+            (&*state.first_failure, &*state.recovery_status),
+            ("identity_check", "needs_check")
+        );
+        assert!(store.agy_recovery_candidates().await.unwrap().is_empty());
+        store
+            .retire_agy_credentials(account.id, operation, generation)
+            .await
+            .unwrap();
+        store
+            .begin_agy_credentials(&account, "new-operation", "reauth")
+            .await
+            .unwrap();
+        assert!(
+            store
+                .agy_credential_state(account.id)
+                .await
+                .unwrap()
+                .first_failure
+                .is_empty()
+        );
     }
 
     #[tokio::test]
@@ -378,6 +461,58 @@ mod tests {
 }
 
 impl AccountStore {
+    /// 读取可自动核对的原操作。@return 按更新时间排序的账号和操作 ID。
+    pub async fn agy_recovery_candidates(&self) -> Result<Vec<(i64, String)>, AppError> {
+        Ok(sqlx::query_as(
+            "SELECT account_id,operation_id FROM account_credential_states
+             WHERE operation_id IS NOT NULL AND recovery_status NOT IN ('needs_check','reauthorization_required')
+               AND (phase IN ('refresh_pending','reconcile') OR (phase='reauth' AND updated_at_ms <= $1))
+             ORDER BY updated_at_ms,account_id",
+        )
+        .bind(Utc::now().timestamp_millis() - 90_000)
+        .fetch_all(&self.pool)
+        .await?)
+    }
+
+    /// 保存原操作的首次失败和当前诊断。@param id 账号。@param operation 原操作。@param generation 原代次。@param failure 首个已证实阶段。@param status 当前恢复状态。@return 持久化结果。
+    pub async fn record_agy_recovery(
+        &self,
+        id: i64,
+        operation: &str,
+        generation: i64,
+        failure: &str,
+        status: &str,
+    ) -> Result<(), AppError> {
+        sqlx::query(
+            "UPDATE account_credential_states SET first_failure=COALESCE(NULLIF(first_failure,''),$1),recovery_status=$2
+             WHERE account_id=$3 AND operation_id=$4 AND generation=$5 AND phase<>'ready'",
+        )
+        .bind(failure).bind(status).bind(id).bind(operation).bind(generation)
+        .execute(&self.pool).await?;
+        Ok(())
+    }
+
+    /// 记录授权启动与链接确认。@param id 原账号。@param operation 预占 ID。@param generation 原代次。@param before 原标记。@param after 新标记。@return 条件写入结果。
+    pub async fn agy_authorization_phase(
+        &self,
+        id: i64,
+        operation: &str,
+        generation: i64,
+        before: &str,
+        after: &str,
+    ) -> Result<(), AppError> {
+        let changed = sqlx::query(
+            "UPDATE account_credential_states SET recovery_status=$1,updated_at_ms=$2
+             WHERE account_id=$3 AND operation_id=$4 AND generation=$5 AND phase='reauth' AND recovery_status=$6",
+        )
+        .bind(after).bind(Utc::now().timestamp_millis()).bind(id).bind(operation).bind(generation).bind(before)
+        .execute(&self.pool).await?.rows_affected();
+        if changed != 1 {
+            return Err(AppError::BadRequest("AGY 原授权预占已变化".into()));
+        }
+        Ok(())
+    }
+
     /// 读取仍可能产生账号变更的原凭据操作。@return 待核对的非空操作标识。
     pub async fn pending_agy_credential_operations(&self) -> Result<Vec<String>, AppError> {
         let operations = sqlx::query_scalar(
@@ -400,11 +535,13 @@ impl AccountStore {
     }
     /// 读取当前 AGY 操作。@param id 账号。@return 阶段及代次。
     pub async fn agy_credential_state(&self, id: i64) -> Result<AgyCredentialState, AppError> {
-        let row = sqlx::query("SELECT generation,phase,COALESCE(operation_id,'') AS operation_id FROM account_credential_states WHERE account_id=$1")
+        let row = sqlx::query("SELECT generation,phase,COALESCE(operation_id,'') AS operation_id,first_failure,recovery_status FROM account_credential_states WHERE account_id=$1")
             .bind(id).fetch_optional(&self.pool).await?.ok_or_else(|| AppError::ServiceUnavailable("AGY 凭据归属记录缺失".into()))?;
         Ok(AgyCredentialState {
             generation: row.try_get("generation")?,
             phase: row.try_get("phase")?,
+            first_failure: row.try_get("first_failure")?,
+            recovery_status: row.try_get("recovery_status")?,
             operation_id: {
                 let value: String = row.try_get("operation_id")?;
                 if value.is_empty() { None } else { Some(value) }
@@ -419,14 +556,35 @@ impl AccountStore {
         operation: &str,
         phase: &str,
     ) -> Result<i64, AppError> {
+        self.begin_agy_credentials_with_status(expected, operation, phase, "")
+            .await
+    }
+
+    /// 原子登记起链预占和启动标记。@param expected 原权威账号。@param operation 预占 ID。@return 冻结的代次。
+    pub async fn reserve_agy_authorization(
+        &self,
+        expected: &Account,
+        operation: &str,
+    ) -> Result<i64, AppError> {
+        self.begin_agy_credentials_with_status(expected, operation, "reauth", "starting")
+            .await
+    }
+
+    async fn begin_agy_credentials_with_status(
+        &self,
+        expected: &Account,
+        operation: &str,
+        phase: &str,
+        status: &str,
+    ) -> Result<i64, AppError> {
         if !expected.is_antigravity() || !["refresh_pending", "reauth"].contains(&phase) {
             return Err(AppError::BadRequest("AGY 凭据操作无效".into()));
         }
         let mut transaction = self.pool.begin().await?;
-        let changed = sqlx::query("UPDATE account_credential_states SET phase=$1,operation_id=$2,updated_at_ms=$3
+        let changed = sqlx::query("UPDATE account_credential_states SET phase=$1,operation_id=$2,updated_at_ms=$3,first_failure='',recovery_status=$8
             WHERE account_id=$4 AND phase='ready' AND EXISTS(SELECT 1 FROM accounts WHERE id=$4 AND platform='antigravity' AND access_token=$5 AND refresh_token=$6 AND email=$7)")
             .bind(phase).bind(operation).bind(Utc::now().timestamp_millis()).bind(expected.id)
-            .bind(&expected.access_token).bind(&expected.refresh_token).bind(&expected.email)
+            .bind(&expected.access_token).bind(&expected.refresh_token).bind(&expected.email).bind(status)
             .execute(&mut *transaction).await?.rows_affected();
         if changed != 1 {
             return Err(AppError::ServiceUnavailable(
@@ -579,7 +737,7 @@ impl AccountStore {
                 "AGY 凭据代次已变化，请读取当前状态".into(),
             ));
         }
-        let changed = sqlx::query("UPDATE account_credential_states SET phase='ready',generation=generation+1,updated_at_ms=$1 WHERE account_id=$2 AND generation=$3 AND operation_id=$4")
+        let changed = sqlx::query("UPDATE account_credential_states SET phase='ready',generation=generation+1,updated_at_ms=$1,recovery_status='' WHERE account_id=$2 AND generation=$3 AND operation_id=$4")
             .bind(Utc::now().timestamp_millis()).bind(expected.id).bind(generation).bind(operation)
             .execute(&mut *transaction).await?.rows_affected();
         if changed != 1 {
@@ -596,7 +754,7 @@ impl AccountStore {
         operation: &str,
         generation: i64,
     ) -> Result<(), AppError> {
-        let changed = sqlx::query("UPDATE account_credential_states SET phase='ready',operation_id=NULL,updated_at_ms=$1 WHERE account_id=$2 AND operation_id=$3 AND generation=$4 AND phase IN ('refresh_pending','reauth','reconcile')")
+        let changed = sqlx::query("UPDATE account_credential_states SET phase='ready',operation_id=NULL,updated_at_ms=$1,recovery_status='' WHERE account_id=$2 AND operation_id=$3 AND generation=$4 AND phase IN ('refresh_pending','reauth','reconcile')")
             .bind(Utc::now().timestamp_millis()).bind(id).bind(operation).bind(generation).execute(&self.pool).await?.rows_affected();
         if changed != 1 {
             return Err(AppError::BadRequest("AGY 原操作已被后续代次替代".into()));
@@ -606,7 +764,7 @@ impl AccountStore {
 
     /// 撤销尚未提交授权码的原操作。@param id 账号。@param operation 会话。@return 原操作是否已恢复。
     pub async fn cancel_agy_reauth(&self, id: i64, operation: &str) -> Result<(), AppError> {
-        sqlx::query("UPDATE account_credential_states SET phase='ready',operation_id=NULL,updated_at_ms=$1 WHERE account_id=$2 AND operation_id=$3 AND phase='reauth'")
+        sqlx::query("UPDATE account_credential_states SET phase='ready',operation_id=NULL,updated_at_ms=$1,recovery_status='' WHERE account_id=$2 AND operation_id=$3 AND phase='reauth'")
             .bind(Utc::now().timestamp_millis()).bind(id).bind(operation).execute(&self.pool).await?;
         Ok(())
     }

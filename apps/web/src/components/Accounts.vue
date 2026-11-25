@@ -1374,8 +1374,23 @@ async function cancelAgyReauth(account:Account): Promise<void> {
 
 /** 展示账号凭据的业务状态。@param account 当前账号。@return 中文状态。 */
 function agyPhaseLabel(account:Account): string {
+  const recovery = account.credential_state?.recovery_status;
+  if (recovery === 'retrying') return '正在恢复凭据';
+  if (recovery === 'needs_check') return '凭据需核对';
+  if (recovery === 'reauthorization_required') return '需要重新授权';
   const labels:Record<string,string>={ready:'凭据就绪',refresh_pending:'刷新待确认',reauth:'重新授权中',reconcile:'凭据待核对'};
   return labels[account.credential_state?.phase ?? ''] ?? '状态待更新';
+}
+
+/** 将已保存的首个失败阶段转换为脱敏文案。@param account 当前账号。@return 已知阶段文案。 */
+function agyFirstFailure(account: Account): string | undefined {
+  const stages: Record<string, string> = {
+    start_refresh: '启动凭据刷新', refresh: '原生凭据刷新', stop_refresh: '结束原刷新进程',
+    credential_file: '读取落盘凭据', credential_expiry: '核对凭据有效期', identity_check: '核对账号身份',
+    receipt: '保存恢复回执', receipt_validation: '核对凭据回执',
+    receive_receipt: '接收原生回执', gateway_commit: '提交网关凭据',
+  };
+  return stages[account.credential_state?.first_failure ?? ''];
 }
 
 /** 对账当前账号的原凭据操作。@param id 冻结账号。@return 无。 */
@@ -1547,6 +1562,7 @@ async function copyText(text: string) {
             <template v-if="(a.queued_requests ?? 0)>0" #end><button type="button" class="account-queue-alert" @click="openAccountCapacity(a)">排队 {{ a.queued_requests }}</button></template>
           </NoticeStrip>
           <NoticeStrip v-if="a.auth_error" tone="danger" role="alert" class="account-strip-text">{{ a.auth_error }}</NoticeStrip>
+          <p v-if="a.platform === 'antigravity' && a.credential_state && a.credential_state.phase !== 'ready'" class="account-note" role="status">{{ agyPhaseLabel(a) }}<template v-if="agyFirstFailure(a)"> · 首次失败阶段 {{ agyFirstFailure(a) }}</template></p>
           <NoticeStrip v-if="a.v3_scheduling_error" tone="warning" class="account-strip-text">{{ a.v3_scheduling_error }}，调度观测待更新。</NoticeStrip>
           <p v-if="a.credential_ownership" class="account-note" role="status">{{ a.credential_ownership.phase === 'ready' ? (a.credential_ownership.owner === 'local' ? '本地管理凭据 · 网关已暂停' : '网关管理凭据') : (a.credential_ownership.phase === 'reauth' ? '重新授权中 · 上游活动暂停' : '凭据交接待确认 · 请在账号环境页对账') }}</p>
           <EntityBlock v-if="!a.platform || a.platform === 'claude_code' || a.platform === 'antigravity'" class="account-routing">
@@ -1621,6 +1637,7 @@ async function copyText(text: string) {
           <AgyAccountUsage :account="detailAccount" expanded />
           <EntityBlock class="account-capabilities">
             <header><h3>平台能力</h3><Badge :variant="detailAccount.credential_state?.phase !== 'ready' ? 'warning' : 'success'" :class="{'is-warning':detailAccount.credential_state?.phase !== 'ready'}">{{ agyPhaseLabel(detailAccount) }}</Badge></header>
+            <p v-if="agyFirstFailure(detailAccount)" class="account-note">首次失败阶段 {{ agyFirstFailure(detailAccount) }}</p>
             <dl><div><dt>模型目录</dt><dd>{{ overviewCapabilities?.models ? `${overviewCapabilities.models.length} 个模型` : '未观测' }}</dd></div><div><dt>能力快照</dt><dd>{{ !overviewCapabilities ? '未观测' : Date.now() - overviewCapabilities.observed_at_ms > 300000 ? '待刷新' : '已更新' }}</dd></div><div class="capability-observed"><dt>观测时间</dt><dd>{{ overviewCapabilities?.observed_at_ms ? new Date(overviewCapabilities.observed_at_ms).toLocaleString('zh-CN') : '未提供' }}</dd></div></dl>
             <details class="account-capability-details"><summary>可用模型<ChevronRight :size="14" /></summary><div class="account-model-list"><code v-for="model in overviewCapabilities?.models" :key="model">{{ model }}</code><p v-if="!overviewCapabilities?.models?.length">{{ overviewCapabilities?.models ? '目录为空' : '模型目录未观测' }}</p></div></details>
             <details class="account-capability-details">

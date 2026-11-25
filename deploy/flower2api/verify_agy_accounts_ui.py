@@ -227,12 +227,21 @@ async def main():
         await page.reload()
         await expect(second).to_be_visible()
         await expect(second.locator('.account-plan')).to_have_count(0)
+        # 同一账号先尝试自动恢复，之后独立区分人工核对和明确要求重授权。
+        for recovery, label in [('retrying', '正在恢复凭据'), ('needs_check', '凭据需核对'),
+                ('reauthorization_required', '需要重新授权')]:
+            fixture.accounts[1]['credential_state'] = {'phase': 'reconcile', 'generation': 2,
+                'recovery_status': recovery, 'first_failure': 'identity_check'}
+            await page.reload()
+            await expect(second.get_by_role('status').filter(has_text=label)).to_contain_text('首次失败阶段 核对账号身份')
+            await expect(first.get_by_text('首次失败阶段', exact=False)).to_have_count(0)
         await page.set_viewport_size({'width':390,'height':844})
         await first.get_by_role('button',name='编辑',exact=True).click()
         assert await dialog.evaluate('e=>e.scrollWidth<=e.clientWidth+1')
         await expect(switch).to_be_checked()
         await expect(reminder).to_be_checked()
         output = ROOT/'.trellis/.runtime/agy-account-ui-390.png'
+        output.parent.mkdir(parents=True, exist_ok=True)
         await page.screenshot(path=str(output))
         assert not errors,errors
         print(json.dumps({'passed':True,'platform_filter':True,'independent_switches':True,'draft_survives_poll':True,'late_native_session_cancelled':True,

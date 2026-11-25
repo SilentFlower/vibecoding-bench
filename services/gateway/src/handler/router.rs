@@ -2138,88 +2138,138 @@ async fn resolve_oauth_proxy(
     Ok(req)
 }
 
+/// HTTP 请求取消时按原操作补偿，覆盖预占后等待目录锁和原生启动的窗口。
+struct AgyAuthorizationReservation {
+    accounts: Arc<AccountService>,
+    id: i64,
+    operation: String,
+    generation: i64,
+    armed: bool,
+    start_attempted: bool,
+}
+
+impl Drop for AgyAuthorizationReservation {
+    fn drop(&mut self) {
+        if self.armed {
+            let accounts = Arc::clone(&self.accounts);
+            let id = self.id;
+            let operation = std::mem::take(&mut self.operation);
+            let generation = self.generation;
+            let start_attempted = self.start_attempted;
+            tokio::spawn(async move {
+                let _ = accounts
+                    .abort_agy_reauth(id, &operation, generation, start_attempted)
+                    .await;
+            });
+        }
+    }
+}
+
+async fn resolve_agy_auth_proxy(
+    state: &AppState,
+    req: GenerateAuthUrlRequest,
+) -> Result<GenerateAuthUrlRequest, AppError> {
+    let mut req = resolve_oauth_proxy(state, req).await?;
+    if req.platform.as_deref() != Some("antigravity") {
+        return Ok(req);
+    }
+    if let Some(proxy) = req.proxy_url.as_mut().filter(|value| !value.is_empty()) {
+        *proxy = ProxyConnection::parse(proxy)?.private_url;
+    }
+    if let Some(id) = req.account_id {
+        let account = state.account_svc.get_account(id).await?;
+        if !account.is_antigravity() {
+            return Err(AppError::BadRequest("该账号属于其他平台".into()));
+        }
+        if !req.replace_proxy {
+            if req
+                .proxy_url
+                .as_ref()
+                .is_some_and(|proxy| proxy != &account.proxy_url)
+            {
+                return Err(AppError::BadRequest(
+                    "账号代理已变化，请重新读取后授权".into(),
+                ));
+            }
+            req.proxy_url = Some(account.proxy_url);
+        }
+    }
+    Ok(req)
+}
+
 async fn oauth_generate_auth_url(
     State(state): State<AppState>,
     Json(req): Json<crate::service::oauth_flow::GenerateAuthUrlRequest>,
 ) -> Result<Json<crate::service::oauth_flow::GenerateAuthUrlResponse>, AppError> {
-    let _guard = state.proxy_svc.mutations.lock().await;
+    let agy = req.platform.as_deref() == Some("antigravity");
     let explicit_line = (req.proxy_id.is_some() && req.proxy_revision.is_some())
         || req.proxy_url.as_deref() == Some("");
-    if req.replace_proxy
-        && (req.platform.as_deref() != Some("antigravity")
-            || req.account_id.is_none()
-            || !explicit_line)
-    {
+    if req.replace_proxy && (!agy || req.account_id.is_none() || !explicit_line) {
         return Err(AppError::BadRequest(
             "请为原 AGY 账号明确选择授权线路".into(),
         ));
     }
-    let mut req = resolve_oauth_proxy(&state, req).await?;
-    if req.platform.as_deref() == Some("antigravity") {
-        if let Some(proxy) = req.proxy_url.as_mut().filter(|value| !value.is_empty()) {
-            *proxy = ProxyConnection::parse(proxy)?.private_url;
-        }
+    if !agy && req.account_id.is_some() {
+        return Err(AppError::BadRequest("此目标参数仅适用于 AGY 授权".into()));
     }
-    let generation = if req.platform.as_deref() == Some("antigravity") {
-        if let Some(id) = req.account_id {
-            let account = state.account_svc.get_account(id).await?;
-            if !account.is_antigravity() {
-                return Err(AppError::BadRequest("该账号属于其他平台".into()));
-            }
-            if !req.replace_proxy {
-                if req
-                    .proxy_url
-                    .as_ref()
-                    .is_some_and(|proxy| proxy != &account.proxy_url)
-                {
-                    return Err(AppError::BadRequest(
-                        "账号代理已变化，请重新读取后授权".into(),
-                    ));
-                }
-                req.proxy_url = Some(account.proxy_url);
-            }
-            let status = state.account_svc.agy_state(id).await?;
-            if status["phase"] == "reconcile" {
-                state.account_svc.retire_agy_operation(id).await?;
-            } else if status["phase"] != "ready" {
-                return Err(AppError::BadRequest("请先结束或核对原凭据操作".into()));
-            }
-            status["generation"].as_i64()
-        } else {
-            None
-        }
+    let mut reservation = if let Some(id) = req.account_id {
+        // 等待原刷新期间开放目录操作。开始原生授权前在目录锁内重读线路及修订。
+        resolve_agy_auth_proxy(&state, req.clone()).await?;
+        let operation = Uuid::new_v4().simple().to_string();
+        let generation = state.account_svc.begin_agy_reauth(id, &operation).await?;
+        Some(AgyAuthorizationReservation {
+            accounts: Arc::clone(&state.account_svc),
+            id,
+            operation,
+            generation,
+            armed: true,
+            start_attempted: false,
+        })
     } else {
-        if req.account_id.is_some() {
-            return Err(AppError::BadRequest("此目标参数仅适用于 AGY 授权".into()));
-        }
         None
     };
-    let result = state
-        .oauth_flow_svc
-        .generate_platform_auth_url(&req, generation)
-        .await?;
-    if let Some(id) = req.account_id {
-        match state
-            .account_svc
-            .begin_agy_reauth(id, &result.session_id)
-            .await
-        {
-            Ok(actual) if Some(actual) == generation => {}
-            other => {
-                let phase = state
-                    .oauth_flow_svc
-                    .cancel_session(&result.session_id)
-                    .await?;
-                state
-                    .account_svc
-                    .cancel_agy_operation(&result.session_id, &phase)
-                    .await?;
-                other?;
-                return Err(AppError::BadRequest("AGY 原账号代次已变化，请重试".into()));
-            }
+    let _guard = state.proxy_svc.mutations.lock().await;
+    let result = async {
+        let _update = system_update::admission()?;
+        let req = resolve_agy_auth_proxy(&state, req).await?;
+        if let Some(value) = &mut reservation {
+            value.start_attempted = true;
         }
+        let response = state
+            .oauth_flow_svc
+            .generate_platform_auth_url(
+                &req,
+                reservation
+                    .as_ref()
+                    .map(|value| (value.operation.as_str(), value.generation)),
+            )
+            .await?;
+        if let Some(value) = &reservation {
+            state
+                .account_svc
+                .confirm_agy_authorization(value.id, &value.operation, value.generation)
+                .await?;
+        }
+        Ok::<_, AppError>(response)
     }
-    Ok(Json(result))
+    .await;
+    if let Some(value) = &mut reservation {
+        if result.is_err() {
+            let compensated = state
+                .account_svc
+                .abort_agy_reauth(
+                    value.id,
+                    &value.operation,
+                    value.generation,
+                    value.start_attempted,
+                )
+                .await;
+            value.armed = false;
+            compensated?;
+        }
+        value.armed = false;
+    }
+    Ok(Json(result?))
 }
 
 async fn oauth_generate_setup_token_url(

@@ -33,6 +33,8 @@ mod task_proxy;
 
 const SESSION_TIMEOUT: Duration = Duration::from_secs(5);
 const STATUS_TIMEOUT: Duration = Duration::from_secs(10);
+/// 单次 AGY 原生管理调用的现有预算，重授权等待原操作沿用同一预算。
+pub(crate) const AGY_MANAGEMENT_TIMEOUT: Duration = Duration::from_secs(90);
 
 /// 编排器确认的环境登记和后台绑定结果。
 #[derive(Deserialize)]
@@ -451,6 +453,7 @@ pub async fn agy_request(action: &str, input: &Value) -> Result<Value, AppError>
         "verify",
         "refresh",
         "recover",
+        "recover-status",
         "prepare",
         "retire",
         "proxy-references",
@@ -467,7 +470,7 @@ pub async fn agy_request(action: &str, input: &Value) -> Result<Value, AppError>
         .timeout(if action == "proxy-references" {
             STATUS_TIMEOUT
         } else {
-            Duration::from_secs(90)
+            AGY_MANAGEMENT_TIMEOUT
         })
         .send()
         .await

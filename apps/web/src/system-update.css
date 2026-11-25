@@ -65,6 +65,13 @@
 
   /* ---------- 步骤列表 ---------- */
   .su-progress { gap: calc(var(--ui-space-unit) * 2.5); }
+  .su-download-progress {
+    display: grid;
+    gap: calc(var(--ui-space-unit) * 1.5);
+    min-width: 0;
+  }
+  .su-download-progress progress { width: 100%; accent-color: var(--ui-color-primary); }
+  .su-download-progress .su-meta { margin: 0; overflow-wrap: anywhere; }
   .su-log { display: flex; flex-direction: column; gap: 5px; margin: 0; padding: 0; list-style: none; }
   .su-log li { position: relative; display: grid; grid-template-columns: 64px 10px 120px minmax(0, 1fr); align-items: center; gap: calc(var(--ui-space-unit) * 2.5); height: 34px; padding: 0 calc(var(--ui-space-unit) * 3); border-radius: calc(var(--ui-radius-control) + 1px); background: var(--ui-color-surface); font-size: var(--ui-font-size-meta); }
   .su-log time { color: var(--ui-color-text-4); font: 500 var(--ui-font-size-sm) var(--ui-font-family-mono); }

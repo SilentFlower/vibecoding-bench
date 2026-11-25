@@ -80,7 +80,7 @@ export interface Account {
   agy_system_prompt_as_user_reminder?: boolean
   agy_gif_frames_enabled?: boolean
   agy_disable_safety_filtering?: boolean
-  credential_state?: {generation:number; phase:string; operation_id?:string | null}
+  credential_state?: { generation: number; phase: string; operation_id?: string | null; first_failure?: string; recovery_status?: string }
   name: string
   email: string
   status: string
@@ -397,6 +397,13 @@ export interface SystemUpdateOperation {
   cleanup?: { status: string; removed: string[]; retained?: string[] } | null
   /** 按实际顺序记录的阶段与进入时间；旧操作没有记录时为空。 */
   steps?: Array<{ phase: string; at: string }> | null
+  download_progress?: {
+    source: 'registry' | 'bundle'
+    component: 'control' | 'account' | 'bundle'
+    state: 'downloading' | 'cached' | 'loading' | 'verifying'
+    downloaded_bytes: number | null
+    total_bytes: number | null
+  } | null
 }
 
 /** 当前控制镜像提供的独立平台版本。 */

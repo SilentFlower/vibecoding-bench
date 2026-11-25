@@ -1919,6 +1919,7 @@ transport.submit(prepared, body, ttfb_timeout).await
 - POST /admin/oauth/:session_id/cancel?platform=antigravity；GET /admin/accounts/:id/agy-credentials；POST /admin/accounts/:id/agy-credentials/recover。
 - 内部POST /internal/v3/agy-auth/{action}：start/exchange/cancel/verify/refresh/prepare/recover/retire/proxy-references。start 在重授权换线时携带 replace_proxy=true。refresh、prepare 输入 operation_id/account_id/generation/document/proxy_url，recover、retire 输入前三项。proxy-references 接收原操作 ID 列表 operations，回传 `{references: [[operation_id, proxy_url]]}` 供网关内部引用。
 - gateway.account-platforms.5追加accounts.platform、INTEGER开关、UNIQUE(platform,email)及account_credential_states(account_id,generation,phase,operation_id,updated_at_ms)。阶段为ready/refresh_pending/reauth/reconcile；元数据表不存令牌。
+- 网关迁移 `gateway.agy-recovery.14` 为 `account_credential_states` 增加 `first_failure` 与 `recovery_status`。私有接口 `POST /internal/v3/agy-auth/recover-status` 按账号、操作 ID 和代次返回恢复结果。
 
 ### 3. Contracts
 
@@ -1934,6 +1935,8 @@ transport.submit(prepared, body, ttfb_timeout).await
 - AGY固定1.5.9、私有HOME、OOB与PKCE白名单；制品身份沿[AGY凭据研究合同](../../platform/deploy/agy-credential-contract.md)。内部操作沿Bearer及UPDATE_GATE认证准入，公开错误脱敏，完整材料不进入日志或浏览器持久缓存。
 - 可选构建输入V3_AGY_AUTH_ASSET通过固定大小及完整SHA校验后冻结，省略时声明未就绪。经auth_asset_identity校验的可用制品身份进入account.content_sha256；旧清单缺省及显式未提供等价，制品双向启停均触发account_rebuild_required。control的vibebench.account-platforms=1与宿主旧版兼容门禁共同阻止旧程序误读新平台记录。
 - UI在既有账号页显式选择平台，保持草稿及焦点；平台/账号切换、关闭和旧回执按generation隔离。平台筛选保留读屏标签，桌面与状态组同高，390px平台/搜索首行、状态组次行。能力目录、套餐及额度按真实来源展示，未知、过期和零分别表达。
+- 启动与周期巡检用原操作已落盘的访问凭据核验账号身份。身份核对成功后按原代次提交一次。首次故障用受控阶段记录。
+- 绑定账号的授权链接在登记操作 ID 与代次后建立。刷新先发时，等待原操作收尾。缓存锁到期后仍以原生写者状态为准。
 
 ### 4. Validation & Error Matrix
 
@@ -1948,6 +1951,8 @@ transport.submit(prepared, body, ttfb_timeout).await
 | 正在重授权的候选连接被修改或删除 | 线路受原操作引用保护，重启后仍可核对 |
 | 旧操作、错误代次、跨账号终止证明 | 拒绝解除门禁或提交 |
 | 制品字段、版本、大小或摘要不匹配 | 签发前拒绝；缺省未提供兼容读取 |
+| 同一操作的原生写者仍在运行 | 返回 `in_flight`，授权调用继续等待 |
+| 刷新材料已过期或明确拒绝 | 分别显示需要核对或重新授权，保留原操作首个失败阶段 |
 
 ### 5. Scenarios and Examples
 
@@ -1966,6 +1971,7 @@ transport.submit(prepared, body, ttfb_timeout).await
 - 重授权选线由 verify_agy_accounts_ui.py 核对当前线路、目录选择载荷及成功回读。verify_agy_accounts_api.py 核对过期修订、重启引用保护、原账号提交及显式直连。
 - 前端构建与verify_accounts_design.py、verify_agy_accounts_ui.py、verify_account_filters_ui.py：旧CC载荷、两账号开关、草稿/焦点、取消与迟到结果、组合筛选及390/720/1440/1920px。
 - 原生OOB启动/取消与合成身份回执分别记证据。真实Google登录、身份及刷新由具备授权测试账号的外部验收独立记录，不能用合成通过冒充真实验收，模型提交预算为0。
+- `verify_agy_accounts_api.py --slow-refresh` 验证先发刷新跨越普通等待时间与缓存锁租期、维护关闸和等待中断连。成功链接绑定新代次，原刷新只执行一次。
 
 ## Scenario: 反重力 Messages 与 WebSearch
 

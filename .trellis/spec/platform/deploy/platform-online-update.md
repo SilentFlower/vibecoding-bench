@@ -779,6 +779,7 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 - `POST /runtime/api/system-updates/prepare` 沿原冻结更新请求。状态响应提供 `staged_updates`、`prepared_candidate`，回执含 `operation_id`、`target_release`、`manifest_sha256`、`fast_transition`。
 - `POST /runtime/api/system-updates/install` 接受可选规范 UUID `prepared_operation_id`。`POST /runtime/api/system-updates/operations/{id}/retry-account` 接受 `expected_revision` 与 `environment_id`。
 - 内部 `snapshot` 接受 `control_only=true`，返回 `scope=control`。内部 `environment` 接受 `action=rollout`，按原操作 UUID、epoch、环境身份与冻结代次执行。状态响应的 `account_rollout` 含生效目标发行、原操作 UUID 和各环境进度。
+- 准备操作可附带 `download_progress`。字段为 `source`、`component`、`state`、`downloaded_bytes`、`total_bytes`。兼容宿主允许缺少该对象。
 
 ### 3. Contracts
 
@@ -788,6 +789,7 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 - 控制和数据验收通过后，宿主提交生效发行并开放全局准入。本机账号随后使用各自的环境锁、排他租约和预留容量重建。原发送器首次恢复请求时沿现有接口同步额度身份。租约快照中同一排他租约可同时出现在 `lease` 和 `holders`。匹配维护所有者及租约代次后视为同一许可。
 - 后台进度使用 `queued/updating/updated/stopped/waiting/needs_check`。更新器重启继续本次生效发行的待处理事项。单环境重试固定原操作、当前修订和环境身份。重建尝试在环境私有目录保留原代次、下一代次、CPU 额度及完成标记。用户个人的整体启停及 API 准入依旧由账号开关控制。
 - 固定宿主交付包包含 `orchestrator/system_update_rollout.py`。现有 v2 安装沿同协议源码刷新。较旧宿主和组件组合使用其支持的安装入口。
+- 镜像传输按当前组件的压缩层累计，离线包按已读取的包字节计量。界面在总量可靠时显示当前组件的百分比。准备回执与当前操作、目标和目录清单匹配时，进度页直接显示「立即重启」。
 
 ### 4. Validation & Error Matrix
 
@@ -798,18 +800,21 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 | 原镜像、账号、角色或环境代次不匹配 | 隔离该账号并展示待核对 |
 | 账号仍有独立工作或租约 | 该账号等待空闲，其余事项继续 |
 | 已恢复接单后执行器中断 | 续接已生效发行的后台事项并保护后来业务写入 |
+| 总量未知、命中本地缓存或进入校验 | 分别显示可用字节、缓存或校验状态。安装资格由准备回执决定 |
 
 ### 5. Scenarios and Examples
 
 - 正常。下载完成后刷新页面，继续使用原准备回执。点击「立即重启」后，控制服务先恢复接单，兼容账号继续使用原环境。
 - 边界。本地候选材料失效时重新下载。账号独立活动无法立即收尾时通过账号后台进度重试。
 - 错误用法。用最近一次下载回执替换其他目标的回执。正确处理。安装请求携带该目标与清单摘要对应的准备操作 UUID。
+- 例如，两个镜像层下载到约三分之一时，进度页显示字节及 33%。下载结束后仍须完成本地校验才能重启。把解包大小当网络传输分母会使百分比失真。
 
 ### 6. Tests Required
 
 - `test_system_updater` 覆盖持久准备回执、缓存失效时原版继续服务、开放准入与账号更新顺序、单账号故障和重试。
 - `test_system_update_recovery`、`test_account_update_identity` 及网关绑定测试覆盖原排他许可、外来占用、跨账号、角色、环境和代次拒绝。
 - `verify_system_update.py --fast-transition` 覆盖旧账号请求、后台延迟、失败重试、运行环境代次、SSH 节点独立换版和中断恢复。`verify_system_update_browser.py` 覆盖下载后刷新、重启确认、恢复接单和单账号重试。
+- `FLOWER_TEST_LOCAL_DOCKER=1` 启用 `test_system_host` 的回环仓库用例。核对实际下载字节、离线包切换和缓存；浏览器验证同页重启、回执不匹配、重开以及双击幂等。
 
 ## Scenario: 候选项目库准备与控制端验收
 

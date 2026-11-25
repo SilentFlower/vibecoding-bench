@@ -172,6 +172,18 @@ class AgyAuthTests(unittest.TestCase):
             with self.assertRaises(ValueError): self.manager.recover(identity, account, generation)
         self.assertEqual(self.manager._launch.call_count, 1)
 
+    def test_recover_status_reports_the_existing_writer_without_retiring(self):
+        """原生账号文件锁仍由刷新持有时只返回原操作范围。@return 无。"""
+        scope = {'operation_id': 'd'*32, 'account_id': 1, 'generation': 3}
+        with self.manager._locked('account-1'):
+            self.assertEqual({**scope, 'recovery_status': 'in_flight'},
+                self.manager.handle('recover-status', scope))
+            with self.assertRaises(ValueError):
+                self.manager.handle('recover', scope)
+            self.assertFalse(self.manager._folder(scope['operation_id']).exists())
+        result = self.manager.handle('recover-status', scope)
+        self.assertEqual('not_started', result['phase'])
+
     def test_refresh_wait_timeout_completes_with_saved_token(self):
         """等待超时后核验已落盘的新 AT，省略 RT 时保留原值。@return 无。"""
         identity = 'b'*32
@@ -247,6 +259,68 @@ class AgyAuthTests(unittest.TestCase):
         self.assertFalse((folder / 'result.json').exists())
         self.manager.verify.side_effect = None
         self.assertEqual(self.manager.recover(identity, 1, 1)['document'], updated)
+        self.manager._launch.assert_called_once()
+
+    def test_refresh_recovers_after_manager_restart_with_first_failure_and_identity_only(self):
+        """两次核验失败后沿原落盘材料恢复，重启保留首因且仅消费一次 RT。@return 无。"""
+        identity = 'c'*32
+        updated = document('synthetic-rt2')
+        updated['token']['access_token'] = 'synthetic-at2'
+
+        def launch(folder, state, **kwargs):
+            self.token_file(folder, updated)
+            return SimpleNamespace(wait=lambda timeout: {'StatusCode': 0})
+
+        self.manager._launch = Mock(side_effect=launch)
+        self.manager.verify.side_effect = ValueError('synthetic-identity-rpc-unavailable')
+        with self.assertRaisesRegex(ValueError, '待对账'):
+            self.manager.refresh(identity, 1, 1, document(), '')
+        restarted = AgyAuthManager(self.client, self.data, self.data, 'synthetic-image', 'bridge')
+        restarted._launch = Mock(side_effect=AssertionError('旧 RT 不应重放'))
+        restarted.verify = Mock(side_effect=[OSError('synthetic-private'), {'email_address': 'synthetic@example.test'}])
+        pending = restarted.recover(identity, 1, 1, report_status=True)
+        self.assertEqual(('retrying', 'identity_check'), (pending['recovery_status'], pending['first_failure']))
+        self.assertNotIn('synthetic-private', json.dumps(pending))
+        final = restarted.recover(identity, 1, 1, report_status=True)
+        self.assertEqual((updated, 'identity_check'), (final['document'], final['first_failure']))
+        self.assertEqual(final, restarted.recover(identity, 1, 1, report_status=True))
+        self.assertTrue(all(call.kwargs == {'identity_only': True} for call in restarted.verify.call_args_list))
+        self.manager._launch.assert_called_once()
+        restarted._launch.assert_not_called()
+
+    def test_invalid_grant_and_expired_material_remain_scoped(self):
+        """有明确 OAuth 拒绝的原操作单独分类，未知到期材料保留人工核对。@return 无。"""
+        for number, output, expected in [(1, b'{"error":"invalid_grant","secret":"synthetic"}', 'reauthorization_required'),
+                                         (2, b'temporarily unavailable', 'needs_check')]:
+            identity = str(number)*32
+
+            def launch(folder, state, **kwargs):
+                self.token_file(folder, kwargs['document'])
+                return SimpleNamespace(wait=lambda timeout: {'StatusCode': 1}, logs=lambda **_: output)
+
+            self.manager._launch = Mock(side_effect=launch)
+            with self.assertRaisesRegex(ValueError, '待对账'):
+                self.manager.refresh(identity, number, 1, document(), '')
+            result = self.manager.recover(identity, number, 1, report_status=True)
+            self.assertEqual(expected, result['recovery_status'])
+            self.assertNotIn('synthetic', json.dumps(result))
+            self.manager._launch.assert_called_once()
+        self.manager.verify.assert_not_called()
+
+    def test_reserved_authorization_does_not_restart_or_revive_retired_id(self):
+        """预占会话首开、重试与终止使用同一身份。@return 无。"""
+        identity = 'c'*32
+        self.manager._launch = Mock(return_value=SimpleNamespace(logs=lambda **_: b'synthetic'))
+        with patch('agy_auth.authorization_url', return_value='https://accounts.google.com/synthetic'):
+            first = self.manager.start('', 1, 1, identity)
+            self.assertEqual(identity, first['session_id'])
+            self.assertEqual(first, self.manager.start('', 1, 1, identity))
+            with self.assertRaises(ValueError):
+                self.manager.start('', 2, 1, identity)
+            self.assertEqual('authorizing', self.manager.recover(identity, 1, 1, report_status=True)['recovery_status'])
+            self.manager.retire(identity, 1, 1)
+            with self.assertRaises(ValueError):
+                self.manager.start('', 1, 1, identity)
         self.manager._launch.assert_called_once()
 
     def test_refresh_without_writer_shutdown_stays_in_reconcile(self):
