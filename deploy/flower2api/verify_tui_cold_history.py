@@ -25,7 +25,7 @@ from tempfile import TemporaryDirectory
 from threading import Event, Timer
 from time import monotonic, sleep, time_ns
 from urllib.parse import parse_qs, urlencode, urlsplit
-from uuid import uuid4
+from uuid import UUID, uuid4
 from zlib import compress, crc32
 
 from fixtures.native_model_send.fixture_tunnel import _relay
@@ -164,7 +164,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            history_png=False, history_images=False, history_tool_blocks=False, previous=None, failure_boundaries=False,
            current_text_blocks=False, signed_tool_history=False, split_history_tools=False, v1_runtime=None,
            parallel_tools=False, reconnect_tool_stream=False, current_images=False, auto_tool_choice=False,
-           recovery_ledger_contention=False):
+           recovery_ledger_contention=False, recovery_workspace_rejection=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -187,6 +187,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param current_images 是否用本轮原生图文替换纯文本问题。
     @param auto_tool_choice 是否核对显式自动选择和并行工具。
     @param recovery_ledger_contention 是否在提交原回执时短暂占用账号账本锁。
+    @param recovery_workspace_rejection 是否核对工作区绑定拒绝及原回执再次认领。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -594,6 +595,30 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             release_lock = Timer(2, lock.close)
             stack.callback(release_lock.cancel)
             release_lock.start()
+        if recovery_workspace_rejection:
+            original_binding = binding_file.read_bytes()
+            mismatched = {**json.loads(original_binding), "session_key": "0" * 64}
+            started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+            try:
+                binding_file.write_text(json.dumps(mismatched))
+                rejection_status, _, rejected_request = checked_messages(
+                    manage, token, follow, headers, received, "recovered_receipt_workspace", expected_status=503,
+                )
+                assert rejected_request and len(received) == 1
+                evidence = report_request_diagnostics(
+                    manage, "recovered_receipt_workspace", rejected_request, headers["x-session-id"], started_at,
+                )
+                record, = evidence["requests"]
+                assert record["status_code"] == 503 and record["error_stage"] == "tui_workspace_bind", record
+                assert record["attempt_count"] == 0 and record["attempts"] == [], record
+                reservation = record["diagnostic_context"]["tui_reservation_id"]
+                assert str(UUID(reservation)) == reservation
+                with closing(connect(temporary / "gateway.db")) as database:
+                    tools = database.execute("SELECT tools FROM tui_native_turns WHERE tools IN (?, ?)",
+                                             (registered_tools, "!" + registered_tools)).fetchall()
+                    assert tools == [(registered_tools,)], tools
+            finally:
+                binding_file.write_bytes(original_binding)
         expected_status = 422 if signed_tool_history and recover_pending else 200
         status, raw, continuation_request_id = checked_messages(
             manage, token, follow, headers, received, "recovered_receipt" if recover_pending else "receipt",
@@ -727,6 +752,13 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             if recovery_ledger_contention:
                 assert lock.closed
                 proof["recovered_pending_tool"]["ledger_lock_delay_seconds"] = 2
+            if recovery_workspace_rejection:
+                assert rejected_request != continuation_request_id
+                proof["recovered_pending_tool"]["workspace_rejection"] = {
+                    "http_status": rejection_status, "error_stage": record["error_stage"],
+                    "attempt_count": record["attempt_count"], "request_id": rejected_request,
+                    "reservation_id": reservation, "receipt_reopened": True,
+                }
         if current_images and not recover_pending and not restart_history:
             proof["image_only"] = verify_image_only_requests(
                 manage, token, account_token, headers, received,
@@ -851,7 +883,7 @@ def checked_messages(manage, token, body, headers, received, phase, *, expected_
 def report_request_diagnostics(manage, phase, request_id, session_id, started_at):
     """在网关退出前读回本请求诊断。@param manage 管理入口。@param phase 夹具阶段。
     @param request_id 响应关联头，可为空。@param session_id 合成会话。@param started_at 本次 UTC 开始时间。
-    @return 无。
+    @return 诊断事件。
     """
     query = {"correlation_id": request_id} if request_id else {"since": started_at, "page_size": 100}
     event = {"event": "messages_failure_diagnostics", "phase": phase, "request_id": request_id,
@@ -870,7 +902,7 @@ def report_request_diagnostics(manage, phase, request_id, session_id, started_at
         context = row.get("context") or {}
         return {key: context[key] for key in (
             "control_state", "control_error_code", "control_recovery", "observed_control_http_status",
-            "native_receive_ended", "native_source_terminal",
+            "native_receive_ended", "native_source_terminal", "tui_reservation_id",
             "tool_continuation_mode", "tool_continuation_path", "tool_continuation_reason",
         ) if context.get(key) is not None}
 
@@ -895,6 +927,7 @@ def report_request_diagnostics(manage, phase, request_id, session_id, started_at
             item["lookup_error"] = type(error).__name__
         event["requests"].append(item)
     print(json.dumps(event, ensure_ascii=False), file=stderr, flush=True)
+    return event
 
 
 def verify_tool_stream_reconnect(manage, temporary, token, account_token, headers, follow,
@@ -1417,7 +1450,9 @@ def main():
     parser.add_argument("--current-images", action="store_true")
     parser.add_argument("--auto-tool-choice", action="store_true")
     parser.add_argument("--signed-tool-history", action="store_true")
-    parser.add_argument("--recovery-ledger-contention", action="store_true")
+    fault = parser.add_mutually_exclusive_group()
+    fault.add_argument("--recovery-ledger-contention", action="store_true")
+    fault.add_argument("--recovery-workspace-rejection", action="store_true")
     scenario = parser.add_mutually_exclusive_group()
     scenario.add_argument("--restart-history", action="store_true")
     scenario.add_argument("--text-input", action="store_true")
@@ -1438,8 +1473,10 @@ def main():
     scenario.add_argument("--failure-boundaries", action="store_true")
     scenario.add_argument("--v1-runtime", type=Path)
     args = parser.parse_args()
-    if args.recovery_ledger_contention and (not args.recover_pending_tool or args.signed_tool_history):
-        parser.error("--recovery-ledger-contention 需要可提交的 --recover-pending-tool 原回执")
+    if (args.recovery_ledger_contention or args.recovery_workspace_rejection) and (
+        not args.recover_pending_tool or args.signed_tool_history
+    ):
+        parser.error("恢复故障注入需要可提交的 --recover-pending-tool 原回执")
     if (not Path("/.dockerenv").exists() or {name for _, name in if_nameindex()} != {"lo"}
             or Path("/run/v3/sender.json").exists() or any(Path("/native").glob("*"))):
         raise RuntimeError("请在空白的 docker --network none 账号容器中运行")
@@ -1465,7 +1502,8 @@ def main():
                        v1_runtime=args.v1_runtime, parallel_tools=args.parallel_new_tools,
                        reconnect_tool_stream=args.reconnect_tool_stream, current_images=args.current_images,
                        auto_tool_choice=args.auto_tool_choice,
-                       recovery_ledger_contention=args.recovery_ledger_contention)
+                       recovery_ledger_contention=args.recovery_ledger_contention,
+                       recovery_workspace_rejection=args.recovery_workspace_rejection)
         print(json.dumps(proof, ensure_ascii=False))
 
 

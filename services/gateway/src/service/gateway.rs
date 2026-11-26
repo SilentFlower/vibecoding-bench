@@ -2817,7 +2817,12 @@ impl GatewayService {
                     wake,
                     (returning_tool && owner.is_some()).then_some(route.binding.as_str()),
                 )
-                .await?;
+                .await
+                .inspect_err(|error| {
+                    if matches!(error, AppError::ServiceUnavailable(_)) {
+                        diagnostics::error_stage("tui_v2_readiness");
+                    }
+                })?;
                 let checking_recovery = recovery.is_some();
                 let (binding, mut turn, draining) = route
                     .begin_v2(
@@ -2829,7 +2834,12 @@ impl GatewayService {
                         returning_tool,
                         recovery.take(),
                     )
-                    .await?;
+                    .await
+                    .inspect_err(|error| {
+                        if matches!(error, AppError::ServiceUnavailable(_)) {
+                            diagnostics::error_stage("tui_v2_binding");
+                        }
+                    })?;
                 let assigned_session = turn
                     .as_ref()
                     .and_then(NativeTurn::stateless_session)
@@ -3022,21 +3032,37 @@ impl GatewayService {
                     .submit_with_account_credentials(ttfb_timeout, credentials)
                     .await
                     .inspect_err(|_| {
+                        diagnostics::error_stage("tui_send_http");
                         if let Some(trace) = &mut wire_attempt {
                             trace.transport_error();
                         }
                     })?;
-                let ledger_rejected_before_model = matches!(
+                let sender_rejected_before_model = matches!(
                     response.status(),
                     StatusCode::TOO_MANY_REQUESTS | StatusCode::SERVICE_UNAVAILABLE
-                ) && runtime_transport::tui_projection_marker(
-                    response.headers(),
-                    runtime_transport::TUI_ERROR_SOURCE,
-                    runtime_transport::TUI_SUBMISSION_LEDGER,
-                );
-                if ledger_rejected_before_model {
-                    diagnostics::error_stage(runtime_transport::TUI_SUBMISSION_LEDGER);
+                )
+                .then(|| {
+                    runtime_transport::tui_failure_stage(
+                        response.headers(),
+                        &[
+                            runtime_transport::TUI_SENDER_CONFIG,
+                            runtime_transport::TUI_SEND_CLAIM,
+                            runtime_transport::TUI_SUBMISSION_LEDGER,
+                            runtime_transport::TUI_WORKSPACE_BIND,
+                        ],
+                    )
+                })
+                .flatten();
+                if let Some(stage) = sender_rejected_before_model {
+                    diagnostics::error_stage(stage);
                 }
+                let release_sender_rejection = matches!(
+                    sender_rejected_before_model,
+                    Some(
+                        runtime_transport::TUI_SUBMISSION_LEDGER
+                            | runtime_transport::TUI_WORKSPACE_BIND
+                    )
+                );
                 let file_rejected_before_model = failed_token.is_some()
                     && response.status() == StatusCode::SERVICE_UNAVAILABLE
                     && runtime_transport::tui_projection_marker(
@@ -3044,7 +3070,7 @@ impl GatewayService {
                         runtime_transport::TUI_ERROR_SOURCE,
                         "oauth_file_before_model",
                     );
-                if (file_rejected_before_model || ledger_rejected_before_model)
+                if (file_rejected_before_model || release_sender_rejection)
                     && let Some(turn) = &turn
                     && let Err(error) = turn.release_tui_before_model().await
                 {
@@ -3070,7 +3096,7 @@ impl GatewayService {
                         capture_state,
                         started,
                         fixture,
-                        file_rejected_before_model || ledger_rejected_before_model,
+                        file_rejected_before_model || sender_rejected_before_model.is_some(),
                         false,
                     )
                     .await?;
@@ -3153,7 +3179,7 @@ impl GatewayService {
                 }
                 let codings = response_content_codings(response.headers());
                 if response.status().is_client_error()
-                    && !ledger_rejected_before_model
+                    && !release_sender_rejection
                     && let Some(turn) = turn.as_mut()
                     && let Err(error) = turn.retire_v2_rejection().await
                 {

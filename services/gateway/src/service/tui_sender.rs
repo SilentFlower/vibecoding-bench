@@ -41,8 +41,9 @@ use crate::service::runtime_transport::{
 };
 use crate::service::runtime_transport::{
     TUI_CAPTURE, TUI_CLI_SUBMISSION, TUI_ERROR_SOURCE, TUI_FINAL_CAPTURE, TUI_MODEL_ACCEPT_OMITTED,
-    TUI_MODEL_HEADER_POLICY, TUI_REPAIR_ATTEMPT, TUI_SIGNATURE_REPAIR, TUI_SUBMISSION_LEDGER,
-    TUI_SYSTEM_PROMPT_POLICY, TuiReceiptProbe,
+    TUI_MODEL_HEADER_POLICY, TUI_PREPARE_BIND, TUI_PREPARE_EXCHANGE, TUI_PREPARE_LEDGER,
+    TUI_REPAIR_ATTEMPT, TUI_SEND_CLAIM, TUI_SENDER_CONFIG, TUI_SIGNATURE_REPAIR,
+    TUI_SUBMISSION_LEDGER, TUI_SYSTEM_PROMPT_POLICY, TUI_WORKSPACE_BIND, TuiReceiptProbe,
 };
 use crate::service::session_policy_block;
 use crate::service::tui_sender_response;
@@ -284,6 +285,14 @@ impl Default for TuiSender {
 
 fn unavailable() -> AppError {
     AppError::ServiceUnavailable("V2 本机事件源未通过准备或绑定核验".into())
+}
+
+fn stage_response(error: AppError, stage: &'static str) -> Response {
+    let mut response = error.into_response();
+    response
+        .headers_mut()
+        .insert(TUI_ERROR_SOURCE, HeaderValue::from_static(stage));
+    response
 }
 
 fn invalid_identity() -> AppError {
@@ -663,12 +672,16 @@ impl TuiSender {
             })
             .transpose()?;
         let (deadline, replay_until) = identity.deadlines(binding, now_ms())?;
+        let config = match setting(config) {
+            Ok(config) => config,
+            Err(error) => return Ok(stage_response(error, TUI_SENDER_CONFIG)),
+        };
         let (mut slot, mut cancelled) = self.reserve(
             identity.clone(),
             binding,
             deadline,
             replay_until,
-            setting(config)?.max_reservations,
+            config.max_reservations,
         )?;
         let capture_requested = tui_projection_marker(request.headers(), TUI_CAPTURE, "1");
         let wire_protocol = tui_projection_marker(request.headers(), TUI_FINAL_CAPTURE, "1");
@@ -682,6 +695,7 @@ impl TuiSender {
             } else {
                 None
             };
+        let mut stage = TUI_PREPARE_LEDGER;
         let prepared = async {
             if submission_log::was_consumed(
                 &self.submission_storage,
@@ -694,6 +708,7 @@ impl TuiSender {
                 return Err(consumed());
             }
             // 先在将承载正文的同一个 socket 核对账号。遇到错绑时连预留信封也不送出。
+            stage = TUI_PREPARE_BIND;
             let VerifiedSource {
                 mut connection,
                 proof,
@@ -730,6 +745,7 @@ impl TuiSender {
             if system_prompt.is_some() && (!managed_oauth || !system_prompt_policy) {
                 return Err(unavailable());
             }
+            stage = TUI_PREPARE_EXCHANGE;
             let model_header_policy = offer_header_policy && model_header_policy && model_headers;
             let option_bytes = if model_headers {
                 let mut options = tui_model_headers(request.headers(), model_header_policy)?;
@@ -907,6 +923,11 @@ impl TuiSender {
                 },
             ))
         };
+        let result = tokio::select! {
+            biased;
+            _ = cancelled.changed() => return Err(consumed()),
+            result = timeout_at(deadline, prepared) => result.unwrap_or_else(|_| Err(limited())),
+        };
         let (
             connection,
             kind,
@@ -919,10 +940,12 @@ impl TuiSender {
             managed_oauth,
             oauth_file,
             signature_repair,
-        ) = tokio::select! {
-            biased;
-            _ = cancelled.changed() => return Err(consumed()),
-            result = timeout_at(deadline, prepared) => result.map_err(|_| limited())??,
+        ) = match result {
+            Ok(prepared) => prepared,
+            Err(error @ AppError::ServiceUnavailable(_)) => {
+                return Ok(stage_response(error, stage));
+            }
+            Err(error) => return Err(error),
         };
         let mut book = self.book.lock().unwrap();
         let record = book
@@ -1074,7 +1097,9 @@ impl TuiSender {
     ) -> Result<Response, AppError> {
         let identity = Identity::decode(headers, binding)?;
         let (deadline, _) = identity.deadlines(binding, now_ms())?;
-        setting(config)?;
+        if let Err(error) = setting(config) {
+            return Ok(stage_response(error, TUI_SENDER_CONFIG));
+        }
         let mut session_headers = headers.get_all(TUI_UPSTREAM_SESSION).iter();
         let upstream_session = session_headers
             .next()
@@ -1103,13 +1128,19 @@ impl TuiSender {
             })
             .transpose()?;
         let oauth_file = oauth_file_payload(headers)?;
-        let (slot, mut connection, workspace, signature_repair, cli_submission) = self.claim(
+        let (slot, mut connection, workspace, signature_repair, cli_submission) = match self.claim(
             binding,
             &identity,
             upstream_session.is_some(),
             account_token.is_some(),
             oauth_file.is_some(),
-        )?;
+        ) {
+            Ok(claimed) => claimed,
+            Err(error @ AppError::ServiceUnavailable(_)) => {
+                return Ok(stage_response(error, TUI_SEND_CLAIM));
+            }
+            Err(error) => return Err(error),
+        };
         // 先同步提交事实。进程退出或回包丢失后，重放的 prepare 与 send 仍无法触发第二次提交。
         let committed = timeout_at(
             deadline,
@@ -1132,6 +1163,7 @@ impl TuiSender {
                     kind => {
                         tracing::warn!(
                             account_id = binding.account_id,
+                            reservation_id = %identity.reservation_id,
                             ?kind,
                             "V2 发送前写入提交账本失败"
                         );
@@ -1139,12 +1171,7 @@ impl TuiSender {
                     }
                 };
                 // 账本失败时尚未向事件源发送 send，网关可以安全归还原工具回执。
-                let mut response = error.into_response();
-                response.headers_mut().insert(
-                    TUI_ERROR_SOURCE,
-                    HeaderValue::from_static(TUI_SUBMISSION_LEDGER),
-                );
-                return Ok(response);
+                return Ok(stage_response(error, TUI_SUBMISSION_LEDGER));
             }
         };
         if !committed {
@@ -1213,13 +1240,19 @@ impl TuiSender {
         if let Some(candidate) = workspace {
             let root = self.submission_storage.clone();
             let launch = tokio::task::spawn_blocking(move || candidate.bind(&root, &identity));
-            command["workspace"] = timeout_at(deadline, launch)
+            let resolved = timeout_at(deadline, async { launch.await.map_err(|_| unavailable())? })
                 .await
-                .map_err(|_| limited())?
-                .map_err(|_| unavailable())??;
-            if Instant::now() >= deadline {
-                return Err(limited());
-            }
+                .unwrap_or_else(|_| Err(limited()));
+            command["workspace"] = match resolved {
+                Ok(workspace) if Instant::now() < deadline => workspace,
+                Ok(_) => return Ok(stage_response(limited(), TUI_WORKSPACE_BIND)),
+                Err(error @ AppError::ServiceUnavailable(_))
+                | Err(error @ AppError::AdmissionLimited { .. }) => {
+                    // 预留已认领，但事件源还没收到 send。网关可以归还原回执。
+                    return Ok(stage_response(error, TUI_WORKSPACE_BIND));
+                }
+                Err(error) => return Err(error),
+            };
         }
         let reply = timeout(IO_TIMEOUT, async {
             write_json(&mut connection, &command).await?;
@@ -2098,7 +2131,7 @@ mod tests {
                 (Err(AppError::TuiInput { code, status, .. }), Some(expected)) => {
                     assert_eq!((code, status), (reason, expected));
                 }
-                (Err(AppError::ServiceUnavailable(_)), None) => {}
+                (Ok(response), None) => assert_stage(response, TUI_PREPARE_EXCHANGE),
                 _ => panic!("准备错误映射不符"),
             }
             assert_eq!(source.sender.active(), 0);
@@ -2148,7 +2181,7 @@ mod tests {
             socket
         });
         assert_eq!(prepared.unwrap().headers()[TUI_MANAGED_OAUTH], "1");
-        assert!(source.send(&identity).await.is_err());
+        assert_stage(source.send(&identity).await.unwrap(), TUI_SEND_CLAIM);
         let mut credential_headers = headers(&identity);
         let token = "synthetic-account-at";
         credential_headers.insert(TUI_MANAGED_OAUTH, HeaderValue::from_static(token));
@@ -2266,12 +2299,12 @@ mod tests {
                 .send(&source.binding, Some(&source.config), headers, None)
         };
         legacy.insert(TUI_MANAGED_OAUTH, HeaderValue::from_static("legacy-at"));
-        assert!(send(&legacy).await.is_err());
+        assert_stage(send(&legacy).await.unwrap(), TUI_SEND_CLAIM);
         let value = file.header().unwrap();
         assert!(value.is_sensitive());
         let mut both = legacy.clone();
         both.insert(TUI_OAUTH_FILE, value.clone());
-        assert!(send(&both).await.is_err());
+        assert_stage(send(&both).await.unwrap(), TUI_SEND_CLAIM);
         let mut private = headers(&identity);
         private.insert(TUI_OAUTH_FILE, value);
         private.insert(
@@ -2550,12 +2583,13 @@ mod tests {
             );
             send_headers.insert(TUI_UPSTREAM_SESSION, mapped.parse().unwrap());
             if !supported {
-                assert!(
+                assert_stage(
                     source
                         .sender
                         .send(&source.binding, Some(&source.config), &send_headers, None)
                         .await
-                        .is_err()
+                        .unwrap(),
+                    TUI_SEND_CLAIM,
                 );
                 send_headers.remove(TUI_UPSTREAM_SESSION);
             }
@@ -2610,7 +2644,7 @@ mod tests {
                 assert!(remaining.is_empty());
             }
         );
-        assert!(matches!(result, Err(AppError::ServiceUnavailable(_))));
+        assert_stage(result.unwrap(), TUI_PREPARE_BIND);
         assert_eq!(source.sender.active(), 0);
     }
 
@@ -2665,6 +2699,11 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert(RESERVATION_HEADER, header(identity));
         headers
+    }
+
+    fn assert_stage(response: Response, stage: &str) {
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(response.headers()[TUI_ERROR_SOURCE], stage);
     }
 
     async fn chunk(connection: &mut BufReader<UnixStream>, bytes: &[u8]) {
@@ -3256,7 +3295,7 @@ mod tests {
                     socket.read_to_end(&mut received).await.unwrap();
                     received
                 });
-            assert!(matches!(prepared, Err(AppError::ServiceUnavailable(_))));
+            assert_stage(prepared.unwrap(), TUI_PREPARE_BIND);
             assert!(received.is_empty());
             assert_eq!(source.sender.active(), 0);
         }

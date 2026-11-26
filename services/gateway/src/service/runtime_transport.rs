@@ -91,7 +91,13 @@ const TUI_ACCOUNT_MODEL: &str = "x-v3-tui-account-model";
 pub(super) const TUI_SIGNATURE_REPAIR: &str = "x-v3-tui-signature-repair";
 pub(super) const TUI_REPAIR_ATTEMPT: &str = "x-v3-tui-repair-attempt";
 pub(super) const TUI_ERROR_SOURCE: &str = "x-v3-tui-error-source";
+pub(super) const TUI_SENDER_CONFIG: &str = "tui_sender_config";
+pub(super) const TUI_PREPARE_LEDGER: &str = "tui_prepare_ledger";
+pub(super) const TUI_PREPARE_BIND: &str = "tui_prepare_bind";
+pub(super) const TUI_PREPARE_EXCHANGE: &str = "tui_prepare_exchange";
+pub(super) const TUI_SEND_CLAIM: &str = "tui_send_claim";
 pub(super) const TUI_SUBMISSION_LEDGER: &str = "tui_submission_ledger";
+pub(super) const TUI_WORKSPACE_BIND: &str = "tui_workspace_bind";
 pub(super) const TUI_JSON_PROJECTION_V1: &str = "gateway-json-v1";
 pub(super) const TUI_SSE_PROJECTION_HEADER: &str = "x-v3-tui-sse-projection";
 pub(super) const TUI_SSE_PROJECTION_V1: &str = "gateway-sse-v1";
@@ -194,6 +200,18 @@ pub(super) fn tui_delegates_json(headers: &HeaderMap) -> bool {
 pub(super) fn tui_projection_marker(headers: &HeaderMap, name: &str, expected: &str) -> bool {
     let mut values = headers.get_all(name).iter();
     values.next().is_some_and(|value| value == expected) && values.next().is_none()
+}
+
+/// 读取已绑定 sender 的单值失败阶段。@param headers 私有响应头。
+/// @param permitted 当前私有入口的固定阶段。@return 已核验的阶段。
+pub(super) fn tui_failure_stage(
+    headers: &HeaderMap,
+    permitted: &[&'static str],
+) -> Option<&'static str> {
+    permitted
+        .iter()
+        .copied()
+        .find(|stage| tui_projection_marker(headers, TUI_ERROR_SOURCE, stage))
 }
 
 /// 内部响应模式，供公开路由采用正文终态记账。
@@ -1714,6 +1732,7 @@ pub(super) async fn tui_public_response(
         && (tui_projection_marker(headers, TUI_ERROR_SOURCE, "local_provider_http")
             || tui_projection_marker(headers, TUI_ERROR_SOURCE, "managed_oauth_http")
             || tui_projection_marker(headers, TUI_ERROR_SOURCE, TUI_SUBMISSION_LEDGER)
+            || tui_projection_marker(headers, TUI_ERROR_SOURCE, TUI_WORKSPACE_BIND)
             || tui_projection_marker(headers, TUI_ERROR_SOURCE, "local_provider_backoff")))
     .then(|| tui_retry_seconds(headers))
     .flatten()
@@ -2016,6 +2035,7 @@ pub(super) async fn prepare_tui(
             .map_err(|_| AppError::Internal("V2 预留身份编码失败".into()))?,
     );
     let attempt_id = identity.reservation_id.clone();
+    super::diagnostics::tui_reservation(&attempt_id);
     let mut reservation = TuiReservation {
         client,
         binding,
@@ -2084,12 +2104,32 @@ pub(super) async fn prepare_tui(
         .send()
         .await
         .map_err(|error| {
+            super::diagnostics::error_stage("tui_prepare_http");
             if error.is_timeout() {
                 limited()
             } else {
                 AppError::ServiceUnavailable("V2 sender 准备通道不可用".into())
             }
         })?;
+    if matches!(
+        response.status(),
+        StatusCode::SERVICE_UNAVAILABLE | StatusCode::TOO_MANY_REQUESTS
+    ) {
+        let stage = tui_failure_stage(
+            response.headers(),
+            &[
+                TUI_SENDER_CONFIG,
+                TUI_PREPARE_LEDGER,
+                TUI_PREPARE_BIND,
+                TUI_PREPARE_EXCHANGE,
+            ],
+        );
+        if let Some(stage) = stage.or_else(|| {
+            (response.status() == StatusCode::SERVICE_UNAVAILABLE).then_some("tui_prepare")
+        }) {
+            super::diagnostics::error_stage(stage);
+        }
+    }
     if let Some(error @ AppError::TuiInput { status, .. }) = response
         .headers()
         .get(TUI_PREPARE_REASON)

@@ -444,6 +444,17 @@ pub(crate) fn error_stage(stage: &'static str) {
     let _ = CURRENT_TRACE.try_with(|trace| trace.lock().request.error_stage = Some(stage.into()));
 }
 
+/// 关联当前公开请求和账号发送器预留。@param id 网关生成的预留 ID。@return 无。
+pub(super) fn tui_reservation(id: &str) {
+    let _ = CURRENT_TRACE.try_with(|trace| {
+        let mut state = trace.lock();
+        let context = state.request.context.get_or_insert_with(Default::default);
+        context.tui_reservation_id = Some(id.to_owned());
+        drop(state);
+        trace.emit(None);
+    });
+}
+
 /// 记录 sender 已验证的本地拒绝及采集归属，保持零上游尝试。
 /// @param reason 固定原因码，未知时为空。
 /// @param capture_id 当前已提交的原生作业 UUID。

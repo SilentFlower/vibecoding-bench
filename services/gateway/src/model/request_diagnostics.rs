@@ -344,6 +344,9 @@ pub struct DiagnosticContext {
     pub conversation_id: Option<String>,
     pub trajectory_id: Option<String>,
     pub native_model_calls: Option<u64>,
+    /// V2 私有预留的关联 ID，准备失败时也可以存在。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tui_reservation_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input_rejection_reason: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
