@@ -68,6 +68,7 @@ class ColdHistory:
     max_tokens: int
     thinking: dict | None
     system_policy: str
+    effort: str | None = None
 
     @classmethod
     def from_request(cls, body, system_policy="append"):
@@ -75,11 +76,15 @@ class ColdHistory:
         @param body 已校验的请求。@param system_policy 本轮冻结的账号系统指令动作。
         @return 原生输入计划或空。
         """
-        if body.keys() - {"model", "max_tokens", "thinking", "system", "messages", "tools", "stream"}:
+        if body.keys() - {"model", "max_tokens", "thinking", "system", "messages", "tools", "stream", "output_config"}:
             return None
         if type(body.get("max_tokens")) is not int or body["max_tokens"] <= 0:
             return None
         if body.get("thinking") not in (None, {"type": "disabled"}):
+            return None
+        output = body.get("output_config", {})
+        if not isinstance(output, dict) or output and (
+                output.keys() != {"effort"} or output["effort"] not in ("low", "medium", "high", "max")):
             return None
         *history, current = body["messages"]
         if (current["role"] != "user" or any(
@@ -106,7 +111,7 @@ class ColdHistory:
             system = system or ""
         tools = {MCP_PREFIX + tool["name"]: tool for tool in declared}
         return cls(history, body["model"], content[0]["text"], system, tools, body["max_tokens"],
-                   body.get("thinking"), system_policy)
+                   body.get("thinking"), system_policy, output.get("effort"))
 
     def system_argument(self):
         """选择原生 CLI 提示词文件选项。@return 参数和文件正文，或缺省值。"""
@@ -123,7 +128,9 @@ class ColdHistory:
         return self.prompt
 
     def _scope(self):
-        return (self.model, self.system_policy, self.system, self.tools, self.max_tokens, self.thinking)
+        scope = (self.model, self.system_policy, self.system, self.tools, self.max_tokens, self.thinking)
+        # 缺省沿用既有工作区和等待回执的摘要。
+        return scope if self.effort is None else (*scope, self.effort)
 
     def receipt_boundary(self):
         """冻结必须随原工具回执复用的根轮输入。@return 不含客户原文的边界。"""

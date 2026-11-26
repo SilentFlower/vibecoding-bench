@@ -211,3 +211,11 @@ class ColdHistoryTests(TestCase):
             {"name": "LookupNote", "description": "", "inputSchema": {"type": "object"}},
         ])
         self.assertIn("error", plan.mcp({**request, "method": "tools/call"}))
+
+    def test_output_effort_matches_the_frozen_root_scope(self):
+        """只有原生交互 CLI 已支持的强度进入原生计划。@return 无。"""
+        expected = ColdHistory.from_request({**self.body, "output_config": {"effort": "low"}})
+        self.assertEqual(expected.effort, "low")
+        self.assertNotEqual(expected.receipt_boundary(), ColdHistory.from_request(self.body).receipt_boundary())
+        for output in ({"effort": "unknown"}, {"format": {"type": "json_schema", "schema": {}}}):
+            self.assertIsNone(ColdHistory.from_request({**self.body, "output_config": output}))

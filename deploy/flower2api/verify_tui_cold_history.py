@@ -71,7 +71,7 @@ def install_source():
 
 
 def verify(gateway, sender, temporary, *, restart_history=False, text_input=False, system_policy=False,
-           toggle_pending_policy=False, tool_policy=None, recover_pending=False):
+           toggle_pending_policy=False, tool_policy=None, recover_pending=False, output_effort=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -79,6 +79,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param toggle_pending_policy 是否在客户端工具等待时更改账号动作。
     @param tool_policy 工具往返前显式设置的 V2 动作。
     @param recover_pending 是否结束等待进程并在发送器重启后恢复真实工具回执。
+    @param output_effort 是否核对 CLI 实际生成的推理强度和 Token 上限。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -227,6 +228,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         messages = [{"role": role, "content": text} for role, text in HISTORY]
         if text_input:
             return verify_text_inputs(manage, token, account_token, headers, messages, received)
+        if output_effort:
+            return verify_output_effort(manage, token, account_token, headers, received)
         if system_policy:
             account_path = f"accounts/{identifier}"
             first = manage("GET", account_path)
@@ -253,12 +256,16 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         # 历史中的旧工具结果和当前问题之间保留完成边界，CLI 启动后只提交当前问题。
         body = {"model": MODEL, "max_tokens": 128, "stream": True, "messages": messages,
                 "tools": [TOOL], "system": [{"type": "text", "text": part} for part in SYSTEM]}
+        if recover_pending:
+            body["output_config"] = {"effort": "medium"}
         status, raw = call(18090, "POST", "/v1/messages", token, body, headers)
         assert status == 200, (status, raw)
         events = [json.loads(line[5:]) for line in raw.splitlines() if line.startswith(b"data:")]
         assert events[-1]["type"] == "message_stop", events
         (tool,) = [e["content_block"] for e in events if e["type"] == "content_block_start"]
-        assert tool["id"] == NEW_ID and tool["name"] == TOOL["name"], tool
+        assert tool.get("id") == NEW_ID and tool.get("name") == TOOL["name"], (
+            tool, [[t["name"] for t in document.get("tools", [])] for _, document, _ in received],
+        )
         tool["input"] = json.loads("".join(e["delta"]["partial_json"] for e in events
                                           if e["type"] == "content_block_delta"))
         assert tool["input"] == ARGS
@@ -298,6 +305,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             modified_system = {**follow, "system": "更改已经冻结的指令"}
             changed_policy, response = call(18090, "POST", "/v1/messages", token, modified_system, headers)
             assert changed_policy == 422 and len(received) == 1, (changed_policy, response, len(received))
+            modified_effort = {**follow, "output_config": {"effort": "low"}}
+            changed_effort, response = call(18090, "POST", "/v1/messages", token, modified_effort, headers)
+            assert changed_effort == 422 and len(received) == 1, (changed_effort, response, len(received))
         status, raw = call(18090, "POST", "/v1/messages", token, follow, headers)
         if status != 200:
             trace = [{key: row.get(key) for key in ("status_code", "outcome", "error_stage", "attempt_count")}
@@ -330,11 +340,13 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         if recover_pending:
             assert original_file.read_bytes() == original_history
             _, native_recovery, _ = received[-1]
+            assert all(document["output_config"]["effort"] == "medium" for _, document, _ in received)
             restored_id = json.loads(native_recovery["metadata"]["user_id"])["session_id"]
             assert restored_id != original_id and (original_file.parent / (restored_id + ".jsonl")).is_file()
             restored_text = [(row["role"], block.get("text")) for row in native_recovery["messages"] for block in blocks(row)]
             assert restored_text.count(("user", "Continue from where you left off.")) == 1
             proof["recovered_pending_tool"] = {"changed_system_http": changed_policy, "frozen_policy": "append",
+                                              "changed_effort_http": changed_effort, "frozen_effort": "medium",
                                               "old_session_id": original_id, "recovered_session_id": restored_id,
                                               "original_history_preserved": True}
         if restart_history:
@@ -453,6 +465,34 @@ def blocks(row):
     return row["content"] if isinstance(row["content"], list) else [{"type": "text", "text": row["content"]}]
 
 
+def verify_output_effort(manage, token, account_token, headers, received):
+    """按 HTTPS 模型实收核对本轮原生输出参数。
+    @param manage 管理入口。@param token 客户端。@param account_token 合成账号授权。
+    @param headers 公开会话。@param received 模型实收。@return 各组核对结果。
+    """
+    outcomes = []
+    for index, effort in enumerate(("low", "medium", "high", "max"), 1):
+        question = f"合成推理强度用例 {index}"
+        body = {"model": MODEL, "max_tokens": 127 + index, "stream": False,
+                "output_config": {"effort": effort}, "messages": [{"role": "user", "content": question}]}
+        if index == 1:
+            body["thinking"] = {"type": "disabled"}
+        status, raw = call(18090, "POST", "/v1/messages", token, body, headers)
+        assert status == 200 and len(received) == index, (status, raw, len(received))
+        _, native, _ = received[-1]
+        assert native["output_config"]["effort"] == effort and native["max_tokens"] == body["max_tokens"]
+        if index == 1:
+            assert native["thinking"] == body["thinking"]
+        texts = [block.get("text") for row in native["messages"] for block in blocks(row)]
+        assert texts.count(question) == 1
+        outcomes.append({"effort": effort, "max_tokens": native["max_tokens"],
+                         "body_sha256": sha256(encoded(body)).hexdigest()})
+    for outcome, attempt in zip(outcomes, verify_captures(manage, received, account_token), strict=True):
+        assert outcome["body_sha256"] == attempt["ingress_body_sha256"]
+        outcome.update(attempt)
+    return {"output_effort": outcomes, "model_posts": len(received)}
+
+
 def fixture_command_has(path, argument):
     """仅比较隔离夹具的进程标记。@param path 进程参数。@param argument 合成会话标记。@return 是否匹配。"""
     try:
@@ -548,6 +588,7 @@ def main():
     scenario.add_argument("--toggle-pending-policy", action="store_true")
     scenario.add_argument("--tool-policy", choices=("replace", "user_reminder"))
     scenario.add_argument("--recover-pending-tool", action="store_true")
+    scenario.add_argument("--output-effort", action="store_true")
     args = parser.parse_args()
     if (not Path("/.dockerenv").exists() or {name for _, name in if_nameindex()} != {"lo"}
             or Path("/run/v3/sender.json").exists() or any(Path("/native").glob("*"))):
@@ -557,7 +598,8 @@ def main():
         proof = verify(args.gateway, args.sender, Path(directory),
                        restart_history=args.restart_history, text_input=args.text_input,
                        system_policy=args.system_policy, toggle_pending_policy=args.toggle_pending_policy,
-                       tool_policy=args.tool_policy, recover_pending=args.recover_pending_tool)
+                       tool_policy=args.tool_policy, recover_pending=args.recover_pending_tool,
+                       output_effort=args.output_effort)
         print(json.dumps(proof, ensure_ascii=False))
 
 

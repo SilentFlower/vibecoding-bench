@@ -265,6 +265,8 @@ class _Callback(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(payload)))
             self.end_headers()
             self.wfile.write(payload)
+            if mcp and data.get("method") == "tools/list":
+                actor.mcp_ready.set()
         except _StaleReceipt:
             with suppress(OSError):
                 self.send_error(409)
@@ -313,6 +315,7 @@ class _Actor:
         self.guard_text = "Flower2API 会话 " + uuid4().hex
         self.changed = Condition()
         self.ready = Event()
+        self.mcp_ready = Event()
         self.dead = Event()
         self.retired = Event()
         self.failure = None
@@ -413,6 +416,7 @@ class _Actor:
                     ]
                     launch_options = {}
                     resume = None
+                    wait_for_mcp = False
                     if self.cold_history is not None:
                         plan = self.cold_history
                         # 本轮设置来自当前账号，恢复时也应按当前轮构造系统正文。
@@ -422,7 +426,10 @@ class _Actor:
                             instructions = plugin / "instructions.md"
                             atomic_text(instructions, text)
                             opts.extend([flag, str(instructions)])
+                        if plan.effort:
+                            opts.extend(["--effort", plan.effort])
                         if plan.tools:
+                            wait_for_mcp = True
                             mcp = plugin / "mcp.json"
                             atomic_text(mcp, _json({"mcpServers": {MCP_SERVER: {
                                 "type": "http", "url": endpoint + "/mcp", "headers": {
@@ -490,6 +497,7 @@ class _Actor:
                             if (
                                 seen
                                 and self.ready.is_set()
+                                and (not wait_for_mcp or self.mcp_ready.is_set())
                                 and not submitted
                                 and not self.dead.is_set()
                             ):
@@ -840,6 +848,11 @@ class _Actor:
                 if handle.kind == "new" and self.agent_offer is not None:
                     self.agent_offer.messages.clear()
                     self.agent_messages.clear()
+                if self.cold_history is not None and self.cold_history.effort is not None:
+                    output = native.get("output_config")
+                    if not isinstance(output, dict) or output.get("effort") != self.cold_history.effort:
+                        raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
+                            "code": "unsupported_parameter", "message": "CLI 当前模型未生成请求的推理强度"}}))
                 if handle.kind == "recovered" and not self.driver.checkpoints.submit(
                     self.identity, self.receipt_revision, handle.request_digest, True
                 ):
