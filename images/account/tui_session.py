@@ -728,7 +728,7 @@ class _Actor:
         self.expected = self.step.blocks if self.step.reason == "tool_use" else None
         if self.expected:
             native = self.cold_history.receipt_boundary() if self.cold_history is not None else None
-            if native is not None and (self.cold_history.thinking or {}).get("display") == "summarized":
+            if native is not None:
                 if self.step.response_model and any(b["type"] in SIGNED_THINKING_TYPES for b in self.expected):
                     self.signed_tool_models.update(dict.fromkeys(self.step.tool_ids, self.step.response_model))
                 if self.signed_tool_models:

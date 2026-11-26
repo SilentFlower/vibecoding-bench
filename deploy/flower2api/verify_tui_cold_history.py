@@ -141,14 +141,18 @@ def build_cutover_record(temporary, old, deployment, release):
     return gate
 
 
-def fixture_tool_sse(tool, *, with_signature, second=None, model=MODEL):
+def fixture_tool_sse(tool, *, with_signature, second=None, model=MODEL, thinking_text=SIGNED_THINKING["thinking"]):
     """交付隔离模型工具流。@param tool 原生工具调用。@param with_signature 是否先交付合成签名块。
-    @param second 可选的同轮第二次工具调用。@param model 模型实际回复的身份。@return SSE。"""
+    @param second 可选的同轮第二次工具调用。@param model 模型实际回复的身份，可省略。
+    @param thinking_text 合成思考摘要，可为空。@return SSE。"""
     wire = message_sse(tool, "tool_use", "msg_cold_tool")
     if not with_signature and second is None and model == MODEL:
         return wire
     events = [json.loads(line[5:]) for line in wire.splitlines() if line.startswith(b"data:")]
-    events[0]["message"]["model"] = model
+    if model is None:
+        events[0]["message"].pop("model")
+    else:
+        events[0]["message"]["model"] = model
     if second is not None:
         secondary = message_sse(second, "tool_use", "msg_fixture_unused")
         extra = [json.loads(line[5:]) for line in secondary.splitlines() if line.startswith(b"data:")]
@@ -159,12 +163,15 @@ def fixture_tool_sse(tool, *, with_signature, second=None, model=MODEL):
     for event in events:
         if "index" in event:
             event["index"] += 1
-    events[1:1] = [
-        {"type": "content_block_start", "index": 0, "content_block": {"type": "thinking", "thinking": ""}},
-        {"type": "content_block_delta", "index": 0, "delta": {"type": "thinking_delta", "thinking": SIGNED_THINKING["thinking"]}},
+    signed = [{"type": "content_block_start", "index": 0, "content_block": {"type": "thinking", "thinking": ""}}]
+    if thinking_text:
+        signed.append({"type": "content_block_delta", "index": 0,
+                       "delta": {"type": "thinking_delta", "thinking": thinking_text}})
+    signed.extend([
         {"type": "content_block_delta", "index": 0, "delta": {"type": "signature_delta", "signature": SIGNED_THINKING["signature"]}},
         {"type": "content_block_stop", "index": 0},
-    ]
+    ])
+    events[1:1] = signed
     return b"".join(map(frame, events))
 
 
@@ -210,7 +217,8 @@ def fixture_thinking_display_sse(body, *, message_id="msg_cold_thinking_display"
 def verify(gateway, sender, temporary, *, restart_history=False, text_input=False, system_policy=False,
            toggle_pending_policy=False, tool_policy=None, recover_pending=False, output_effort=False,
            history_png=False, history_images=False, history_tool_blocks=False, previous=None, failure_boundaries=False,
-           current_text_blocks=False, signed_tool_history=False, split_history_tools=False, v1_runtime=None,
+           current_text_blocks=False, signed_tool_history=False, signed_tool_response=None, split_history_tools=False,
+           v1_runtime=None,
            parallel_tools=False, reconnect_tool_stream=False, current_images=False, auto_tool_choice=False,
            adaptive_thinking_model=None, adaptive_thinking_display="updates", thinking_display_model=None,
            thinking_cli_summaries=None,
@@ -232,6 +240,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param failure_boundaries 是否分别在模型收件前后切断隔离连接。
     @param current_text_blocks 是否验证本轮文本块顺序及边界归属。
     @param signed_tool_history 是否核对隔离模型原工具轮的签名块。
+    @param signed_tool_response 可选，模拟空思考正文或缺少助手模型的隔离响应。
     @param split_history_tools 是否将已闭合的旧工具组分为相邻消息。
     @param v1_runtime 固定 V1 制品，提供时仅验证 V1 内核的公开能力。
     @param parallel_tools 是否验证同一步多个新工具的回执。
@@ -278,6 +287,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     slow_tool_arrivals = []
     model_betas = []
     summarized_thinking = adaptive_thinking_model is not None and adaptive_thinking_display == "summarized"
+    signed_thinking_text = "" if signed_tool_response == "signature-only" else SIGNED_THINKING["thinking"]
     lookups = []
     deny_proxy = False
     denied_tunnels = []
@@ -324,7 +334,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 if parallel_tools:
                     other, = [t for t in body["tools"] if t.get("description") == SECOND_TOOL["description"]]
                     second = {"type": "tool_use", "id": SECOND_ID, "name": other["name"], "input": SECOND_ARGS}
-                wire = fixture_tool_sse(content, with_signature=signed_tool_history, second=second, model=body["model"])
+                response_model = None if signed_tool_response == "missing-model" else body["model"]
+                wire = fixture_tool_sse(content, with_signature=signed_tool_history, second=second,
+                                        model=response_model, thinking_text=signed_thinking_text)
             elif reconnect_tool_stream and results and not find_blocks(body, "tool_use_id", RECONNECT_ID):
                 prefix, wire = fixture_reconnect_sse(tool["name"])
             elif thinking_display_model:
@@ -627,8 +639,10 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         if auto_tool_choice:
             body["tool_choice"] = {"type": "auto", "disable_parallel_tool_use": False}
         if adaptive_thinking_model:
-            body.update(model=adaptive_thinking_model, thinking={**ADAPTIVE_THINKING, "display": adaptive_thinking_display})
-            if not summarized_thinking:
+            body["model"] = adaptive_thinking_model
+            if adaptive_thinking_display != "default":
+                body["thinking"] = {**ADAPTIVE_THINKING, "display": adaptive_thinking_display}
+            if adaptive_thinking_display == "updates":
                 headers["anthropic-beta"] = THINKING_UPDATES_BETA
         if recover_pending:
             body["output_config"] = {"effort": "medium"}
@@ -682,10 +696,22 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             result["content"].insert(0, {"type": "tool_result", "tool_use_id": SECOND_ID,
                                          "content": SECOND_REPLY, "is_error": True})
         if signed_tool_history:
+            (start,) = [event["content_block"] for event in events if event["type"] == "content_block_start"
+                        and event["index"] == 0 and event["content_block"]["type"] == "thinking"]
             deltas = [event["delta"] for event in events if event["type"] == "content_block_delta" and event["index"] == 0]
-            assert deltas == [{"type": "thinking_delta", "thinking": SIGNED_THINKING["thinking"]},
-                              {"type": "signature_delta", "signature": SIGNED_THINKING["signature"]}]
-            offered.insert(0, SIGNED_THINKING)
+            signed_block = {**start,
+                            "thinking": start["thinking"] + "".join(d["thinking"] for d in deltas if d["type"] == "thinking_delta"),
+                            "signature": "".join(d["signature"] for d in deltas if d["type"] == "signature_delta")}
+            assert signed_block == {**SIGNED_THINKING, "thinking": signed_thinking_text}
+            offered.insert(0, signed_block)
+            if previous is None:
+                with closing(connect("file:/native/tui-reconnect/receipts.db?mode=ro", uri=True)) as database:
+                    (context,), = database.execute("SELECT n.context FROM receipts r JOIN native_receipt_inputs n"
+                                                  " ON r.actor=n.actor AND r.revision=n.revision").fetchall()
+                signed_tool_models = json.loads(context).get("signed_tool_models", {})
+                expected_models = ({} if signed_tool_response == "missing-model"
+                                   else dict.fromkeys(expected_ids, body["model"]))
+                assert signed_tool_models == expected_models, signed_tool_models
         follow = {**body, "stream": reconnect_tool_stream,
                   "messages": [*messages, {"role": "assistant", "content": offered}, result]}
         wrong_subject, _ = call(18090, "POST", "/v1/messages", foreign, follow, headers)
@@ -782,7 +808,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 )
             assert len(received) == 1
         if signed_tool_history:
-            tampered = {**SIGNED_THINKING, "signature": "Y2hhbmdlZA=="}
+            tampered = {**signed_block, "signature": "Y2hhbmdlZA=="}
             changed = {**follow, "messages": [*messages, {"role": "assistant", "content": [tampered, *offered[1:]]}, result]}
             changed_signature, response = call(18090, "POST", "/v1/messages", token, changed, headers)
             assert changed_signature == 422 and len(received) == 1, (changed_signature, response, len(received))
@@ -889,21 +915,25 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                         "original_history_preserved": True}
             finally:
                 manage("PUT", "settings", {budget_key: previous_budget})
-        rejected_signed_recovery = signed_tool_history and recover_pending and not summarized_thinking
+        rejected_signed_recovery = signed_tool_history and recover_pending and signed_tool_response == "missing-model"
         status, raw, continuation_request_id = checked_messages(
             manage, token, follow, headers, received, "recovered_receipt" if recover_pending else "receipt",
             expected_status=422 if rejected_signed_recovery else 200, trace_startup=trace_startup,
             sender_status=sender_state_after_failure,
         )
         if rejected_signed_recovery:
-            # 缺少已登记助手模型的旧合同在准备阶段拒绝，避免恢复后丢掉原签名。
+            # 缺少已记录的助手模型时在准备阶段拒绝恢复，保留原签名和归属。
             assert status == 422 and len(received) == 1, (status, raw, len(received))
+            assert json.loads(raw)["error"]["code"] == "unsupported_parameter", raw
+            assert not manage("GET", "request-diagnostics/" + continuation_request_id)["attempts"]
             assert original_file.read_bytes() == original_history
             (first_attempt,) = verify_captures(manage, received, account_token)
             proof = {"cold_recovery_status": status, "changed_signature_status": changed_signature,
+                     "receipt_request_id": continuation_request_id, "receipt_attempts": 0,
+                     "recorded_signed_tool_models": signed_tool_models,
                      "model_posts": len(received), "original_history_preserved": True, "attempt": first_attempt}
             if adaptive_thinking_model:
-                assert received[0][1]["thinking"] == body["thinking"]
+                assert received[0][1]["thinking"] == body.get("thinking", ADAPTIVE_THINKING)
                 proof.update(thinking=received[0][1]["thinking"], changed_thinking_status=changed_thinking)
             return proof
         final = json.loads(raw)
@@ -1023,7 +1053,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             proof.update(auto_tool_choice=observed, changed_tool_choice_status=changed_choice)
         if adaptive_thinking_model:
             actual_thinking = [native.get("thinking") for _, native, _ in received]
-            assert actual_thinking == [body["thinking"]] * 2, actual_thinking
+            assert actual_thinking == [body.get("thinking", ADAPTIVE_THINKING)] * 2, actual_thinking
             assert all(native["model"] == adaptive_thinking_model for _, native, _ in received)
             if not summarized_thinking:
                 assert len(model_betas) == 2 and all(THINKING_UPDATES_BETA in beta.split(",") for beta in model_betas), model_betas
@@ -1033,10 +1063,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 proof["client_content"] = final["content"]
         if signed_tool_history:
             hydrated = find_blocks(received[1][1], "type", "thinking")
-            assert hydrated == [("assistant", SIGNED_THINKING)], (
+            assert hydrated == [("assistant", signed_block)], (
                 hydrated, [(row["role"], [block["type"] for block in blocks(row)]) for row in received[1][1]["messages"]],
             )
-            proof.update(observed_signature_preserved=True, changed_signature_status=changed_signature)
+            proof.update(observed_signature_preserved=True, changed_signature_status=changed_signature,
+                         signed_reply=hydrated[0][1], recorded_signed_tool_models=signed_tool_models)
         if toggle_pending_policy:
             proof["pending_policy"] = "append"
         if tool_policy:
@@ -1048,7 +1079,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             restored_id = json.loads(native_recovery["metadata"]["user_id"])["session_id"]
             restored_file = original_file.parent / (restored_id + ".jsonl")
             assert restored_id != original_id and restored_file.is_file()
-            if signed_tool_history and summarized_thinking:
+            if signed_tool_history:
                 archived = [row["message"] for row in map(json.loads, restored_file.read_text().splitlines())
                             if row.get("type") == "assistant" and any(
                                 block.get("id") == NEW_ID for block in blocks(row["message"]))]
@@ -2309,9 +2340,10 @@ def main():
                               const="ordinary-contract")
     parser.add_argument("--auto-tool-choice", action="store_true")
     parser.add_argument("--adaptive-thinking-model", choices=(MODEL, "claude-opus-5-5"))
-    parser.add_argument("--adaptive-thinking-display", choices=("updates", "summarized"), default="updates")
+    parser.add_argument("--adaptive-thinking-display", choices=("default", "updates", "summarized"), default="updates")
     parser.add_argument("--thinking-cli-summaries", choices=("on", "off"))
     parser.add_argument("--signed-tool-history", action="store_true")
+    parser.add_argument("--signed-tool-response", choices=("signature-only", "missing-model"))
     parser.add_argument("--trace-initial-startup", action="store_true", help="记录源码 V2 夹具的启动阶段")
     fault = parser.add_mutually_exclusive_group()
     fault.add_argument("--recovery-ledger-contention", action="store_true")
@@ -2343,7 +2375,9 @@ def main():
     scenario.add_argument("--v1-runtime", type=Path)
     args = parser.parse_args()
     if args.adaptive_thinking_display != "updates" and args.adaptive_thinking_model is None:
-        parser.error("--adaptive-thinking-display summarized 需要同用 --adaptive-thinking-model")
+        parser.error("--adaptive-thinking-display 需要同用 --adaptive-thinking-model")
+    if args.signed_tool_response and not args.signed_tool_history:
+        parser.error("--signed-tool-response 需要同用 --signed-tool-history")
     if args.thinking_cli_summaries is not None and not args.thinking_display_contract:
         parser.error("--thinking-cli-summaries 需要同用 --thinking-display-contract")
     thinking_cli_summaries = {"on": True, "off": False}.get(args.thinking_cli_summaries)
@@ -2382,7 +2416,8 @@ def main():
                        history_images=args.history_images, history_tool_blocks=args.history_tool_blocks,
                        previous=previous,
                        failure_boundaries=args.failure_boundaries, current_text_blocks=args.current_text_blocks,
-                       signed_tool_history=args.signed_tool_history, split_history_tools=args.split_history_tools,
+                       signed_tool_history=args.signed_tool_history, signed_tool_response=args.signed_tool_response,
+                       split_history_tools=args.split_history_tools,
                        v1_runtime=args.v1_runtime, parallel_tools=args.parallel_new_tools,
                        reconnect_tool_stream=args.reconnect_tool_stream, current_images=args.current_images,
                        auto_tool_choice=args.auto_tool_choice,

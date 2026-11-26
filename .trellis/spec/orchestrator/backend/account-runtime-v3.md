@@ -2568,7 +2568,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 声明客户端工具时接受显式 `tool_choice.type=auto`，`disable_parallel_tool_use` 可省略或显式为 false。固定 CLI 的默认自动选择与并行许可符合这一合同。事件源在模型派发前核对实际工具和选择语义，显式原参数随工具回执冻结。
 - 普通工具名中的连字符与下划线分别保留。固定 CLI 2.1.293 仅增加会话 MCP 前缀，嵌套 Schema 与参数沿原描述交付。重启后工具回执仍核对原名、ID 和完整参数。
 - 原生等待进程丢失时，私有回执按同一修订核对根轮策略及正文摘要。新原生会话导入客户端已核对的工具结果，保留原 JSONL。由受管 PTY 使用 CLI 的继续提示启动模型步骤，原问题和已完成工具保持在历史中。旧工具回执仍以原表布局读取。
-- 活跃工具组的签名属于发送器实收的助手块。回传时核对原签名和工具参数。显式 `adaptive/summarized` 的原生根轮按工具 ID 登记原 `message_start.message.model`，与当前回执修订一起保存。冷恢复仅将该事实写入对应的已验签助手行，普通外部历史仍使用 `role/content`。固定 CLI 2.1.293 依此保留原签名，模型提交前核对签名块和工具 ID 的原序。缺少已登记的助手模型时冷恢复在准备阶段返回 422，原会话文件保留，模型零新增投递。
+- 活跃工具组的签名属于发送器实收的助手块。回传时核对原签名和工具参数。受支持的原生根轮按工具 ID 登记实际 `message_start.message.model`，与当前回执修订一起保存，覆盖缺省 `thinking`、显式 `adaptive/updates` 和 `adaptive/summarized`。冷恢复仅将该事实写入对应的已验签助手行，普通外部历史仍使用 `role/content`。固定 CLI 2.1.293 依此保留原签名，模型提交前核对签名块和工具 ID 的原序。带签名回执的来源数据缺失或旧存量未登记助手模型时，冷恢复在准备阶段返回 `422/unsupported_parameter`，原会话文件保留，回执零尝试和零新增投递。无签名旧回执沿原布局恢复。
 - CLI 回环模型请求沿原账号 sender 授权路径送到固定供应商。该次请求交付 CLI 实际生成的 JSON 实体。调试快照的正文摘要取自这一实体，`wire_final.status` 为 `unavailable`。
 - 账户、会话、模型、替代的调用方参数或连接归属变更均沿原预留和回执门槛处理。冷导入只协商当前支持的普通输入形状。其他形状继续沿该发行既有入口合同。
 
@@ -2626,4 +2626,4 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `verify_tui_cold_history.py --auto-tool-choice --parallel-new-tools` 核对显式自动选择下的并行工具和改写拒绝。与 `--recover-pending-tool` 组合时核对原选择在丢进程后的续轮仍受保护。
 - `verify_tui_cold_history.py --split-history-tools` 核对分行的两对旧工具及结果、原顺序和单次新工具执行。
 - `verify_tui_cold_history.py --current-text-blocks` 核对本轮两个独立文本块的模型实收，合并边界的回执返回 422。与 `--recover-pending-tool` 组合时，另核对重启后原始文本块、记录和工具结果仍被保留。
-- `verify_tui_cold_history.py --signed-tool-history` 由隔离模型发出真实 SSE 签名事件，验证同一活跃工具轮的原块实收和改签名拒绝。与 `--recover-pending-tool` 组合时，普通根轮缺少已登记助手模型，验证 422 和零新增投递。加 `--adaptive-thinking-model <模型> --adaptive-thinking-display summarized` 时核对合法回执的签名、助手模型和原档，模型共实收两轮，旧工具零执行。
+- `verify_tui_cold_history.py --signed-tool-history` 从公开 SSE 重组签名块，核对同进程和 `--recover-pending-tool` 的合法回执、原档及模型实收。用 `--adaptive-thinking-model <模型>` 和 `--adaptive-thinking-display default|updates|summarized` 区分省略 `thinking` 与两种显式模式。`--signed-tool-response signature-only` 模拟带签名的空思考块，`--signed-tool-response missing-model` 保留签名而省略模型响应里的助手模型，验证冷恢复 422 和零尝试。源检查点只登记实收模型，恢复档只在对应的已验签助手行携带该事实。

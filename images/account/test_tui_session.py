@@ -397,7 +397,8 @@ class SessionTests(unittest.TestCase):
         with actor.changed:
             actor.history = handle.history
             actor.step = SimpleNamespace(
-                final=[b"finished"], stopped=True, reason="tool_use", blocks=list(group)
+                final=[b"finished"], stopped=True, reason="tool_use", blocks=list(group),
+                response_model=stage.response_model, tool_ids=stage.tool_ids,
             )
             actor._finish_step()
             actor.frame_batch = []
