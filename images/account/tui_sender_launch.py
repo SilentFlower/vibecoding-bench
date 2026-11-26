@@ -498,6 +498,7 @@ def launch_session(
     environment: dict[str, str], resume: bool | None, terminal_fd: int, mod_dir: Path,
     model_endpoint: tuple[str, str] | None = None,
     oauth_file: bool = False,
+    prepare_history=None,
 ) -> Popen:
     """用账号内核限定工作区后，在真实 PTY 上运行固定版本。
 
@@ -511,6 +512,7 @@ def launch_session(
     @param mod_dir 只属于本原生会话的受信任 Mod 目录。
     @param model_endpoint 会话回环端点与本次使用的账号凭据或开发口令。
     @param oauth_file 是否启用独占账号刷新与完整文件。
+    @param prepare_history 可选，同一会话的外部历史导入函数。
     @return 直属交互进程，退出由账号执行器回收。
     """
     home, mod = session_paths(command)
@@ -551,4 +553,5 @@ def launch_session(
             }, resume=resume, terminal_fd=terminal_fd, storage=STORAGE, program_fd=fd,
             inherited_fds=network_fds,
             initialize_profile=lambda work: _initialize_local_profile(config_dir, work),
+            prepare_history=prepare_history,
         )

@@ -16,6 +16,7 @@ from subprocess import Popen, run
 from tempfile import mkdtemp
 from threading import Thread
 from time import monotonic, sleep
+from urllib.parse import parse_qs, urlsplit
 from uuid import uuid4
 
 
@@ -76,11 +77,17 @@ def probe(folder: Path, gateway: Path) -> None:
                 self.send_error(401)
                 return
             registry_queries.append(self.path)
-            route = '/internal/v3/transport/1'
-            if self.path not in (route + '?wake=false', route, route + '?wake=true'):
+            target = urlsplit(self.path)
+            query = parse_qs(target.query, keep_blank_values=True)
+            if (target.path != '/internal/v3/transport/1'
+                    or query.keys() - {'wake', 'tui_oauth_profile', 'tui_previous_release'}
+                    or query.get('wake') not in (None, ['false'], ['true'])
+                    or query.get('tui_oauth_profile') not in (None, ['false'])
+                    or ('tui_previous_release' in query and (
+                        query['tui_previous_release'] != ['true'] or query.get('wake') != ['false']))):
                 self.send_error(404)
                 return
-            if self.path != route + '?wake=false':
+            if query.get('wake') != ['false']:
                 sleeping = False
             data = json.dumps(None if sleeping else registered).encode()
             self.send_response(200)
@@ -256,7 +263,9 @@ def probe(folder: Path, gateway: Path) -> None:
             diagnostic = log_path.read_bytes()[previous:].decode()
             assert '发送前拒绝 V2 请求' in diagnostic and expected in diagnostic, (label, diagnostic)
             public[label] = {'status': code, 'diagnostic': expected}
-        assert registry_queries[before_invalid:] == ['/internal/v3/transport/1?wake=false'] * len(public)
+        assert registry_queries[before_invalid:] == [
+            '/internal/v3/transport/1?wake=false&tui_oauth_profile=false'
+        ] * len(public)
         assert control()[1]['active'] == 0 and not upstream_connections
         result = {'status': 'passed', 'sender': sender, 'private_missing_config': 503,
                   'private_invalid_bearer': 401, 'sender_actions': actions,

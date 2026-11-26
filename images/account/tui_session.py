@@ -23,7 +23,9 @@ from threading import Condition, Event, Thread
 from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 
+from runtime_files import atomic_text
 from tui_capacity import TuiCapacity, TuiCapacityError
+from tui_cold_history import ColdHistory, MCP_SERVER
 from tui_reconnect import ReceiptCheckpoints, digest
 from tui_input_policy import CONTEXT_BETA, InputRejection, native_input
 from tui_messages import (
@@ -217,6 +219,10 @@ class _Callback(BaseHTTPRequestHandler):
         """终止官方子进程发起的外部代理连接。@return 无。"""
         self.send_error(403)
 
+    def do_GET(self):
+        """声明 MCP 使用单次 JSON 应答。@return 无。"""
+        self.send_error(405)
+
     def do_POST(self):
         """按会话令牌校验并分发结构化事件。@return 无。"""
         target = urlsplit(self.path)
@@ -224,6 +230,7 @@ class _Callback(BaseHTTPRequestHandler):
             self.send_error(403)
             return
         actor = self.server.actor
+        mcp = target.path == "/mcp" and actor.cold_history is not None
         model = target.path == actor.model_path + "/v1/messages"
         bearer = actor.model_authorization() if model else actor.bearer
         authorization = self.headers.get("Authorization", "")
@@ -245,9 +252,14 @@ class _Callback(BaseHTTPRequestHandler):
                 raise ValueError("回调正文编码无效")
             data = json.loads(raw)
             if model:
-                actor.serve_model(self, data)
+                actor.serve_model(self, data, native_raw=raw)
                 return
-            payload = _json(actor.callback(self.path, data)).encode()
+            reply = actor.cold_history.mcp(data) if mcp else actor.callback(self.path, data)
+            if reply is None:
+                self.send_response(202)
+                self.end_headers()
+                return
+            payload = _json(reply).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(payload)))
@@ -319,6 +331,7 @@ class _Actor:
         self.claim = None
         self.port = None
         self.worker = None
+        self.cold_history = None
 
     def model_authorization(self):
         """读取当前模型回环的账号授权。@return 当前回合 AT 或原会话口令。"""
@@ -397,6 +410,21 @@ class _Actor:
                         "--plugin-dir",
                         str(plugin),
                     ]
+                    launch_options = {}
+                    if self.cold_history is not None:
+                        plan = self.cold_history
+                        instructions = plugin / "instructions.md"
+                        if plan.system:
+                            atomic_text(instructions, plan.system)
+                            opts.extend(["--append-system-prompt-file", str(instructions)])
+                        mcp = plugin / "mcp.json"
+                        atomic_text(mcp, _json({"mcpServers": {MCP_SERVER: {
+                            "type": "http", "url": endpoint + "/mcp", "headers": {
+                                "Authorization": "Bearer " + self.bearer,
+                            },
+                        }}}))
+                        opts.extend(["--mcp-config", str(mcp)])
+                        launch_options["prepare_history"] = plan.import_session
                     master, slave = os.openpty()
                     self.master = master
                     fcntl.ioctl(
@@ -423,6 +451,7 @@ class _Actor:
                         mod_dir=plugin,
                         model_endpoint=(endpoint + self.model_path, self.launch_token or self.model_bearer),
                         **({"oauth_file": True} if self.oauth_file else {}),
+                        **launch_options,
                     )
                     os.close(slave)
                     slave = None
@@ -474,6 +503,9 @@ class _Actor:
                             self.process.kill()
                             self.process.wait()
                     (plugin / "hooks/binding.js").unlink(missing_ok=True)
+                    if self.cold_history is not None:
+                        (plugin / "mcp.json").unlink(missing_ok=True)
+                        (plugin / "instructions.md").unlink(missing_ok=True)
         except Exception:
             # 任何启动、归属或终端错误都会由等待中的发送者以中断报告；不记录客户正文。
             self.abort()
@@ -751,9 +783,10 @@ class _Actor:
                 actual.pop("anthropic-beta", None)
         return actual
 
-    def _claim_model(self, sdk_headers, native):
+    def _claim_model(self, sdk_headers, native, native_raw=None):
         """在当前预留中认领一次模型提交。@param sdk_headers 该 CLI 的本轮头。
-        @param native 内层 CLI 用于配对的请求。@return 完成策略及会话映射的输入，未匹配时为空。
+        @param native 内层 CLI 用于配对的请求。@param native_raw CLI 已提交的原始正文。
+        @return 本次模型提交的输入，未匹配时为空。
         """
         with self.driver.lock, self.changed:
             step, handle = self.step, self.claim
@@ -805,6 +838,10 @@ class _Actor:
                 self.changed.notify_all()
         if not pending:
             return None
+        if self.cold_history is not None:
+            if native_raw is None:
+                raise RuntimeError("冷导入缺少实际 CLI 正文")
+            return _ModelSubmission(step, handle, native_raw, headers, account_token)
         # 旧进程仍校验启动 AT。文件模式的令牌已经与原生步骤绑定。
         if handle.api_context is not None:
             offered = {v.strip() for v in sdk_headers.get("anthropic-beta", "").split(",")}
@@ -824,17 +861,17 @@ class _Actor:
         )
         return _ModelSubmission(step, handle, raw, headers, account_token)
 
-    def serve_model(self, http, native):
+    def serve_model(self, http, native, *, native_raw=None):
         """交付同一次已认领的模型响应。@param http 当前 TUI 连接。
-        @param native 内层 CLI 请求。@return 无。
+        @param native 内层 CLI 请求。@param native_raw CLI 原始正文。@return 无。
         """
-        submission = self._claim_model(http.headers, native)
+        submission = self._claim_model(http.headers, native, native_raw)
         if submission is None:
             http.send_error(409, "No pending model step")
             return
         if self.driver.managed_oauth and submission.account_token is None:
             raise ModelResponseError(503, b"")
-        if self.driver.native_dispatch is not None and self.driver.managed_oauth:
+        if self.cold_history is None and self.driver.native_dispatch is not None and self.driver.managed_oauth:
             # 只有镜像的受信入口能安装原生投递器；两条路径使用同一份一次认领结果。
             self.driver.native_dispatch(self, http, submission)
             return
@@ -842,7 +879,9 @@ class _Actor:
         raw, headers = submission.body, submission.headers
         account_token = submission.account_token
         options = {"headers": headers}
-        if getattr(handle, "capture", None) is not None:
+        if self.cold_history is not None:
+            submission.record_cli_handoff()
+        elif getattr(handle, "capture", None) is not None:
             options["capture"] = handle.capture
         if self.driver.managed_oauth:
             # CLI 原生请求的授权头只认证回环连接，实际模型发送取当前认领的账号 AT。
@@ -932,6 +971,17 @@ class _Actor:
             if terminal_error:
                 yield wire
                 return
+            public = wire
+            if (self.cold_history is not None and event is not None
+                    and event.get("type") == "content_block_start"
+                    and event.get("content_block", {}).get("type") == "tool_use"):
+                block = event["content_block"]
+                tool = self.cold_history.tools.get(block.get("name"))
+                if tool is None:
+                    raise ValueError("模型工具不属于当前会话的 MCP 声明")
+                # 内层使用原生 MCP 名称，外层仍用客户工具名称和同一模型调用 ID。
+                event = {**event, "content_block": {**block, "name": tool["name"]}}
+                public = b"event: content_block_start\ndata: " + _json(event).encode() + b"\n\n"
             self._observe(step, event)
             with self.changed:
                 if step.stopped:
@@ -939,7 +989,7 @@ class _Actor:
                         raise ValueError("模型终态后的数据超限")
                     tail.extend(wire)
                 else:
-                    self._publish([wire])
+                    self._publish([public])
             yield wire
         with self.changed:
             if not step.stopped or not tail:
@@ -1386,7 +1436,9 @@ class SessionDriver:
             # 只有认证的网关在核对原工具组后设置此位。用独立 actor 和工作区运行原始正文。
             # 同一个子代理的重复查询串行使用自己的进度工作区，避免每次心跳创建一份持久 HOME。
             actor_key = (*actor_key, "agent-summary")
-        returned = split_reply(messages)[1]
+        offered, returned = split_reply(messages)
+        policy = reservation.get("body_policy")
+        native_cache_policy = not policy or (not policy["sub2api"] and policy["ttl"] == "off")
         deadline = reservation["deadline_unix_ms"] / 1000
 
         def remaining():
@@ -1450,10 +1502,25 @@ class SessionDriver:
                         reservation,
                         request,
                     )
+                    if actor.cold_history is not None:
+                        prompt_index = len(actor.cold_history.history) + 1
+                        # 继续使用原进程的生效设置，校验通过后才把回执交给等待工具。
+                        plan = ColdHistory.from_request({**body, "messages": messages[:prompt_index]})
+                        if not native_cache_policy or plan != actor.cold_history or any(
+                            row["role"] != "user" or not isinstance(row["content"], list)
+                            or not row["content"] or any(block["type"] != "tool_result" for block in row["content"])
+                            for row in messages[offered + 1:]
+                        ):
+                            raise InputRejection("unsupported_parameter")
                     actor.claim = handle
                     return handle
 
-        prompt = prompt_text(messages)
+        cold = None
+        if (self.managed_oauth and reservation.get("native_cold_history") is True
+                and native_cache_policy and agent_hint is None and checkpoint is None
+                and not native_input(body, reservation.get("input_format"))):
+            cold = ColdHistory.from_request(body)
+        prompt = cold.prompt if cold is not None else prompt_text(messages)
         with self.lock:
             if agent_hint is not None and not summary and (
                 actor_key in self.sessions
@@ -1549,6 +1616,7 @@ class SessionDriver:
                             slot,
                             offer,
                         )
+                        actor.cold_history = cold
                         if checkpoint is not None:
                             actor.receipt_revision = revision
                         if offer is not None:

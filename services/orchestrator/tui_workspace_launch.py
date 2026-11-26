@@ -82,6 +82,7 @@ def launch_workspace_cli(
     program_fd: int | None = None,
     inherited_fds: tuple[int, ...] = (),
     initialize_profile: Callable[[Path], None] | None = None,
+    prepare_history: Callable[[Path, Path], Path] | None = None,
 ) -> Popen:
     """在该账号发送器绑定的目录启动交互 CLI，继承事件源已分配的 PTY。
 
@@ -97,6 +98,7 @@ def launch_workspace_cli(
     @param program_fd 可选的已核验程序描述符，由同容器隔离入口在执行时关闭。
     @param inherited_fds 受信启动器额外传入的同会话描述符。
     @param initialize_profile 可选，新会话由受信控制端为已核验目录初始化独立配置。
+    @param prepare_history 可选，由本轮受信驱动在已核验工作区导入历史。
     @return 由事件源负责监督与回收的官方进程。
     """
     if (
@@ -139,7 +141,10 @@ def launch_workspace_cli(
             raise ValueError("V2 提交工作目录不属于当前绑定")
         cwd = _owned_dir(stack, work)
         session_args = ["--session-id", native_id]
-        history = None if resume is False else _resume_path(stack, config_dir, work, native_id, required=resume is True)
+        if prepare_history is not None:
+            history = prepare_history(config_dir, work)
+        else:
+            history = None if resume is False else _resume_path(stack, config_dir, work, native_id, required=resume is True)
         if history is not None:
             session_args = ["--resume", str(history)]
         if initialize_profile is not None:

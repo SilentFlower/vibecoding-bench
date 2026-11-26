@@ -149,7 +149,7 @@ enum Phase {
         managed_oauth: bool,
         oauth_file: bool,
         signature_repair: Option<bool>,
-        cli_submission: bool,
+        cli_submission: Option<&'static str>,
     },
     Submitted,
     RepairPending(oneshot::Sender<RepairPermit>),
@@ -203,7 +203,7 @@ struct SourceOptions {
     managed: bool,
     oauth_file: bool,
     wire: bool,
-    cli_submission: bool,
+    cli_submission: Option<&'static str>,
     captured: bool,
 }
 
@@ -694,7 +694,8 @@ impl TuiSender {
                 .await
                 .map_err(|_| unavailable())?;
             // 双方明确支持原生交付表示才采集。旧控制端继续使用其认识的来源。
-            let cli_submission = cli_submission && managed_oauth && capture_requested
+            let offer_cli_capture = managed_oauth
+                && capture_requested
                 && tui_projection_marker(request.headers(), TUI_CLI_SUBMISSION, "1");
             if identity.agent_summary && !agent_summary {
                 return Err(unavailable());
@@ -736,6 +737,9 @@ impl TuiSender {
             let mut control = proof.clone();
             control["action"] = json!("prepare");
             control["reservation"] = json!(identity);
+            if managed_oauth {
+                control["native_cold_history_protocol"] = json!(1);
+            }
             if offer_oauth_file {
                 control["oauth_file_protocol"] = json!(1);
             }
@@ -773,6 +777,17 @@ impl TuiSender {
                 .await
                 .map_err(|_| unavailable())?;
             verify_reply(&reply, &proof).map_err(|_| unavailable())?;
+            let cold = reply["native_cold_history_protocol"].as_u64() == Some(1);
+            if cold && !managed_oauth {
+                return Err(unavailable());
+            }
+            let cli_submission = match (offer_cli_capture, cold, cli_submission) {
+                (true, true, _) => Some("request_from_interactive_cli"),
+                (true, false, true) => Some("request_to_interactive_cli"),
+                _ => None,
+            };
+            let capture_http = capture_http && !cold;
+            let signature_repair = signature_repair && !cold;
             let oauth_file = reply["oauth_file_protocol"].as_u64() == Some(1);
             if oauth_file && !offer_oauth_file {
                 return Err(unavailable());
@@ -928,8 +943,8 @@ impl TuiSender {
                 .headers_mut()
                 .insert(TUI_SIGNATURE_REPAIR, HeaderValue::from_static("1"));
         }
-        if capture_requested && (capture_http || cli_submission) {
-            if wire_protocol && !cli_submission {
+        if capture_requested && (capture_http || cli_submission.is_some()) {
+            if wire_protocol && cli_submission.is_none() {
                 response
                     .headers_mut()
                     .insert(TUI_FINAL_CAPTURE, HeaderValue::from_static("1"));
@@ -959,7 +974,7 @@ impl TuiSender {
             BufReader<UnixStream>,
             Option<workspace::Candidate>,
             Option<bool>,
-            bool,
+            Option<&'static str>,
         ),
         AppError,
     > {
@@ -1099,7 +1114,8 @@ impl TuiSender {
                 .is_some()
                 .then(|| (dir.clone(), input.clone(), *account))
         });
-        let wire_protocol = !cli_submission && tui_projection_marker(headers, TUI_FINAL_CAPTURE, "1");
+        let wire_protocol =
+            cli_submission.is_none() && tui_projection_marker(headers, TUI_FINAL_CAPTURE, "1");
         let wire_captured = if managed_oauth && wire_protocol {
             capture
                 .take()
@@ -1117,7 +1133,11 @@ impl TuiSender {
             command["capture_assembly"] = json!(true);
         }
         if capture.is_some() {
-            command[if cli_submission { "capture_cli_submission" } else { "capture_http" }] = json!(true);
+            if cli_submission.is_some() {
+                command["capture_cli_submission"] = json!(true);
+            } else {
+                command["capture_http"] = json!(true);
+            }
         }
         if let Some(known) = signature_repair {
             command["signature_repair"] = json!(known);
@@ -1590,8 +1610,8 @@ fn save_provider_capture(
     let (directory, input, account, attempt, permit) = capture;
     tokio::task::spawn_blocking(move || {
         let _permit = permit;
-        let format = if options.cli_submission {
-            "request_to_interactive_cli"
+        let format = if let Some(format) = options.cli_submission {
+            format
         } else if options.managed {
             "request_to_account_sender"
         } else {
@@ -1605,7 +1625,7 @@ fn save_provider_capture(
                 pairs,
                 raw,
                 format,
-                !options.wire && !options.cli_submission,
+                !options.wire && options.cli_submission.is_none(),
                 None,
             )
             .is_err()

@@ -99,6 +99,7 @@ pub(super) struct NativeTurn {
     session_id: String,
     pub(super) binding: String,
     submitted: AtomicBool,
+    released: bool,
     remember_receipt: bool,
     recovery: Option<ReceiptRow>,
     delivery: Option<Arc<Delivery>>,
@@ -650,6 +651,7 @@ impl ReceiptRow {
             session_id: self.session_id.clone(),
             binding: self.binding.clone(),
             submitted: AtomicBool::new(false),
+            released: false,
             remember_receipt: true,
             recovery: Some(self),
             delivery: None,
@@ -757,6 +759,7 @@ pub(super) async fn claim(
                 session_id,
                 binding,
                 submitted: AtomicBool::new(false),
+                released: false,
                 recovery: None,
                 delivery: None,
                 remember_receipt: version != "legacy",
@@ -816,6 +819,7 @@ pub(super) async fn claim(
         session_id,
         binding,
         submitted: AtomicBool::new(false),
+        released: false,
         recovery: None,
         delivery: None,
         remember_receipt: false,
@@ -824,7 +828,7 @@ pub(super) async fn claim(
 
 impl Drop for NativeTurn {
     fn drop(&mut self) {
-        if self.recovery.is_some() || self.submitted.load(Ordering::Acquire) {
+        if self.released || self.recovery.is_some() || self.submitted.load(Ordering::Acquire) {
             return;
         }
         if let Ok(runtime) = Handle::try_current() {
@@ -925,6 +929,16 @@ impl NativeTurn {
         }
         tx.commit().await?;
         self.recovery = None;
+        Ok(())
+    }
+
+    /// 准备失败时，在返回公开错误前归还仍未提交的工具轮。@return 持久归还结果。
+    pub(super) async fn release_rejected_prepare(mut self) -> Result<(), AppError> {
+        if self.recovery.is_none() {
+            self.release_tui_before_model().await?;
+            // 后续合法认领可能重用同一行和工具组，归还后析构不能再修改它。
+            self.released = true;
+        }
         Ok(())
     }
 

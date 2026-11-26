@@ -2533,3 +2533,40 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `test_cluster_migration_files/test_cluster_migration_runner`：真实部分文件、上传完成回包未知、协调器重建、CAS／取消后拒绝、已核验包和链接保护。 节点激活替身核对实际已准备尝试，覆盖新尝试的最终激活及 `test_renewed_transfer_activation_resumes_after_committed_response_loss` 的提交后重启续接。
 - `test_cluster_project_capture/test_cluster_projects_terminal`：双空间实际文件、真实迁移归档、旧节点离线、原账本保持、零运行时准备、scope 和路径拒绝。
 - `test_cluster_agent.NodeAgentTests.test_history_capture_through_real_ssh_light_client_and_actor`：真实隔离 SSH→轻量客户端→UDS Actor→原文件；Docker exec 使用明确命令替身，保持零真实账号请求。
+
+## Scenario: V2 受管账号从普通 Messages 冷导入已闭合工具历史
+
+### 1. Scope / Trigger
+
+- 修改受管账号的外部历史导入、工具续轮、私有 sender 协议或 CLI 出站诊断时适用。
+
+### 2. Signatures
+
+- 公开入口仍为 `POST /v1/messages`。受管 sender 在原绑定 Unix socket 的 `prepare` 提出整数 `native_cold_history_protocol: 1`。事件源选用该路径时在同一预留回执确认该字段。
+- 冷导入回执启用 `capture_cli_submission_protocol: 1`。本次调试证据的 `tui_provider_request.representation` 为 `request_from_interactive_cli`。
+
+### 3. Contracts
+
+- 普通 Messages 的已闭合文本与工具历史、当前单文本问题和支持的客户端工具声明共用当前账号作用域。工作区归属核验后，事件源原子发布固定 2.1.293 格式的私有会话记录。CLI 恢复该历史并提交当前问题。顶层追加指令保持输入顺序。
+- 工具声明由会话私有 HTTP MCP 返回。公开调用块恢复原名，ID 与参数增量仍对应原模型事件。工具结果通过原进程的回执账本交付，接收方、历史、原调用和本轮生效设置均需匹配。
+- CLI 回环模型请求沿原账号 sender 授权路径送到固定供应商。该次请求交付 CLI 实际生成的 JSON 实体。调试快照的正文摘要取自这一实体，`wire_final.status` 为 `unavailable`。
+- 账户、会话、模型、替代的调用方参数或连接归属变更均沿原预留和回执门槛处理。冷导入只协商当前支持的普通输入形状。其他形状继续沿该发行既有入口合同。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 主体或公开会话与等待工具组不匹配 | 400，零新增模型提交 |
+| 原工具参数被改写 | 422。准备阶段先归还回执，合法新请求可立即认领 |
+| 同组合法回执已交付后再次提交 | 原回执规则拒绝重放 |
+| 仅开启该路径的调试采集 | 保存 CLI 实际实体证据，最终 TLS 写出未采集 |
+
+### 5. Scenarios and Examples
+
+- 首次带两组旧问答和已完成的工具对发起请求。HTTPS 模型收到原历史及一次当前问题，随后收到新工具的单次合法结果。
+- 将 CLI 回环摘要标作最终 TLS 写出会混淆采集点。使用 `request_from_interactive_cli` 记录 CLI 实际交付，并单独对照 HTTPS 接收端正文摘要。
+
+### 6. Tests Required
+
+- `test_tui_cold_history.py` 核对闭合边界、私有 JSONL 父链和 MCP 声明范围。
+- `verify_tui_cold_history.py` 使用公开入口、生产事件源、真实 2.1.293 CLI 和账号代理，对照 HTTPS 实收、公开流式调用、JSON 续轮及拒绝路径。

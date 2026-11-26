@@ -2845,7 +2845,7 @@ impl GatewayService {
                         &body_map,
                     )
                 });
-                let mut prepared = runtime_transport::prepare_tui(
+                let prepared = runtime_transport::prepare_tui(
                     sender,
                     principal.id,
                     sender_session,
@@ -2871,12 +2871,21 @@ impl GatewayService {
                         message: "当前账号发送器未确认这轮的恢复凭据。请核对原会话、工具回执和请求参数，使用旧版账号后台时请更新后重试",
                     },
                     error => error,
-                })
-                .inspect_err(|error| {
-                    if let Some(writer) = &reconnect {
-                        writer.rejected(error);
+                });
+                let mut prepared = match prepared {
+                    Ok(prepared) => prepared,
+                    Err(error) => {
+                        if let Some(turn) = turn.take()
+                            && let Err(release_error) = turn.release_rejected_prepare().await
+                        {
+                            warn!(account_id = account.id, %release_error, "V2 准备拒绝后的回执待对账");
+                        }
+                        if let Some(writer) = &reconnect {
+                            writer.rejected(&error);
+                        }
+                        return Err(error);
                     }
-                })?;
+                };
                 prepared.verify_input_policy(&body_map)?;
                 if let Some(turn) = &mut turn {
                     turn.confirm_recovery(prepared.recovered).await?;

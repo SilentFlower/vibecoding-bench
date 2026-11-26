@@ -249,6 +249,11 @@ class AccountSource:
             ):
                 return
             reservation = {**reservation, "body_policy": policy}
+        if "native_cold_history_protocol" in prepared:
+            if (type(prepared["native_cold_history_protocol"]) is not int
+                    or prepared["native_cold_history_protocol"] != 1 or not managed_oauth):
+                return
+            reservation = {**reservation, "native_cold_history": True}
         size = prepared["body_len"]
         if type(size) is not int or not 0 < size <= BODY_LIMIT:
             return
@@ -318,6 +323,14 @@ class AccountSource:
                 "workspace_protocol": 1,
                 "workspace_resume": getattr(handle, "workspace_resume", False),
             }
+            cold = bool(getattr(getattr(handle, "actor", None), "cold_history", None))
+            if cold:
+                if reservation.get("native_cold_history") is not True:
+                    return
+                reply["native_cold_history_protocol"] = 1
+                reply.pop("capture_http_protocol", None)
+                reply.pop("signature_repair_protocol", None)
+                reply["capture_cli_submission_protocol"] = 1
             if not oauth_file:
                 reply.pop("oauth_file_protocol", None)
             if reservation.get("agent_hint") is not None:
@@ -338,10 +351,14 @@ class AccountSource:
                 return
             if "oauth_file" in command:
                 return
-            if not sender_features and ("signature_repair" in command or command.get("capture_http") is True):
+            if (cold or not sender_features) and (
+                "signature_repair" in command or command.get("capture_http") is True
+            ):
+                return
+            if cold and "capture_assembly" in command:
                 return
             if "capture_cli_submission" in command and (
-                command["capture_cli_submission"] is not True or "capture_cli_submission_protocol" not in state
+                command["capture_cli_submission"] is not True or "capture_cli_submission_protocol" not in reply
                 or "capture_http" in command or "capture_assembly" in command
             ):
                 return
