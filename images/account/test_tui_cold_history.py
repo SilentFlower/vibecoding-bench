@@ -86,8 +86,43 @@ class ColdHistoryTests(TestCase):
             self.assertNotEqual(fork, session)
             self.assertEqual(original.read_bytes(), original_bytes)
             forked = _resume_path(stack, config, work, fork, required=True)
-            self.assertEqual(json.loads(forked.read_bytes().splitlines()[0])["message"]["content"][0]["text"],
+            fork_bytes = forked.read_bytes()
+            self.assertEqual(json.loads(fork_bytes.splitlines()[0])["message"]["content"][0]["text"],
                              "另一条已确认的上一轮输入")
+            barrier = Barrier(3)
+            futures = [pool.submit(prepare, ColdHistory.from_request(deepcopy(changed))) for _ in range(3)]
+            self.assertEqual([future.result() for future in futures], [fork] * 3)
+            self.assertEqual(set(original.parent.iterdir()), {original, forked})
+            self.assertEqual(forked.read_bytes(), fork_bytes)
+
+    def test_advanced_fork_keeps_its_bytes_and_reuses_unadvanced_revision(self):
+        """已推进的分叉保持原记录，重复确认边界复用同一未推进修订。@return 无。"""
+        base = ColdHistory.from_request(self.body)
+        changed = deepcopy(self.body)
+        changed["messages"][0]["content"] = "分叉的确认输入"
+        fork_plan = ColdHistory.from_request(changed)
+        work = Path("/native/workspace")
+        session, other = str(uuid4()), str(uuid4())
+        with TemporaryDirectory() as directory, ExitStack() as stack:
+            config = Path(directory)
+            base.import_session(config, work, session)
+            base.import_session(config, work, other)
+            original = _resume_path(stack, config, work, session, required=True)
+            original_bytes = original.read_bytes()
+            first = fork_plan.import_session(config, work, session)
+            forked = _resume_path(stack, config, work, first, required=True)
+            last = json.loads(forked.read_bytes().splitlines()[-1])
+            with forked.open("a") as output:
+                output.write(json.dumps({**last, "type": "user", "parentUuid": last["uuid"], "uuid": str(uuid4()),
+                                         "message": {"role": "user", "content": "当前问题"}}) + "\n")
+            advanced_bytes = forked.read_bytes()
+            second = fork_plan.import_session(config, work, session)
+            self.assertNotIn(second, {session, first})
+            restored = ColdHistory.from_request(deepcopy(changed))
+            self.assertEqual(restored.import_session(config, work, session), second)
+            self.assertNotIn(restored.import_session(config, work, other), {session, first, second, other})
+            self.assertEqual(original.read_bytes(), original_bytes)
+            self.assertEqual(forked.read_bytes(), advanced_bytes)
 
     def test_mismatched_disk_owner_is_not_replaced_or_used(self):
         """已有文件的原生会话或目录发生变化时拒绝恢复并保留文件。@return 无。"""

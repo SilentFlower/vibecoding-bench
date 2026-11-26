@@ -174,7 +174,7 @@ class BoundLaunchTests(TestCase):
             self.assertEqual(native_id, self.native)
             return publish_workspace_history(config, work, native_id, lambda rows: bool(list(rows)), lambda sid: json.dumps(
                 {"type": "user", "cwd": str(work), "sessionId": sid, "message": {"role": "user", "content": "合成历史"}}
-            ) + "\n")
+            ) + "\n", boundary="fixture-boundary")
 
         with patch("tui_workspace_launch.Popen") as spawn:
             self._start(prepare_history=prepare, resume=None)

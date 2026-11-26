@@ -4,6 +4,7 @@ from collections.abc import Callable, Iterator
 from contextlib import ExitStack
 from fcntl import LOCK_EX, flock
 from hashlib import sha256
+from itertools import count
 import json
 import os
 from pathlib import Path
@@ -84,6 +85,7 @@ def publish_workspace_history(
     config: Path, work: Path, native_id: str,
     matches: Callable[[Iterator[dict]], bool],
     render: Callable[[str], str] | None,
+    *, boundary: str,
 ) -> str:
     """按工作区绑定选择新会话或发布已核对的历史。
 
@@ -92,6 +94,7 @@ def publish_workspace_history(
     @param native_id 发送器工作区绑定中的会话 UUID。
     @param matches 比较已有全部主链与本次确认边界。
     @param render 以选中的原生 UUID 组装完整 JSONL。纯新轮传 None，CLI 自行创建对话记录。
+    @param boundary 规范化确认历史和生效设置的摘要。
     @return 本次新建或恢复的会话 UUID。
     """
     if str(UUID(native_id)) != native_id or UUID(native_id).version != 4:
@@ -103,19 +106,23 @@ def publish_workspace_history(
         directory = _owned_dir(stack, project)
         # 所有导入者在同一个目录内完成比较和原子发布。原有会话记录可能仍是恢复或分支的依据。
         flock(directory, LOCK_EX)
-        name = native_id + ".jsonl"
-        try:
-            stream = _owned_file(directory, name)
-        except FileNotFoundError:
-            pass
-        else:
+        candidate = native_id
+        for revision in count():
+            name = candidate + ".jsonl"
+            try:
+                stream = _owned_file(directory, name)
+            except FileNotFoundError:
+                if render is not None:
+                    atomic_text(project / name, render(candidate), replace=False)
+                return candidate
             with stream:
-                if matches(_main_history(stream, work, native_id)):
-                    return native_id
-            native_id = str(uuid4())
-        if render is not None:
-            atomic_text(project / (native_id + ".jsonl"), render(native_id), replace=False)
-        return native_id
+                if matches(_main_history(stream, work, candidate)):
+                    return candidate
+            if render is None:
+                return str(uuid4())
+            # 分叉按登记会话和确认边界定位。一份记录已推进时，保留它并继续查找同一边界的后续记录。
+            digest = bytes.fromhex(_key(("v2-history-branch", native_id, boundary, revision)))
+            candidate = str(UUID(bytes=digest[:16], version=4))
 
 
 def launch_workspace_cli(

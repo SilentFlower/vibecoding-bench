@@ -2,7 +2,9 @@
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from hashlib import sha256
 from itertools import zip_longest
+import json
 import re
 from uuid import uuid4
 
@@ -107,8 +109,14 @@ class ColdHistory:
         def render(session_id):
             return self._transcript(work, session_id)
 
+        boundary = sha256(json.dumps(
+            (self.model, self.system, self.tools, self.max_tokens, self.thinking,
+             [(row["role"], _blocks(row)) for row in self.history]),
+            ensure_ascii=False, separators=(",", ":"), sort_keys=True, allow_nan=False,
+        ).encode()).hexdigest()
         return publish_workspace_history(
             config, work, native_id, self._matches_history, render if self.history else None,
+            boundary=boundary,
         )
 
     def _matches_history(self, rows):

@@ -279,29 +279,49 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             projects = Path("/native/tui-sessions") / native_id / "home/.claude/projects"
             (history_file,) = projects.glob("*/" + native_id + ".jsonl")
             original = history_file.read_bytes()
-            stop(source)
-            restarted = start_sender()
-            try:
-                wait_for(lambda: sender_state().get("ready") and sender_state().get("idle"))
-            except AssertionError as error:
-                raise AssertionError(("账号发送器重启后未就绪", restarted.poll(), sender_state())) from error
+            def restart(process):
+                wait_for(lambda: sender_state().get("idle"))
+                stop(process)
+                restarted = start_sender()
+                try:
+                    wait_for(lambda: sender_state().get("ready") and sender_state().get("idle"))
+                except AssertionError as error:
+                    raise AssertionError(("账号发送器重启后未就绪", restarted.poll(), sender_state())) from error
+                return restarted
+
+            restarted = restart(source)
+            divergent = "H1：分叉历史中的项目名是水杉。"
             branch = {**body, "stream": False,
-                      "messages": [*messages[:-1], {"role": "user", "content": AFTER_RESTART}]}
-            status, raw = call(18090, "POST", "/v1/messages", token, branch, headers)
-            assert status == 200 and len(received) == 3, (status, raw, len(received))
-            assert json.loads(raw)["content"] == [{"type": "text", "text": FINAL}]
-            model_body = received[-1][1]
-            texts = [(row["role"], b.get("text")) for row in model_body["messages"] for b in blocks(row)]
-            history_texts = {text for _, text in HISTORY}
-            assert [(role, text) for role, text in texts if text in history_texts] == HISTORY
-            assert texts.count(("user", AFTER_RESTART)) == 1 and ("user", QUESTION) not in texts
-            assert find_blocks(model_body, "id", PAST_ID) and find_blocks(model_body, "tool_use_id", PAST_ID)
-            assert history_file.read_bytes() == original
-            branch_id = json.loads(model_body["metadata"]["user_id"])["session_id"]
-            assert branch_id != native_id and (history_file.parent / (branch_id + ".jsonl")).is_file()
-            proof["restart"] = {"bound_session_id": native_id, "branch_session_id": branch_id,
-                                "preserved_bytes": len(original), "additional_model_posts": 1,
-                                "attempt": verify_captures(manage, received[-1:], account_token)[0]}
+                      "messages": [{"role": "user", "content": divergent}, *messages[1:-1],
+                                   {"role": "user", "content": AFTER_RESTART}]}
+            expected_history = [("user", divergent), *HISTORY[1:]]
+            history_texts = {text for _, text in expected_history}
+            branch_ids = []
+            snapshots = {history_file: original}
+            for post in (3, 4):
+                status, raw = call(18090, "POST", "/v1/messages", token, branch, headers)
+                assert status == 200 and len(received) == post, (status, raw, len(received))
+                assert json.loads(raw)["content"] == [{"type": "text", "text": FINAL}]
+                model_body = received[-1][1]
+                texts = [(row["role"], b.get("text")) for row in model_body["messages"] for b in blocks(row)]
+                assert [(role, text) for role, text in texts if text in history_texts] == expected_history
+                assert texts.count(("user", AFTER_RESTART)) == 1 and not {QUESTION, HISTORY[0][1], FINAL} & {
+                    text for _, text in texts
+                }
+                assert find_blocks(model_body, "id", PAST_ID) and find_blocks(model_body, "tool_use_id", PAST_ID)
+                wait_for(lambda: sender_state().get("idle"))
+                assert all(path.read_bytes() == data for path, data in snapshots.items())
+                branch_id = json.loads(model_body["metadata"]["user_id"])["session_id"]
+                assert branch_id not in (native_id, *branch_ids)
+                branch_ids.append(branch_id)
+                path = history_file.parent / (branch_id + ".jsonl")
+                snapshots[path] = path.read_bytes()
+                if post == 3:
+                    restart(restarted)
+            proof["restart"] = {"bound_session_id": native_id, "branch_session_ids": branch_ids,
+                                "preserved_bytes": [len(data) for data in snapshots.values()],
+                                "additional_model_posts": 2,
+                                "attempts": verify_captures(manage, received[-2:], account_token)}
         return proof
 
 
