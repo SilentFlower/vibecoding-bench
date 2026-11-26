@@ -12,6 +12,7 @@ use crate::service::telemetry::MessageTelemetryUsage;
 use crate::service::usage_pricing::{cache_write_tokens, price_version};
 
 /// 一次真实上游调用的数值摘要，不保存正文或凭据。
+#[derive(Clone)]
 pub struct UsageRecord {
     pub record_id: String,
     pub account_id: i64,
@@ -54,7 +55,16 @@ impl UsageStore {
     /// @param record 已解析的安全摘要。
     /// @return 写入成功或数据库／数值范围错误。
     pub async fn record(&self, record: &UsageRecord) -> Result<(), AppError> {
-        let result = self.insert(record).await;
+        self.save(record, false).await
+    }
+
+    /// 以同一真实调用的唯一键补全正在观察的用量。@param record 已观测累计值。@return 写入结果。
+    pub(crate) async fn record_progress(&self, record: &UsageRecord) -> Result<(), AppError> {
+        self.save(record, true).await
+    }
+
+    async fn save(&self, record: &UsageRecord, progress: bool) -> Result<(), AppError> {
+        let result = self.insert(record, progress).await;
         if result.is_err() {
             self.last_gap_ms
                 .store(Utc::now().timestamp_millis(), Ordering::Relaxed);
@@ -62,7 +72,7 @@ impl UsageStore {
         result
     }
 
-    async fn insert(&self, record: &UsageRecord) -> Result<(), AppError> {
+    async fn insert(&self, record: &UsageRecord, progress: bool) -> Result<(), AppError> {
         let values = [
             record.usage.input_tokens,
             record.usage.output_tokens,
@@ -86,11 +96,16 @@ impl UsageStore {
             (record_id,account_id,started_at,finished_at,model,input_tokens,output_tokens,cache_read_tokens,
              cache_write_tokens,cache_write_5m_tokens,cache_write_1h_tokens,cost_usd,partial,price_version)
             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-            ON CONFLICT(record_id) DO NOTHING")
+            ON CONFLICT(record_id) DO UPDATE SET finished_at=excluded.finished_at,model=excluded.model,
+             input_tokens=excluded.input_tokens,output_tokens=excluded.output_tokens,
+             cache_read_tokens=excluded.cache_read_tokens,cache_write_tokens=excluded.cache_write_tokens,
+             cache_write_5m_tokens=excluded.cache_write_5m_tokens,cache_write_1h_tokens=excluded.cache_write_1h_tokens,
+             cost_usd=excluded.cost_usd,partial=excluded.partial,price_version=excluded.price_version
+             WHERE $15=1 AND usage_records.partial=1")
             .bind(&record.record_id).bind(record.account_id).bind(timestamp(record.started_at))
             .bind(timestamp(Utc::now())).bind(&record.model)
             .bind(tokens[0]).bind(tokens[1]).bind(tokens[2]).bind(tokens[3]).bind(tokens[4]).bind(tokens[5])
-            .bind(record.cost_usd).bind(i64::from(record.partial)).bind(price_version())
+            .bind(record.cost_usd).bind(i64::from(record.partial)).bind(price_version()).bind(i64::from(progress))
             .execute(&self.pool).await.map_err(storage_error)?;
 
         // 按时间保留八天，不能按条数截断，否则高流量会破坏当前周统计。

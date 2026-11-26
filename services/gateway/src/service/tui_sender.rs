@@ -797,6 +797,7 @@ impl TuiSender {
             let kind = match reply["kind"].as_str() {
                 Some("new") if !identity.continuation_only => "new",
                 Some("continuation") => "continuation",
+                Some("recovered") if identity.continuation_only => "recovered",
                 _ => return Err(invalid_identity()),
             };
             // 支持绑定的源在准备时仅预留容量，到 send 才获得实际启动目录。

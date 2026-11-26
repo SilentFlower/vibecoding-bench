@@ -24,6 +24,52 @@ pub struct UsageCapture {
     decoder: ResponseBodyDecoder<UsageParser>,
 }
 
+/// 为允许断线重连的真实调用保存已观察到的用量；同一个响应的读者共用一条记录。
+pub(super) struct ReconnectUsage {
+    capture: UsageCapture,
+    saved: Option<[Option<u64>; 6]>,
+}
+
+impl ReconnectUsage {
+    /// 接管该次调用原有的用量解析器。@param capture 用量存储与原模型。@param codings 实际编码。
+    pub(super) fn new(mut capture: UsageCapture, codings: &[String]) -> Self {
+        capture.configure_codings(codings);
+        Self {
+            capture,
+            saved: None,
+        }
+    }
+
+    /// 在向读者发布含用量的帧前保存变化的累计值。@param bytes 原公开响应分块。@return 无。
+    pub(super) async fn observe(&mut self, bytes: &[u8]) {
+        self.capture.observe(bytes);
+        let Some(parser) = self.capture.decoder.sink_mut() else {
+            return;
+        };
+        if !(parser.saw_input || parser.saw_output) || self.saved == Some(parser.tokens) {
+            return;
+        }
+        let Some(store) = &parser.store else { return };
+        let mut record = parser.record.clone();
+        record.partial = true;
+        record.cost_usd = calculate_cost(&record.model, &parser.speed, record.usage);
+        match store.record_progress(&record).await {
+            Ok(()) => self.saved = Some(parser.tokens),
+            Err(error) => warn!(account_id=record.account_id,%error,"续轮用量快照写入失败"),
+        }
+    }
+
+    /// 收口同一条记录。@param complete 是否取得可信终态。@return 无。
+    pub(super) async fn finish(self, complete: bool) {
+        let parser = self.capture.completed_parser(complete);
+        if let Some(store) = parser.store
+            && let Err(error) = store.record_progress(&parser.record).await
+        {
+            warn!(account_id=parser.record.account_id,%error,"续轮用量收口失败");
+        }
+    }
+}
+
 /// 解码链末端拥有解析状态，避免跨块借用或自引用回调。
 struct UsageParser {
     store: Option<Arc<UsageStore>>,

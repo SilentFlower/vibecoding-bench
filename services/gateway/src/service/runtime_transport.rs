@@ -1435,6 +1435,7 @@ pub(super) struct TuiReservation {
     pub(super) oauth_file: bool,
     tui_oauth_profile: Option<Map<String, Value>>,
     pub(super) continuation: bool,
+    pub(super) recovered: bool,
 }
 
 impl TuiReservation {
@@ -1805,6 +1806,9 @@ const TUI_PREPARE_REASON: &str = "x-v3-tui-prepare-reason";
 pub(super) fn tui_input_rejection(reason: &str) -> Option<AppError> {
     use StatusCode as S;
     const REASONS: &[(&str, S, &str)] = &[
+        ("outstanding_tool", S::CONFLICT, "该轮已开始交付新的工具。请提交该工具 ID 的执行结果后继续"),
+        ("recovery_used", S::CONFLICT, "本轮替代生成已提交，请先核对该次响应"),
+        ("unrecoverable_tool", S::BAD_REQUEST, "缺少原工具轮的有效恢复记录，请核对原会话和工具结果"),
         ("invalid_header", S::BAD_REQUEST, "请求头格式不合法"),
         ("duplicate_header", S::BAD_REQUEST, "单值协议请求头重复"),
         ("invalid_model", S::BAD_REQUEST, "model 必须为非空字符串"),
@@ -1894,7 +1898,7 @@ fn legacy_tui_input_compatible(body: &Value) -> bool {
 
 /// 无 billing 的原生格式还须匹配固定 CLI 版本和入口，宽泛客户端分类仅用于工具归属。
 /// @param headers 原始入口头。@return 已验证的私有来源线索。
-fn tui_cli_format(headers: &HeaderMap) -> Option<&'static str> {
+pub(super) fn tui_cli_format(headers: &HeaderMap) -> Option<&'static str> {
     static CLI: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(r"^claude-cli/2\.1\.(280|293) \(external, (?:cli|sdk-cli|claude-vscode)(?:, agent-sdk/[0-9A-Za-z.+-]+)?\)$")
             .expect("固定 CLI 来源表达式")
@@ -2006,6 +2010,7 @@ pub(super) async fn prepare_tui(
         signature_repair: false,
         repair_pending: false,
         continuation: false,
+        recovered: false,
     };
     let mut prepare = reservation.request("prepare");
     if let Some(known) = input.signature_repair {
@@ -2105,6 +2110,10 @@ pub(super) async fn prepare_tui(
                 .map(HeaderValue::as_bytes)
             {
                 Some(b"continuation") => reservation.continuation = true,
+                Some(b"recovered") if continuation_only => {
+                    reservation.continuation = true;
+                    reservation.recovered = true;
+                }
                 Some(b"new") if !continuation_only => {}
                 _ => {
                     return Err(AppError::ServiceUnavailable(
@@ -4560,6 +4569,7 @@ mod tests {
             signature_repair: false,
             repair_pending: false,
             continuation: false,
+            recovered: false,
         };
         drop(reservation("before-send"));
         let (action, identity) = timeout(Duration::from_secs(2), events.recv())

@@ -53,7 +53,6 @@ use crate::service::native_contract::validate_idle_timeout;
 use crate::service::native_error::{REJECTION_CAPTURE_HEADER, REJECTION_HEADER, rejection_reason};
 use crate::service::native_prewarm::NativePrewarmer;
 use crate::service::native_runtime::NativeSubmission;
-use crate::service::system_update::InferenceCutover;
 use crate::service::native_signature_repair::{
     CLEAR_THINKING, EMPTY_MESSAGE, NativeSignatureRepairs, SIGNATURE_ERROR_BODY_LIMIT,
     SignatureRejection, ThinkingRewrite, is_signature_rejection, thinking_rewrite,
@@ -75,16 +74,18 @@ use crate::service::runtime_transport::{self, PreparedRequest};
 use crate::service::session_hello_probe::{
     SessionHelloProbeConfig, SessionHelloProbeDecision, SessionHelloProbeService,
 };
+use crate::service::system_update::{InferenceCutover, UpdateActivity};
 use crate::service::telemetry::{
     MessageTelemetryContext, MessageTelemetryResult, MessageTelemetryUsage, TelemetryService,
     merge_message_usage,
 };
 use crate::service::tui_backend::{self, LEGACY_BINDING, TUI_V2, TuiRequestRoute};
 use crate::service::tui_native_drain::{
-    NativeTurn, active_agent_account, continuation_account, summary_account,
+    NativeTurn, active_agent_account, continuation_account, recovery_row, summary_account,
 };
+use crate::service::tui_reconnect::{self, BeforeHeaders, Reconnects, Reservation};
 use crate::service::tui_tool_history::{self, SERVER_SESSION_PREFIX};
-use crate::service::usage::UsageCapture;
+use crate::service::usage::{ReconnectUsage, UsageCapture};
 use crate::service::v3_scheduling::{RequestPhase, SchedulingRequest};
 use crate::service::version_profile::{
     COUNT_TOKENS_BETA_TOKEN, COUNT_TOKENS_BETA_TOKENS, ClaudeCodeProfile,
@@ -631,6 +632,7 @@ struct AccessProfileConfig {
 }
 
 pub struct GatewayService {
+    tui_reconnects: Reconnects,
     native_signature_repairs: NativeSignatureRepairs,
     native_prewarmer: NativePrewarmer,
     pub(crate) session_policy_block_svc: Arc<SessionPolicyBlockService>,
@@ -711,6 +713,7 @@ impl GatewayService {
     ) -> Self {
         let request_diagnostics_config = Arc::new(RwLock::default());
         Self {
+            tui_reconnects: Default::default(),
             native_signature_repairs: NativeSignatureRepairs::default(),
             session_policy_block_svc: Arc::new(SessionPolicyBlockService::new(&settings_store)),
             native_prewarmer: NativePrewarmer::new(
@@ -1744,6 +1747,30 @@ impl GatewayService {
         )
     }
 
+    /// 执行已鉴权的公开请求，并允许已提交的 V2 工具轮等待首次响应头。
+    /// @param req 入口请求。@param token 真实令牌。@return 公开网关响应。
+    pub async fn handle_authenticated(
+        self: Arc<Self>,
+        mut req: Request,
+        token: ApiToken,
+    ) -> Response {
+        if req.method() != Method::POST
+            || req.uri().path() != "/v1/messages"
+            || !runtime_transport::tui_runtime_configured()
+        {
+            return self.handle_request(req, Some(&token)).await;
+        }
+        let before = BeforeHeaders::default();
+        let cutover = req.extensions().get::<InferenceCutover>().cloned();
+        req.extensions_mut().insert(before.clone());
+        before
+            .run(
+                async move { self.handle_request(req, Some(&token)).await },
+                cutover,
+            )
+            .await
+    }
+
     /// 核心网关逻辑 -- axum handler。
     /// @param req 已通过入口鉴权的请求。
     /// @param api_token 已校验的账号访问范围。
@@ -2110,6 +2137,8 @@ impl GatewayService {
         let query = req.uri().query().unwrap_or("").to_string();
         let gemini = req.extensions().get::<Arc<GeminiService>>().cloned();
         let cutover: Option<InferenceCutover> = req.extensions().get().cloned();
+        let before_headers = req.extensions().get::<BeforeHeaders>().cloned();
+        let update_activity = req.extensions().get::<Arc<UpdateActivity>>().cloned();
 
         let mut native_header_map = req.headers().clone();
         let tui_ingress_headers = (path == "/v1/messages"
@@ -2368,8 +2397,56 @@ impl GatewayService {
         } else {
             None
         };
+        let native_message_cache = *self.message_cache_control_rewrite.read().await;
+        let tui_cache_ttl = *self.cache_control_ttl_rewrite.read().await;
+        let native_disabled_thinking = self.disabled_thinking_rewrite.read().await.clone();
+        let body_policy = runtime_transport::TuiBodyPolicy::new(
+            native_message_cache,
+            tui_cache_ttl,
+            native_disabled_thinking.should_rewrite(&body_map),
+        );
+        let reconnect_key = if summary.is_none()
+            && method == "POST"
+            && path == "/v1/messages"
+            && runtime_transport::tui_runtime_configured()
+            && let Some(token) = api_token
+            && tui_tool_history::has_result(&body_map)
+        {
+            tui_reconnect::key(
+                token.id,
+                original_session,
+                &body_map,
+                &native_header_map,
+                client_type == ClientType::ClaudeCode,
+                body_policy,
+                &query,
+            )
+            .ok()
+        } else {
+            None
+        };
+        let mut replay_owner = reconnect_key
+            .as_ref()
+            .and_then(|key| self.tui_reconnects.account(key));
+        let mut recovery = if reconnect_key.is_some()
+            && replay_owner.is_none()
+            && let Some(token) = api_token
+        {
+            recovery_row(
+                &self.account_svc.tui_database(),
+                token.id,
+                original_session,
+                &body_map,
+            )
+            .await?
+        } else {
+            None
+        };
         let tool_owner = if let Some((owner, ..)) = &summary {
             Some(*owner)
+        } else if let Some(owner) = replay_owner.or_else(|| recovery.as_ref().map(|r| r.account_id))
+        {
+            Some(owner)
         } else if method == "POST"
             && path == "/v1/messages"
             && runtime_transport::tui_runtime_configured()
@@ -2452,9 +2529,7 @@ impl GatewayService {
         };
 
         // 每个请求只冻结一次；保留原始 body_map/body_bytes，换号和重试复用相同清理正文。
-        let native_message_cache = *self.message_cache_control_rewrite.read().await;
-        let tui_cache_ttl = *self.cache_control_ttl_rewrite.read().await;
-        let native_disabled_thinking = self.disabled_thinking_rewrite.read().await.clone();
+
         let message_top_field_filter_enabled = *self.message_top_field_filter_enabled.read().await;
         let filtered_message_body =
             Rewriter::filter_message_top_fields(&body_map, &path, message_top_field_filter_enabled);
@@ -2495,6 +2570,17 @@ impl GatewayService {
                     )
                     .await
             };
+            if matches!(selection, Err(AppError::ServiceUnavailable(_)))
+                && replay_owner.is_none()
+                && let Some(owner) = reconnect_key
+                    .as_ref()
+                    .and_then(|key| self.tui_reconnects.account(key))
+                && Some(owner) == tool_owner
+            {
+                // 选号等待期间，另一条相同请求已取得原轮。仅因这一状态变化再核验一次原账号。
+                replay_owner = Some(owner);
+                continue;
+            }
             let selected = match selection.inspect_err(|error| {
                 if matches!(error, AppError::ServiceUnavailable(_)) {
                     diagnostics::error_stage("account_selection");
@@ -2693,6 +2779,34 @@ impl GatewayService {
                 {
                     signal.protect_tui();
                 }
+                let reconnect = if let Some(key) = reconnect_key
+                    && owner.is_some()
+                {
+                    match self
+                        .tui_reconnects
+                        .reserve(key, account.id, &route.binding)?
+                    {
+                        Reservation::First(writer) => {
+                            if replay_owner.is_some() && recovery.is_none() {
+                                // 选号期间旧缓存可能已回收。重新读取原回执，冷恢复仍须发送器出具证明。
+                                recovery = recovery_row(
+                                    &self.account_svc.tui_database(),
+                                    principal.id,
+                                    original_session,
+                                    &body_map,
+                                )
+                                .await?;
+                            }
+                            Some(writer)
+                        }
+                        Reservation::Existing(reply) => {
+                            diagnostics::selected_account(account.id);
+                            return reply.subscribe(false).await;
+                        }
+                    }
+                } else {
+                    None
+                };
                 request.phase(RequestPhase::Preparing);
                 let wake = route
                     .may_wake_v2(&self.account_svc, &account, returning_tool)
@@ -2704,6 +2818,7 @@ impl GatewayService {
                     (returning_tool && owner.is_some()).then_some(route.binding.as_str()),
                 )
                 .await?;
+                let checking_recovery = recovery.is_some();
                 let (binding, mut turn, draining) = route
                     .begin_v2(
                         &self.account_svc,
@@ -2712,6 +2827,7 @@ impl GatewayService {
                         &body_map,
                         &sender,
                         returning_tool,
+                        recovery.take(),
                     )
                     .await?;
                 let assigned_session = turn
@@ -2739,11 +2855,7 @@ impl GatewayService {
                         native_cc: client_type == ClientType::ClaudeCode,
                         agent_summary: native_summary,
                         oauth_file: account.auth_type == AccountAuthType::Oauth,
-                        body_policy: runtime_transport::TuiBodyPolicy::new(
-                            native_message_cache,
-                            tui_cache_ttl,
-                            native_disabled_thinking.should_rewrite(&body_map),
-                        ),
+                        body_policy,
                         signature_repair: Some(repair_session.as_deref().is_some_and(|session| {
                             self.native_signature_repairs.contains(session, &body_map)
                         })),
@@ -2751,8 +2863,27 @@ impl GatewayService {
                     request.deadline(),
                     draining || owned_tool_group,
                 )
-                .await?;
+                .await
+                .map_err(|error| match error {
+                    AppError::TuiInputUnsupported if checking_recovery => AppError::TuiInput {
+                        status: StatusCode::CONFLICT,
+                        code: "tool_recovery_unconfirmed",
+                        message: "当前账号发送器未确认这轮的恢复凭据。请核对原会话、工具回执和请求参数，使用旧版账号后台时请更新后重试",
+                    },
+                    error => error,
+                })
+                .inspect_err(|error| {
+                    if let Some(writer) = &reconnect {
+                        writer.rejected(error);
+                    }
+                })?;
                 prepared.verify_input_policy(&body_map)?;
+                if let Some(turn) = &mut turn {
+                    turn.confirm_recovery(prepared.recovered).await?;
+                    if prepared.recovered {
+                        diagnostics::retry_reason("tui_reconnect_regenerated");
+                    }
+                }
                 if let Some(headers) = &tui_ingress_headers {
                     prepared.observe_ingress(
                         headers,
@@ -2846,6 +2977,15 @@ impl GatewayService {
                 let repair_deadline = TokioInstant::now() + ttfb_timeout;
                 let started = std::time::Instant::now();
                 let usage_started_at = Utc::now();
+                let delivery = if let (Some(writer), Some(turn)) = (&reconnect, &mut turn) {
+                    let delivery = turn.track_delivery();
+                    if let Some(before) = &before_headers {
+                        before.submitted(writer, &delivery);
+                    }
+                    Some(delivery)
+                } else {
+                    None
+                };
                 send_permit.submitted();
                 if let Some(turn) = &turn {
                     turn.mark_submitted();
@@ -2998,7 +3138,7 @@ impl GatewayService {
                     warn!(account_id = account.id, %error, "V2 拒绝响应的轮次状态待核对");
                 }
                 let status = response.status().as_u16();
-                let usage = response.status().is_success().then(|| {
+                let mut usage = response.status().is_success().then(|| {
                     UsageCapture::new(
                         self.usage_store.clone(),
                         account.id,
@@ -3006,6 +3146,13 @@ impl GatewayService {
                         usage_started_at,
                     )
                 });
+                let retained_usage = if reconnect.is_some() && status == 200 {
+                    usage
+                        .take()
+                        .map(|capture| ReconnectUsage::new(capture, &codings))
+                } else {
+                    None
+                };
                 let response = match turn {
                     Some(turn) => turn.observe_v2_response(response, &codings, cutover.clone()),
                     None => response,
@@ -3029,7 +3176,21 @@ impl GatewayService {
                 )
                 .with_usage_capture(usage)
                 .with_tui_retirement(Some(self.account_svc.clone()));
-                return Ok(Response::from_parts(parts, Body::new(guarded)));
+                let response = Response::from_parts(parts, Body::new(guarded));
+                return match (reconnect, delivery) {
+                    (Some(writer), Some(verified)) => {
+                        writer
+                            .publish(
+                                response,
+                                cutover.clone(),
+                                verified,
+                                update_activity,
+                                retained_usage,
+                            )
+                            .await
+                    }
+                    _ => Ok(response),
+                };
             }
 
             // 先获得并发槽位，再做 RPM admission：排队中的请求还没有准备发往上游，

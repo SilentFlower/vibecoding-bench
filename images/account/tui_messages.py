@@ -375,9 +375,23 @@ def _snapshot(block):
     return record
 
 
-def tool_receipts(messages, previous, expected, *, input_format=None):
+def receipt_snapshot(block):
+    """持久化声明的比较依据。@param block 原生响应快照。@return 含身份及规范摘要的记录。"""
+    direct = block.get("type") == "tool_use" and block.get("caller") == {"type": "direct"}
+    fields = {k: v for k, v in block.items() if not (direct and k == "caller")}
+    raw = json.dumps(fields, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    proof = {"type": block["type"], "digest": hashlib.sha256(raw.encode()).hexdigest()}
+    if block["type"] == "tool_use":
+        proof.update(id=block["id"], name=block["name"])
+    if direct:
+        proof["caller"] = {"type": "direct"}
+    return proof
+
+
+def tool_receipts(messages, previous, expected, *, input_format=None, checkpoint=False):
     """完整校验原轮和终端所等待的结果。@param messages 本轮正文。@param previous 原历史摘要。
-    @param expected 实际响应块摘要。@param input_format 本轮已识别的客户端布局。@return 原 ID 到未改写结果的映射。
+    @param expected 实际响应块摘要。@param input_format 本轮已识别的客户端布局。
+    @param checkpoint 是否使用持久摘要。@return 原 ID 到未改写结果的映射。
     """
     pos, returned = split_reply(messages)
     if (
@@ -387,6 +401,8 @@ def tool_receipts(messages, previous, expected, *, input_format=None):
     ):
         raise ValueError("工具结果不属于原历史")
     offered = [_snapshot(b) for b in _blocks(messages[pos])]
+    if checkpoint:
+        offered = [receipt_snapshot(b) for b in offered]
     if (input_format == "claude_code" and any(b.get("name") in ("Agent", "Task") for b in expected)
             and all(b["type"] in ("text", "tool_use") for b in expected)
             and [b["type"] for b in offered] != [b["type"] for b in expected]):

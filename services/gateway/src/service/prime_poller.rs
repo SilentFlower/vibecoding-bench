@@ -951,7 +951,15 @@ impl PrimePollerService {
             let sender =
                 runtime_transport::ready_tui_sender(&account, deadline, wake, None).await?;
             let (binding, _, _) = route
-                .begin_v2(&self.account_svc, &account, None, &body, &sender, false)
+                .begin_v2(
+                    &self.account_svc,
+                    &account,
+                    None,
+                    &body,
+                    &sender,
+                    false,
+                    None,
+                )
                 .await?;
             let session = format!("{SERVER_SESSION_PREFIX}prime-{}", Uuid::new_v4());
             let bytes = Bytes::from(

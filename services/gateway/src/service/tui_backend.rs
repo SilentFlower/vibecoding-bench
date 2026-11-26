@@ -102,6 +102,7 @@ impl TuiRequestRoute {
         body: &Value,
         sender: &TuiReadySender,
         continuation: bool,
+        recovery: Option<tui_native_drain::ReceiptRow>,
     ) -> Result<(String, Option<NativeTurn>, bool), AppError> {
         let _config = self.queue.tui_config.lock().await;
         let mut state = service.tui_backend(account.id).await?;
@@ -140,7 +141,15 @@ impl TuiRequestRoute {
         if !body["messages"].is_array() {
             return Err(tui_input_rejection("invalid_messages").expect("固定 Messages 输入分类"));
         }
-        let turn = if let Some(owner) = owner {
+        let turn = if let (Some(row), Some(owner)) = (recovery, owner) {
+            Some(row.pending(
+                service.tui_database(),
+                account.id,
+                &state.binding,
+                owner,
+                body,
+            )?)
+        } else if let Some(owner) = owner {
             Some(
                 tui_native_drain::claim(
                     service.tui_database(),

@@ -24,7 +24,8 @@ from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 
 from tui_capacity import TuiCapacity, TuiCapacityError
-from tui_input_policy import CONTEXT_BETA, native_input
+from tui_reconnect import ReceiptCheckpoints, digest
+from tui_input_policy import CONTEXT_BETA, InputRejection, native_input
 from tui_messages import (
     BODY_LIMIT,
     MODEL_PROTOCOL_HEADERS,
@@ -37,6 +38,7 @@ from tui_messages import (
     input_message,
     passive_quota_headers,
     prompt_text,
+    receipt_snapshot,
     provider_session,
     split_reply,
     tool_receipts,
@@ -93,6 +95,7 @@ class _Waiting:
     actor_key: tuple
     offer: _AgentOffer | None = None
     agent_summary: bool = False
+    recovering: bool = False
     exact_receipt_only: bool = False
     groups: frozenset | None = None
 
@@ -291,6 +294,7 @@ class _Actor:
         self.finished = False
         self.history = None
         self.expected = None
+        self.receipt_revision = None
         self.wait_until = None
         self.answers = {}
         self.delivered = set()
@@ -415,6 +419,9 @@ class _Actor:
                         seen, tail, submitted = False, b"", False
                         while not self.dead.is_set() and self.process.poll() is None:
                             with self.changed:
+                                if self.claim and self.claim.disconnected and self.claim.disconnected.is_set():
+                                    # 网关已释放这次私有发送。空闲模型也随监护循环退出。
+                                    break
                                 if (
                                     self.wait_until is not None
                                     and time.monotonic() >= self.wait_until
@@ -560,6 +567,12 @@ class _Actor:
 
     def _observe(self, step, event):
         with self.changed:
+            if self.dead.is_set():
+                raise RuntimeError("原工具步骤已退出")
+            if (event and event.get("type") == "content_block_start"
+                    and event.get("content_block", {}).get("type") in ("tool_use", "server_tool_use")):
+                # 新指令可能随下一帧到达客户端，从此不能再派发产生它的旧步骤。
+                self.driver.checkpoints.new_tool(self.identity, self.receipt_revision)
             block = step.observe(event)
         if self.reservation.get("agent_summary"):
             # 进度回复只交给辅助请求，模型输出不能创建业务工具派工。
@@ -587,13 +600,17 @@ class _Actor:
             self.driver.lock.notify_all()
 
     def _finish_step(self):
-        self._publish(self.step.final)
-        self.finished = True
         self.expected = self.step.blocks if self.step.reason == "tool_use" else None
         if self.expected:
+            self.receipt_revision = self.driver.checkpoints.offer(
+                self.identity, self.reservation["session_id"], self.history,
+                [receipt_snapshot(b) for b in self.expected], _RECEIPT_SECONDS,
+            )
             self.wait_until = time.monotonic() + _RECEIPT_SECONDS
             for offer in self.agent_offers.values():
                 offer.until = self.wait_until
+        self._publish(self.step.final)
+        self.finished = True
         self.changed.notify_all()
 
     def _publish(self, batch):
@@ -756,6 +773,10 @@ class _Actor:
                 if handle.kind == "new" and self.agent_offer is not None:
                     self.agent_offer.messages.clear()
                     self.agent_messages.clear()
+                if handle.kind == "recovered" and not self.driver.checkpoints.submit(
+                    self.identity, self.receipt_revision, handle.request_digest, True
+                ):
+                    raise InputRejection("recovery_used")
                 step.claimed = True
                 raw, handle.raw = handle.raw, None
                 account_token = handle.account_token
@@ -894,10 +915,10 @@ class _Actor:
             self.agent_offers = {}
             self.step = WireStep(handle.tools)
             self.history = handle.history
-            self.answers = handle.answers
+            self.answers = {} if handle.kind == "recovered" else handle.answers
             self.wait_until = None
             self.changed.notify_all()
-            if handle.kind == "new":
+            if handle.kind != "continuation":
                 self.launch_token = None if self.oauth_file else handle.account_token
                 self.start(command)
         while True:
@@ -917,10 +938,16 @@ class _Actor:
                 return
 
 
+def _receipt_request(body, reservation):
+    # 只绑定实际支持的生成参数和返回表示，连接 ID 与预留期限可随重试变化。
+    return digest([body, dict(reservation.get("model_headers") or {}),
+                   reservation.get("body_policy"), reservation.get("input_format")])
+
+
 class _Reserved:
     """账号内只准单次提交的交互预留。"""
 
-    def __init__(self, actor, kind, history, answers, body, stream, raw, reservation):
+    def __init__(self, actor, kind, history, answers, body, stream, raw, reservation, request_digest=None):
         self.actor = actor
         self.kind = kind
         self.history = history
@@ -937,6 +964,7 @@ class _Reserved:
         self.upstream_session_id = None
         self.reservation = reservation
         self.account_token = None
+        self.disconnected = None
         self.quota_headers = None
         self.expires_at = None
         # 原生请求已声明完整的协议上下文。普通 API 的历史管理需要本次实际 CLI 提供能力。
@@ -947,6 +975,7 @@ class _Reserved:
         self.signature_known = False
         self.repair_attempt_id = None
         self.sent = self.completed = False
+        self.request_digest = request_digest
 
     def send(self, command):
         """实际启动或恢复一个模型步骤。@param command 已核验工作区。@return 逐帧输出。"""
@@ -982,7 +1011,15 @@ class _Reserved:
                 actor.agent_offer.submitted = True
             self.capture_assembly = command.get("capture_assembly") is True
             self.upstream_session_id = command.get("upstream_session_id")
-            if self.kind == "new":
+            if self.answers:
+                recorded = actor.driver.checkpoints.submit(
+                    actor.identity, actor.receipt_revision, self.request_digest, False
+                )
+                if self.kind == "recovered" and not recorded:
+                    raise ValueError("此恢复许可已消费或过期")
+            else:
+                actor.driver.checkpoints.discard(actor.identity)
+            if self.kind != "continuation":
                 actor.oauth_file = file is not None
             self.account_token = token
             self.sent = True
@@ -1006,7 +1043,7 @@ class _Reserved:
                     and bool(step.final)
                 )
                 actor.abort()
-            if not self.sent and self.kind == "new":
+            if not self.sent and self.kind != "continuation":
                 actor.abort()
             actor.changed.notify_all()
         if actor.dead.is_set() and actor.worker is None:
@@ -1021,6 +1058,7 @@ class SessionDriver:
         if launcher is None:
             import tui_sender_launch as launcher
         self.launcher = launcher
+        self.checkpoints = ReceiptCheckpoints(getattr(launcher, "STORAGE", None))
         self.managed_oauth = getattr(launcher, "managed_oauth_enabled", lambda: False)()
         self.oauth_file_available = getattr(launcher, "file_oauth_enabled", lambda: False)()
         # 编排每个 HTTP 并发配置两个预留。等待新 TUI 的队列必须留下至少一个传输名额还工具。
@@ -1100,6 +1138,7 @@ class SessionDriver:
                             child.agent_offer is not None
                             and child.agent_offer.parent is actor
                         ):
+                            self.checkpoints.discard(child.identity)
                             child.abort()
                 for offer in self.background_agents.values():
                     if offer.parent is actor:
@@ -1252,6 +1291,8 @@ class SessionDriver:
                 owner is not None and owner.expected is not None and not owner.dead.is_set()
                 and not any(w.offer and any(w.offer.waiting_ancestors()) for w in self.waiters)
             )
+        if ticket.recovering:
+            return ordinary_room or len(key) > 5
         return (len(key) == 5 or offer is not None) and (
             ordinary_room or offer is not None and any(offer.waiting_ancestors())
         )
@@ -1310,41 +1351,63 @@ class SessionDriver:
                 raise TimeoutError("原版会话预留已取消或到期")
             return result
 
+        checkpoint = None
         if not summary and (returned or reservation["continuation_only"]):
+            if not returned:
+                raise ValueError("缺少原轮工具结果")
+            request = _receipt_request(body, reservation)
             with self.lock:
-                actor = self.sessions.get(actor_key)
-            if actor is None or not returned:
-                raise ValueError("缺少工具结果所属的原会话")
-            with actor.changed:
-                # 对外终帧可稍早于上一传输线程归还句柄。只等本次已经确认完成的交接。
-                prior = actor.claim
-                while (
-                    actor.claim is not None
-                    and actor.claim is prior
-                    and actor.finished
-                    and not actor.dead.is_set()
-                ):
-                    actor.changed.wait(min(remaining(), 0.05))
-                if (
-                    actor.dead.is_set()
-                    or actor.expected is None
-                    or actor.claim is not None
-                ):
-                    raise ValueError("原会话未准备接收该工具结果")
-                answers = tool_receipts(messages, actor.history, actor.expected,
-                                        input_format=reservation.get("input_format"))
-                handle = _Reserved(
-                    actor,
-                    "continuation",
-                    history,
-                    answers,
-                    body,
-                    stream,
-                    frozen,
-                    reservation,
-                )
-                actor.claim = handle
-                return handle
+                while (actor := self.sessions.get(actor_key)) is not None:
+                    with actor.changed:
+                        prior = actor.claim
+                        retiring = actor.dead.is_set() or (prior is not None and prior.sent
+                                                           and prior.request_digest == request)
+                    if not retiring:
+                        break
+                    # 原网关退出时，发送器可能正在释放同一请求。只等待该步骤的监护线程。
+                    self.lock.wait(min(remaining(), 0.05))
+                # 监护线程已经完成进程回收才会从此表删除；同一会话的其他子代理独立运行。
+                if actor is None:
+                    checkpoint = self.checkpoints.find(actor_key)
+                    if checkpoint is None:
+                        raise InputRejection("unrecoverable_tool")
+                    branch, previous, expected, prior_request, revision = checkpoint
+                    answers = tool_receipts(messages, previous, expected,
+                                            input_format=reservation.get("input_format"), checkpoint=True)
+                    if prior_request is not None and prior_request != request:
+                        raise ValueError("已提交的工具结果或模型参数与重试不符")
+            if actor is not None:
+                with actor.changed:
+                    # 对外终帧可稍早于上一传输线程归还句柄。只等本次已经确认完成的交接。
+                    prior = actor.claim
+                    while (
+                        actor.claim is not None
+                        and actor.claim is prior
+                        and actor.finished
+                        and not actor.dead.is_set()
+                    ):
+                        actor.changed.wait(min(remaining(), 0.05))
+                    if (
+                        actor.dead.is_set()
+                        or actor.expected is None
+                        or actor.claim is not None
+                    ):
+                        raise ValueError("原会话未准备接收该工具结果")
+                    answers = tool_receipts(messages, actor.history, actor.expected,
+                                            input_format=reservation.get("input_format"))
+                    handle = _Reserved(
+                        actor,
+                        "continuation",
+                        history,
+                        answers,
+                        body,
+                        stream,
+                        frozen,
+                        reservation,
+                        request,
+                    )
+                    actor.claim = handle
+                    return handle
 
         prompt = prompt_text(messages)
         with self.lock:
@@ -1353,13 +1416,13 @@ class SessionDriver:
                 or any(item.actor_key == actor_key for item in self.waiters)
             ):
                 raise SubagentBindingError("此子代理已持有独立进程，工具回执须返回原轮")
-            if agent_hint is not None and not summary:
+            if agent_hint is not None and not summary and checkpoint is None:
                 child_text, extras = _agent_prompt(messages)
                 prompts = [sha256(child_text.encode()).digest()]
                 if child_text.endswith("\n"):
                     prompts.append(sha256(child_text[:-1].encode()).digest())
             offer = None
-            ticket = _Waiting(actor_key, agent_summary=summary)
+            ticket = _Waiting(actor_key, agent_summary=summary, recovering=checkpoint is not None)
             handoff_limit = time.monotonic() + _AGENT_HANDOFF_SECONDS
             try:
                 while True:
@@ -1377,7 +1440,7 @@ class SessionDriver:
                             and all(actor.expected and actor.claim is None for actor in self.sessions.values())):
                         # 全部物理位都在等外部工具。让进度请求退避，把下一次准入留给真回执。
                         raise TimeoutError("原工具等待已占满账号物理进程额度")
-                    if agent_hint is not None and not summary and offer is None:
+                    if agent_hint is not None and not summary and offer is None and checkpoint is None:
                         # 两个相同提示在收到启动回执前无法区分，挂起握手而不占进程。
                         offer = ticket.offer = self._claim_agent(
                             identity,
@@ -1425,6 +1488,8 @@ class SessionDriver:
                         if summary:
                             branch_id = UUID(bytes=sha256(_json(actor_key).encode()).digest()[:16], version=4)
                             actor_reservation = {**reservation, "session_id": AGENT_SESSION_PREFIX + str(branch_id)}
+                        elif checkpoint is not None:
+                            actor_reservation = {**reservation, "session_id": branch}
                         elif offer is not None:
                             actor_reservation = {**reservation, "session_id": AGENT_SESSION_PREFIX + str(uuid4())}
                         actor = _Actor(
@@ -1440,18 +1505,21 @@ class SessionDriver:
                             slot,
                             offer,
                         )
+                        if checkpoint is not None:
+                            actor.receipt_revision = revision
                         if offer is not None:
                             actor.agent_messages = extras
                         self.sessions[actor_key] = actor
                         handle = _Reserved(
                             actor,
-                            "new",
+                            "recovered" if checkpoint is not None else "new",
                             history,
-                            {},
+                            answers if checkpoint is not None else {},
                             body,
                             stream,
                             frozen,
                             reservation,
+                            request if checkpoint is not None else None,
                         )
                         actor.claim = handle
                         return handle
@@ -1494,3 +1562,4 @@ class SessionDriver:
                 actor.worker.join()
             else:
                 self._retire(actor)
+        self.checkpoints.close()

@@ -120,7 +120,7 @@ pub struct UpdateActivity;
 
 struct TrackedBody {
     inner: Body,
-    activity: Option<UpdateActivity>,
+    activity: Option<Arc<UpdateActivity>>,
     cutover: Option<Pin<Box<dyn Future<Output = ()> + Send>>>,
 }
 
@@ -447,7 +447,9 @@ pub async fn middleware(mut request: Request, next: Next) -> Response {
             activity
         }
     };
+    let activity = Arc::new(activity);
     let mut wait = cutover.map(|mut signal| {
+        request.extensions_mut().insert(activity.clone());
         request.extensions_mut().insert(signal.clone());
         Box::pin(async move { signal.interrupt().await })
             as Pin<Box<dyn Future<Output = ()> + Send>>
@@ -484,6 +486,7 @@ mod tests {
     use std::env::temp_dir;
     use std::fs;
     use std::os::unix::fs::PermissionsExt;
+    use std::sync::Arc;
     use std::time::Duration;
     use tokio::sync::{mpsc, watch};
     use tokio_stream::wrappers::ReceiverStream;
@@ -497,7 +500,7 @@ mod tests {
                     Ok::<_, std::io::Error>(Bytes::from_static(b"first")),
                     Ok(Bytes::from_static(b"last")),
                 ])),
-                activity: Some(UpdateActivity),
+                activity: Some(Arc::new(UpdateActivity)),
                 cutover: None,
             }
         };
@@ -518,7 +521,7 @@ mod tests {
             inner: Body::from_stream(stream::iter([Err::<Bytes, _>(std::io::Error::other(
                 "合成断流",
             ))])),
-            activity: Some(UpdateActivity),
+            activity: Some(Arc::new(UpdateActivity)),
             cutover: None,
         };
         assert!(failed.frame().await.unwrap().is_err());
