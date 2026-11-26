@@ -1379,7 +1379,7 @@ impl TuiReadySender {
 
 /// 解析账号登记并核验 sender 的实际能力。@param account 已授权账号。
 /// @param deadline 请求的单调时钟截止。@param wake 是否允许沿编排合同唤醒。
-/// @param registered 原回执已登记的绑定。@return 原传输及其就绪证明。
+/// @param registered 原回执已登记的绑定。@return 原传输及其就绪证明，新轮只使用当前发行。
 pub(super) async fn ready_tui_sender(
     account: &Account,
     deadline: Instant,
@@ -1391,6 +1391,13 @@ pub(super) async fn ready_tui_sender(
         .ok_or(AppError::AdmissionLimited { retry_after: 1 })?;
     let (transport, (idle, agent_summary, system_prompt_policy)) = timeout(budget, async {
         let transport = tui_transport(account, wake.then_some(budget), registered, true).await?;
+        if registered.is_none()
+            && !transport.fixture
+            && transport.binding.release_id != configured_account_release()
+        {
+            // 滚动更新的旧本机绑定仍可被发现。仅已登记回执可以继续使用该发行的发送器。
+            return Err(TuiV2Unavailable::BindingUnverified);
+        }
         let idle = tui_status(
             &transport.client,
             &transport.binding,

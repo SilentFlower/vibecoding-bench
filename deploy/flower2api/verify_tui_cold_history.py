@@ -17,6 +17,7 @@ from subprocess import PIPE, Popen, run
 from sys import executable
 from tempfile import TemporaryDirectory
 from time import time_ns
+from urllib.parse import parse_qs, urlsplit
 from uuid import uuid4
 
 from fixtures.native_model_send.fixture_tunnel import _relay
@@ -61,19 +62,40 @@ class QuietHandler(BaseHTTPRequestHandler):
         """省略验收请求日志。@return 无。"""
 
 
-def install_source():
-    """把当前版本生产模块安装到 Rust 发送器的固定入口。@return 无。"""
+def install_source(root=ROOT):
+    """安装与发送器配套的生产事件源。@param root 检出的源代码。@return 无。"""
     target = Path("/opt/flower/tui")
-    for file in (ROOT / "images/account").glob("tui_*.py"):
+    for file in (root / "images/account").glob("tui_*.py"):
         copy2(file, target / file.name)
-    copytree(ROOT / "images/account/tui-mod", target / "tui-mod", dirs_exist_ok=True)
+    copytree(root / "images/account/tui-mod", target / "tui-mod", dirs_exist_ok=True)
     for name in ("runtime_files.py", "tui_workspace_launch.py", "tui_capacity.py"):
-        copy2(ROOT / "services/orchestrator" / name, target / name)
+        copy2(root / "services/orchestrator" / name, target / name)
+
+
+def build_cutover_record(temporary, old, deployment, release):
+    """建立隔离演练的本地准入记录。@param temporary 私有目录。@param old 原账号绑定。
+    @param deployment 测试部署。@param release 目标发行标识。@return 准入目录。
+    """
+    gate = temporary / "update-gate"
+    gate.mkdir(mode=0o700)
+    admission = {"schema_version": 1, "deployment": deployment, "operation_id": None,
+                 "epoch": str(uuid4()), "phase": "idle", "target_release": None,
+                 "revision": str(uuid4()), "created_at": "2026-01-01T00:00:00Z"}
+    rollout = {"schema_version": 1, "deployment": deployment, "control_release": release,
+               "account_release": release, "environments": {old["environment_id"]: {
+                   "account_id": 1, "gateway_account_id": old["account_id"], "generation": old["generation"],
+                   "origin": {"release": old["release_id"], "environment_id": old["environment_id"], "protocol": 1},
+               }}}
+    for name, value in (("admission.json", admission), (f"account-rollout-{release}.json", rollout)):
+        path = gate / name
+        path.write_text(json.dumps(value))
+        path.chmod(0o600)
+    return gate
 
 
 def verify(gateway, sender, temporary, *, restart_history=False, text_input=False, system_policy=False,
            toggle_pending_policy=False, tool_policy=None, recover_pending=False, output_effort=False,
-           history_png=False, history_tool_blocks=False):
+           history_png=False, history_tool_blocks=False, previous=None):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -84,11 +106,13 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param output_effort 是否核对 CLI 实际生成的推理强度和 Token 上限。
     @param history_png 是否核对用户历史里的内嵌 PNG。
     @param history_tool_blocks 是否核对已完成工具结果的原始文本块。
+    @param previous 可选，旧发行源码、网关、发送器三个离线制品。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
     nonce = uuid4().hex
-    deployment, release = "cold-history-" + nonce, "cold-history-fixture"
+    deployment = "cold-history-" + nonce
+    release, next_release = ("ci-4311-1", "ci-4312-1") if previous else ("cold-history-fixture", None)
     host = "flower2api-" + sha256(deployment.encode()).hexdigest()[:12] + "-" + nonce
     binding = {"account_id": 1, "environment_id": nonce, "generation": 1, "release_id": release,
                "endpoint": f"http://{host}:8091", "secret": secret}
@@ -101,6 +125,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     config = Path("/run/v3/sender.json")
     copy2(temporary / "ca.der", config.with_name("verification-ca.der"))
     received, callbacks, proxy_targets = [], [], []
+    lookups = []
 
     class Receiver(QuietHandler):
         """以生产主机名的临时证书接收原生请求，返回固定工具或文本。"""
@@ -149,8 +174,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             if self.headers.get("Authorization") != "Bearer " + internal:
                 self.send_error(403)
                 return
-            path = self.path.partition("?")[0]
+            target = urlsplit(self.path)
+            path = target.path
             if path == "/internal/v3/transport/1":
+                if previous:
+                    lookups.append(parse_qs(target.query))
                 return response_json(self, binding)
             prefix = "/internal/v3/native-captures/1/"
             if path.startswith(prefix):
@@ -169,31 +197,41 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         proxy = serve(stack, ThreadingHTTPServer(("127.0.0.1", 0), Proxy))
         registry = serve(stack, ThreadingHTTPServer(("127.0.0.1", 0), Registry))
         proxy_url = f"http://127.0.0.1:{proxy.server_port}"
-        config.write_text(json.dumps({"binding": binding, "proxy_url": proxy_url,
-                                     "allowed_origin": "https://api.anthropic.com",
-                                     "native_capture_dir": "/flows/api/cc-prepared",
-                                     "tui_v2": {"max_reservations": 4}}))
-        config.chmod(0o640)
-        os.chown(config, 0, 1001)
+
+        def write_sender_config():
+            config.write_text(json.dumps({"binding": binding, "proxy_url": proxy_url,
+                                          "allowed_origin": "https://api.anthropic.com",
+                                          "native_capture_dir": "/flows/api/cc-prepared",
+                                          "tui_v2": {"max_reservations": 4}}))
+            config.chmod(0o640)
+            os.chown(config, 0, 1001)
+
+        write_sender_config()
         common = {"PATH": os.defpath, "LANG": "C.UTF-8", "HOME": "/tmp", "TOKIO_WORKER_THREADS": "2"}
-        def start_sender():
-            process = Popen([sender], user=1001, group=1001, extra_groups=[], env={
+
+        def start_sender(program=sender):
+            process = Popen([program], user=1001, group=1001, extra_groups=[], env={
                 **common, "RUST_LOG": "warn", "V3_SENDER_CONFIG": str(config),
                 "V3_TUI_SESSION_HOST": "1", "V3_TUI_MANAGED_OAUTH": "1",
             })
             stack.callback(stop, process)
             return process
 
-        source = start_sender()
-        control = Popen([gateway], cwd=temporary, env={
-            **common, "SERVER_PORT": "18090", "SERVER_HOST": "127.0.0.1", "DATABASE_DRIVER": "sqlite",
-            "DATABASE_DSN": str(temporary / "gateway.db"), "ADMIN_PASSWORD": admin,
-            "V3_INTERNAL_TOKEN": internal, "V3_DEPLOYMENT_ID": deployment,
-            "V3_RELEASE": release, "V3_RUNTIME_URL": f"http://127.0.0.1:{registry.server_port}",
-            "LOG_LEVEL": "warn",
-        })
-        stack.callback(stop, control)
-        wait_for(lambda: call(18090, "GET", "/admin/accounts", admin)[0] == 200)
+        def start_gateway(program, version, **gate):
+            process = Popen([program], cwd=temporary, env={
+                **common, "SERVER_PORT": "18090", "SERVER_HOST": "127.0.0.1", "DATABASE_DRIVER": "sqlite",
+                "DATABASE_DSN": str(temporary / "gateway.db"), "ADMIN_PASSWORD": admin,
+                "V3_INTERNAL_TOKEN": internal, "V3_DEPLOYMENT_ID": deployment,
+                "V3_RELEASE": version, "V3_RUNTIME_URL": f"http://127.0.0.1:{registry.server_port}",
+                "LOG_LEVEL": "warn", **gate,
+            })
+            stack.callback(stop, process)
+            wait_for(lambda: call(18090, "GET", "/admin/accounts", admin)[0] == 200)
+            return process
+
+        source = start_sender(previous[2] if previous else sender)
+        control = start_gateway(previous[1] if previous else gateway, release)
+
         def sender_state():
             return json.loads(call(8091, "GET", "/internal/status", secret)[1]).get("tui_v2", {})
 
@@ -280,6 +318,19 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         assert tool["input"] == ARGS
         # 合成客户端只执行登记过的这一个调用。旧工具的 ID 不经过公开回执。
         callbacks.append(tool["id"])
+        if previous:
+            assert received[0][1]["tools"][0]["name"] == TOOL["name"]
+            assert not sender_state().get("idle")
+            old_binding = {key: binding[key] for key in ("account_id", "environment_id", "generation", "release_id", "endpoint")}
+            gate = build_cutover_record(temporary, old_binding, deployment, next_release)
+            stop(control)
+            start_gateway(gateway, next_release, V3_UPDATE_GATE_DIR=str(gate), V3_ACCOUNT_RELEASE=next_release)
+            fresh = {**body, "stream": False, "messages": [{"role": "user", "content": AFTER_RESTART}]}
+            lookup_boundary = len(lookups)
+            premature, refuse = call(18090, "POST", "/v1/messages", token, fresh,
+                                     {**headers, "x-session-id": str(uuid4())})
+            assert premature == 503 and len(received) == 1, (premature, refuse, len(received))
+            assert any("tui_previous_release" not in lookup for lookup in lookups[lookup_boundary:])
         if toggle_pending_policy:
             changed = manage("PUT", f"accounts/{identifier}", {"client_system_prompt_policy": "replace"})
             assert changed["client_system_prompt_policy"] == "replace"
@@ -327,6 +378,38 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         duplicate, _ = call(18090, "POST", "/v1/messages", token, follow, headers)
         assert duplicate == 400 and len(received) == 2, (duplicate, len(received))
         assert callbacks == [NEW_ID]
+        if previous:
+            ((role, old_receipt),) = find_blocks(received[1][1], "tool_use_id", NEW_ID)
+            assert role == "user" and REPLY in json.dumps(old_receipt, ensure_ascii=False)
+            assert any(lookup.get("tui_previous_release") == ["true"] for lookup in lookups[lookup_boundary:])
+            wait_for(lambda: sender_state().get("idle"))
+            with closing(connect(temporary / "gateway.db")) as database:
+                wait_for(lambda: database.execute("SELECT count(*) FROM tui_native_turns WHERE tools IN (?, ?)",
+                                                 (json.dumps([NEW_ID]), "!" + json.dumps([NEW_ID]))).fetchone()[0] == 0)
+            stop(source)
+            install_source()
+            binding.update(generation=2, release_id=next_release)
+            write_sender_config()
+            binding["tui_predecessors"] = [old_binding]
+            start_sender()
+            wait_for(lambda: sender_state().get("ready") and sender_state().get("idle"))
+            status, raw = call(18090, "POST", "/v1/messages", token, fresh, {**headers, "x-session-id": str(uuid4())})
+            assert status == 200 and len(received) == 3, (status, raw, len(received))
+            assert json.loads(raw)["content"] == [{"type": "text", "text": FINAL}]
+            native = received[-1][1]
+            assert any("You are Claude Code" in block["text"] for block in native["system"])
+            assert any(tool["name"] == "mcp__flower__LookupNote" for tool in native["tools"])
+            assert sum(block.get("text") == AFTER_RESTART for row in native["messages"] for block in blocks(row)) == 1
+            assert not find_blocks(native, "tool_use_id", NEW_ID)
+            (new_attempt,) = verify_captures(manage, received[-1:], account_token)
+            assert new_attempt["ingress_body_sha256"] == sha256(encoded(fresh)).hexdigest()
+            assert new_attempt["cli_and_https_body_sha256"] != new_attempt["ingress_body_sha256"]
+            return {"old_release": release, "next_release": next_release, "new_before_drain": premature,
+                    "wrong_subject": wrong_subject, "wrong_session": wrong_session,
+                    "changed_arguments": wrong_arguments, "duplicate": duplicate,
+                    "old_release_tool_callbacks": 1, "historical_tool_callbacks": 0,
+                    "old_model_posts": 2, "new_model_posts": 1,
+                    "new_attempt": new_attempt}
         verify_model(received, policy=tool_policy or "append", old_content=old_result)
         captures = verify_captures(manage, received, account_token)
         for attempt, request_body, reply_id, model_id in zip(
@@ -684,18 +767,20 @@ def main():
     scenario.add_argument("--output-effort", action="store_true")
     scenario.add_argument("--history-png", action="store_true")
     scenario.add_argument("--history-tool-blocks", action="store_true")
+    scenario.add_argument("--mixed-release", nargs=3, type=Path,
+                          metavar=("OLD_SOURCE", "OLD_GATEWAY", "OLD_SENDER"))
     args = parser.parse_args()
     if (not Path("/.dockerenv").exists() or {name for _, name in if_nameindex()} != {"lo"}
             or Path("/run/v3/sender.json").exists() or any(Path("/native").glob("*"))):
         raise RuntimeError("请在空白的 docker --network none 账号容器中运行")
-    install_source()
+    install_source(args.mixed_release[0] if args.mixed_release else ROOT)
     with TemporaryDirectory(prefix="cold-history-") as directory:
         proof = verify(args.gateway, args.sender, Path(directory),
                        restart_history=args.restart_history, text_input=args.text_input,
                        system_policy=args.system_policy, toggle_pending_policy=args.toggle_pending_policy,
                        tool_policy=args.tool_policy, recover_pending=args.recover_pending_tool,
                        output_effort=args.output_effort, history_png=args.history_png,
-                       history_tool_blocks=args.history_tool_blocks)
+                       history_tool_blocks=args.history_tool_blocks, previous=args.mixed_release)
         print(json.dumps(proof, ensure_ascii=False))
 
 
