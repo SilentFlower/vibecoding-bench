@@ -107,6 +107,7 @@ src/tlsfp/
 - `account_backend_defaults_validate_and_obey_busy_gate`、`historical_backend_migration_and_account_updates_are_independent`：默认/非法值/忙门禁/两账号和回退。
 - `native293_reports_its_fixed_client_system_prompt_policy` 核对创建、详情、列表、普通编辑及拒绝策略写入。`services/runtime/tests/native/native.test.ts` 的普通 Messages 样本在隔离模型实收核对省略、单文本、显式空和多段提示词。
 - `deploy/flower2api/verify_tui_cold_history.py --v1-runtime <固定分发体>` 使用真实公开网关、账号发送器和固定 2.1.293。隔离模型逐项比对省略、空串、空数组、字符串和有序文本块的系统正文、身份计费块及显式工具。将实际生成的完整 CC 正文再次经公开入口投递，核对消息、系统段和工具保真。
+- 同一 V1 公开验收核对受支持模型实收的消息级 system、`clear_at`、轮次 effort、缓存断点和功能头。受限模型返回 400 且模型零投递。独立用例核对命名的 `tool_choice` 和完整的 `output_config.format`。
 - `native_backend_preserves_account_feature_authorization_without_rewriting`：Fast/1M 权限拒绝且正文保持；前端 `npm run build` 及创建/编辑/reset 链路核对。
 - `runtime_transport_test` 覆盖私有 POST 鉴权早于正文、原绑定拒绝、过滤上游保留头和实际状态字节保真。`native_execution_logs_error_event_eof_and_deadline` 核对首响应等待与输入管道阻塞分别受原期限约束，并验证输入超时按提交状态未知处理。
 - `tests/native_signature_fixture.py`经真实Gateway及回环sender覆盖280/293首次400→2xx、续轮单发、同一实际会话跨账号/版本/模型复用、正文与头部会话关联、不同/缺失实际会话独立判断、失败不学习、独立诊断尝试、普通400/业务透传429/提交未知保持单发和预算耗尽；`native_signature_repair`单测覆盖完整思考前缀、不同会话及变更历史隔离、跨模型复用、新建实例重新学习、7天过期及4096项上限。

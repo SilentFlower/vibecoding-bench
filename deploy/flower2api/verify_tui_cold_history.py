@@ -176,6 +176,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     config = Path("/run/v3/sender.json")
     copy2(temporary / "ca.der", config.with_name("verification-ca.der"))
     received, callbacks, proxy_targets = [], [], []
+    v1_betas = []
     lookups = []
     deny_proxy = False
     denied_tunnels = []
@@ -196,6 +197,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             raw = self.rfile.read(int(self.headers["Content-Length"]))
             body = json.loads(raw)
             received.append((sha256(raw).hexdigest(), body, self.connection.version()))
+            if v1_runtime is not None:
+                v1_betas.append(self.headers.get("anthropic-beta", ""))
             if failure_boundaries and any(block.get("text") == DROP_REPLY
                                           for row in body["messages"] for block in blocks(row)):
                 self.close_connection = True
@@ -345,7 +348,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         if v1_runtime is not None:
             assert account["request_backend"] == "native293" and account["client_system_prompt_policy"] == "replace"
             token = manage("POST", "tokens", {"name": "v1-policy-owner", "allowed_accounts": str(identifier)})["token"]
-            return verify_v1_prompt_policy(token, received)
+            return verify_v1_prompt_policy(token, received, v1_betas)
         assert account["tui_v2_available"]
         manage("PUT", f"accounts/{identifier}", {"request_backend": "tui_v2",
                "request_backend_revision": account["request_backend_revision"]})
@@ -734,8 +737,9 @@ def stage_history_branch(config, work, native_id, body):
     return output.stdout.decode().strip()
 
 
-def verify_v1_prompt_policy(token, received):
-    """从公开入口核对 V1 固定策略。@param token 合成调用方令牌。@param received 模型实收。@return 证据。
+def verify_v1_prompt_policy(token, received, model_betas):
+    """从公开入口核对 V1 固定策略与输入合同。
+    @param token 合成调用方令牌。@param received 模型实收。@param model_betas 模型实收功能头。@return 证据。
     """
     long_system = "你是客服助手。提到 Claude Code 时仍保留客户身份。只返回订单状态 JSON。"
     cases = (("omitted", None, None), ("empty_string", "", []), ("empty_array", [], []),
@@ -777,6 +781,54 @@ def verify_v1_prompt_policy(token, received):
     assert native["system"][1:] == complete["system"][1:], native["system"][1:]
     assert native["messages"] == complete["messages"] and native["tools"] == complete["tools"]
     proof["complete_cc"] = {"status": status, "model_body_sha256": digest}
+    marker = {"type": "ephemeral", "ttl": "5m"}
+    system_rows = [
+        {"role": "user", "content": "V1 系统轮合同样本"},
+        {"role": "system", "content": [{"type": "text", "text": SYSTEM[0], "cache_control": marker}],
+         "clear_at": "next_user_message"},
+        {"role": "system", "content": [], "output_config": {"effort": "high"}},
+        {"role": "user", "content": "V1 系统轮的后续问题"},
+    ]
+    betas = ["mid-conversation-system-2026-04-07", "per-turn-control-2026-07-01",
+             "mid-conversation-system-clear-at-2026-08-21"]
+    system = [{"type": "text", "text": SYSTEM[1], "cache_control": marker}]
+    format_spec = {"type": "json_schema", "schema": {
+        "type": "object", "properties": {"title": {"type": "string"}}, "required": ["title"],
+    }}
+    extra_cases = (
+        ("system_rows", {"model": "claude-opus-5-5", "messages": system_rows, "system": system}, betas),
+        ("forced_tool", {"tool_choice": {"type": "tool", "name": TOOL["name"]},
+                         "tools": [TOOL], "thinking": {"type": "disabled"}}, []),
+        ("structured_output", {"output_config": {"format": format_spec}}, []),
+    )
+    for label, fields, beta in extra_cases:
+        count = len(received)
+        body = {"model": MODEL, "max_tokens": 128, "stream": True,
+                "messages": [{"role": "user", "content": "V1 额外输入合同样本"}], **fields}
+        headers = {"User-Agent": "flower2api-v1-policy-fixture/1", "x-session-id": str(uuid4())}
+        if beta:
+            headers["anthropic-beta"] = ",".join(beta)
+        status, raw = call(18090, "POST", "/v1/messages", token, body, headers)
+        assert status == 200 and len(received) == count + 1, (label, status, raw, len(received))
+        digest, native, _ = received[-1]
+        if label == "system_rows":
+            assert native["messages"] == system_rows and native["system"][1:] == fields["system"]
+            assert set(beta) <= {item.strip() for item in model_betas[-1].split(",")}, model_betas[-1]
+        elif label == "structured_output":
+            assert native.get("output_config", {}).get("format") == format_spec, native.get("output_config")
+        else:
+            for name, expected in fields.items():
+                assert native.get(name) == expected, (label, name, native.get(name))
+        proof[label] = {"status": status, "model_body_sha256": digest}
+    count = len(received)
+    status, raw = call(18090, "POST", "/v1/messages", token,
+                       {"model": MODEL, "max_tokens": 128, "stream": True, "messages": system_rows,
+                        "system": system},
+                       {"User-Agent": "flower2api-v1-policy-fixture/1", "x-session-id": str(uuid4()),
+                        "anthropic-beta": ",".join(betas)})
+    assert status == 400 and len(received) == count, (status, raw, len(received))
+    assert json.loads(raw)["error"]["code"] == "system_role_model_not_allowed"
+    proof["system_rows_unsupported_model"] = {"status": status, "model_posts": 0}
     return {"v1_fixed_policy": "replace", "launcher_sha256": V1_RUNTIME_SHA256, "model_posts": len(received), "cases": proof}
 
 
