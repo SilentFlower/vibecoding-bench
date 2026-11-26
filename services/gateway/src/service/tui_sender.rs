@@ -24,6 +24,7 @@ use uuid::Uuid;
 
 use crate::error::AppError;
 use crate::model::account::TuiSystemPromptPolicy;
+use crate::model::request_diagnostics::TuiBodySource;
 use crate::service::diagnostics::tui_startup_event;
 use crate::service::gateway::is_passive_usage_header;
 use crate::service::native_capture::tui_wire::CaptureJob;
@@ -41,8 +42,9 @@ use crate::service::runtime_transport::{
     tui_input_rejection, tui_model_headers, tui_projection_marker, valid_tui_account_token,
 };
 use crate::service::runtime_transport::{
-    TUI_CAPTURE, TUI_CLI_SUBMISSION, TUI_ERROR_SOURCE, TUI_FINAL_CAPTURE, TUI_MODEL_ACCEPT_OMITTED,
-    TUI_MODEL_HEADER_POLICY, TUI_PREPARE_BIND, TUI_PREPARE_EXCHANGE, TUI_PREPARE_LEDGER, TUI_PROMPT_SUGGESTION,
+    TUI_BODY_SOURCE, TUI_CAPTURE, TUI_CLI_SUBMISSION, TUI_ERROR_SOURCE, TUI_FINAL_CAPTURE,
+    TUI_MODEL_ACCEPT_OMITTED, TUI_MODEL_HEADER_POLICY, TUI_PREPARE_BIND, TUI_PREPARE_EXCHANGE,
+    TUI_PREPARE_LEDGER, TUI_PROMPT_SUGGESTION,
     TUI_REPAIR_ATTEMPT, TUI_SEND_CLAIM, TUI_SENDER_CONFIG, TUI_SIGNATURE_REPAIR,
     TUI_SUBMISSION_LEDGER, TUI_SYSTEM_PROMPT_POLICY, TUI_TITLE_SESSION_MAPPING, TUI_WORKSPACE_BIND,
     TuiReceiptProbe, TuiV2Unavailable,
@@ -1629,6 +1631,13 @@ impl TuiSender {
         response
             .headers_mut()
             .insert(TUI_GATEWAY_ID_HEADER, HeaderValue::from_static(mode));
+        if status.is_success()
+            && let Some(source) = head["body_source"].as_str().and_then(TuiBodySource::from_wire)
+        {
+            response
+                .headers_mut()
+                .insert(TUI_BODY_SOURCE, HeaderValue::from_static(source.as_str()));
+        }
         if options.captured {
             response
                 .headers_mut()
@@ -2276,6 +2285,7 @@ mod tests {
                 &mut socket,
                 &json!({
                     "status":200, "content_type":"text/event-stream", "message_id_mode":"gateway",
+                    "body_source":"account_sender",
                     "quota_headers":{
                         "anthropic-ratelimit-unified-5h-utilization":"0.25",
                         "anthropic-ratelimit-unified-5h-reset":"2030-01-01T12:00:00Z",
@@ -2291,6 +2301,7 @@ mod tests {
             chunk(&mut socket, b"").await;
         });
         let response = response.unwrap();
+        assert_eq!(response.headers()[TUI_BODY_SOURCE], "account_sender");
         assert_eq!(
             response.headers()["anthropic-ratelimit-unified-5h-utilization"],
             "0.25"
@@ -2437,6 +2448,7 @@ mod tests {
         let response = response.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(response.headers()[TUI_CAPTURE], "queued");
+        assert!(!response.headers().contains_key(TUI_BODY_SOURCE));
         assert_eq!(
             response.headers()["anthropic-ratelimit-unified-7d-utilization"],
             "0.43"

@@ -1116,6 +1116,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             ("msg_cold_tool", "msg_cold_reply"), strict=True,
         ):
             assert attempt["request_id"] == request_id
+            if recover_pending:
+                assert attempt["diagnostic_body_source"] == "interactive_cli", attempt
             assert attempt["ingress_body_sha256"] == sha256(encoded(request_body)).hexdigest()
             assert attempt["cli_and_https_body_sha256"] != attempt["ingress_body_sha256"]
             attempt.update(client_message_id=reply_id, model_message_id=model_id)
@@ -1370,6 +1372,7 @@ def checked_messages(manage, token, body, headers, received, phase, *, expected_
 
     def observe(response):
         evidence.update(http_status=response.status, request_id=response.getheader("x-cc2api-request-id"))
+        assert response.getheader("x-v3-tui-body-source") is None
         if trace_startup:
             startup_event("public_response_headers", phase=phase, session_id=session_id,
                           request_id=evidence["request_id"], http_status=response.status,
@@ -1445,6 +1448,7 @@ def report_request_diagnostics(manage, phase, request_id, session_id, started_at
             "control_state", "control_error_code", "control_recovery", "observed_control_http_status",
             "native_receive_ended", "native_source_terminal", "tui_reservation_id",
             "tool_continuation_mode", "tool_continuation_path", "tool_continuation_reason",
+            "tui_body_source",
         ) if context.get(key) is not None}
 
     try:
@@ -2152,6 +2156,9 @@ def verify_structured_output(manage, token, identifier, received):
                 reservation = (request.get("context") or {}).get("tui_reservation_id")
                 claims = MODEL_BODY_TRACE.read_text().splitlines()[before_claims:]
                 assert request["request_id"] == request_id, request
+                assert request["log_mode"] == "info" and "tui_body_source" not in (request.get("context") or {})
+                summary = json.dumps(detail, ensure_ascii=False)
+                assert question not in summary and system not in summary
                 result = {"status": status, "policy": policy, "response_mode": response_mode,
                           "input_output_config": config,
                           "request_id": request_id, "reservation_id": reservation, "attempt_count": len(attempts),
@@ -2169,6 +2176,10 @@ def verify_structured_output(manage, token, identifier, received):
                     assert attempt["request_id"] == request_id and attempt["attempt_id"] == reservation, (phase, attempt)
                     from_cli = config is None
                     assert claim["uses_native_history"] is from_cli and claim["from_interactive_cli"] is from_cli, claim
+                    body_source = attempt["context"]["tui_body_source"]
+                    assert attempt["log_mode"] == "info" and body_source == (
+                        "interactive_cli" if from_cli else "account_sender"
+                    ), (phase, attempt)
                     assert native["model"] == MODEL and native["max_tokens"] == 128 and not native.get("tools"), phase
                     output = native.get("output_config", {})
                     assert ("format" not in output if from_cli else output == config), (phase, output)
@@ -2196,6 +2207,7 @@ def verify_structured_output(manage, token, identifier, received):
                         text, stop_reason = block["text"], reply["stop_reason"]
                     assert stop_reason == "end_turn" and text == (FINAL if from_cli else STRUCTURED_REPLY), phase
                     result.update(provider_path="interactive_cli" if from_cli else "account_sender",
+                                  diagnostic_body_source=body_source,
                                   attempt_id=reservation, model_body_sha256=digest, model_output_config=output,
                                   model_instruction_role="user" if reminder else "system",
                                   model_root_system_shape="string" if isinstance(root, str) else "blocks",
@@ -2860,7 +2872,8 @@ def verify_captures(manage, received, account_token):
                 assert account_token not in json.dumps(snap)
                 captures[digest] = {"request_id": request_id, "attempt_id": attempt_id,
                                     "ingress_body_sha256": snap["ingress"]["original_body_sha256"],
-                                    "cli_and_https_body_sha256": digest, "final_tls_capture": "unavailable"}
+                                    "cli_and_https_body_sha256": digest, "final_tls_capture": "unavailable",
+                                    "diagnostic_body_source": (attempt.get("context") or {}).get("tui_body_source")}
         return [captures[digest] for digest in expected] if captures.keys() == expected.keys() else None
 
     return wait_for(observe)

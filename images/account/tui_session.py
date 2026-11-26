@@ -980,6 +980,7 @@ class _Actor:
         if self.cold_history is not None:
             if native_raw is None:
                 raise RuntimeError("冷导入缺少实际 CLI 正文")
+            handle.body_source = "interactive_cli"
             return _ModelSubmission(step, handle, native_raw, headers, account_token)
         # 旧进程仍校验启动 AT。文件模式的令牌已经与原生步骤绑定。
         if handle.api_context is not None:
@@ -999,6 +1000,7 @@ class _Actor:
             raw, headers, self.identity[4].removeprefix(TITLE_SESSION_PREFIX).removeprefix(SUGGESTION_SESSION_PREFIX),
             handle.upstream_session_id,
         )
+        handle.body_source = "account_sender"
         return _ModelSubmission(step, handle, raw, headers, account_token)
 
     def serve_model(self, http, native, *, native_raw=None):
@@ -1216,6 +1218,7 @@ class _Reserved:
         self.signature_exchange = None
         self.signature_known = False
         self.repair_attempt_id = None
+        self.body_source = None
         self.sent = self.completed = False
         self.request_digest = request_digest
 

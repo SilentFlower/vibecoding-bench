@@ -28,7 +28,7 @@ use crate::model::identity::device_profile;
 use crate::model::request_diagnostics::{
     AttemptDiagnostic, DiagnosticContext, DiagnosticParameters, DiagnosticSessions,
     DiagnosticTokens, ExecutionLocation, NativeRejection, NativeRequestObservation,
-    RequestDiagnostic, RequestLogMode, normalize_correlation_id, safe_model,
+    RequestDiagnostic, RequestLogMode, TuiBodySource, normalize_correlation_id, safe_model,
 };
 use crate::service::native_capture;
 use crate::service::request_session::RequestSession;
@@ -790,6 +790,13 @@ impl AttemptTrace {
         if let Some(record) = &mut self.record {
             record.attempt_id = id;
             record.capture_status = status.map(str::to_owned);
+        }
+    }
+
+    /// 记录已绑定发送器确认的同轮正文归属。@param source 私有回执来源。@return 无。
+    pub(super) fn tui_body_source(&mut self, source: TuiBodySource) {
+        if let Some(record) = self.record.as_mut() {
+            record.context.get_or_insert_with(Default::default).tui_body_source = Some(source);
         }
     }
 

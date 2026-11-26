@@ -89,6 +89,7 @@ class SessionTests(unittest.TestCase):
             actor.serve_model(wrong, request)
             wrong.send_error.assert_called_once_with(409, "No pending model step")
             self.assertFalse(actor.step.claimed)
+            self.assertIsNone(handle.body_source)
             failed = Mock(headers={"Authorization": "Bearer " + handle.account_token})
             expires_at, handle.expires_at = handle.expires_at, 1
             with self.assertRaises(ModelResponseError) as expired:
@@ -104,6 +105,7 @@ class SessionTests(unittest.TestCase):
             submission = driver.native_dispatch.call_args.args[2]
             self.assertIs(submission.step, actor.step)
             self.assertEqual(submission.body, raw)
+            self.assertEqual(handle.body_source, "account_sender")
             self.assertNotIn(handle.account_token, repr(submission))
             self.assertIsNone(handle.raw)
 

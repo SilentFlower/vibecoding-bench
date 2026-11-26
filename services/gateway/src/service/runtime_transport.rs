@@ -79,6 +79,7 @@ pub(super) const TUI_V2_STATUS_PROTOCOL: u8 = 1;
 // 仅由已绑定 sender 的私有 HTTP 回包转递。公开响应白名单不会交付此头。
 pub(super) const TUI_GATEWAY_ID_HEADER: &str = "x-v3-tui-message-id-mode";
 pub(super) const TUI_CAPTURE: &str = "x-v3-tui-http-capture";
+pub(super) const TUI_BODY_SOURCE: &str = "x-v3-tui-body-source";
 pub(super) const TUI_FINAL_CAPTURE: &str = "x-v3-tui-final-capture";
 pub(super) const TUI_CLI_SUBMISSION: &str = "x-v3-tui-cli-submission";
 pub(super) const TUI_UPSTREAM_SESSION: &str = "x-v3-tui-upstream-session";

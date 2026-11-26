@@ -625,6 +625,7 @@ export interface DiagnosticContext {
   trajectory_id?: string | null
   native_model_calls?: number | null
   tui_reservation_id?: string | null
+  tui_body_source?: 'interactive_cli' | 'account_sender' | null
   control_state?: string | null
   control_observed_at?: string | null
   control_error_code?: string | null
