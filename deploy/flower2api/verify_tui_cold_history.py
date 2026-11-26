@@ -42,6 +42,7 @@ PAST_ID = "toolu_past_fixture"
 PAST_SECOND_ID = "toolu_past_second_fixture"
 NEW_ID = "toolu_cold_fixture"
 SIGNED_THINKING = {"type": "thinking", "thinking": "隔离模型的合成思考段。", "signature": "c2lnbmF0dXJlLWZpeHR1cmU="}
+V1_RUNTIME_SHA256 = "017ec892b9dfbf08bf4cb2e5bf59048cb41a0ecfc21b1ad518751a23a911b9b7"
 TOOL = {"name": "Lookup-Note", "description": "读取合成便签", "input_schema": {
     "type": "object", "required": ["key", "options"], "additionalProperties": False,
     "properties": {"key": {"type": "string"}, "options": {
@@ -124,7 +125,7 @@ def fixture_tool_sse(tool, *, with_signature):
 def verify(gateway, sender, temporary, *, restart_history=False, text_input=False, system_policy=False,
            toggle_pending_policy=False, tool_policy=None, recover_pending=False, output_effort=False,
            history_png=False, history_images=False, history_tool_blocks=False, previous=None, failure_boundaries=False,
-           current_text_blocks=False, signed_tool_history=False, split_history_tools=False):
+           current_text_blocks=False, signed_tool_history=False, split_history_tools=False, v1_runtime=None):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -141,6 +142,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param current_text_blocks 是否验证本轮文本块顺序及边界归属。
     @param signed_tool_history 是否核对隔离模型原工具轮的签名块。
     @param split_history_tools 是否将已闭合的旧工具组分为相邻消息。
+    @param v1_runtime 固定 V1 制品，提供时仅验证 V1 内核的公开能力。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -170,7 +172,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
 
         def do_POST(self):
             """验证合成凭据并返回同一轮 SSE。@return 无。"""
-            if (self.path != "/v1/messages"
+            accepted_path = (self.path == "/v1/messages"
+                             or (v1_runtime is not None and self.path == "/v1/messages?beta=true"))
+            if (not accepted_path
                     or self.headers.get("Authorization") != "Bearer " + account_token):
                 self.send_error(403)
                 return
@@ -184,7 +188,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             tool = next((t for t in body.get("tools", []) if t.get("description") == TOOL["description"]), None)
             results = find_blocks(body, "tool_use_id", NEW_ID)
             restart = any(b.get("text") == AFTER_RESTART for row in body["messages"] for b in blocks(row))
-            if not results and tool and not restart:
+            if not results and tool and not restart and v1_runtime is None:
                 content = {"type": "tool_use", "id": NEW_ID, "name": tool["name"], "input": ARGS}
                 wire = fixture_tool_sse(content, with_signature=signed_tool_history)
             else:
@@ -243,10 +247,14 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         proxy_url = f"http://127.0.0.1:{proxy.server_port}"
 
         def write_sender_config():
-            config.write_text(json.dumps({"binding": binding, "proxy_url": proxy_url,
-                                          "allowed_origin": "https://api.anthropic.com",
-                                          "native_capture_dir": "/flows/api/cc-prepared",
-                                          "tui_v2": {"max_reservations": 4}}))
+            state = {"binding": binding, "proxy_url": proxy_url, "allowed_origin": "https://api.anthropic.com",
+                     "native_capture_dir": "/flows/api/cc-prepared"}
+            if v1_runtime is None:
+                state["tui_v2"] = {"max_reservations": 4}
+            else:
+                state.update(native={"binary_path": str(v1_runtime), "work_root": "/native/workers",
+                                     "memory_mib": 0, "max_workers": 4}, native_adaptive_prewarm=False)
+            config.write_text(json.dumps(state))
             config.chmod(0o640)
             os.chown(config, 0, 1001)
 
@@ -254,9 +262,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         common = {"PATH": os.defpath, "LANG": "C.UTF-8", "HOME": "/tmp", "TOKIO_WORKER_THREADS": "2"}
 
         def start_sender(program=sender):
+            tui = {"V3_TUI_SESSION_HOST": "1", "V3_TUI_MANAGED_OAUTH": "1"} if v1_runtime is None else {}
             process = Popen([program], user=1001, group=1001, extra_groups=[], env={
-                **common, "RUST_LOG": "warn", "V3_SENDER_CONFIG": str(config),
-                "V3_TUI_SESSION_HOST": "1", "V3_TUI_MANAGED_OAUTH": "1",
+                **common, **tui, "RUST_LOG": "warn", "V3_SENDER_CONFIG": str(config),
             })
             stack.callback(stop, process)
             return process
@@ -289,7 +297,14 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 raise AssertionError(("账号发送器重启后未就绪", restarted.poll(), sender_state())) from error
             return restarted
 
-        wait_for(lambda: sender_state().get("ready"))
+        if v1_runtime is None:
+            wait_for(lambda: sender_state().get("ready"))
+        else:
+            def native_ready():
+                status, raw = call(8091, "GET", "/internal/native/status", secret)
+                return status == 200 and json.loads(raw).get("raw_input_protocol") == 1
+
+            wait_for(native_ready)
 
         def manage(method, path, body=None):
             status, raw = call(18090, method, "/admin/" + path, admin, body)
@@ -297,14 +312,21 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             return json.loads(raw)
 
         manage("PUT", "settings", {"allowed_user_agents": "", "request_diagnostics_log_mode": "debug"})
+        credentials = {"auth_type": "oauth", "access_token": account_token, "refresh_token": token_hex(32),
+                       "expires_at": time_ns() // 1_000_000 + 1_800_000, "subscription_type": "max"}
+        if v1_runtime is not None:
+            credentials = {"setup_token": account_token, "account_uuid": str(uuid4()), "organization_uuid": str(uuid4())}
         account = manage("POST", "accounts", {
-            "email": "cold-history@example.invalid", "request_backend": "native293", "auth_type": "oauth",
-            "access_token": account_token, "refresh_token": token_hex(32), "proxy_url": proxy_url,
-            "expires_at": time_ns() // 1_000_000 + 1_800_000, "subscription_type": "max",
+            "email": "cold-history@example.invalid", "request_backend": "native293", "proxy_url": proxy_url,
+            **credentials,
             "auto_telemetry": False, "auto_poll_usage": False, "concurrency": 2, "rpm_limit": 0,
         })
         identifier = account["id"]
         account = manage("GET", f"accounts/{identifier}")
+        if v1_runtime is not None:
+            assert account["request_backend"] == "native293" and account["client_system_prompt_policy"] == "replace"
+            token = manage("POST", "tokens", {"name": "v1-policy-owner", "allowed_accounts": str(identifier)})["token"]
+            return verify_v1_prompt_policy(token, received)
         assert account["tui_v2_available"]
         manage("PUT", f"accounts/{identifier}", {"request_backend": "tui_v2",
                "request_backend_revision": account["request_backend_revision"]})
@@ -657,6 +679,52 @@ def stage_history_branch(config, work, native_id, body):
     return output.stdout.decode().strip()
 
 
+def verify_v1_prompt_policy(token, received):
+    """从公开入口核对 V1 固定策略。@param token 合成调用方令牌。@param received 模型实收。@return 证据。
+    """
+    long_system = "你是客服助手。提到 Claude Code 时仍保留客户身份。只返回订单状态 JSON。"
+    cases = (("omitted", None, None), ("empty_string", "", []), ("empty_array", [], []),
+             ("string", long_system, [long_system]),
+             ("ordered_blocks", [{"type": "text", "text": text} for text in SYSTEM], ["\n\n".join(SYSTEM)]))
+    proof = {}
+    for index, (label, system, expected) in enumerate(cases, 1):
+        question = f"V1 合成查询 {index}"
+        body = {"model": MODEL, "max_tokens": 128, "stream": True,
+                "messages": [{"role": "user", "content": question}], "tools": [TOOL]}
+        if system is not None:
+            body["system"] = system
+        status, raw = call(18090, "POST", "/v1/messages", token, body,
+                           {"User-Agent": "flower2api-v1-policy-fixture/1", "x-session-id": str(uuid4())})
+        assert status == 200 and len(received) == index, (label, status, raw, len(received))
+        events = [json.loads(line[5:]) for line in raw.splitlines() if line.startswith(b"data:")]
+        assert events[-1]["type"] == "message_stop"
+        digest, native, _ = received[-1]
+        texts = [block["text"] for block in native["system"]]
+        assert texts[0].startswith("x-anthropic-billing-header:") and "cc_version=2.1.293." in texts[0]
+        assert texts[1] == "You are Claude Code, Anthropic's official CLI for Claude."
+        if expected is None:
+            assert any(text.strip() for text in texts[2:])
+        else:
+            assert texts[2:] == expected, (label, texts[2:])
+        assert native["tools"] == [TOOL]
+        turns = [part.get("text", "") for row in native["messages"] if row["role"] == "user" for part in blocks(row)]
+        assert sum(text.count(question) for text in turns) == 1
+        proof[label] = {"status": status, "model_body_sha256": digest}
+
+    # 使用上一请求实际生成的完整 CC 正文，核对显式身份和计费块不会再次叠加。
+    complete = received[-1][1]
+    session = json.loads(complete["metadata"]["user_id"])["session_id"]
+    status, raw = call(18090, "POST", "/v1/messages", token, complete,
+                       {"User-Agent": "claude-code/2.1.293 (external, cli)", "x-app": "cli",
+                        "x-session-id": session, "x-claude-code-session-id": session})
+    assert status == 200 and len(received) == len(cases) + 1, (status, raw, len(received))
+    digest, native, _ = received[-1]
+    assert native["system"][1:] == complete["system"][1:], native["system"][1:]
+    assert native["messages"] == complete["messages"] and native["tools"] == complete["tools"]
+    proof["complete_cc"] = {"status": status, "model_body_sha256": digest}
+    return {"v1_fixed_policy": "replace", "launcher_sha256": V1_RUNTIME_SHA256, "model_posts": len(received), "cases": proof}
+
+
 def verify_text_inputs(manage, token, account_token, headers, history, received, *, policy="append",
                        current_text_blocks=False):
     """核对模型端的默认原生指令及用户提供的文本。
@@ -918,11 +986,15 @@ def main():
     scenario.add_argument("--mixed-release", nargs=3, type=Path,
                           metavar=("OLD_SOURCE", "OLD_GATEWAY", "OLD_SENDER"))
     scenario.add_argument("--failure-boundaries", action="store_true")
+    scenario.add_argument("--v1-runtime", type=Path)
     args = parser.parse_args()
     if (not Path("/.dockerenv").exists() or {name for _, name in if_nameindex()} != {"lo"}
             or Path("/run/v3/sender.json").exists() or any(Path("/native").glob("*"))):
         raise RuntimeError("请在空白的 docker --network none 账号容器中运行")
-    install_source(args.mixed_release[0] if args.mixed_release else ROOT)
+    if args.v1_runtime is None:
+        install_source(args.mixed_release[0] if args.mixed_release else ROOT)
+    elif sha256(args.v1_runtime.read_bytes()).hexdigest() != V1_RUNTIME_SHA256:
+        parser.error("V1 启动器摘要与固定版不符")
     with TemporaryDirectory(prefix="cold-history-") as directory:
         proof = verify(args.gateway, args.sender, Path(directory),
                        restart_history=args.restart_history, text_input=args.text_input,
@@ -932,7 +1004,8 @@ def main():
                        history_images=args.history_images, history_tool_blocks=args.history_tool_blocks,
                        previous=args.mixed_release,
                        failure_boundaries=args.failure_boundaries, current_text_blocks=args.current_text_blocks,
-                       signed_tool_history=args.signed_tool_history, split_history_tools=args.split_history_tools)
+                       signed_tool_history=args.signed_tool_history, split_history_tools=args.split_history_tools,
+                       v1_runtime=args.v1_runtime)
         print(json.dumps(proof, ensure_ascii=False))
 
 
