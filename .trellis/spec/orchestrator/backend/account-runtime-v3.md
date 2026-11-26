@@ -2562,7 +2562,8 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 已闭合工具结果内的文本块也可带历史 `ephemeral` 标记。它与历史直接文本共用四个断点预算和 TTL 顺序。发送前按原调用 ID、角色及工具结果内的块位置核对；只处理已确认前缀，活跃工具的新结果继续使用原回执合同。
 - 旧工具调用和回执可以拆在相邻同角色历史里。原生导入按角色合并相邻行，保持块内容和先后顺序，整组调用必须在下一助理轮前闭合。原公开历史仍作为回执归属的比较依据。
 - V2 管理端可选择 `append`、`replace`、`user_reminder`。已核验发送器通过私有预留传递非默认动作。替换以启动文件承载系统正文，省略保留默认正文，显式空串或空数组仅保留身份和计费块。提醒保留默认系统正文，附到首条不含工具回执的用户消息。纯新轮的提醒随原问题提交。完整 CC 原生请求沿原输入合同。已登记等待工具的进程沿用其启动动作。
-- 普通原生输入的 `output_config.effort` 支持 `low`、`medium`、`high`、`max`，由 2.1.293 的 `--effort` 组装。模型出站前核对实际字段。等待和冷恢复沿用根轮冻结的强度。交互 `--json-schema` 的组件探针未生成 `output_config.format`，此字段沿现有输入合同处理。
+- 普通原生输入的 `output_config.effort` 支持 `low`、`medium`、`high`、`max`，由 2.1.293 的 `--effort` 组装。模型出站前核对实际字段。等待和冷恢复沿用根轮冻结的强度。
+- 普通 Messages 的 `output_config.format.type=json_schema` 仍是退役兼容缺口。固定 2.1.293 的 `--json-schema` 交互 PTY 探针在禁用和启用默认工具时均未生成 `output_config.format`。`--print` 正对照经 `StructuredOutput` 工具发送 schema，模型正文仍无该字段。[Claude Code CLI 参数](https://code.claude.com/docs/en/cli-reference) · [Messages JSON 输出](https://platform.claude.com/docs/en/build-with-claude/structured-outputs)
 - 固定 2.1.293 对 `claude-sonnet-4-6` 和 `claude-opus-5-5` 原生支持显式 `adaptive/updates` 和 `adaptive/summarized`。后者在原生计划确定后以 CLI `--settings` 启用 `showThinkingSummaries`，恢复沿同一根轮配置。投递前核对 CLI 真实生成的 `thinking` 对象。回执改动 `display`、省略显式值、或改成平台会自动重写的 `disabled` 时返回 `422/unsupported_parameter`。新请求的缺省 `display`、显式 `omitted` 和平台自动重写沿既有合同。用 `--adaptive-thinking-model` 指定模型，搭配 `--adaptive-thinking-display summarized` 验证摘要，省略显示选项验证 `updates` 及其功能头。两种模式均可搭配 `--recover-pending-tool`。
 - 工具声明由会话私有 HTTP MCP 返回。有工具的轮次等待 `tools/list` 应答写出后才提交 PTY 提示。公开调用块恢复原名，ID 与参数增量仍对应原模型事件。工具结果通过原进程的回执账本交付，接收方、历史、原调用和本轮生效设置均需匹配。
 - 声明客户端工具时接受显式 `tool_choice.type=auto`，`disable_parallel_tool_use` 可省略或显式为 false。固定 CLI 的默认自动选择与并行许可符合这一合同。事件源在模型派发前核对实际工具和选择语义，显式原参数随工具回执冻结。
@@ -2584,6 +2585,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 | 同一分叉边界 A→B→B，B 尚未推进 | 两次 B 使用同一分支 UUID。A 和首次 B 的文件保持原字节 |
 | 分叉公开回复已成功交付，重启后再次提交相同历史及问题 | 新尝试使用同一分叉 UUID。模型只收到客户端确认的历史和一次当前问题，档案数量和已有字节保持 |
 | 文件归属错误或包含其他工作区的主链 | 拒绝恢复，保留原文件 |
+| 普通 API 携带 `output_config.format.type=json_schema`，单独使用或同带 `effort=medium` | `append` 经旧账号发送器透传，实收一次。`replace` 和 `user_reminder` 返回 `422/unsupported_parameter`，零尝试、零投递 |
 | 仅开启该路径的调试采集 | 保存 CLI 实际实体证据，最终 TLS 写出未采集 |
 
 ### 5. Scenarios and Examples
@@ -2602,6 +2604,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `--cache-marker-capabilities native-default` 和 `native-no-auto` 仅用于隔离能力实验。当前块通过 `prompt.submit` 与 `session.append` 交给固定 2.1.293；MCP `tools/list` 在声明及 `_meta` 中提供相同标记。默认配置的模型实收与无标记对照相同，当前用户末块自动标为 `1h`，工具声明无标记。关闭自动缓存后，两种位置均无标记。实收保留用户角色、两块的相邻顺序及工具名称映射、描述和 schema。末块 `1h` 样本同时检查无标记和关闭自动缓存对照，以免把默认行为认作客户端标记保真。此能力缺口影响调用方显式断点的前缀和时长，保留旧账号路径直至原生合同通过。最终 TLS 写出保持未采集。
 - `--message-system-roles` 对照当前 V2、`bdaca089` 旧 V2 与固定 V1 制品。白名单模型的普通 API 可保留原位 `system` 文本及缓存块、`clear_at`、携带 effort 的空系统消息和根系统块。当前和旧 V2 都经账号代发，V1 经 `native293`。只有根 `system` 的当前 V2 对照使用交互 CLI。白名单外模型返回 `400/system_role_model_not_allowed`，给 user 或 assistant 加专属字段返回 `422/unsupported_parameter`，无效 `clear_at` 返回 `400/invalid_parameter`。显式测试的三个功能头均到达模型。客户端省略它们时，本次固定 V1 公开入口实收带 `mid-conversation-system-clear-at-2026-08-21`，两版 V2 实收缺少该项。
 - `--ordinary-message-system-contract` 固定普通 API 上述状态、错误码、模型投递和尝试次数。省略缓存、`clear_at` 与 effort 的纯文本对照覆盖原位置和文档支持的 `user → system → assistant` 位置。模型实收核对成功请求的原系统角色、位置及内容。仅有顶层 `system` 的 V2 正对照须使用交互 CLI，允许 CLI 自行生成 effort 和环境上下文的 `system` 行。含消息级 `system` 的成功用例以实收合同为准，并记录实际处理路径。传入 `--v1-runtime` 时核对同一公开入口的固定 V1 制品。
+- `--structured-output-contract` 从普通公开入口对照三种账号动作的无 schema、仅 schema、schema 与 `effort=medium`，覆盖 SSE 和非流式 JSON。无 schema 的六例走交互 CLI。成功用例核对模型实收的 `output_config`、问题一次、工作指令落点和公开响应终态。隔离模型仅在收到完整 schema 时返回约定的 JSON 文本。用预留、尝试和实收摘要确认发送路径，拒绝用例核对零尝试和零投递。最终 TLS 写出未采集。
 - `--thinking-display-contract <claude-sonnet-4-6|claude-opus-5-5>` 通过普通 Messages 对照省略整个 `thinking`、仅省略 `display`、显式 `omitted` 和 `summarized`。完全省略时三种账号动作均使用交互 CLI 生成 `adaptive/updates`，显式 `summarized` 也走交互 CLI。仅省略 `display` 或显式 `omitted` 时，追加策略经账号代发保留原对象，替换及用户提醒均返回 `422/unsupported_parameter`、零投递。隔离模型按文档模拟 Sonnet 4.6 缺省摘要及 Opus 5.5 缺省省略，SSE 检查摘要增量和签名顺序，JSON 检查等价内容块。显式 `omitted` 的合成回复保留空思考块和签名。核对原生分支、正文 SHA-256 及预留和尝试的关联。最终 TLS 写出未采集。
 - 将 `--thinking-cli-summaries on|off` 与 `--thinking-display-contract` 同用，探针只在启动固定 CLI 的 `--settings` 设置 `showThinkingSummaries`。公开请求省略整个 `thinking`。两个模型在 `on` 下原生生成 `adaptive/summarized`，在 `off` 下原生生成 `adaptive/updates`。两种状态的 SSE 和 JSON 均按隔离模型实际回复核对。`off` 产生的 `updates` 和显式 `omitted` 是不同的模型请求模式。
 - `verify_tui_system_session_input.py <固定 CLI>` 在仅回环容器内以真实交互 2.1.293 和 Opus 5.5 核对 `hookSpecificOutput.additionalContext`。`UserPromptSubmit` 的正文由 CLI 加上来源前缀，放在该轮 user 之后、该轮 assistant 之前的 `system` 行。档案保存 `hook_additional_context` 附件，热续轮和从原档案 `--resume` 都保留该位置和一次内容。恢复时新执行的 `SessionStart` 钩子生成带来源前缀的当前轮 `system`，排在重开后新 user 之后。此组件实验记录直接由 CLI 发出的模型正文和原档案前缀，外部 Messages 原始文本块及指定历史位置仍需独立满足公开输入合同。当前公开追加策略对中途 `system` 的成功形状依赖旧账号代发，保留退役阻塞。

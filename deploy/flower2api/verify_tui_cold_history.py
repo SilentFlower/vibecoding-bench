@@ -60,6 +60,11 @@ SIGNED_THINKING = {"type": "thinking", "thinking": "隔离模型的合成思考�
 ADAPTIVE_THINKING = {"type": "adaptive", "display": "updates"}
 THINKING_UPDATES_BETA = "thinking-display-updates-2026-08-18"
 THINKING_DISPLAY_DEFAULTS = {MODEL: "summarized", "claude-opus-5-5": "omitted"}
+STRUCTURED_FORMAT = {"type": "json_schema", "schema": {
+    "type": "object", "properties": {"fixture_order_status": {"type": "string", "enum": ["ready"]}},
+    "required": ["fixture_order_status"], "additionalProperties": False,
+}}
+STRUCTURED_REPLY = '{"fixture_order_status":"ready"}'
 V1_RUNTIME_SHA256 = "017ec892b9dfbf08bf4cb2e5bf59048cb41a0ecfc21b1ad518751a23a911b9b7"
 TOOL = {"name": "Lookup-Note", "description": "读取合成便签", "input_schema": {
     "type": "object", "required": ["key", "options"], "additionalProperties": False,
@@ -224,7 +229,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            thinking_cli_summaries=None,
            recovery_ledger_contention=False, recovery_ledger_deadline=False, recovery_workspace_rejection=False,
            recovery_slow_model=False, initial_idle_model_connection=False, trace_startup=False, cache_markers=False,
-           history_cache_markers=False, history_cache_ttl=None, cache_capability=None, message_system_roles=False):
+           history_cache_markers=False, history_cache_ttl=None, cache_capability=None, message_system_roles=False,
+           structured_output=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -262,6 +268,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param history_cache_ttl 工具往返启用的平台历史断点时长。
     @param cache_capability 对照生产入口或 CLI 提示词和工具的缓存标记能力。
     @param message_system_roles 消息级系统角色对照或普通 API 固定回归模式。
+    @param structured_output 是否核对普通 API 的结构化输出和实际发送路径。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -276,7 +283,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     for directory in (Path("/run/v3/tui-v2"), Path("/native"), Path("/flows/api")):
         directory.mkdir(mode=0o700, parents=True, exist_ok=True)
         os.chown(directory, 1001, 1001)
-    inspect_model_body = cache_markers or message_system_roles or thinking_display_model
+    inspect_model_body = cache_markers or message_system_roles or thinking_display_model or structured_output
     if inspect_model_body and v1_runtime is None:
         MODEL_BODY_TRACE.touch(mode=0o600, exist_ok=False)
         os.chown(MODEL_BODY_TRACE, 1001, 1001)
@@ -344,7 +351,10 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             elif summarized_thinking:
                 wire = fixture_thinking_display_sse(body, message_id="msg_cold_reply")
             else:
-                wire = message_sse({"type": "text", "text": FINAL}, "end_turn", "msg_cold_reply")
+                text = FINAL
+                if structured_output and body.get("output_config", {}).get("format") == STRUCTURED_FORMAT:
+                    text = STRUCTURED_REPLY
+                wire = message_sse({"type": "text", "text": text}, "end_turn", "msg_cold_reply")
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Content-Length", str(len(prefix) + len(wire)))
@@ -552,6 +562,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             account = manage("GET", f"accounts/{identifier}")
             return verify_message_system_roles(manage, token, account, received, model_betas,
                                                fixed=message_system_roles == "ordinary-contract")
+        if structured_output:
+            return verify_structured_output(manage, token, identifier, received)
         if cache_capability:
             return verify_cache_capabilities(manage, token, identifier, headers, received, cache_capability)
         if history_cache_markers:
@@ -1707,6 +1719,97 @@ def verify_thinking_display_contract(manage, token, identifier, received, model,
             "wire_final": "unavailable", "cases": proof, "model_posts": len(received)}
 
 
+def verify_structured_output(manage, token, identifier, received):
+    """核对三种账号动作下的普通结构化输出。
+    @param manage 管理入口。@param token 合成令牌。@param identifier 账号 ID。
+    @param received 隔离模型实收。@return 公开响应和发送归属证据。
+    """
+    system = "合成结构化输出用例的工作指令。"
+    configs = {"no_schema": None, "schema": {"format": STRUCTURED_FORMAT},
+               "schema_with_effort": {"effort": "medium", "format": STRUCTURED_FORMAT}}
+    cases = {}
+    for policy in ("append", "replace", "user_reminder"):
+        account = manage("PUT", f"accounts/{identifier}", {"client_system_prompt_policy": policy})
+        assert account["client_system_prompt_policy"] == policy
+        for label, config in configs.items():
+            for stream in (True, False):
+                response_mode = "sse" if stream else "json"
+                phase = f"{policy}_{label}_{response_mode}"
+                question = f"查询合成订单的状态 {phase}"
+                headers = {"x-session-id": str(uuid4()), "User-Agent": "flower2api-structured-output-fixture/1"}
+                body = {"model": MODEL, "max_tokens": 128, "stream": stream, "system": system,
+                        "messages": [{"role": "user", "content": question}]}
+                if config is not None:
+                    body["output_config"] = config
+                expected_status = 200 if config is None or policy == "append" else 422
+                before = len(received)
+                before_claims = len(MODEL_BODY_TRACE.read_text().splitlines())
+                status, raw, request_id = checked_messages(manage, token, body, headers, received, phase,
+                                                           expected_status=expected_status, trace_startup=True)
+                path = "request-diagnostics/" + request_id
+
+                def finished_diagnostics():
+                    detail = manage("GET", path)
+                    return detail if detail["request"].get("finished_at") else None
+
+                detail = wait_for(finished_diagnostics)
+                request, attempts = detail["request"], detail["attempts"]
+                reservation = (request.get("context") or {}).get("tui_reservation_id")
+                claims = MODEL_BODY_TRACE.read_text().splitlines()[before_claims:]
+                assert request["request_id"] == request_id, request
+                result = {"status": status, "policy": policy, "response_mode": response_mode,
+                          "input_output_config": config,
+                          "request_id": request_id, "reservation_id": reservation, "attempt_count": len(attempts),
+                          "model_posts": len(received) - before}
+                if status == 422:
+                    assert not (attempts or claims or result["model_posts"]), (phase, result)
+                    error_code = json.loads(raw)["error"]["code"]
+                    assert error_code == "unsupported_parameter", (phase, raw)
+                    result.update(error_code=error_code, diagnostics_stage=request.get("error_stage"))
+                else:
+                    ((digest, native, _),) = received[before:]
+                    (raw_claim,), (attempt,) = claims, attempts
+                    claim = json.loads(raw_claim)
+                    assert claim["sha256"] == digest and claim["reservation_id"] == reservation, (phase, claim)
+                    assert attempt["request_id"] == request_id and attempt["attempt_id"] == reservation, (phase, attempt)
+                    from_cli = config is None
+                    assert claim["uses_native_history"] is from_cli and claim["from_interactive_cli"] is from_cli, claim
+                    assert native["model"] == MODEL and native["max_tokens"] == 128 and not native.get("tools"), phase
+                    output = native.get("output_config", {})
+                    assert ("format" not in output if from_cli else output == config), (phase, output)
+                    root = native["system"]
+                    root_blocks = [root] if isinstance(root, str) else [block["text"] for block in root]
+                    user_texts = [b.get("text", "") for row in native["messages"] if row["role"] == "user"
+                                  for b in blocks(row)]
+                    reminder = policy == "user_reminder"
+                    assert sum(text.count(question) for text in user_texts) == 1, (phase, user_texts)
+                    assert sum(text.count(system) for text in user_texts) == int(reminder), (phase, user_texts)
+                    assert sum(text.count(system) for text in root_blocks) == int(not reminder), (phase, root_blocks)
+                    if policy == "replace":
+                        assert root_blocks[2:] == [system], (phase, root_blocks)
+                    if stream:
+                        events = [json.loads(line[5:]) for line in raw.splitlines() if line.startswith(b"data:")]
+                        assert events[-1]["type"] == "message_stop", (phase, events[-1])
+                        (terminal,) = [event["delta"] for event in events if event["type"] == "message_delta"]
+                        text = "".join(event["delta"]["text"] for event in events
+                                       if event["type"] == "content_block_delta")
+                        stop_reason = terminal["stop_reason"]
+                    else:
+                        reply = json.loads(raw)
+                        (block,) = reply["content"]
+                        assert block["type"] == "text", (phase, block)
+                        text, stop_reason = block["text"], reply["stop_reason"]
+                    assert stop_reason == "end_turn" and text == (FINAL if from_cli else STRUCTURED_REPLY), phase
+                    result.update(provider_path="interactive_cli" if from_cli else "account_sender",
+                                  attempt_id=reservation, model_body_sha256=digest, model_output_config=output,
+                                  model_instruction_role="user" if reminder else "system",
+                                  model_root_system_shape="string" if isinstance(root, str) else "blocks",
+                                  client_text=text, client_stop_reason=stop_reason)
+                cases[phase] = result
+    assert not any(path.is_file() for path in Path("/flows/api").rglob("*"))
+    return {"wire_final": "unavailable", "cases": cases, "model_posts": len(received)}
+
+
 def verify_v1_prompt_policy(token, received, model_betas):
     """从公开入口核对 V1 固定策略与输入合同。
     @param token 合成调用方令牌。@param received 模型实收。@param model_betas 模型实收功能头。@return 证据。
@@ -2361,6 +2464,7 @@ def main():
     scenario.add_argument("--recover-pending-tool", action="store_true")
     scenario.add_argument("--initial-idle-model-connection", action="store_true")
     scenario.add_argument("--output-effort", action="store_true")
+    scenario.add_argument("--structured-output-contract", action="store_true")
     scenario.add_argument("--thinking-display-contract", choices=tuple(THINKING_DISPLAY_DEFAULTS))
     scenario.add_argument("--history-png", action="store_true")
     scenario.add_argument("--history-images", action="store_true")
@@ -2394,6 +2498,7 @@ def main():
     previous = args.mixed_release
     cache_markers = args.cache_markers or args.cache_marker_capabilities is not None
     trace_startup = (args.initial_idle_model_connection or args.trace_initial_startup or cache_markers
+                     or args.structured_output_contract
                      or bool(args.thinking_display_contract)
                      or (bool(args.message_system_roles) and args.v1_runtime is None))
     if trace_startup and (previous or args.mixed_image_peers or args.v1_runtime):
@@ -2432,7 +2537,7 @@ def main():
                        initial_idle_model_connection=args.initial_idle_model_connection, trace_startup=trace_startup,
                        cache_markers=cache_markers, history_cache_markers=args.history_cache_markers,
                        history_cache_ttl=args.history_cache_ttl, cache_capability=args.cache_marker_capabilities,
-                       message_system_roles=args.message_system_roles)
+                       message_system_roles=args.message_system_roles, structured_output=args.structured_output_contract)
         print(json.dumps(proof, ensure_ascii=False))
 
 
