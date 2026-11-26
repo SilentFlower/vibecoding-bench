@@ -2216,6 +2216,7 @@ transport.submit(prepared, body, ttfb_timeout).await
 ### 6. Tests Required
 
 - `agent_summary_response_provides_local_receipt_and_zero_usage` 核对流式及非流式的回执、内容、零用量与完整终态，并验证普通生成响应头。
+- `verify_tui_cold_history.py --agent-progress <sample.json>` 使用固定 2.1.293 从隔离模型录得的真实父子轮和回执，以及现有服务支持的完整进度模板。在父轮的 `Agent` 和子轮的 `Read` 均等待原回执时，经公开入口核对本地与转发两种模式的 SSE/JSON、用量和尝试归属。进度完成期间父子原档与工具登记保持，原回执各成功一次，异主体、异会话及重复回执为 400。测试通过隔离模型收件核对正文，最终 TLS 写出未采集。
 
 ## V2 公开会话标题的归属
 

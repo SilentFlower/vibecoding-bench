@@ -30,6 +30,7 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 from uuid import UUID, uuid4
 from zlib import compress, crc32
 
+from fixtures.native_model_send.agent_progress import model_reply as agent_progress_model_reply, verify_agent_progress
 from fixtures.native_model_send.fixture_tunnel import _relay
 from fixtures.native_model_send.tui_startup_trace import MODEL_BODY_TRACE, THINKING_SUMMARIES_SETTING, startup_event
 from verify_tui_concurrency import frame
@@ -238,7 +239,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            history_cache_markers=False, history_cache_ttl=None, history_cache_scope=None,
            cache_capability=None, message_system_roles=False,
            structured_output=False, forced_tool_choice=None, no_tool_choice=False, auxiliary_mode=None,
-           auxiliary_kind="title", auxiliary_sample=None):
+           auxiliary_kind="title", auxiliary_sample=None, agent_progress=None):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -283,6 +284,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param no_tool_choice 是否核对无工具时的显式 none 和保留声明的兼容路径。
     @param auxiliary_mode 可选，观察等待工具时的公开辅助轮投递或本地拦截。
     @param auxiliary_kind 标题或建议。@param auxiliary_sample 从官方 CLI 隔离运行导出的请求。
+    @param agent_progress 已捕获父子轮与固定进度请求样本。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -365,7 +367,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 sleep(SLOW_MODEL_DELAY)
             restart = any(b.get("text") == AFTER_RESTART for row in body["messages"] for b in blocks(row))
             prefix = b""
-            if is_auxiliary:
+            if agent_progress:
+                wire = agent_progress_model_reply(len(received) - 1, body, agent_progress, fixture_tool_sse, message_sse, frame)
+            elif is_auxiliary:
                 if auxiliary_mode == "tool-output":
                     frames = fixture_tool_sse({"type": "tool_use", "name": "Read", "id": "toolu_unexpected_suggestion",
                                                "input": {"file_path": "synthetic-note.txt"}}, with_signature=False)
@@ -579,7 +583,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             return json.loads(raw)
 
         manage("PUT", "settings", {"allowed_user_agents": "",
-                                   "request_diagnostics_log_mode": "info" if inspect_model_body else "debug"})
+                                   "request_diagnostics_log_mode": "info" if inspect_model_body or agent_progress else "debug"})
         if auxiliary_mode:
             manage("PUT", "settings", {
                 f"intercept_warmup_{auxiliary_kind}_enabled": "true" if auxiliary_mode == "mock" else "false",
@@ -618,6 +622,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                "request_backend_revision": account["request_backend_revision"]})
         token, foreign = (manage("POST", "tokens", {"name": name, "allowed_accounts": str(identifier)})["token"]
                           for name in ("cold-history-owner", "cold-history-foreign"))
+        if agent_progress:
+            return verify_agent_progress(manage, token, foreign, received, temporary / "gateway.db", agent_progress,
+                                         checked_messages, wait_for)
         session_id = auxiliary_sample["headers"]["x-claude-code-session-id"] if auxiliary_sample else str(uuid4())
         headers = {"x-session-id": session_id, "User-Agent": "flower2api-cold-history-fixture/1"}
         messages = [{"role": role, "content": text} for role, text in HISTORY]
@@ -2905,6 +2912,7 @@ def main():
     parser.add_argument("--title-request", type=Path, help="官方 CLI 隔离模型导出的标题请求")
     scenario.add_argument("--interleaved-suggestion", choices=("forward", "mock", "pooled", "pool-unsupported", "tool-output"))
     parser.add_argument("--suggestion-request", type=Path, help="官方 CLI 隔离模型导出的建议请求")
+    scenario.add_argument("--agent-progress", type=Path, help="官方父子轮与固定进度查询的隔离样本")
     scenario.add_argument("--thinking-display-contract", choices=tuple(THINKING_DISPLAY_DEFAULTS))
     scenario.add_argument("--history-png", action="store_true")
     scenario.add_argument("--history-images", action="store_true")
@@ -2949,7 +2957,7 @@ def main():
     cache_markers = args.cache_markers or args.cache_marker_capabilities is not None
     trace_startup = (args.initial_idle_model_connection or args.trace_initial_startup or cache_markers
                      or args.structured_output_contract or bool(args.forced_tool_choice_contract) or args.no_tool_choice_contract
-                     or bool(auxiliary_mode)
+                     or bool(auxiliary_mode or args.agent_progress)
                      or bool(args.thinking_display_contract)
                      or (bool(args.message_system_roles) and args.v1_runtime is None))
     if trace_startup and (previous or args.mixed_image_peers or args.v1_runtime):
@@ -2994,7 +3002,8 @@ def main():
                        forced_tool_choice=args.forced_tool_choice_contract, no_tool_choice=args.no_tool_choice_contract,
                        auxiliary_mode=auxiliary_mode,
                        auxiliary_kind="suggestion" if args.interleaved_suggestion else "title",
-                       auxiliary_sample=json.loads(auxiliary_path.read_bytes()) if auxiliary_path else None)
+                       auxiliary_sample=json.loads(auxiliary_path.read_bytes()) if auxiliary_path else None,
+                       agent_progress=json.loads(args.agent_progress.read_bytes()) if args.agent_progress else None)
         print(json.dumps(proof, ensure_ascii=False))
 
 
