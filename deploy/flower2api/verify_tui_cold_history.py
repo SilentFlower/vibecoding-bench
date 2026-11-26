@@ -182,7 +182,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            parallel_tools=False, reconnect_tool_stream=False, current_images=False, auto_tool_choice=False,
            recovery_ledger_contention=False, recovery_ledger_deadline=False, recovery_workspace_rejection=False,
            recovery_slow_model=False, initial_idle_model_connection=False, trace_startup=False, cache_markers=False,
-           history_cache_markers=False, history_cache_ttl=None, cache_capability=None):
+           history_cache_markers=False, history_cache_ttl=None, cache_capability=None, message_system_roles=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -214,6 +214,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param history_cache_markers 是否冻结历史标记并验证工具往返。
     @param history_cache_ttl 工具往返启用的平台历史断点时长。
     @param cache_capability 对照生产入口或 CLI 提示词和工具的缓存标记能力。
+    @param message_system_roles 是否对照普通请求及原生形状的消息级系统角色。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -228,7 +229,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     for directory in (Path("/run/v3/tui-v2"), Path("/native"), Path("/flows/api")):
         directory.mkdir(mode=0o700, parents=True, exist_ok=True)
         os.chown(directory, 1001, 1001)
-    if cache_markers:
+    inspect_model_body = cache_markers or message_system_roles
+    if inspect_model_body and v1_runtime is None:
         MODEL_BODY_TRACE.touch(mode=0o600, exist_ok=False)
         os.chown(MODEL_BODY_TRACE, 1001, 1001)
     certificates(temporary)
@@ -262,7 +264,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             received.append((sha256(raw).hexdigest(), body, self.connection.version()))
             if trace_startup:
                 startup_event("model_received", peer_port=self.client_address[1], model_posts=len(received))
-            if v1_runtime is not None:
+            if v1_runtime is not None or message_system_roles:
                 v1_betas.append(self.headers.get("anthropic-beta", ""))
             if failure_boundaries and any(block.get("text") == DROP_REPLY
                                           for row in body["messages"] for block in blocks(row)):
@@ -370,7 +372,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
 
         def write_sender_config():
             state = {"binding": binding, "proxy_url": proxy_url, "allowed_origin": "https://api.anthropic.com"}
-            if not cache_markers:
+            if not inspect_model_body:
                 state["native_capture_dir"] = "/flows/api/cc-prepared"
             if v1_runtime is None:
                 state["tui_v2"] = {"max_reservations": 4}
@@ -435,7 +437,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             return json.loads(raw)
 
         manage("PUT", "settings", {"allowed_user_agents": "",
-                                   "request_diagnostics_log_mode": "info" if cache_markers else "debug"})
+                                   "request_diagnostics_log_mode": "info" if inspect_model_body else "debug"})
         if history_cache_ttl:
             manage("PUT", "settings", {"message_cache_control_rewrite": "off",
                                        "cache_control_ttl_rewrite": history_cache_ttl})
@@ -453,6 +455,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         if v1_runtime is not None:
             assert account["request_backend"] == "native293" and account["client_system_prompt_policy"] == "replace"
             token = manage("POST", "tokens", {"name": "v1-policy-owner", "allowed_accounts": str(identifier)})["token"]
+            if message_system_roles:
+                return verify_message_system_roles(manage, token, account, received, v1_betas)
             return verify_v1_prompt_policy(token, received, v1_betas)
         assert account["tui_v2_available"]
         manage("PUT", f"accounts/{identifier}", {"request_backend": "tui_v2",
@@ -461,6 +465,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                           for name in ("cold-history-owner", "cold-history-foreign"))
         headers = {"x-session-id": str(uuid4()), "User-Agent": "flower2api-cold-history-fixture/1"}
         messages = [{"role": role, "content": text} for role, text in HISTORY]
+        if message_system_roles:
+            account = manage("GET", f"accounts/{identifier}")
+            return verify_message_system_roles(manage, token, account, received, v1_betas)
         if cache_capability:
             return verify_cache_capabilities(manage, token, identifier, headers, received, cache_capability)
         if history_cache_markers:
@@ -1050,7 +1057,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
 def checked_messages(manage, token, body, headers, received, phase, *, expected_status=200, trace_startup=False):
     """在断言前保留本轮公开响应与诊断归属。
     @param manage 管理入口。@param token 合成凭据。@param body 公开输入。@param headers 原入口头。
-    @param received 隔离模型收件。@param phase 夹具阶段。@param expected_status 预期 HTTP 状态。
+    @param received 隔离模型收件。@param phase 夹具阶段。@param expected_status 预期 HTTP 状态，空值保留实测状态。
     @param trace_startup 是否记录首请求时间及失败后线程栈。
     @return 实际状态、响应字节和公开请求 ID。
     """
@@ -1088,7 +1095,7 @@ def checked_messages(manage, token, body, headers, received, phase, *, expected_
         report(transport_error=type(error).__name__,
                transport_stage="response_body" if evidence["http_status"] is not None else "before_response_headers")
         raise
-    if status != expected_status:
+    if expected_status is not None and status != expected_status:
         try:
             payload = json.loads(raw)
         except ValueError:
@@ -1254,6 +1261,138 @@ def stage_history_branch(config, work, native_id, body):
                  input=encoded(body), stdout=PIPE, user=1001, group=1001, extra_groups=[],
                  env={}, check=True, timeout=10)
     return output.stdout.decode().strip()
+
+
+def verify_message_system_roles(manage, token, account, received, model_betas):
+    """对照公开来源、消息级角色与出站归属。@param manage 管理入口。@param token 合成令牌。
+    @param account 选定账号。@param received 模型实收。@param model_betas 模型头实收。@return 逐例证据。
+    """
+    backend = account["request_backend"]
+    assert backend in ("native293", "tui_v2")
+    manage("PUT", "settings", {"message_cache_control_rewrite": "off", "cache_control_ttl_rewrite": "off"})
+    model_ok = "claude-opus-5-5"
+    beta = ("mid-conversation-system-2026-04-07", "per-turn-control-2026-07-01",
+            "mid-conversation-system-clear-at-2026-08-21")
+    root = {"type": "text", "text": "合成根系统指令。", "cache_control": {"type": "ephemeral", "ttl": "5m"}}
+    rows = [
+        {"role": "user", "content": "合成第一轮问题。"},
+        {"role": "assistant", "content": "合成历史答复。"},
+        {"role": "system", "content": [{**root, "text": "合成中途系统指令。"}], "clear_at": "next_user_message"},
+        {"role": "system", "content": [], "output_config": {"effort": "high"}},
+        {"role": "user", "content": "合成当前问题。"},
+    ]
+    default_policy = "replace" if backend == "native293" else "append"
+    cases = [
+        ("api_with_betas", "api", default_policy, model_ok, "system", True),
+        ("api_without_betas", "api", default_policy, model_ok, "system", False),
+        ("cc_ua_only", "ua_only", default_policy, model_ok, "system", True),
+        ("cc_with_billing", "cc_with_billing", default_policy, model_ok, "system", True),
+        ("cc_without_billing", "cc_without_billing", default_policy, model_ok, "system", True),
+        ("cc_alias_without_billing", "cc_without_billing_alias", default_policy, model_ok, "system", True),
+        ("cc_bad_metadata", "cc_bad_metadata", default_policy, model_ok, "system", True),
+        ("api_denied_model", "api", default_policy, MODEL, "system", True),
+        ("cc_denied_model", "cc_with_billing", default_policy, MODEL, "system", True),
+        ("user_control_fields", "api", default_policy, model_ok, "user_fields", True),
+        ("assistant_control_fields", "api", default_policy, model_ok, "assistant_fields", True),
+        ("bad_clear_at", "api", default_policy, model_ok, "bad_clear_at", True),
+        ("root_system_control", "api", default_policy, MODEL, "root_only", False),
+    ]
+    can_set_policy = backend == "tui_v2" and account.get("tui_system_prompt_policy_available") is True
+    if can_set_policy:
+        cases.extend((policy + "_" + source, source, policy, model_ok, "system", True)
+                     for policy in ("replace", "user_reminder")
+                     for source in ("api", "ua_only", "cc_with_billing", "cc_without_billing"))
+        cases.append(("replace_cc_alias_without_billing", "cc_without_billing_alias", "replace", model_ok, "system", True))
+
+    proof = {}
+    active_policy = default_policy
+    for label, origin, policy, model, variant, with_betas in cases:
+        if policy != active_policy:
+            account = manage("PUT", f"accounts/{account['id']}", {"client_system_prompt_policy": policy})
+            assert account["client_system_prompt_policy"] == policy
+            active_policy = policy
+        session = str(uuid4())
+        headers = {"User-Agent": "flower2api-system-role-fixture/1", "x-session-id": session}
+        if with_betas:
+            headers["anthropic-beta"] = ",".join(beta)
+        if origin == "ua_only":
+            headers["User-Agent"] = "claude-cli/2.1.293 (external, cli)"
+        elif origin != "api":
+            family = "claude-code" if origin == "cc_without_billing_alias" else "claude-cli"
+            headers.update({"User-Agent": f"{family}/2.1.293 (external, cli)", "x-app": "cli",
+                            "x-claude-code-session-id": session})
+        messages = deepcopy(rows)
+        system = [root]
+        if variant == "root_only":
+            messages = [row for row in messages if row["role"] != "system"]
+            system = [dict(type="text", text=root["text"])]
+        elif variant.endswith("_fields"):
+            messages[2]["role"] = variant.removesuffix("_fields")
+        elif variant == "bad_clear_at":
+            messages[2]["clear_at"] = "past"
+        body = {"model": model, "max_tokens": 128, "stream": True, "messages": messages, "system": system}
+        if origin.startswith("cc_"):
+            # 使用合成身份对照结构校验，公开鉴权仍由同一个真实网关令牌完成。
+            identity = {"type": "text", "text": "You are Claude Code, Anthropic's official CLI for Claude."}
+            body["system"] = [identity, *system]
+            if not origin.startswith("cc_without_billing"):
+                body["system"].insert(0, {"type": "text", "text":
+                    "x-anthropic-billing-header: cc_version=2.1.293.abc; cc_entrypoint=cli;"})
+            body["metadata"] = {"user_id": json.dumps({"device_id": "bad" if origin == "cc_bad_metadata" else "1" * 64,
+                                                       "account_uuid": "", "session_id": session})}
+
+        before = len(received)
+        before_claims = len(MODEL_BODY_TRACE.read_text().splitlines()) if backend == "tui_v2" else 0
+        status, raw, request_id = checked_messages(
+            manage, token, body, headers, received, label, expected_status=None, trace_startup=backend == "tui_v2",
+        )
+        result = {"request_id": request_id}
+        query = "request-diagnostics?" + urlencode({"correlation_id": request_id})
+        (record,) = wait_for(lambda: [item for item in manage("GET", query)["items"] if item.get("finished_at")])
+        assert record["request_id"] == request_id
+        details = manage("GET", "request-diagnostics/" + request_id)
+        reservation = (details["request"].get("context") or {}).get("tui_reservation_id")
+        claims = ([json.loads(line) for line in MODEL_BODY_TRACE.read_text().splitlines()[before_claims:]]
+                  if backend == "tui_v2" else [])
+        result.update(status=status, origin_shape=origin, policy=policy, model=model,
+                      input_roles=[row["role"] for row in messages], input_betas=list(beta) if with_betas else [],
+                      model_posts=len(received) - before, attempt_count=record["attempt_count"],
+                      diagnostics_stage=record.get("error_stage"))
+        if status == 200:
+            frames = [json.loads(line[5:]) for line in raw.splitlines() if line.startswith(b"data:")]
+            assert frames[-1]["type"] == "message_stop"
+            ((body_hash, model_body, _),) = received[before:]
+            if backend == "tui_v2":
+                (claim,) = claims
+                assert claim["sha256"] == body_hash
+                if reservation is not None:
+                    assert claim["reservation_id"] == reservation
+                result.update(reservation_id=claim["reservation_id"],
+                              provider_path="interactive_cli" if claim["from_interactive_cli"] else "account_sender",
+                              attribution="request_reservation" if reservation is not None else "serial_provider_digest")
+            else:
+                result["provider_path"] = "native293"
+            model_system = model_body.get("system", [])
+            identity_rows = [block.get("text", "") for block in model_system if isinstance(block, dict)]
+            metadata = model_body.get("metadata", {}).get("user_id")
+            model_identity = json.loads(metadata) if isinstance(metadata, str) and metadata.startswith("{") else {}
+            result.update(model_body_sha256=body_hash, model_roles=[row["role"] for row in model_body["messages"]],
+                          model_system_rows=[row for row in model_body["messages"] if row["role"] == "system"],
+                          model_root_system=[block for block in model_system
+                                             if isinstance(block, dict) and block.get("text") == root["text"]],
+                          model_betas=[item.strip() for item in model_betas[-1].split(",") if item.strip()],
+                          model_billing_present=any(text.startswith("x-anthropic-billing-header:") for text in identity_rows),
+                          model_metadata_present=bool(metadata),
+                          model_fixture_device_retained=model_identity.get("device_id") == "1" * 64,
+                          messages_preserved=model_body["messages"] == messages)
+            if variant == "system":
+                assert model_body["messages"] == messages and result["model_root_system"] == [root], (label, result)
+        else:
+            assert len(received) == before and not claims, (label, result)
+            result["error_code"] = json.loads(raw)["error"].get("code")
+        proof[label] = result
+    assert not any(path.is_file() for path in Path("/flows/api").rglob("*"))
+    return {"backend": backend, "cases": proof, "model_posts": len(received), "wire_final": "unavailable"}
 
 
 def verify_v1_prompt_policy(token, received, model_betas):
@@ -1883,6 +2022,7 @@ def main():
     parser.add_argument("--current-images", action="store_true")
     parser.add_argument("--history-cache-markers", action="store_true")
     parser.add_argument("--history-cache-ttl", choices=("5m", "1h"))
+    parser.add_argument("--message-system-roles", action="store_true")
     parser.add_argument("--auto-tool-choice", action="store_true")
     parser.add_argument("--signed-tool-history", action="store_true")
     parser.add_argument("--trace-initial-startup", action="store_true", help="记录源码 V2 夹具的启动阶段")
@@ -1926,7 +2066,8 @@ def main():
         raise RuntimeError("请在空白的 docker --network none 账号容器中运行")
     previous = args.mixed_release
     cache_markers = args.cache_markers or args.cache_marker_capabilities is not None
-    trace_startup = args.initial_idle_model_connection or args.trace_initial_startup or cache_markers
+    trace_startup = (args.initial_idle_model_connection or args.trace_initial_startup or cache_markers
+                     or (args.message_system_roles and args.v1_runtime is None))
     if trace_startup and (previous or args.mixed_image_peers or args.v1_runtime):
         parser.error("启动观测需要当前 V2 源码夹具")
     if args.mixed_image_peers:
@@ -1957,7 +2098,8 @@ def main():
                        recovery_slow_model=args.recovery_slow_model,
                        initial_idle_model_connection=args.initial_idle_model_connection, trace_startup=trace_startup,
                        cache_markers=cache_markers, history_cache_markers=args.history_cache_markers,
-                       history_cache_ttl=args.history_cache_ttl, cache_capability=args.cache_marker_capabilities)
+                       history_cache_ttl=args.history_cache_ttl, cache_capability=args.cache_marker_capabilities,
+                       message_system_roles=args.message_system_roles)
         print(json.dumps(proof, ensure_ascii=False))
 
 

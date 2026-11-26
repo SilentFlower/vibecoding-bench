@@ -63,13 +63,14 @@ def main():
             startup_event("cli_prompt_accepted", reservation_id=actor.reservation["reservation_id"])
         return result
 
-    def trace_model(actor, http, native, *, native_raw=None):
+    def trace_model(actor, http, native, **options):
         startup_event("cli_model_callback", cli_launch_reservation_id=actor.reservation["reservation_id"])
-        return serve_model(actor, http, native, native_raw=native_raw)
+        return serve_model(actor, http, native, **options)
 
-    def trace_model_body(actor, headers, native, native_raw=None):
-        submission = claim_model(actor, headers, native, native_raw)
+    def trace_model_body(actor, headers, native, *args, **options):
+        submission = claim_model(actor, headers, native, *args, **options)
         if submission is not None:
+            native_raw = args[0] if args else options.get("native_raw")
             # 摘要取自已认领的提交，不能用 CLI 回调的存在推断出站正文来自 CLI。
             evidence = {"reservation_id": submission.handle.reservation["reservation_id"],
                         "from_interactive_cli": submission.body == native_raw,
