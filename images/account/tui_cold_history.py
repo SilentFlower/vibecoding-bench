@@ -125,7 +125,7 @@ class ColdHistory:
         declared = body.get("tools", [])
         for tool in declared:
             if (tool.keys() - {"name", "input_schema", "description"}
-                    or not re.fullmatch(r"[A-Za-z0-9_]+", tool["name"])
+                    or not re.fullmatch(r"[A-Za-z0-9_-]+", tool["name"])
                     or not isinstance(tool.get("description", ""), str)
                     or "input_schema" not in tool):
                 return None

@@ -38,10 +38,15 @@ DROP_REPLY = "FAILURE：模型收到正文后关闭响应连接。"
 SYSTEM = ["RULE1：你是便签助手。", "RULE2：请只使用已声明的工具。"]
 PAST_ID = "toolu_past_fixture"
 NEW_ID = "toolu_cold_fixture"
-TOOL = {"name": "LookupNote", "description": "读取合成便签", "input_schema": {
-    "type": "object", "properties": {"key": {"type": "string"}}, "required": ["key"],
+TOOL = {"name": "Lookup-Note", "description": "读取合成便签", "input_schema": {
+    "type": "object", "required": ["key", "options"], "additionalProperties": False,
+    "properties": {"key": {"type": "string"}, "options": {
+        "type": "object", "properties": {"labels": {"type": "array", "items": {"type": "string"}}},
+        "required": ["labels"], "additionalProperties": False,
+    }},
 }}
-ARGS = {"key": "synthetic-note"}
+NATIVE_TOOL_NAME = "mcp__flower__" + TOOL["name"]
+ARGS = {"key": "synthetic-note", "options": {"labels": ["项目", "便签"]}}
 REPLY = "CLIENT：合成便签内容"
 FINAL = "模型已收到本次客户端回执。"
 
@@ -375,7 +380,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         wrong_session, _ = call(18090, "POST", "/v1/messages", token, follow,
                                 {**headers, "x-session-id": str(uuid4())})
         changed = {**follow, "messages": [*messages, {"role": "assistant", "content": [
-            {**tool, "input": {"key": "another-note"}}]}, result]}
+            {**tool, "input": {**ARGS, "key": "another-note"}}]}, result]}
         wrong_arguments, rejection = call(18090, "POST", "/v1/messages", token, changed, headers)
         rejected = wrong_subject, wrong_session, wrong_arguments, len(received)
         assert rejected == (400, 400, 422, 1), (rejected, rejection)
@@ -433,7 +438,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             assert json.loads(raw)["content"] == [{"type": "text", "text": FINAL}]
             native = received[-1][1]
             assert any("You are Claude Code" in block["text"] for block in native["system"])
-            assert any(tool["name"] == "mcp__flower__LookupNote" for tool in native["tools"])
+            assert any(tool["name"] == NATIVE_TOOL_NAME for tool in native["tools"])
             assert sum(block.get("text") == AFTER_RESTART for row in native["messages"] for block in blocks(row)) == 1
             assert not find_blocks(native, "tool_use_id", NEW_ID)
             (new_attempt,) = verify_captures(manage, received[-1:], account_token)
@@ -748,11 +753,11 @@ def verify_model(received, *, policy, old_content):
         assert old == ("assistant", {"type": "tool_use", "id": PAST_ID, "name": "OldNote", "input": ARGS})
         assert old_result[0] == "user" and old_result[1]["content"] == old_content
         (tool,) = [t for t in body["tools"] if t.get("description") == TOOL["description"]]
-        assert tool["name"] == "mcp__flower__LookupNote" and tool["input_schema"] == TOOL["input_schema"]
+        assert tool["name"] == NATIVE_TOOL_NAME and tool["input_schema"] == TOOL["input_schema"]
     assert not find_blocks(first, "id", NEW_ID) and not find_blocks(first, "tool_use_id", NEW_ID)
     (new,) = find_blocks(second, "id", NEW_ID)
     (reply,) = find_blocks(second, "tool_use_id", NEW_ID)
-    assert new[0] == "assistant" and new[1]["name"] == "mcp__flower__LookupNote" and new[1]["input"] == ARGS
+    assert new[0] == "assistant" and new[1]["name"] == NATIVE_TOOL_NAME and new[1]["input"] == ARGS
     assert reply[0] == "user" and REPLY in json.dumps(reply[1], ensure_ascii=False)
 
 

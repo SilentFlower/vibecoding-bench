@@ -391,11 +391,16 @@ class ColdHistoryTests(TestCase):
 
     def test_mcp_only_advertises_this_sessions_declarations(self):
         """检查 MCP 只提供本次准入的定义，执行由原回执链处理。@return 无。"""
-        plan = ColdHistory.from_request(self.body)
+        body = deepcopy(self.body)
+        for name in ("Lookup-Note", "Lookup_Note"):
+            body["tools"].append({"name": name, "input_schema": {"type": "object"}})
+        plan = ColdHistory.from_request(body)
         request = {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
         self.assertEqual(plan.mcp(request)["result"]["tools"], [
-            {"name": "LookupNote", "description": "", "inputSchema": {"type": "object"}},
+            {"name": name, "description": "", "inputSchema": {"type": "object"}}
+            for name in ("LookupNote", "Lookup-Note", "Lookup_Note")
         ])
+        self.assertEqual(list(plan.tools), ["mcp__flower__LookupNote", "mcp__flower__Lookup-Note", "mcp__flower__Lookup_Note"])
         self.assertIn("error", plan.mcp({**request, "method": "tools/call"}))
 
     def test_output_effort_matches_the_frozen_root_scope(self):
