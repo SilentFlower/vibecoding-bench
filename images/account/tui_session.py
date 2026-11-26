@@ -1557,7 +1557,8 @@ class SessionDriver:
             actor_key = (*actor_key, "agent-summary")
         offered, returned = split_reply(messages)
         policy = reservation.get("body_policy")
-        native_cache_policy = not policy or (not policy["sub2api"] and policy["ttl"] == "off")
+        native_cache_policy = not policy or not policy["sub2api"]
+        native_cache_ttl = policy["ttl"] if policy else "off"
         deadline = reservation["deadline_unix_ms"] / 1000
 
         def remaining():
@@ -1632,6 +1633,7 @@ class SessionDriver:
                         # 继续使用原进程的生效设置，校验通过后才把回执交给等待工具。
                         plan = ColdHistory.from_request(
                             {**body, "messages": messages[:prompt_index]}, actor.cold_history.system_policy,
+                            cache_ttl=native_cache_ttl,
                         )
                         if not native_cache_policy or plan != actor.cold_history or not tool_results_only:
                             raise InputRejection("unsupported_parameter")
@@ -1648,6 +1650,7 @@ class SessionDriver:
                 raise InputRejection("unsupported_parameter")
             cold = ColdHistory.from_request(
                 {**body, "messages": messages[:native_checkpoint["prompt_index"]]}, native_checkpoint["system_policy"],
+                cache_ttl=native_cache_ttl,
             )
             if cold is None or cold.receipt_boundary() != native_checkpoint:
                 raise InputRejection("unsupported_parameter")
@@ -1655,7 +1658,7 @@ class SessionDriver:
             if recovery_history is None:
                 raise InputRejection("unsupported_parameter")
         elif native_history_allowed and checkpoint is None:
-            cold = ColdHistory.from_request(body, system_policy)
+            cold = ColdHistory.from_request(body, system_policy, cache_ttl=native_cache_ttl)
         if cold is None and system_policy != "append" and not is_native and checkpoint is None:
             raise InputRejection("unsupported_parameter")
         launch_plan = recovery_history or cold

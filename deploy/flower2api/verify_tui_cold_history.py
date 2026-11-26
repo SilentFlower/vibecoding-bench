@@ -174,7 +174,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            parallel_tools=False, reconnect_tool_stream=False, current_images=False, auto_tool_choice=False,
            recovery_ledger_contention=False, recovery_ledger_deadline=False, recovery_workspace_rejection=False,
            recovery_slow_model=False, initial_idle_model_connection=False, trace_startup=False, cache_markers=False,
-           history_cache_markers=False):
+           history_cache_markers=False, history_cache_ttl=None):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -204,6 +204,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param trace_startup 是否记录隔离启动阶段。
     @param cache_markers 是否核对普通 Messages 显式缓存标记的模型实收和出站归属。
     @param history_cache_markers 是否冻结历史标记并验证工具往返。
+    @param history_cache_ttl 工具往返启用的平台历史断点时长。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -426,6 +427,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
 
         manage("PUT", "settings", {"allowed_user_agents": "",
                                    "request_diagnostics_log_mode": "info" if cache_markers else "debug"})
+        if history_cache_ttl:
+            manage("PUT", "settings", {"message_cache_control_rewrite": "off",
+                                       "cache_control_ttl_rewrite": history_cache_ttl})
         credentials = {"auth_type": "oauth", "access_token": account_token, "refresh_token": token_hex(32),
                        "expires_at": time_ns() // 1_000_000 + 1_800_000, "subscription_type": "max"}
         if v1_runtime is not None:
@@ -506,7 +510,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         old_result = "已完成的旧工具结果。"
         if history_tool_blocks:
             old_result = [{"type": "text", "text": text} for text in ("已完成的旧工具结果。", "保持第二段结果。")]
-        if history_cache_markers:
+        if history_cache_markers and not history_cache_ttl:
             text = {"type": "text", "text": "已确认的重复旧工具结果。"}
             old_result = [text, {**text, "cache_control": {"type": "ephemeral", "ttl": "5m"}}]
         messages[3:3] = [
@@ -656,12 +660,21 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 manage, token, changed, headers, received, "changed_history_cache", expected_status=422,
             )
             assert len(received) == 1
-            changed_nested = deepcopy(follow)
-            ((_, old_tool_result),) = find_blocks(changed_nested, "tool_use_id", PAST_ID)
-            old_tool_result["content"][1].pop("cache_control")
-            changed_nested_cache, _, _ = checked_messages(
-                manage, token, changed_nested, headers, received, "changed_nested_history_cache", expected_status=422,
-            )
+            if history_cache_ttl:
+                try:
+                    manage("PUT", "settings", {"cache_control_ttl_rewrite": "off"})
+                    changed_ttl_policy, _, _ = checked_messages(
+                        manage, token, follow, headers, received, "changed_history_ttl_policy", expected_status=422,
+                    )
+                finally:
+                    manage("PUT", "settings", {"cache_control_ttl_rewrite": history_cache_ttl})
+            else:
+                changed_nested = deepcopy(follow)
+                ((_, old_tool_result),) = find_blocks(changed_nested, "tool_use_id", PAST_ID)
+                old_tool_result["content"][1].pop("cache_control")
+                changed_nested_cache, _, _ = checked_messages(
+                    manage, token, changed_nested, headers, received, "changed_nested_history_cache", expected_status=422,
+                )
             assert len(received) == 1
         if signed_tool_history:
             tampered = {**SIGNED_THINKING, "signature": "Y2hhbmdlZA=="}
@@ -846,11 +859,17 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             observed = [observed_cache_breakpoints(model) for _, model, _ in received]
             expected = [(i, 0, role, row["content"][0])
                         for i, ((role, _), row) in enumerate(zip(HISTORY[:2], messages[:2], strict=True))]
+            if history_cache_ttl:
+                expected = [(i, offset, role, {**block, "cache_control": {"type": "ephemeral", "ttl": history_cache_ttl}})
+                            for i, offset, role, block in expected]
             assert observed == [expected, expected], observed
             proof.update(history_cache_markers=observed, changed_history_cache_status=changed_cache)
-            proof.update(nested_history_cache_markers=[find_blocks(model, "tool_use_id", PAST_ID)
-                                                       for _, model, _ in received],
-                         changed_nested_history_cache_status=changed_nested_cache)
+            if history_cache_ttl:
+                proof.update(history_cache_ttl=history_cache_ttl, changed_history_ttl_policy_status=changed_ttl_policy)
+            else:
+                proof.update(nested_history_cache_markers=[find_blocks(model, "tool_use_id", PAST_ID)
+                                                           for _, model, _ in received],
+                             changed_nested_history_cache_status=changed_nested_cache)
         if parallel_tools:
             first, second = (document for _, document, _ in received)
             for native in (first, second):
@@ -1414,8 +1433,10 @@ def verify_cache_markers(manage, token, account_id, headers, received):
             "input_schema": {"type": "object", "properties": {}}, "cache_control": long}
     closed = [prefix[0], row("assistant", historical_tool), row("user", historical_result),
               row("assistant", text("已结束旧工具轮。")), plain[-1]]
-    forced_ttl_history = [row("user", {**past, "cache_control": short}),
-                          row("assistant", {**answer, "cache_control": short}), plain[-1]]
+    def forced_history(marker):
+        return [row("user", {**past, "cache_control": marker}),
+                row("assistant", {**answer, "cache_control": marker}), plain[-1]]
+
     cases = (
         ("unmarked", "append", {}, plain, None, 200),
         ("current", "append", {}, current, current, 200),
@@ -1428,15 +1449,19 @@ def verify_cache_markers(manage, token, account_id, headers, received):
         ("system", "append", {"system": [{**system, "cache_control": long}]}, plain, None, 422),
         ("replace", "replace", {"system": [system]}, current, None, 422),
         ("user_reminder", "user_reminder", {"system": [system]}, current, None, 422),
-        ("forced_ttl_5m", "append", {}, history, forced_ttl_history, 200),
+        ("forced_ttl_5m", "append", {}, history, forced_history(short), 200),
+        ("forced_ttl_1h", "append", {}, history, forced_history(long), 200),
+        ("forced_unmarked", "append", {}, plain, plain, 200),
+        ("forced_nested_result", "append", {}, closed, closed, 200),
     )
+    ttl_settings = {"forced_ttl_5m": "5m", "forced_ttl_1h": "1h", "forced_unmarked": "5m", "forced_nested_result": "1h"}
     proof = {}
     account_path = f"accounts/{account_id}"
     for name, policy, extra, messages, expected, http_status in cases:
         account = manage("PUT", account_path, {"client_system_prompt_policy": policy})
         assert account["request_backend"] == "tui_v2" and account["client_system_prompt_policy"] == policy
-        manage("PUT", "settings", {"message_cache_control_rewrite": "off",
-                                    "cache_control_ttl_rewrite": "5m" if name == "forced_ttl_5m" else "off"})
+        forced_ttl = ttl_settings.get(name, "off")
+        manage("PUT", "settings", {"message_cache_control_rewrite": "off", "cache_control_ttl_rewrite": forced_ttl})
         body = {"model": MODEL, "max_tokens": 128, "stream": False, "messages": messages, **extra}
         before = len(received)
         status, raw, request_id = checked_messages(
@@ -1452,6 +1477,7 @@ def verify_cache_markers(manage, token, account_id, headers, received):
         claims = [json.loads(line) for line in MODEL_BODY_TRACE.read_text().splitlines()]
         own_claims = [claim for claim in claims if claim["reservation_id"] == reservation]
         evidence = {"http_status": status, "model_posts": len(received) - before, "account_policy": policy,
+                    "ttl_policy": forced_ttl,
                     "request_id": request_id, "reservation_id": reservation, "attempt_count": record["attempt_count"]}
         if status == 422:
             assert len(received) == before and not own_claims and record["attempt_count"] == 0, (name, evidence)
@@ -1464,7 +1490,8 @@ def verify_cache_markers(manage, token, account_id, headers, received):
             ((digest, model, _),) = received[before:]
             (claim,) = own_claims
             assert claim["sha256"] == digest, (name, evidence, claim)
-            from_cli = name in ("unmarked", "history", "history_replace", "history_user_reminder", "nested_result")
+            from_cli = name in ("unmarked", "history", "history_replace", "history_user_reminder", "nested_result",
+                                "forced_ttl_5m", "forced_ttl_1h")
             assert claim["from_interactive_cli"] is from_cli, (name, claim)
             assert model.get("tools", []) == body.get("tools", []), name
             if from_cli:
@@ -1751,6 +1778,7 @@ def main():
     parser.add_argument("--current-text-blocks", action="store_true")
     parser.add_argument("--current-images", action="store_true")
     parser.add_argument("--history-cache-markers", action="store_true")
+    parser.add_argument("--history-cache-ttl", choices=("5m", "1h"))
     parser.add_argument("--auto-tool-choice", action="store_true")
     parser.add_argument("--signed-tool-history", action="store_true")
     parser.add_argument("--trace-initial-startup", action="store_true", help="记录源码 V2 夹具的启动阶段")
@@ -1781,6 +1809,8 @@ def main():
     scenario.add_argument("--failure-boundaries", action="store_true")
     scenario.add_argument("--v1-runtime", type=Path)
     args = parser.parse_args()
+    if args.history_cache_ttl and not args.history_cache_markers:
+        parser.error("--history-cache-ttl 需要同用 --history-cache-markers")
     if (args.recovery_ledger_contention or args.recovery_ledger_deadline or args.recovery_workspace_rejection
         or args.recovery_slow_model) and (
         not args.recover_pending_tool or args.signed_tool_history
@@ -1819,7 +1849,8 @@ def main():
                        recovery_workspace_rejection=args.recovery_workspace_rejection,
                        recovery_slow_model=args.recovery_slow_model,
                        initial_idle_model_connection=args.initial_idle_model_connection, trace_startup=trace_startup,
-                       cache_markers=args.cache_markers, history_cache_markers=args.history_cache_markers)
+                       cache_markers=args.cache_markers, history_cache_markers=args.history_cache_markers,
+                       history_cache_ttl=args.history_cache_ttl)
         print(json.dumps(proof, ensure_ascii=False))
 
 

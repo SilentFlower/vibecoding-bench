@@ -12,6 +12,7 @@ from tempfile import TemporaryDirectory
 from uuid import uuid4
 
 from runtime_files import atomic_text
+from tui_cache_policy import model_body
 from tui_messages import encode
 from tui_reconnect import digest
 from tui_workspace_launch import publish_workspace_history
@@ -185,11 +186,13 @@ class ColdHistory:
     effort: str | None = None
     current_blocks: tuple[dict, ...] = ()
     tool_choice: dict | None = None
+    cache_ttl: str = "off"
 
     @classmethod
-    def from_request(cls, body, system_policy="append"):
+    def from_request(cls, body, system_policy="append", *, cache_ttl="off"):
         """识别普通文本、内嵌图像及受支持的闭合历史。
         @param body 已校验的请求。@param system_policy 本轮冻结的账号系统指令动作。
+        @param cache_ttl 经账号预留核对的平台 TTL。仅承接有直接历史断点的强制模式。
         @return 原生输入计划或空。
         """
         if body.keys() - {"model", "max_tokens", "thinking", "system", "messages", "tools", "stream", "output_config",
@@ -211,12 +214,14 @@ class ColdHistory:
         content = _blocks(current)
         if not content or not all(_plain_text(block) or _inline_image(block, for_paste=True) for block in content):
             return None
-        cache_blocks = [block for row in history for _, _, _, block in _marked_blocks(_blocks(row))]
+        cache_blocks = [(inner, block) for row in history for _, inner, _, block in _marked_blocks(_blocks(row))]
+        if cache_ttl != "off" and (not cache_blocks or any(inner is not None for inner, _ in cache_blocks)):
+            return None
         if cache_blocks:
             # 原生路径仅承接已验证的历史文本。保留默认 TTL，并限制断点数量和前缀的时长顺序。
             if len(cache_blocks) > 4 or not all(_plain_text(b) for b in content):
                 return None
-            ttls = [block["cache_control"].get("ttl", "5m") for block in cache_blocks]
+            ttls = [block["cache_control"].get("ttl", "5m") for _, block in cache_blocks]
             if ttls != sorted(ttls, key=lambda ttl: ttl != "1h"):
                 return None
         declared = body.get("tools", [])
@@ -239,7 +244,7 @@ class ColdHistory:
         tools = {MCP_PREFIX + tool["name"]: tool for tool in declared}
         return cls(history, body["model"], content[0].get("text", ""), system, tools, body["max_tokens"],
                    body.get("thinking"), system_policy, output.get("effort"),
-                   tuple(content) if len(content) > 1 or content[0]["type"] == "image" else (), choice)
+                   tuple(content) if len(content) > 1 or content[0]["type"] == "image" else (), choice, cache_ttl)
 
     def system_argument(self):
         """选择原生 CLI 提示词文件选项。@return 参数和文件正文，或缺省值。"""
@@ -269,7 +274,9 @@ class ColdHistory:
         # 缺省沿用既有工作区和等待回执的摘要。
         if self.effort is not None:
             scope = (*scope, self.effort)
-        return scope if self.tool_choice is None else (*scope, self.tool_choice)
+        if self.tool_choice is not None:
+            scope = (*scope, self.tool_choice)
+        return scope if self.cache_ttl == "off" else (*scope, self.cache_ttl)
 
     def matches_tool_choice(self, native):
         """核对显式自动工具选择及并行许可。@param native CLI 已生成的请求。@return 是否维持原选择。"""
@@ -336,8 +343,13 @@ class ColdHistory:
 
     def _grouped_history(self):
         reminder_index = self._reminder_index()
+        source = self.history
+        if self.cache_ttl != "off":
+            # 复用账号的 TTL 政策。原输入保留供工具回执核对，有效值在导入前生效。
+            source = model_body({"messages": source}, {"sub2api": False, "ttl": self.cache_ttl, "adaptive": False},
+                                native=False)["messages"]
         history = []
-        for index, row in enumerate(self.history):
+        for index, row in enumerate(source):
             blocks = _blocks(row)
             if index == reminder_index:
                 blocks = [*blocks, {"type": "text", "text": self._reminder()}]

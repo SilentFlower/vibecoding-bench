@@ -377,6 +377,27 @@ class ColdHistoryTests(TestCase):
         rows = [*self.body["messages"][:-1], {"role": "user", "content": [marked]}]
         self.assertIsNone(ColdHistory.from_request({**self.body, "messages": rows}))
 
+    def test_forced_history_cache_ttl_preserves_original_receipt_boundary(self):
+        """有效 TTL 写入原生历史，冻结边界仍核对平台政策和客户端原值。@return 无。"""
+        body = deepcopy(self.body)
+        body["messages"][0]["content"] = [{"type": "text", "text": "有标记的历史",
+                                           "cache_control": {"type": "ephemeral", "ttl": "1h"}}]
+        plan = ColdHistory.from_request(body, cache_ttl="5m")
+        forced = deepcopy(body)
+        forced["messages"][0]["content"][0]["cache_control"]["ttl"] = "5m"
+        self.assertTrue(plan.matches_history_cache_markers(forced))
+        self.assertFalse(plan.matches_history_cache_markers(body))
+        self.assertEqual(plan.history[0]["content"][0]["cache_control"]["ttl"], "1h")
+        self.assertNotEqual(plan.receipt_boundary(), ColdHistory.from_request(body).receipt_boundary())
+        self.assertNotEqual(plan.receipt_boundary(), ColdHistory.from_request(forced, cache_ttl="5m").receipt_boundary())
+        self.assertIsNone(ColdHistory.from_request(self.body, cache_ttl="5m"))
+
+        with TemporaryDirectory() as directory, ExitStack() as stack:
+            config, work, native_id = Path(directory), Path("/native/workspace"), str(uuid4())
+            self.assertEqual(plan.import_session(config, work, native_id), native_id)
+            path = _resume_path(stack, config, work, native_id, required=True)
+            self.assertEqual(json.loads(path.read_bytes().splitlines()[0])["message"], forced["messages"][0])
+
     def test_preserves_completed_tool_result_text_blocks(self):
         """导入旧工具结果的文本块顺序及配对，扩展块沿原入口合同。@return 无。"""
         body = deepcopy(self.body)
