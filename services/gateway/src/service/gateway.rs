@@ -2922,6 +2922,9 @@ impl GatewayService {
                 let mut prepared = match prepared {
                     Ok(prepared) => prepared,
                     Err(error) => {
+                        diagnostics::observe_tui_model(
+                            diagnostics::TuiModelObservation::RejectedBeforeSend,
+                        );
                         if let Some(turn) = turn.take()
                             && let Err(release_error) = turn.release_rejected_prepare().await
                         {
@@ -4459,6 +4462,29 @@ impl GatewayService {
             .get(runtime_transport::TUI_INSTRUCTION_LOCATION)
             .and_then(|header| header.to_str().ok())
             .and_then(TuiInstructionLocation::from_wire);
+        if !fixture {
+            if rejected_before_model {
+                diagnostics::observe_tui_model(
+                    diagnostics::TuiModelObservation::RejectedBeforeSend,
+                );
+            } else if body_source.is_some_and(|source| {
+                runtime_transport::tui_projection_marker(
+                    response.headers(),
+                    runtime_transport::TUI_BODY_SOURCE,
+                    source.as_str(),
+                )
+            }) || runtime_transport::tui_failure_stage(
+                response.headers(),
+                &["local_provider_http", "managed_oauth_http"],
+            )
+            .is_some()
+            {
+                // 私有头已经收到模型证据，公开投影或正文读取随后仍可能失败。
+                diagnostics::observe_tui_model(
+                    diagnostics::TuiModelObservation::ResponseReceived,
+                );
+            }
+        }
         let mut response =
             runtime_transport::tui_public_response(response, (!fixture).then_some(account.id))
                 .await

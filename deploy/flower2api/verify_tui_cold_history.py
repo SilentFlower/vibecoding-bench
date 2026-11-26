@@ -50,6 +50,7 @@ QUESTION = "NOW：查询新便签并回答。"
 QUESTION_TAIL = "NOW：保留本轮问题第二段。"
 AFTER_RESTART = "RESTART：从已确认的旧问答开启另一轮。"
 DROP_REPLY = "FAILURE：模型收到正文后关闭响应连接。"
+REJECT_MODEL_REQUEST = "FAILURE：模型收到正文后返回合成拒绝。"
 SLOW_MODEL_DELAY = 4.25
 SYSTEM = ["RULE1：你是便签助手。", "RULE2：请只使用已声明的工具。"]
 PAST_ID = "toolu_past_fixture"
@@ -95,10 +96,12 @@ SUGGESTION_REPLY = "summarize the synthetic note next"
 FORCED_CHOICES = {"any": {"type": "any"}, "named": {"type": "tool", "name": SECOND_TOOL["name"]}}
 
 
-def response_json(handler, payload):
-    """写入合成 JSON 响应。@param handler 当前连接。@param payload 响应对象。@return 无。"""
+def response_json(handler, payload, *, status=200):
+    """写入合成 JSON 响应。@param handler 当前连接。@param payload 响应对象。
+    @param status 该隔离服务的实际状态。@return 无。
+    """
     raw = json.dumps(payload).encode()
-    handler.send_response(200)
+    handler.send_response(status)
     handler.send_header("Content-Type", "application/json")
     handler.send_header("Content-Length", str(len(raw)))
     handler.end_headers()
@@ -390,6 +393,12 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             if failure_boundaries and any(block.get("text") == DROP_REPLY
                                           for row in body["messages"] for block in blocks(row)):
                 self.close_connection = True
+                return
+            if failure_boundaries and any(block.get("text") == REJECT_MODEL_REQUEST
+                                          for row in body["messages"] for block in blocks(row)):
+                response_json(self, {"type": "error", "error": {
+                    "type": "invalid_request_error", "message": "隔离模型明确拒绝合成请求",
+                }}, status=400)
                 return
             tool = next((t for t in body.get("tools", []) if t.get("description") == TOOL["description"]), None)
             results = find_blocks(body, "tool_use_id", NEW_ID)
@@ -707,27 +716,41 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         if cache_markers:
             return verify_cache_markers(manage, token, identifier, headers, received)
         if failure_boundaries:
-            def post(question):
+            def post(question, phase, expected_status, *, session=None):
                 request = {"model": MODEL, "max_tokens": 128, "stream": False,
                            "messages": [{"role": "user", "content": question}]}
-                return call(18090, "POST", "/v1/messages", token, request,
-                            {**headers, "x-session-id": str(uuid4())})
+                return checked_messages(
+                    manage, token, request, {**headers, "x-session-id": session or str(uuid4())}, received,
+                    phase, expected_status=expected_status, trace_startup=trace_startup,
+                )
 
             deny_proxy = True
-            before, before_body = post(AFTER_RESTART)
+            before, before_body, _ = post(AFTER_RESTART, "before_model", 502)
             assert before == 502 and not received, (before, before_body, len(received))
             assert denied_tunnels == ["api.anthropic.com:443"], denied_tunnels
             deny_proxy = False
-            after, after_body = post(DROP_REPLY)
+            after, after_body, _ = post(DROP_REPLY, "model_stream_dropped", 502)
             assert after == 502 and len(received) == 1, (after, after_body, len(received))
-            status, answer = post(AFTER_RESTART)
+            status, answer, _ = post(AFTER_RESTART, "new_request", 200)
             assert status == 200 and len(received) == 2, (status, answer, len(received))
             assert json.loads(answer)["content"] == [{"type": "text", "text": FINAL}]
             (failed, success) = verify_captures(manage, received, account_token)
             for attempt in (failed, success):
                 assert attempt["cli_and_https_body_sha256"] != attempt["ingress_body_sha256"]
+            assert failed["confirmed_model_responses"] is None and success["confirmed_model_responses"] == 1
+            session = str(uuid4())
+            started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+            rejected, error_body, request_id = post(REJECT_MODEL_REQUEST, "model_http_rejection", 400, session=session)
+            assert rejected == 400 and len(received) == 3, (rejected, error_body, len(received))
+            assert json.loads(error_body)["error"]["type"] == "invalid_request_error"
+            assert request_id
+            (record,) = report_request_diagnostics(manage, "model_http_rejection", request_id, session,
+                                                    started_at)["requests"]
+            assert record["attempt_count"] == record["diagnostic_context"]["tui_confirmed_model_responses"] == 1, record
             return {"before_send": before, "before_model_posts": 0, "after_send": after,
                     "after_model_posts": 1, "next_request": status, "next_model_posts": 1,
+                    "model_http_rejection": {"http_status": rejected, "model_posts": 1, "request_id": request_id,
+                                             "confirmed_model_responses": 1},
                     "attempts": [failed, success]}
         if text_input:
             return verify_text_inputs(manage, token, account_token, headers, messages, received,
@@ -1012,6 +1035,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                         429, "tui_submission_ledger", "local_rejected",
                     ), expired
                     assert expired["attempt_count"] == 0 and expired["attempts"] == [], expired
+                    assert expired["diagnostic_context"]["tui_confirmed_model_responses"] == 0, expired
                     expired_reservation = expired["diagnostic_context"]["tui_reservation_id"]
                     assert str(UUID(expired_reservation)) == expired_reservation
                     with closing(connect(temporary / "gateway.db")) as database:
@@ -1055,6 +1079,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             try:
                 status, _, request_id = checked_messages(
                     manage, token, follow, headers, received, "recovered_receipt_slow_model", expected_status=502,
+                    trace_startup=trace_startup, sender_status=sender_state_after_failure,
                 )
                 returned = monotonic()
                 arrival, = slow_tool_arrivals
@@ -1070,6 +1095,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                     status, "tui_send_http", "transport_error",
                 ), record
                 assert record["native_rejection"] is None and record["attempt_count"] == 0 and record["attempts"] == [], record
+                assert "tui_confirmed_model_responses" not in record["diagnostic_context"], record
                 reservation = record["diagnostic_context"]["tui_reservation_id"]
                 assert str(UUID(reservation)) == reservation
                 assert len(received) == 2 and callbacks == [NEW_ID] and original_file.read_bytes() == original_history
@@ -1078,6 +1104,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                         "model_posts": len(received), "client_tool_calls": len(callbacks), "old_tool_calls": 0,
                         "request_id": request_id, "reservation_id": reservation, "outcome": record["outcome"],
                         "error_stage": record["error_stage"], "attempt_count": record["attempt_count"],
+                        "confirmed_model_responses": record["diagnostic_context"].get("tui_confirmed_model_responses"),
                         "original_history_preserved": True}
             finally:
                 manage("PUT", "settings", {budget_key: previous_budget})
@@ -1160,6 +1187,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             assert attempt["request_id"] == request_id
             if recover_pending:
                 assert attempt["diagnostic_body_source"] == "interactive_cli", attempt
+                assert attempt["confirmed_model_responses"] == 1, attempt
             assert attempt["ingress_body_sha256"] == sha256(encoded(request_body)).hexdigest()
             assert attempt["cli_and_https_body_sha256"] != attempt["ingress_body_sha256"]
             attempt.update(client_message_id=reply_id, model_message_id=model_id)
@@ -1302,6 +1330,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 proof["recovered_pending_tool"]["ledger_deadline"] = {
                     "http_status": expired_status, "error_stage": expired["error_stage"],
                     "attempt_count": expired["attempt_count"], "request_id": expired_request,
+                    "confirmed_model_responses": expired["diagnostic_context"]["tui_confirmed_model_responses"],
                     "reservation_id": expired_reservation, "elapsed_ms": elapsed_ms,
                     "model_posts_before_retry": posts_before_retry, "receipt_reopened": True,
                 }
@@ -1510,6 +1539,7 @@ def report_request_diagnostics(manage, phase, request_id, session_id, started_at
             "native_receive_ended", "native_source_terminal", "tui_reservation_id",
             "tool_continuation_mode", "tool_continuation_path", "tool_continuation_reason",
             "tui_body_source", "tui_session_origin", "tui_instruction_location",
+            "tui_confirmed_model_responses",
         ) if context.get(key) is not None}
 
     try:
@@ -2236,11 +2266,14 @@ def verify_structured_output(manage, token, identifier, received):
                 assert request["request_id"] == request_id, request
                 assert request["log_mode"] == "info" and "tui_body_source" not in (request.get("context") or {})
                 assert "tui_instruction_location" not in (request.get("context") or {})
+                confirmed = request["context"]["tui_confirmed_model_responses"]
+                assert confirmed == int(status == 200), (phase, confirmed, request)
                 summary = json.dumps(detail, ensure_ascii=False)
                 assert question not in summary and system not in summary
                 result = {"status": status, "policy": policy, "response_mode": response_mode,
                           "input_output_config": config,
                           "request_id": request_id, "reservation_id": reservation, "attempt_count": len(attempts),
+                          "confirmed_model_responses": confirmed,
                           "model_posts": len(received) - before}
                 if status == 422:
                     assert not (attempts or claims or result["model_posts"]), (phase, result)
@@ -2964,6 +2997,8 @@ def verify_captures(manage, received, account_token):
                 captures[digest] = {"request_id": request_id, "attempt_id": attempt_id,
                                     "ingress_body_sha256": snap["ingress"]["original_body_sha256"],
                                     "cli_and_https_body_sha256": digest, "final_tls_capture": "unavailable",
+                                    "confirmed_model_responses": (row.get("context") or {}).get(
+                                        "tui_confirmed_model_responses"),
                                     "diagnostic_body_source": (attempt.get("context") or {}).get("tui_body_source"),
                                     "diagnostic_session_origin": (attempt.get("context") or {}).get("tui_session_origin"),
                                     "diagnostic_instruction_location": (attempt.get("context") or {}).get(

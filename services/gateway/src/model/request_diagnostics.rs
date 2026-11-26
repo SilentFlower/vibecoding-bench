@@ -443,6 +443,9 @@ pub struct DiagnosticContext {
     /// 实际模型正文中已核对的普通顶层业务指令落点。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tui_instruction_location: Option<TuiInstructionLocation>,
+    /// 该 V2 请求经私有发送器确认的模型响应数，可低于实际投递数。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tui_confirmed_model_responses: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input_rejection_reason: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -505,6 +505,30 @@ pub(super) fn tui_reservation(id: &str) {
     });
 }
 
+/// V2 发送器能够独立确认的模型边界。
+pub(super) enum TuiModelObservation {
+    RejectedBeforeSend,
+    ResponseReceived,
+}
+
+/// 累计根请求已核对的模型响应，保留没有任何确认时的缺省值。
+/// @param observation 准备或私有发送提供的已核对边界。@return 无。
+pub(super) fn observe_tui_model(observation: TuiModelObservation) {
+    let _ = CURRENT_TRACE.try_with(|trace| {
+        let mut state = trace.lock();
+        if state.tui_submission_unknown
+            && matches!(observation, TuiModelObservation::RejectedBeforeSend)
+        {
+            return;
+        }
+        let context = state.request.context.get_or_insert_with(Default::default);
+        let count = context.tui_confirmed_model_responses.get_or_insert(0);
+        if matches!(observation, TuiModelObservation::ResponseReceived) {
+            *count = count.saturating_add(1);
+        }
+    });
+}
+
 /// 记录已发起私有提交后失去响应头的边界。@return 无。
 pub(super) fn tui_submission_unknown() {
     let _ = CURRENT_TRACE.try_with(|trace| {
@@ -512,6 +536,11 @@ pub(super) fn tui_submission_unknown() {
         state.tui_submission_unknown = true;
         state.request.error_stage = Some("tui_send_http".into());
         state.request.native_rejection = None;
+        if let Some(context) = state.request.context.as_mut()
+            && context.tui_confirmed_model_responses == Some(0)
+        {
+            context.tui_confirmed_model_responses = None;
+        }
     });
 }
 
@@ -1237,10 +1266,10 @@ fn identity_hash(account: i64, kind: &str, value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        CURRENT_LOG_MODE, CURRENT_TRACE, RequestTraceGuard, TraceContext, begin_attempt,
+        CURRENT_LOG_MODE, CURRENT_TRACE, RequestTraceGuard, TraceContext, TuiModelObservation, begin_attempt,
         claude_request_session, error_stage, identity_hash, local_outcome, native_rejection, now,
-        prepare_tui_attempt, profile_selection, selected_account, session_context, tui_reservation,
-        tui_submission_unknown,
+        observe_tui_model, prepare_tui_attempt, profile_selection, selected_account, session_context,
+        tui_reservation, tui_submission_unknown,
     };
     use crate::error::AppError;
     use crate::model::account::Account;
@@ -1393,6 +1422,7 @@ mod tests {
             .scope(trace, async {
                 selected_account(7);
                 tui_reservation(&reservation);
+                observe_tui_model(TuiModelObservation::RejectedBeforeSend);
                 tui_submission_unknown();
                 let error = AppError::BadGateway("V2 请求提交状态未知".into());
                 guard.error(&error);
@@ -1418,10 +1448,36 @@ mod tests {
         assert!(detail.request.native_rejection.is_none());
         assert_eq!(detail.request.attempt_count, 0);
         assert!(detail.attempts.is_empty());
-        assert_eq!(
-            detail.request.context.unwrap().tui_reservation_id,
-            Some(reservation)
-        );
+        let context = detail.request.context.unwrap();
+        assert_eq!(context.tui_reservation_id, Some(reservation));
+        assert_eq!(context.tui_confirmed_model_responses, None);
+    }
+
+    /// 私有响应累计已确认次数，后续发送未知只保留先前收到的证据。@return 无。
+    #[tokio::test]
+    async fn confirmed_tui_responses_survive_an_unknown_send() {
+        let store = store().await;
+        let trace = TraceContext::new(store.clone());
+        let guard = RequestTraceGuard::new(trace.clone());
+        let response = CURRENT_TRACE
+            .scope(trace, async {
+                tui_reservation(&Uuid::new_v4().to_string());
+                observe_tui_model(TuiModelObservation::ResponseReceived);
+                observe_tui_model(TuiModelObservation::ResponseReceived);
+                observe_tui_model(TuiModelObservation::RejectedBeforeSend);
+                tui_submission_unknown();
+                let error = AppError::BadGateway("V2 请求提交状态未知".into());
+                guard.error(&error);
+                guard.wrap(error.into_response())
+            })
+            .await;
+        let id = response.headers()["x-cc2api-request-id"].to_str().unwrap().to_owned();
+        let _ = to_bytes(response.into_body(), 1024).await.unwrap();
+        store.flush().await.unwrap();
+        let detail = store.detail(&id).await.unwrap();
+        assert_eq!(detail.request.outcome, "transport_error");
+        assert_eq!(detail.request.context.unwrap().tui_confirmed_model_responses, Some(2));
+        assert!(detail.attempts.is_empty());
     }
 
     /// 入站会话按原值冻结，异常值及重复头保持未知，两种日志模式均可查询。

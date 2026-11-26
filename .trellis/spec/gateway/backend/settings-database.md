@@ -321,6 +321,7 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - 同次私有回执可携带 `context.tui_session_origin`。`live_process` 表示原进程承接工具续轮，`new_session` 表示启动时没有载入历史，`disk_resume` 表示载入已登记档案或由持久工具回执核对的恢复前缀，`external_import` 表示本次实际发布并载入外部历史。重复导入命中已有确认分叉时记录 `disk_resume`。该字段不保存文件位置、会话正文或凭据。旧记录和缺少成功模型帧的尝试保持字段缺省。
 - `context.tui_instruction_location` 仅记录普通 Messages 显式非空顶层业务指令在实际选中正文的落点。系统文本为 `system`。在用户直接文本中核对完整提醒为 `user_reminder`。CLI 正文从同次认领的已组装请求核对，旧账号代发从本次实际冻结正文核对。省略、空指令、完整 CC 客户端自带身份、仅消息级 system 和缺少确认的尝试保持字段缺省。旧记录兼容缺省。指令原文不上报管理摘要或公开响应。
 - 根记录包含起止时间、下游状态、最终选中账号、结果、尝试数和可选的会话字段。根状态与尝试实际上游状态分开；中间认证或签名错误不得覆盖后续尝试结果。首字节字段 `ttft_ms` 测量响应头到达耗时，不解释为首个模型文本 token。
+- V2 根记录的 `context.tui_confirmed_model_responses` 仅累计同次私有发送确认的模型帧或可信上游 HTTP 错误。一条已标记的尝试仍可能发生在确认之前。已确认的准备拒绝或发送前拒绝可记录零。只有超时或传输中断的记录保持缺省。存在较早的已确认模型响应时，保留该计数。管理界面的「已确认模型响应数」与「已记录尝试次数」独立呈现。实际投递总数仍取决于后续证据。最终 TLS 写出采集维持未采集。
 - 本地拒绝、模拟和缓存命中有根记录，但无虚构的上游尝试。EOF、末帧、读取错误和 Drop 只终结一次；HTTP 200 内的错误事件与成功区分，缺用量或采样失败标记 `incomplete/partial`。发送错误不伪造上游 HTTP 状态或断言未提交。
 - 本地 503 的 `error_stage` 由实际失败边界写入：选号为 `account_selection`，凭据解析为 `credentials`，V3 环境/传输绑定准备为 `runtime_prepare`，原生能力检查及原生准备拒绝为 `native_prepare`。`RequestTraceGuard::error` 保留已记录阶段；通用 `AppError::ServiceUnavailable` 缺少边界信息时回退 `gateway`，不能仅凭错误类型归为选号失败。诊断标记不改变响应、准入超时或重试行为。
 - 尝试中的 session/thread/响应消息仅存带账号及标识类型域的 SHA256 前 128 位；线程前驱和响应消息使用同一消息域。只观察既有池解析结果，不能额外 resolve 或刷新 TTL；上游 session 摘要以实际最终 body 为准。
