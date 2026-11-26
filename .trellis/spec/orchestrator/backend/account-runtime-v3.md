@@ -2584,7 +2584,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 
 - `test_tui_cold_history.py` 核对闭合边界、私有 JSONL 父链、最小历史消息、旧格式字节保留、同绑定并发与 MCP 声明范围。`test_tui_workspace_launch.py` 核对首次导入、重复导入和后续预留的正式恢复入口使用同一文件。回调返回的分支须通过目录、会话和权限校验。
 - `verify_tui_cold_history.py` 使用公开入口、生产事件源、真实 2.1.293 CLI 和账号代理，对照 HTTPS 实收、公开流式调用、JSON 续轮及拒绝路径。
-- `verify_tui_cold_history.py --restart-history` 在原工具续轮收口后核对已导入消息的 `role` 和 `content`。以账号权限预先落盘改写后的历史，再重启发送器并从公开入口提交分叉确认历史。收到完整答复后再次重启并重发相同输入，检查独立响应、一次额外模型投递、同一分叉 UUID、两份持久档案的字节及私有临时文件清理。
+- `verify_tui_cold_history.py --restart-history` 在原工具续轮收口后核对已导入消息的 `role` 和 `content`。以账号权限预先落盘改写后的历史，再重启发送器并从公开入口提交分叉确认历史，未推进时须复用同一 UUID。完整答复写入后再次重启并重发相同输入，检查独立响应、一次额外模型投递、确认历史、旧档案字节及工具归属。已推进的内容可由后续分支承接，报告记录实际 UUID 和持久档案数量。
 - `verify_tui_cold_history.py --text-input` 从公开入口核对纯新轮、同公开会话另起新轮、纯文本历史以及缺省、空串、空数组和多段系统指令实收。
 - `verify_tui_cold_history.py --system-policy` 从管理 API 保存并读回动作，按公开 Messages 的模型实收核对三种落点。`--tool-policy` 对照替换和用户提醒的工具往返。`--toggle-pending-policy` 在原工具等待时更改动作，核对回执隔离及原轮指令。
 - `verify_tui_cold_history.py --recover-pending-tool` 结束唯一等待中的真实 CLI 并重启其账号发送器。修改账号动作和客户端指令后，原回执仅继续其冻结策略，恢复模型步骤的正文来自真实 CLI。

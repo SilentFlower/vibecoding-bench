@@ -397,16 +397,20 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 wait_for(lambda: sender_state().get("idle"))
                 assert all(path.read_bytes() == data for path, data in snapshots.items())
                 branch_id = json.loads(model_body["metadata"]["user_id"])["session_id"]
-                assert branch_id == staged_id
                 branch_ids.append(branch_id)
                 path = history_file.parent / (branch_id + ".jsonl")
-                assert set(history_file.parent.glob("*.jsonl")) == {history_file, staged_path}
                 assert not list(cli_config.glob("history-replay-*"))
                 if post == 3:
-                    assert path.read_bytes().startswith(staged_bytes)
-                    snapshots[path] = path.read_bytes()
+                    assert branch_id == staged_id
+                    completed = path.read_bytes()
+                    assert completed.startswith(staged_bytes) and len(completed) > len(staged_bytes)
+                    snapshots[path] = completed
                     restart(restarted)
+                else:
+                    assert branch_id != native_id and path.is_file()
                 followup_ids.append(json.loads(raw)["id"])
+            archives = set(history_file.parent.glob("*.jsonl"))
+            assert archives == {history_file, staged_path, path}
             assert len(set(followup_ids)) == 2
             assert list(binding_file.parent.glob("*.json")) == [binding_file]
             assert binding_file.read_bytes() == binding_bytes
@@ -415,7 +419,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                 "staged_branch_session_id": staged_id,
                                 "binding_preserved": True,
                                 "assistant_history_fields": assistant_fields,
-                                "archive_count_after_repeat": len(snapshots),
+                                "archive_count_after_repeat": len(archives),
                                 "repeat_client_message_ids": followup_ids,
                                 "preserved_bytes": [len(data) for data in snapshots.values()],
                                 "additional_model_posts": 2,
