@@ -19,6 +19,7 @@ class RejectedRequestFixture(ManagementFixture):
         super().__init__(gateway)
         self.status = 400
         self.reason = 'invalid_message_role'
+        self.tui_submission_outcome = None
 
     async def route(self, route):
         """返回零尝试诊断和入口证据。@param route 浏览器请求。@return None。"""
@@ -46,12 +47,17 @@ class RejectedRequestFixture(ManagementFixture):
             'account_id': 11, 'account_name': '合成拒绝账号', 'status_code': self.status,
             'attempt_count': 0, 'log_mode': 'debug', 'outcome': 'local_rejected', 'error_stage': 'native_prepare',
             'native_rejection': {'reason': self.reason, 'capture_id': capture_id, 'capture_status': 'queued'}}
+        if self.tui_submission_outcome:
+            row.update(status_code=502, outcome=self.tui_submission_outcome, error_stage='tui_send_http',
+                       context={'tui_reservation_id': '22222222-2222-4222-8222-222222222222'})
+            if self.tui_submission_outcome == 'transport_error':
+                row.pop('native_rejection')
         value = {'items': [row], 'total': 1, 'health': {}} if path == '/admin/request-diagnostics' else {'request': row, 'attempts': []}
         return await self.respond(route, value)
 
 
 async def run(output):
-    """验证400/422及宽窄屏的拒绝证据。@param output 截图目录。@return 安全聚合报告。"""
+    """验证宽窄屏下的拒绝证据与提交状态未知。@param output 截图目录。@return 安全聚合报告。"""
     from playwright.async_api import async_playwright, expect
     output.mkdir(parents=True, exist_ok=True)
     errors = []
@@ -86,6 +92,23 @@ async def run(output):
                 await page.screenshot(path=str(output / f'rejected-{status}-{width}.png'), full_page=True)
                 scenes.append({'status': status, 'width': width, 'passed': True})
                 await page.keyboard.press('Escape')
+        for width, outcome in [(1280, 'transport_error'), (390, 'local_rejected')]:
+            fixture.tui_submission_outcome = outcome
+            await page.set_viewport_size({'width': width, 'height': 1000})
+            await page.goto(BASE + '/requests')
+            await expect(page.locator('.request-result-button')).to_contain_text('提交状态未知')
+            before = fixture.capture_reads
+            await page.get_by_role('button', name='详情', exact=True).click()
+            panel = page.get_by_role('tabpanel')
+            await expect(panel).to_contain_text('模型可能已收到请求')
+            await expect(panel).to_contain_text('22222222-2222-4222-8222-222222222222')
+            await expect(panel).to_contain_text('已记录尝试次数')
+            await expect(panel).not_to_contain_text('本次在上游发送前拒绝')
+            await expect(panel).not_to_contain_text('无执行尝试')
+            await expect(panel.get_by_role('button', name='查看入站请求', exact=True)).to_have_count(0)
+            assert fixture.capture_reads == before
+            scenes.append({'status': 502, 'stored_outcome': outcome, 'width': width, 'passed': True})
+            await page.keyboard.press('Escape')
         assert not errors, errors
         assert not fixture.external, fixture.external
         await browser.close()

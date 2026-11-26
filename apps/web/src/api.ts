@@ -624,6 +624,7 @@ export interface DiagnosticContext {
   conversation_id?: string | null
   trajectory_id?: string | null
   native_model_calls?: number | null
+  tui_reservation_id?: string | null
   control_state?: string | null
   control_observed_at?: string | null
   control_error_code?: string | null

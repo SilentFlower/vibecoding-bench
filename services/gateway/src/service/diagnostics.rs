@@ -78,6 +78,7 @@ struct TraceState {
     profile_selection: String,
     sessions: DiagnosticSessions,
     local_outcome: Option<&'static str>,
+    tui_submission_unknown: bool,
     next_retry: Option<&'static str>,
     last_attempt: Option<(u32, String, Option<String>)>,
     pending_ingress: Option<PendingIngress>,
@@ -150,6 +151,7 @@ impl TraceContext {
                 request_session_recorded: false,
                 sessions: DiagnosticSessions::default(),
                 local_outcome: None,
+                tui_submission_unknown: false,
                 next_retry: None,
                 last_attempt: None,
                 pending_ingress: None,
@@ -283,6 +285,8 @@ impl TraceContext {
                 .is_some_and(|status| (200..300).contains(&status));
             state.request.outcome = if end != "complete" {
                 end.into()
+            } else if state.tui_submission_unknown {
+                "transport_error".into()
             } else if !success && state.request.attempt_count == 0 {
                 "local_rejected".into()
             } else if let Some(local) = state.local_outcome {
@@ -452,6 +456,16 @@ pub(super) fn tui_reservation(id: &str) {
         context.tui_reservation_id = Some(id.to_owned());
         drop(state);
         trace.emit(None);
+    });
+}
+
+/// 记录已发起私有提交后失去响应头的边界。@return 无。
+pub(super) fn tui_submission_unknown() {
+    let _ = CURRENT_TRACE.try_with(|trace| {
+        let mut state = trace.lock();
+        state.tui_submission_unknown = true;
+        state.request.error_stage = Some("tui_send_http".into());
+        state.request.native_rejection = None;
     });
 }
 
@@ -1047,6 +1061,7 @@ impl RequestTraceGuard {
                 .map(normalize_correlation_id);
             if (response.status().is_client_error() || response.status().is_server_error())
                 && state.request.attempt_count == 0
+                && !state.tui_submission_unknown
                 && state.request.native_rejection.is_none()
             {
                 let reason = state
@@ -1159,7 +1174,8 @@ mod tests {
     use super::{
         CURRENT_LOG_MODE, CURRENT_TRACE, RequestTraceGuard, TraceContext, begin_attempt,
         claude_request_session, error_stage, identity_hash, local_outcome, native_rejection, now,
-        prepare_tui_attempt, profile_selection, selected_account, session_context,
+        prepare_tui_attempt, profile_selection, selected_account, session_context, tui_reservation,
+        tui_submission_unknown,
     };
     use crate::error::AppError;
     use crate::model::account::Account;
@@ -1299,6 +1315,48 @@ mod tests {
                     .contains("合成环境故障")
             );
         }
+    }
+
+    /// 私有提交结果未知时，零观测也保留传输归因和原预留。@return 无。
+    #[tokio::test]
+    async fn unknown_tui_submission_is_not_a_local_rejection() {
+        let store = store().await;
+        let trace = TraceContext::new(store.clone());
+        let guard = RequestTraceGuard::new(trace.clone());
+        let reservation = Uuid::new_v4().to_string();
+        let response = CURRENT_TRACE
+            .scope(trace, async {
+                selected_account(7);
+                tui_reservation(&reservation);
+                tui_submission_unknown();
+                let error = AppError::BadGateway("V2 请求提交状态未知".into());
+                guard.error(&error);
+                guard.wrap(error.into_response())
+            })
+            .await;
+        assert_eq!(response.status(), 502);
+        let id = response.headers()["x-cc2api-request-id"]
+            .to_str()
+            .unwrap()
+            .to_owned();
+        let _ = to_bytes(response.into_body(), 1024).await.unwrap();
+        store.flush().await.unwrap();
+        let detail = store.detail(&id).await.unwrap();
+        assert_eq!(detail.request.request_id, id);
+        assert_eq!(
+            detail.request.response_request_id.as_deref(),
+            Some(id.as_str())
+        );
+        assert_eq!(detail.request.outcome, "transport_error");
+        assert_eq!(detail.request.error_stage.as_deref(), Some("tui_send_http"));
+        assert_eq!(detail.request.status_code, Some(502));
+        assert!(detail.request.native_rejection.is_none());
+        assert_eq!(detail.request.attempt_count, 0);
+        assert!(detail.attempts.is_empty());
+        assert_eq!(
+            detail.request.context.unwrap().tui_reservation_id,
+            Some(reservation)
+        );
     }
 
     /// 入站会话按原值冻结，异常值及重复头保持未知，两种日志模式均可查询。

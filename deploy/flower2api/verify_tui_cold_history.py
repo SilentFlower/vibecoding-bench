@@ -45,6 +45,7 @@ QUESTION = "NOW：查询新便签并回答。"
 QUESTION_TAIL = "NOW：保留本轮问题第二段。"
 AFTER_RESTART = "RESTART：从已确认的旧问答开启另一轮。"
 DROP_REPLY = "FAILURE：模型收到正文后关闭响应连接。"
+SLOW_MODEL_DELAY = 4.25
 SYSTEM = ["RULE1：你是便签助手。", "RULE2：请只使用已声明的工具。"]
 PAST_ID = "toolu_past_fixture"
 PAST_SECOND_ID = "toolu_past_second_fixture"
@@ -164,7 +165,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            history_png=False, history_images=False, history_tool_blocks=False, previous=None, failure_boundaries=False,
            current_text_blocks=False, signed_tool_history=False, split_history_tools=False, v1_runtime=None,
            parallel_tools=False, reconnect_tool_stream=False, current_images=False, auto_tool_choice=False,
-           recovery_ledger_contention=False, recovery_ledger_deadline=False, recovery_workspace_rejection=False):
+           recovery_ledger_contention=False, recovery_ledger_deadline=False, recovery_workspace_rejection=False,
+           recovery_slow_model=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -189,6 +191,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param recovery_ledger_contention 是否在提交原回执时短暂占用账号账本锁。
     @param recovery_ledger_deadline 是否持续持锁直至回执触发准入截止，然后重交。
     @param recovery_workspace_rejection 是否核对工作区绑定拒绝及原回执再次认领。
+    @param recovery_slow_model 是否验证隔离模型收件后的公开超时和诊断归属。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -207,6 +210,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     config = Path("/run/v3/sender.json")
     copy2(temporary / "ca.der", config.with_name("verification-ca.der"))
     received, callbacks, proxy_targets = [], [], []
+    slow_tool_arrivals = []
     v1_betas = []
     lookups = []
     deny_proxy = False
@@ -237,6 +241,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 return
             tool = next((t for t in body.get("tools", []) if t.get("description") == TOOL["description"]), None)
             results = find_blocks(body, "tool_use_id", NEW_ID)
+            if recovery_slow_model and results:
+                slow_tool_arrivals.append(monotonic())
+                sleep(SLOW_MODEL_DELAY)
             restart = any(b.get("text") == AFTER_RESTART for row in body["messages"] for b in blocks(row))
             prefix = b""
             if not results and tool and not restart and v1_runtime is None:
@@ -619,7 +626,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                         manage, "recovered_receipt_ledger_deadline", expired_request, headers["x-session-id"], started_at,
                     )
                     expired, = evidence["requests"]
-                    assert expired["status_code"] == 429 and expired["error_stage"] == "tui_submission_ledger", expired
+                    assert (expired["status_code"], expired["error_stage"], expired["outcome"]) == (
+                        429, "tui_submission_ledger", "local_rejected",
+                    ), expired
                     assert expired["attempt_count"] == 0 and expired["attempts"] == [], expired
                     expired_reservation = expired["diagnostic_context"]["tui_reservation_id"]
                     assert str(UUID(expired_reservation)) == expired_reservation
@@ -643,7 +652,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                     manage, "recovered_receipt_workspace", rejected_request, headers["x-session-id"], started_at,
                 )
                 record, = evidence["requests"]
-                assert record["status_code"] == 503 and record["error_stage"] == "tui_workspace_bind", record
+                assert (record["status_code"], record["error_stage"], record["outcome"]) == (
+                    503, "tui_workspace_bind", "local_rejected",
+                ), record
                 assert record["attempt_count"] == 0 and record["attempts"] == [], record
                 reservation = record["diagnostic_context"]["tui_reservation_id"]
                 assert str(UUID(reservation)) == reservation
@@ -653,6 +664,40 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                     assert tools == [(registered_tools,)], tools
             finally:
                 binding_file.write_bytes(original_binding)
+        if recovery_slow_model:
+            budget_key = "v3_admission_wait_seconds"
+            previous_budget = manage("GET", "settings")[budget_key]
+            manage("PUT", "settings", {budget_key: "3"})
+            started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+            try:
+                status, _, request_id = checked_messages(
+                    manage, token, follow, headers, received, "recovered_receipt_slow_model", expected_status=502,
+                )
+                returned = monotonic()
+                arrival, = slow_tool_arrivals
+                assert request_id and arrival < returned < arrival + SLOW_MODEL_DELAY and len(received) == 2
+                ((role, receipt),) = find_blocks(received[-1][1], "tool_use_id", NEW_ID)
+                assert role == "user" and REPLY in json.dumps(receipt, ensure_ascii=False)
+                sleep(max(0, arrival + SLOW_MODEL_DELAY - monotonic()))
+                evidence = report_request_diagnostics(
+                    manage, "recovered_receipt_slow_model", request_id, headers["x-session-id"], started_at,
+                )
+                record, = evidence["requests"]
+                assert (record["status_code"], record["error_stage"], record["outcome"]) == (
+                    status, "tui_send_http", "transport_error",
+                ), record
+                assert record["native_rejection"] is None and record["attempt_count"] == 0 and record["attempts"] == [], record
+                reservation = record["diagnostic_context"]["tui_reservation_id"]
+                assert str(UUID(reservation)) == reservation
+                assert len(received) == 2 and callbacks == [NEW_ID] and original_file.read_bytes() == original_history
+                verify_model(received, policy="append", old_content=old_result, current_text_blocks=current_text_blocks)
+                return {"http_status": status, "model_received_before_public_return_ms": round((returned - arrival) * 1000),
+                        "model_posts": len(received), "client_tool_calls": len(callbacks), "old_tool_calls": 0,
+                        "request_id": request_id, "reservation_id": reservation, "outcome": record["outcome"],
+                        "error_stage": record["error_stage"], "attempt_count": record["attempt_count"],
+                        "original_history_preserved": True}
+            finally:
+                manage("PUT", "settings", {budget_key: previous_budget})
         expected_status = 422 if signed_tool_history and recover_pending else 200
         status, raw, continuation_request_id = checked_messages(
             manage, token, follow, headers, received, "recovered_receipt" if recover_pending else "receipt",
@@ -1496,6 +1541,7 @@ def main():
     fault.add_argument("--recovery-ledger-contention", action="store_true")
     fault.add_argument("--recovery-ledger-deadline", action="store_true")
     fault.add_argument("--recovery-workspace-rejection", action="store_true")
+    fault.add_argument("--recovery-slow-model", action="store_true")
     scenario = parser.add_mutually_exclusive_group()
     scenario.add_argument("--restart-history", action="store_true")
     scenario.add_argument("--text-input", action="store_true")
@@ -1516,7 +1562,8 @@ def main():
     scenario.add_argument("--failure-boundaries", action="store_true")
     scenario.add_argument("--v1-runtime", type=Path)
     args = parser.parse_args()
-    if (args.recovery_ledger_contention or args.recovery_ledger_deadline or args.recovery_workspace_rejection) and (
+    if (args.recovery_ledger_contention or args.recovery_ledger_deadline or args.recovery_workspace_rejection
+        or args.recovery_slow_model) and (
         not args.recover_pending_tool or args.signed_tool_history
     ):
         parser.error("恢复故障注入需要可提交的 --recover-pending-tool 原回执")
@@ -1547,7 +1594,8 @@ def main():
                        auto_tool_choice=args.auto_tool_choice,
                        recovery_ledger_contention=args.recovery_ledger_contention,
                        recovery_ledger_deadline=args.recovery_ledger_deadline,
-                       recovery_workspace_rejection=args.recovery_workspace_rejection)
+                       recovery_workspace_rejection=args.recovery_workspace_rejection,
+                       recovery_slow_model=args.recovery_slow_model)
         print(json.dumps(proof, ensure_ascii=False))
 
 

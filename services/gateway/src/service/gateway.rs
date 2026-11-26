@@ -3028,8 +3028,12 @@ impl GatewayService {
                 let response = prepared
                     .submit_with_account_credentials(ttfb_deadline, credentials)
                     .await
-                    .inspect_err(|_| {
-                        diagnostics::error_stage("tui_send_http");
+                    .inspect_err(|error| {
+                        if matches!(error, AppError::BadGateway(_)) {
+                            diagnostics::tui_submission_unknown();
+                        } else {
+                            diagnostics::error_stage("tui_send_http");
+                        }
                         if let Some(trace) = &mut wire_attempt {
                             trace.transport_error();
                         }
