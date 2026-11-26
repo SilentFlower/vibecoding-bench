@@ -2572,9 +2572,10 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 固定 2.1.293 对 `claude-sonnet-4-6` 和 `claude-opus-5-5` 原生支持显式 `adaptive/updates` 和 `adaptive/summarized`。后者在原生计划确定后以 CLI `--settings` 启用 `showThinkingSummaries`，恢复沿同一根轮配置。投递前核对 CLI 真实生成的 `thinking` 对象。回执改动 `display`、省略显式值、或改成平台会自动重写的 `disabled` 时返回 `422/unsupported_parameter`。新请求的缺省 `display`、显式 `omitted` 和平台自动重写沿既有合同。用 `--adaptive-thinking-model` 指定模型，搭配 `--adaptive-thinking-display summarized` 验证摘要，省略显示选项验证 `updates` 及其功能头。两种模式均可搭配 `--recover-pending-tool`。
 - 工具声明由会话私有 HTTP MCP 返回。有工具的轮次等待 `tools/list` 应答写出后才提交 PTY 提示。公开调用块恢复原名，ID 与参数增量仍对应原模型事件。工具结果通过原进程的回执账本交付，接收方、历史、原调用和本轮生效设置均需匹配。
 - 声明客户端工具时接受显式 `tool_choice.type=auto`，`disable_parallel_tool_use` 可省略或显式为 false。固定 CLI 2.1.293 的这两种输入保留工具声明，实际模型正文均省略 `tool_choice`。自动选择允许模型直接返回文本，公开 SSE 的 `stop_reason` 为 `end_turn`。等待工具时冻结客户端原字段形状。在线及丢进程后的回执把省略和 false 互换，或改为 `none`、禁止并行、指定工具，均返回 422 且模型零新增收件。原样回执仍可完成。
+- 普通首轮的 `tool_choice={"type":"auto","disable_parallel_tool_use":true}` 保留是否调用工具的自动选择，同时要求禁用并行。固定版的交互 CLI 原生路径尚未承接这个请求形状。按下表保留追加策略的旧发送路径。
 - 普通 Messages 的 `tool_choice={"type":"none"}` 在 `tools` 省略或为空数组时使用交互 CLI。派发前要求 CLI 正文的 `tools` 为空或省略，`tool_choice` 保持显式 `none` 或省略并应用无工具默认值。存在工具声明时仍按既有策略处理并保留完整列表。[Messages 工具选择](https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools)
 - `tool_choice.type=any` 要求模型调用已声明的任一工具，`type=tool` 要求指定名称。固定 2.1.293 交互对照用 `--tools ""` 关闭内置工具并声明两个 MCP 工具，`--allowedTools` 只预许可指定工具时仍保留两个声明，`--disallowedTools` 排除另一工具后仅发送一个声明。三种对照的 CLI 正文均省略 `tool_choice`，均可直接以文本收口。现有受支持的权限及声明入口缺少 Messages 的强制字段，原生支持仍为退役缺口。[CLI 工具选项](https://code.claude.com/docs/en/cli-reference) · [Messages 工具选择](https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools)
-- 普通追加策略的在途强制工具轮由已登记的账号发送器收口，合法回执显式切为 `auto` 时仍沿原归属。完成该轮并交付完整答复后，同一公开会话可带完整已确认历史提交独立的 `auto` 新问题。新轮按原生输入合同判断。验收的 `any` 和命名两例各由交互 CLI 生成并投递一次，模型保留两组已完成工具的调用与结果。
+- 普通追加策略的在途强制工具轮由已登记的账号发送器收口，合法回执显式切为 `auto` 时仍沿原归属。完成该轮并交付完整答复后，同一公开会话可带完整已确认历史提交独立的 `auto` 新问题。新轮按原生输入合同判断。原进程存活及原轮中途重启时，`any` 与命名共四个独立新轮均由交互 CLI 各投递一次，并保留两组已完成工具的调用、原 ID 与结果归属。
 - 普通工具名中的连字符与下划线分别保留。固定 CLI 2.1.293 仅增加会话 MCP 前缀，嵌套 Schema 与参数沿原描述交付。重启后工具回执仍核对原名、ID 和完整参数。
 - 原生等待进程丢失时，私有回执按同一修订核对根轮策略及正文摘要。新原生会话导入客户端已核对的工具结果，保留原 JSONL。由受管 PTY 使用 CLI 的继续提示启动模型步骤，原问题和已完成工具保持在历史中。旧工具回执仍以原表布局读取。
 - 旧账号发送路径可能先登记工具回执，原 CLI 在写入原生主轮之前退出。已核对的旧回执使用自动恢复时，若原绑定档案可解析、归属有效且只有非主轮记录，启动器以新的 CLI 会话 UUID 继续同一已核验工作区，原绑定与档案字节保留。发送器继续使用账本核对过的请求历史。原生导入、显式恢复及普通新轮仍要求原有主链校验。历史内容损坏、文件权限异常及主链归属不符仍拒绝。
@@ -2597,6 +2598,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 | 当前轮合法内嵌图像达到长边 2000 像素或解码后 512000 字节，且其余输入满足原生合同 | 三种账号动作均经交互 CLI 投递一次 |
 | 当前轮内嵌图像长边超过 2000 像素或解码后超过 512000 字节，顶层 `system` 可省略或为已支持的文本 | `append` 沿旧账号发送路径保留原 `messages`，投递一次。`replace` 和 `user_reminder` 返回 `422/unsupported_parameter`，模型零收件 |
 | 普通 API 携带 `output_config.format.type=json_schema`，单独使用或同带 `effort=medium` | `append` 经旧账号发送器透传，实收一次。`replace` 和 `user_reminder` 返回 `422/unsupported_parameter`，零尝试、零投递 |
+| 普通首轮声明客户端工具，显式 `tool_choice.type=auto` 及 `disable_parallel_tool_use:true` | `append` 经 `account_sender` 保留 `true` 和工具声明，投递一次。`replace` 和 `user_reminder` 返回 `422/unsupported_parameter`，模型零收件 |
 | Sonnet 4.6 普通 API 声明两个客户端工具、关闭思考并要求 `tool_choice.type=any` 或指定 `type=tool` | `append` 经旧账号发送器保留工具表与精确选择。`replace` 和 `user_reminder` 返回 `422/unsupported_parameter`，零尝试、零投递 |
 | 普通 API 声明工具且指定 `tool_choice.type=none` | `append` 经旧账号发送器保留选择和声明。`replace` 和 `user_reminder` 返回 `422/unsupported_parameter`，零尝试、零投递 |
 | 仅开启该路径的调试采集 | 保存 CLI 实际实体证据，最终 TLS 写出未采集 |
@@ -2650,6 +2652,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `verify_tui_cold_history.py --cancel-and-change-question` 在公开首轮交付工具 ID 和部分参数时断开读者，隔离模型继续保留尾段。确认原请求终态为取消后，沿同一公开会话从客户端确认的历史改问。新轮走交互 CLI，已取消问题和工具不会进入模型正文，原绑定和会话档案按原字节保留。迟交被取消的工具回执返回 400、零尝试。两轮各一次模型实收。
 - `verify_tui_cold_history.py --parallel-new-tools` 从公开入口核对同一模型响应的两个不同 Schema 的工具。客户端执行返回的调用并按原 ID 逆序回传。模型实收恢复调用顺序，成功文本逐字保留，失败保留 `is_error` 和原文本及原生 token 提醒。缺少结果、用重复 ID 代替缺项、齐全后追加重复项均返回 400，模型零新增收件。随后合法组完成一次。
 - `verify_tui_cold_history.py --auto-tool-choice [bare|explicit-false]` 核对原字段形状、完整工具声明与实际模型正文省略 `tool_choice`。省略选项值时沿用 `explicit-false`。分别与 `--parallel-new-tools`、`--recover-pending-tool` 组合，核对双工具正常续轮与单组丢进程恢复各投递两次。四种改写均拒绝，随后原样回执成功。`--auto-tool-direct-text` 以 bare auto 带两项工具声明验证一次模型投递、零工具执行及公开文本 `end_turn`。
+- 独立首轮禁并行对照使用相同的两项客户端工具，在三种账号动作下分别提交 `auto` 加显式 `true` 或 `false`。六例核对路由、模型正文原字段、声明和投递数。三种 `false` 均由交互 CLI 投递一次，实际模型正文省略 `tool_choice`。
 - `verify_tui_cold_history.py --split-history-tools` 核对分行的两对旧工具及结果、原顺序和单次新工具执行。
 - `verify_tui_cold_history.py --current-text-blocks` 核对本轮两个独立文本块的模型实收，合并边界的回执返回 422。与 `--recover-pending-tool` 组合时，另核对重启后原始文本块、记录和工具结果仍被保留。
 - `verify_tui_cold_history.py --signed-tool-history` 从公开 SSE 重组签名块，核对同进程和 `--recover-pending-tool` 的合法回执、原档及模型实收。用 `--adaptive-thinking-model <模型>` 和 `--adaptive-thinking-display default|updates|summarized` 区分省略 `thinking` 与两种显式模式。`--signed-tool-response signature-only` 模拟带签名的空思考块，`--signed-tool-response missing-model` 保留签名而省略模型响应里的助手模型，验证冷恢复 422 和零尝试。源检查点只登记实收模型，恢复档只在对应的已验签助手行携带该事实。
