@@ -124,6 +124,7 @@ def verify(folder, gateway, sender):
     model_header_policy = Event()
     model_header_policy.set()
     received_modes = []
+    received_accept = []
     cancel_arrived, cancel_release = Event(), Event()
     root = folder / 'account'
     private = root / 'flows/api/cc-prepared'
@@ -148,6 +149,7 @@ def verify(folder, gateway, sender):
                     fields[key.lower()] = value.strip()
                 body = self.rfile.read(int(fields[b'content-length']))
                 assert not any(name.startswith(b'x-v3-') for name in fields)
+                received_accept.append(fields.get(b'accept'))
                 records.append(
                     (
                         sha256(head + body).hexdigest(),
@@ -506,6 +508,13 @@ def verify(folder, gateway, sender):
         caller_headers = {**protocol_headers, 'x-stainless-os': 'fixture-caller', 'x-forwarded-for': '192.0.2.1'}
         assert post('fixture-header-parity', headers=caller_headers) == 200
         assert post('fixture-header-json', stream=False, headers=caller_headers) == 200
+        for name, headers, expected_accept in (
+            ('omitted', {}, b'application/json'),
+            ('wildcard', {'Accept': '*/*'}, b'*/*'),
+            ('hop', {'Connection': 'Accept', 'Accept': 'text/plain'}, b'application/json'),
+        ):
+            assert post('fixture-header-' + name, headers=headers) == 200
+            assert received_accept[-1] == expected_accept, (name, received_accept[-1])
         model_header_policy.clear()
         assert post('fixture-header-legacy', headers=caller_headers) == 200
         model_header_policy.set()

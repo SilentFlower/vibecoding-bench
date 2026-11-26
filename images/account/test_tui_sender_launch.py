@@ -1,7 +1,7 @@
 """用部署者拥有的合成配置检查本机提供方的地址和文件归属边界。"""
 
 from base64 import b64decode
-from http.client import HTTPConnection
+from http.client import HTTPConnection, HTTPResponse
 import json
 import os
 from subprocess import run
@@ -9,6 +9,7 @@ import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from email.utils import formatdate
 from pathlib import Path
+from socket import SHUT_WR, socketpair
 from tempfile import TemporaryDirectory
 from threading import Event, Thread
 import time
@@ -20,6 +21,30 @@ import tui_sender_launch as launch
 
 class ManagedOAuthTests(TestCase):
     """受管凭据只随匹配的账号模型请求走原 sender。"""
+
+    def test_model_error_completeness_follows_http_framing(self):
+        """同一签名 400 的修复资格取决于完整 HTTP 正文。@return 无。"""
+        body = b'{"error":{"type":"invalid_request_error","message":"Invalid signature in thinking block"}}'
+        chunk = f"{len(body):x}\r\n".encode() + body + b"\r\n"
+        for framing, payload, complete in (
+            (b"Connection: close", body, True),
+            (b"Connection: close", body + b" ", False),
+            (f"Content-Length: {len(body)}".encode(), body, True),
+            (f"Content-Length: {len(body) + 1}".encode(), body, False),
+            (b"Content-Length: invalid", body, False),
+            (b"Transfer-Encoding: chunked", chunk + b"0\r\n\r\n", True),
+            (b"Transfer-Encoding: chunked", chunk, False),
+        ):
+            with self.subTest(framing=framing, size=len(payload)):
+                client, server = socketpair()
+                with client, server, HTTPResponse(client) as response, patch.object(launch, "BODY_LIMIT", len(body)):
+                    server.sendall(b"HTTP/1.1 400 Bad Request\r\n" + framing + b"\r\n\r\n" + payload)
+                    server.shutdown(SHUT_WR)
+                    response.begin()
+                    raw, finished = launch._read_model_error(response)
+                    self.assertEqual(finished, complete)
+                    error = launch.ModelResponseError(400, raw, source="local_provider_http", complete=finished)
+                    self.assertEqual(error.signature_evidence is not None, complete)
 
     def test_complete_oauth_file_is_atomic_rotatable_and_idempotent(self):
         """完整凭据同版替换，原快照重复发放复用文件。@return 无。"""

@@ -82,6 +82,7 @@ pub(super) const TUI_FINAL_CAPTURE: &str = "x-v3-tui-final-capture";
 pub(super) const TUI_UPSTREAM_SESSION: &str = "x-v3-tui-upstream-session";
 pub(super) const TUI_MANAGED_OAUTH: &str = "x-v3-tui-managed-oauth";
 pub(super) const TUI_MODEL_HEADER_POLICY: &str = "x-v3-tui-model-header-policy";
+pub(super) const TUI_MODEL_ACCEPT_OMITTED: &str = "x-v3-tui-model-accept-omitted";
 pub(super) const TUI_OAUTH_FILE: &str = "x-v3-tui-oauth-file";
 pub(super) const TUI_ACCOUNT_EXPIRY: &str = "x-v3-tui-account-expiry";
 const TUI_ACCOUNT_MODEL: &str = "x-v3-tui-account-model";
@@ -2031,7 +2032,12 @@ pub(super) async fn prepare_tui(
         prepare = prepare.header(TUI_INPUT_FORMAT, format);
     }
     prepare = prepare.header(TUI_MODEL_HEADER_POLICY, "1");
-    for (name, value) in tui_model_headers(input.headers, true)? {
+    let model_headers = tui_model_headers(input.headers, true)?;
+    // 私有 HTTP 客户端会自动补 Accept；在此保留公开入口筛选后的真实缺省状态。
+    if !model_headers.contains_key("accept") {
+        prepare = prepare.header(TUI_MODEL_ACCEPT_OMITTED, "1");
+    }
+    for (name, value) in model_headers {
         prepare = prepare.header(name, tui_header_value(&value)?);
     }
     let response = prepare

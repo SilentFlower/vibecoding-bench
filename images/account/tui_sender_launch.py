@@ -199,7 +199,12 @@ def _read_model_error(response):
         return b"", False
     if len(raw) > BODY_LIMIT:
         return b"", False
-    return raw, response.isclosed()
+    if response.chunked:
+        return raw, response.isclosed()
+    if response.length is None:
+        # 阻塞读取上限加一字节后的短读已到 EOF。解析失败的长度声明也会得到 None。
+        return raw, response.getheader("Content-Length") is None
+    return raw, response.length == 0
 
 
 @contextmanager

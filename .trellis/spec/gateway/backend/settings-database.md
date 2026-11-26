@@ -614,6 +614,7 @@ V2 的 `POST /v1/messages` 调用方协议头与 V1 `services/runtime/src/contro
 ### 2. 接口
 
 - 网关在私有 prepare 提出 `x-v3-tui-model-header-policy: 1`。发送器同时收到已鉴权 Unix 源的 `model_headers_protocol: 1` 和 `model_header_policy_protocol: 1` 时才确认，并写入整数 `model_header_policy: 1`。
+- 入口筛选后缺少 `Accept` 时，网关在私有 prepare 设置 `x-v3-tui-model-accept-omitted: 1`。发送器据此从模型选项移除内部 HTTP 客户端补入的 `Accept`，让 SDK 选择出站值。客户端显式传入的 `Accept: */*` 仍按流式请求的覆盖规则处理。
 - `model_headers_len` 沿用独立 JSON 对象段，长度上限为 `BODY_LIMIT`。字段值为 HTTP 字节的 Latin-1 表示。未协商时，支持 `model_headers_protocol` 的旧组合沿用 ASCII 版本与 beta 两字段转送。
 
 ### 3. 数据合同

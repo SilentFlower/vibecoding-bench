@@ -39,8 +39,8 @@ use crate::service::runtime_transport::{
     tui_input_rejection, tui_model_headers, tui_projection_marker, valid_tui_account_token,
 };
 use crate::service::runtime_transport::{
-    TUI_CAPTURE, TUI_ERROR_SOURCE, TUI_FINAL_CAPTURE, TUI_MODEL_HEADER_POLICY, TUI_REPAIR_ATTEMPT,
-    TUI_SIGNATURE_REPAIR, TuiReceiptProbe,
+    TUI_CAPTURE, TUI_ERROR_SOURCE, TUI_FINAL_CAPTURE, TUI_MODEL_ACCEPT_OMITTED,
+    TUI_MODEL_HEADER_POLICY, TUI_REPAIR_ATTEMPT, TUI_SIGNATURE_REPAIR, TuiReceiptProbe,
 };
 use crate::service::session_policy_block;
 use crate::service::tui_sender_response;
@@ -699,7 +699,10 @@ impl TuiSender {
             }
             let model_header_policy = offer_header_policy && model_header_policy && model_headers;
             let option_bytes = if model_headers {
-                let options = tui_model_headers(request.headers(), model_header_policy)?;
+                let mut options = tui_model_headers(request.headers(), model_header_policy)?;
+                if tui_projection_marker(request.headers(), TUI_MODEL_ACCEPT_OMITTED, "1") {
+                    options.remove("accept");
+                }
                 (!options.is_empty())
                     .then(|| serde_json::to_vec(&options).expect("版本和功能声明均为字符串"))
             } else {
