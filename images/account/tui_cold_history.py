@@ -1,12 +1,16 @@
 """固定 2.1.293 交互 CLI 的普通 Messages 历史导入与受管 MCP 描述。"""
 
 from base64 import b64decode
+from contextlib import ExitStack
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
-from itertools import chain, zip_longest
+from itertools import chain, islice, zip_longest
+from pathlib import Path
 import re
+from tempfile import TemporaryDirectory
 from uuid import uuid4
 
+from runtime_files import atomic_text
 from tui_messages import encode
 from tui_reconnect import digest
 from tui_workspace_launch import publish_workspace_history
@@ -199,10 +203,11 @@ class ColdHistory:
                 return index
         return len(self.history)
 
-    def import_session(self, config, work, native_id):
+    def import_session(self, config, work, native_id, *, replay_resources: ExitStack | None = None):
         """在已绑定的工作区选择新会话或发布已完成的外部历史。
         @param config 私有配置。@param work 已核验工作目录。@param native_id 绑定的原生会话。
-        @return 本次启动的原生会话 UUID。
+        @param replay_resources 可选，交互进程退出后清理本轮使用的临时确认前缀。
+        @return 本次启动的原生会话 UUID，或 UUID 与本轮临时确认前缀。
         """
         reminder_index = self._reminder_index()
         history = []
@@ -213,10 +218,33 @@ class ColdHistory:
             history.append((row["role"], blocks))
 
         boundary = digest((*self._scope(), history))
+
+        def replay(rows, session_id):
+            kept = list(islice(rows, len(history)))
+            if not self._matches_history(iter(kept), history, boundary):
+                return None
+            question = next(rows, {}).get("message", {})
+            if (not isinstance(question, dict) or question.get("role") != "user" or "content" not in question
+                    or _blocks(question) != [{"type": "text", "text": self.submitted_prompt()}]):
+                return None
+            last = {}
+            for row in rows:
+                last = row.get("message", {})
+            if (not isinstance(last, dict) or last.get("role") != "assistant"
+                    or last.get("stop_reason") in (None, "tool_use")):
+                return None
+            # 固定版 CLI 会向 --resume 的目标追加。本轮只携带客户端确认的前缀，原档案保持原字节。
+            directory = replay_resources.enter_context(TemporaryDirectory(prefix="history-replay-", dir=config))
+            path = Path(directory) / (session_id + ".jsonl")
+            for row, (role, content) in zip(kept, history, strict=True):
+                row["message"] = {"role": role, "content": content}
+            atomic_text(path, "".join(encode(row).decode() + "\n" for row in kept), replace=False)
+            return path
+
         return publish_workspace_history(
             config, work, native_id, lambda rows: self._matches_history(rows, history, boundary),
             (lambda session_id: self._transcript(work, session_id, history, boundary)) if history else None,
-            boundary=boundary,
+            boundary=boundary, replay=replay if history and replay_resources is not None else None,
         )
 
     def _matches_history(self, rows, history, boundary):
@@ -226,7 +254,7 @@ class ColdHistory:
         matches = legacy or first[IMPORT_BOUNDARY] == boundary
         parent = None
         for row, expected in zip_longest(chain((first,), rows), history):
-            # 当前问题由新轮提交。已经追加过的真实原生对话只能作为独立分支的依据。
+            # 直接恢复要求文件正好停在确认边界。本轮问题由新轮提交。
             if row is None or expected is None or row["type"] != expected[0]:
                 matches = False
                 continue

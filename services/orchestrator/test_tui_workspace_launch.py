@@ -7,7 +7,7 @@ from unittest import TestCase
 from unittest.mock import patch
 from uuid import uuid4
 
-from tui_workspace_launch import _key, _project_history_dir, launch_workspace_cli, publish_workspace_history
+from tui_workspace_launch import HistoryReplay, _key, _project_history_dir, launch_workspace_cli, publish_workspace_history
 
 
 class BoundLaunchTests(TestCase):
@@ -224,3 +224,34 @@ class BoundLaunchTests(TestCase):
             fork.unlink()
             self._start(prepare_history=prepare, resume=False)
             self.assertEqual(spawn.call_args.args[0][-2:], ["--session-id", fork_id])
+
+    def test_replay_checks_both_the_archive_and_private_prefix(self):
+        """临时前缀与账号档案均通过原生会话归属检查。@return 无。"""
+        fork_id = str(uuid4())
+        archive = self.history.with_name(fork_id + ".jsonl")
+        replay_dir = self.config / "history-replay-fixture"
+        replay_dir.mkdir(mode=0o700)
+        prefix = replay_dir / archive.name
+        row = {"type": "user", "cwd": str(self.cwd), "sessionId": fork_id}
+        prefix.write_text(json.dumps(row))
+        prefix.chmod(0o600)
+
+        def prepare(config, work, native_id):
+            return HistoryReplay(fork_id, prefix)
+
+        with patch("tui_workspace_launch.Popen") as spawn:
+            with self.assertRaises(FileNotFoundError):
+                self._start(prepare_history=prepare, resume=True)
+            archive.write_text(json.dumps(row))
+            archive.chmod(0o600)
+            prefix.write_text(json.dumps({**row, "sessionId": self.native}))
+            with self.assertRaisesRegex(ValueError, "工作区不匹配"):
+                self._start(prepare_history=prepare, resume=True)
+            prefix.write_text(json.dumps(row))
+            replay_dir.chmod(0o755)
+            with self.assertRaisesRegex(ValueError, "目录的归属或权限"):
+                self._start(prepare_history=prepare, resume=True)
+            replay_dir.chmod(0o700)
+            spawn.assert_not_called()
+            self._start(prepare_history=prepare, resume=True)
+            self.assertEqual(spawn.call_args.args[0][-2:], ["--resume", str(prefix)])

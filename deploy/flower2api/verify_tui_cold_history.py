@@ -382,6 +382,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             history_texts = {text for _, text in expected_history}
             branch_ids = []
             snapshots = {history_file: original}
+            followup_ids = []
             for post in (3, 4):
                 status, raw = call(18090, "POST", "/v1/messages", token, branch, headers)
                 assert status == 200 and len(received) == post, (status, raw, len(received))
@@ -396,15 +397,17 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 wait_for(lambda: sender_state().get("idle"))
                 assert all(path.read_bytes() == data for path, data in snapshots.items())
                 branch_id = json.loads(model_body["metadata"]["user_id"])["session_id"]
-                assert branch_id not in (native_id, *branch_ids)
+                assert branch_id == staged_id
                 branch_ids.append(branch_id)
                 path = history_file.parent / (branch_id + ".jsonl")
+                assert set(history_file.parent.glob("*.jsonl")) == {history_file, staged_path}
+                assert not list(cli_config.glob("history-replay-*"))
                 if post == 3:
-                    assert branch_id == staged_id and path.read_bytes().startswith(staged_bytes)
-                    assert set(history_file.parent.glob("*.jsonl")) == {history_file, staged_path}
-                snapshots[path] = path.read_bytes()
-                if post == 3:
+                    assert path.read_bytes().startswith(staged_bytes)
+                    snapshots[path] = path.read_bytes()
                     restart(restarted)
+                followup_ids.append(json.loads(raw)["id"])
+            assert len(set(followup_ids)) == 2
             assert list(binding_file.parent.glob("*.json")) == [binding_file]
             assert binding_file.read_bytes() == binding_bytes
             assistant_fields = sorted(next(row for row in imported if row["role"] == "assistant"))
@@ -412,6 +415,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                 "staged_branch_session_id": staged_id,
                                 "binding_preserved": True,
                                 "assistant_history_fields": assistant_fields,
+                                "archive_count_after_repeat": len(snapshots),
+                                "repeat_client_message_ids": followup_ids,
                                 "preserved_bytes": [len(data) for data in snapshots.values()],
                                 "additional_model_posts": 2,
                                 "attempts": verify_captures(manage, received[-2:], account_token)}

@@ -4,6 +4,7 @@ from collections import Counter, deque
 from contextlib import ExitStack, closing, suppress
 from dataclasses import dataclass, field
 import fcntl
+from functools import partial
 import gzip
 from hashlib import sha256
 from io import BytesIO
@@ -368,7 +369,7 @@ class _Actor:
         try:
             home, mod = self.driver.launcher.session_paths(command)
             server = ThreadingHTTPServer(("127.0.0.1", 0), _Callback)
-            with closing(server):
+            with closing(server), ExitStack() as history_resources:
                 server.actor = self
                 self.port = server.server_address[1]
                 endpoint = "http://127.0.0.1:" + str(self.port)
@@ -439,6 +440,10 @@ class _Actor:
                             opts.extend(["--mcp-config", str(mcp)])
                         launch_plan = self.recovery_history or plan
                         launch_options["prepare_history"] = launch_plan.import_session
+                        if self.recovery_history is None:
+                            launch_options["prepare_history"] = partial(
+                                launch_plan.import_session, replay_resources=history_resources,
+                            )
                         resume = bool(launch_plan.history)
                     master, slave = os.openpty()
                     self.master = master

@@ -13,7 +13,7 @@ from unittest import TestCase
 from uuid import uuid4
 
 from tui_cold_history import IMPORT_BOUNDARY, ColdHistory
-from tui_workspace_launch import _key, _project_history_dir, _resume_path, launch_workspace_cli
+from tui_workspace_launch import HistoryReplay, _key, _project_history_dir, _resume_path, launch_workspace_cli
 
 
 class ColdHistoryTests(TestCase):
@@ -254,6 +254,43 @@ class ColdHistoryTests(TestCase):
             self.assertNotIn(restored.import_session(config, work, other), {session, first, second, other})
             self.assertEqual(original.read_bytes(), original_bytes)
             self.assertEqual(forked.read_bytes(), advanced_bytes)
+
+    def test_completed_fork_reuses_confirmed_prefix_for_the_same_question(self):
+        """同一问题使用原分叉 UUID，退出后清除临时前缀。@return 无。"""
+        original = ColdHistory.from_request(self.body)
+        changed = deepcopy(self.body)
+        changed["messages"][0]["content"] = "分叉的确认输入"
+        fork = ColdHistory.from_request(changed)
+        work, session = Path("/native/workspace"), str(uuid4())
+        with TemporaryDirectory() as directory, ExitStack() as stack:
+            config = Path(directory)
+            original.import_session(config, work, session)
+            fork_id = fork.import_session(config, work, session)
+            archive = _resume_path(stack, config, work, fork_id, required=True)
+            prefix = archive.read_bytes()
+            parent = json.loads(prefix.splitlines()[-1])["uuid"]
+            with archive.open("a") as output:
+                for message in ({"role": "user", "content": fork.prompt},
+                                {"role": "assistant", "content": "原答复", "stop_reason": "end_turn"}):
+                    entry = str(uuid4())
+                    output.write(json.dumps({"type": message["role"], "uuid": entry, "parentUuid": parent,
+                                             "sessionId": fork_id, "cwd": str(work), "message": message}) + "\n")
+                    parent = entry
+            completed = archive.read_bytes()
+            with ExitStack() as replay_resources:
+                replay = fork.import_session(config, work, session, replay_resources=replay_resources)
+                self.assertIsInstance(replay, HistoryReplay)
+                self.assertEqual(replay.native_id, fork_id)
+                self.assertEqual(replay.path.read_bytes(), prefix)
+                self.assertEqual(len(list(archive.parent.glob("*.jsonl"))), 2)
+            self.assertFalse(replay.path.exists())
+            self.assertEqual(archive.read_bytes(), completed)
+
+            changed["messages"][-1]["content"] = "另一条当前输入"
+            different = ColdHistory.from_request(changed)
+            self.assertIsInstance(different.import_session(config, work, session, replay_resources=stack), str)
+            self.assertEqual(len(list(archive.parent.glob("*.jsonl"))), 3)
+            self.assertEqual(archive.read_bytes(), completed)
 
     def test_mismatched_disk_owner_is_not_replaced_or_used(self):
         """已有文件的原生会话或目录发生变化时拒绝恢复并保留文件。@return 无。"""

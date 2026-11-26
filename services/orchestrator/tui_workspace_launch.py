@@ -2,6 +2,7 @@
 
 from collections.abc import Callable, Iterator
 from contextlib import ExitStack
+from dataclasses import dataclass
 from fcntl import LOCK_EX, flock
 from hashlib import sha256
 from itertools import count
@@ -14,6 +15,16 @@ from subprocess import Popen
 from uuid import UUID, uuid4
 
 from runtime_files import atomic_text, directory_fd, private_directory
+
+
+@dataclass(frozen=True)
+class HistoryReplay:
+    """同一分叉用于本次启动的确认前缀，文件生命周期由调用者管理。
+    @param native_id 私有档案的原生 UUID。@param path 本轮可追加的临时确认前缀。
+    """
+
+    native_id: str
+    path: Path
 
 
 def _key(fields) -> str:
@@ -63,13 +74,17 @@ def _main_history(stream, work: Path, native_id: str) -> Iterator[dict]:
         raise ValueError("V2 恢复历史缺少原生主轮")
 
 
-def _resume_path(stack: ExitStack, config: Path, work: Path, native_id: str, required: bool):
+def _resume_path(stack: ExitStack, config: Path, work: Path, native_id: str, required: bool,
+                 *, replay_dir: Path | None = None):
     # 只对确实不存在的记录允许初次启动。链接、损坏记录和错误归属必须由原检查明确拒绝。
-    project = _project_history_dir(config, work)
+    project = replay_dir if replay_dir is not None else _project_history_dir(config, work)
     name = native_id + ".jsonl"
     try:
-        directory = directory_fd(project)
-        stack.callback(os.close, directory)
+        if replay_dir is None:
+            directory = directory_fd(project)
+            stack.callback(os.close, directory)
+        else:
+            directory = _owned_dir(stack, project)
         stream = _owned_file(directory, name)
     except FileNotFoundError:
         if required:
@@ -85,8 +100,8 @@ def publish_workspace_history(
     config: Path, work: Path, native_id: str,
     matches: Callable[[Iterator[dict]], bool],
     render: Callable[[str], str] | None,
-    *, boundary: str,
-) -> str:
+    *, boundary: str, replay: Callable[[Iterator[dict], str], Path | None] | None = None,
+) -> str | HistoryReplay:
     """按工作区绑定选择新会话或发布已核对的历史。
 
     @param config 账号内原生会话的私有配置目录。
@@ -95,7 +110,8 @@ def publish_workspace_history(
     @param matches 比较已有全部主链与本次确认边界。
     @param render 以选中的原生 UUID 组装完整 JSONL。纯新轮传 None，CLI 自行创建对话记录。
     @param boundary 规范化确认历史和生效设置的摘要。
-    @return 本次新建或恢复的会话 UUID。
+    @param replay 可选，在已推进的同一分叉上为本次启动保存确认前缀。
+    @return 本次会话 UUID，或带临时确认前缀的同一分叉。
     """
     if str(UUID(native_id)) != native_id or UUID(native_id).version != 4:
         raise ValueError("冷导入需要已绑定的原生会话 UUID")
@@ -118,6 +134,10 @@ def publish_workspace_history(
             with stream:
                 if matches(_main_history(stream, work, candidate)):
                     return candidate
+                if replay is not None and candidate != native_id:
+                    stream.seek(0)
+                    if prefix := replay(_main_history(stream, work, candidate), candidate):
+                        return HistoryReplay(candidate, prefix)
             if render is None:
                 return str(uuid4())
             # 分叉按登记会话和确认边界定位。一份记录已推进时，保留它并继续查找同一边界的后续记录。
@@ -139,7 +159,7 @@ def launch_workspace_cli(
     program_fd: int | None = None,
     inherited_fds: tuple[int, ...] = (),
     initialize_profile: Callable[[Path], None] | None = None,
-    prepare_history: Callable[[Path, Path, str], str] | None = None,
+    prepare_history: Callable[[Path, Path, str], str | HistoryReplay] | None = None,
 ) -> Popen:
     """在该账号发送器绑定的目录启动交互 CLI，继承事件源已分配的 PTY。
 
@@ -155,7 +175,7 @@ def launch_workspace_cli(
     @param program_fd 可选的已核验程序描述符，由同容器隔离入口在执行时关闭。
     @param inherited_fds 受信启动器额外传入的同会话描述符。
     @param initialize_profile 可选，新会话由受信控制端为已核验目录初始化独立配置。
-    @param prepare_history 可选，在已核验工作区确定本次会话 UUID。恢复要求合法历史，纯新轮要求所选 UUID 尚无历史。
+    @param prepare_history 可选，在已核验工作区选会话及临时确认前缀。恢复要求合法历史，纯新轮要求所选 UUID 尚无历史。
     @return 由事件源负责监督与回收的官方进程。
     """
     if (
@@ -197,8 +217,13 @@ def launch_workspace_cli(
         if str(work) != launch["work_dir"]:
             raise ValueError("V2 提交工作目录不属于当前绑定")
         cwd = _owned_dir(stack, work)
+        replay = None
         if prepare_history is not None:
-            native_id = prepare_history(config_dir, work, native_id)
+            selected = prepare_history(config_dir, work, native_id)
+            if isinstance(selected, HistoryReplay):
+                native_id, replay = selected.native_id, selected.path
+            else:
+                native_id = selected
             if str(UUID(native_id)) != native_id or UUID(native_id).version != 4:
                 raise ValueError("V2 导入历史未返回原生会话 UUID")
             if resume is None:
@@ -210,6 +235,10 @@ def launch_workspace_cli(
         if history is not None:
             if resume is False:
                 raise ValueError("V2 新会话 UUID 已有历史记录")
+            if replay is not None:
+                if replay.parent.parent != config_dir or replay.name != history.name:
+                    raise ValueError("V2 临时恢复记录不属于当前会话配置")
+                history = _resume_path(stack, config_dir, work, native_id, required=True, replay_dir=replay.parent)
             session_args = ["--resume", str(history)]
         if initialize_profile is not None:
             # 节点迁移只复制对话；首次在目标恢复时按同一私有 cwd 重建本机信任配置。
