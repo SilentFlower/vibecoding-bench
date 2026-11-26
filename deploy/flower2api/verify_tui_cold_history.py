@@ -69,6 +69,9 @@ PAST_SECOND_ID = "toolu_past_second_fixture"
 NEW_ID = "toolu_cold_fixture"
 SECOND_ID = "toolu_second_cold_fixture"
 RECONNECT_ID = "toolu_reconnect_cold_fixture"
+RECONNECT_MESSAGE_ID = "msg_cold_reconnect"
+SLOW_READER_USAGE = (17, 11)
+SLOW_READER_PAUSE_SECONDS = 11
 SIGNED_THINKING = {"type": "thinking", "thinking": "隔离模型的合成思考段。", "signature": "c2lnbmF0dXJlLWZpeHR1cmU="}
 ADAPTIVE_THINKING = {"type": "adaptive", "display": "updates"}
 THINKING_UPDATES_BETA = "thinking-display-updates-2026-08-18"
@@ -236,20 +239,23 @@ def fixture_parallel_results(calls, callbacks):
     return list(reversed(results))
 
 
-def fixture_reconnect_sse(name):
+def fixture_reconnect_sse(name, *, usage=None):
     """构造可分阶段放行的同一模型流。
-    @param name 模型收到的原生工具名。@return 含半段参数的前缀、余下参数及终帧。
+    @param name 模型收到的原生工具名。@param usage 可选，本轮独立输入及输出 token。
+    @return 含半段参数的前缀、余下参数及终帧。
     """
-    message_id = "msg_cold_reconnect"
-    text = message_sse({"type": "text", "text": RECONNECT_PREFIX}, "end_turn", message_id)
+    text = message_sse({"type": "text", "text": RECONNECT_PREFIX}, "end_turn", RECONNECT_MESSAGE_ID)
     tool = message_sse({"type": "tool_use", "id": RECONNECT_ID, "name": name, "input": SECOND_ARGS},
-                       "tool_use", message_id)
+                       "tool_use", RECONNECT_MESSAGE_ID)
     prefix = [json.loads(line[5:]) for line in text.splitlines() if line.startswith(b"data:")][:-2]
     tail = [json.loads(line[5:]) for line in tool.splitlines() if line.startswith(b"data:")][1:]
     for event in tail:
         if "index" in event:
             event["index"] += 1
     start, delta, *terminal = tail
+    if usage is not None:
+        prefix[0]["message"]["usage"]["input_tokens"] = usage[0]
+        terminal[-2]["usage"]["output_tokens"] = usage[1]
     partial = delta["delta"]["partial_json"]
     split_at = len(partial) // 2
     head = {**delta, "delta": {**delta["delta"], "partial_json": partial[:split_at]}}
@@ -313,7 +319,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            structured_output=False, forced_tool_choice=None, no_tool_choice=False, disable_parallel_tool_use=False,
            auxiliary_mode=None,
            auxiliary_kind="title", auxiliary_sample=None, agent_progress=None, stock_client=False,
-           cancel_and_change_question=False, oauth_rotation=False, provider_quota=None):
+           cancel_and_change_question=False, oauth_rotation=False, provider_quota=None, slow_tool_stream=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -338,6 +344,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param v1_runtime 固定 V1 制品，提供时仅验证 V1 内核的公开能力。
     @param parallel_tools 是否验证同一步多个新工具的回执。
     @param reconnect_tool_stream 是否在真实续轮流中断开再接回。
+    @param slow_tool_stream 是否在原公开连接上慢读真实续轮，核对独立用量。
     @param current_images 是否用本轮原生图文替换纯文本问题。
     @param current_image_ending 本轮九块图文以文字或图片结尾。
     @param auto_tool_choice 原请求中自动选择的字段形状。
@@ -411,6 +418,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     denied_tunnels = []
     continue_tool_stream = Event()
     finish_stream = Event()
+    slow_stream_finished = Event()
     stock_homes = tuple(temporary / f"stock-{policy}" for policy in STOCK_POLICIES) if stock_client else ()
 
     class Receiver(QuietHandler):
@@ -554,8 +562,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 response_model = None if signed_tool_response == "missing-model" else body["model"]
                 wire = fixture_tool_sse(content, with_signature=signed_tool_history, second=second,
                                         model=response_model, thinking_text=signed_thinking_text)
-            elif reconnect_tool_stream and results and not find_blocks(body, "tool_use_id", RECONNECT_ID):
-                prefix, middle, wire = fixture_reconnect_sse(tool["name"])
+            elif (reconnect_tool_stream or slow_tool_stream) and results and not find_blocks(body, "tool_use_id", RECONNECT_ID):
+                usage = SLOW_READER_USAGE if slow_tool_stream else None
+                prefix, middle, wire = fixture_reconnect_sse(tool["name"], usage=usage)
             elif thinking_display_model:
                 wire = fixture_thinking_display_sse(body)
             elif summarized_thinking:
@@ -585,6 +594,10 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                     self.close_connection = True
                     return
             self.wfile.write(wire)
+            if slow_tool_stream and middle:
+                self.wfile.flush()
+                startup_event("slow_reader_model_finished", model_posts=len(received))
+                slow_stream_finished.set()
 
     class Proxy(QuietHandler):
         """只把账号认可的固定供应商目标接进当前合成模型。"""
@@ -1065,7 +1078,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 expected_models = ({} if signed_tool_response == "missing-model"
                                    else dict.fromkeys(expected_ids, body["model"]))
                 assert signed_tool_models == expected_models, signed_tool_models
-        follow = {**body, "stream": reconnect_tool_stream,
+        follow = {**body, "stream": reconnect_tool_stream or slow_tool_stream,
                   "messages": [*messages, {"role": "assistant", "content": offered}, result]}
         if auxiliary_mode:
             auxiliary_proof = verify_pending_auxiliary(
@@ -1197,10 +1210,16 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             changed = {**follow, "messages": [*messages, {"role": "assistant", "content": [tampered, *offered[1:]]}, result]}
             changed_signature, response = call(18090, "POST", "/v1/messages", token, changed, headers)
             assert changed_signature == 422 and len(received) == 1, (changed_signature, response, len(received))
-        if reconnect_tool_stream:
+        if reconnect_tool_stream or slow_tool_stream:
             try:
-                proof = verify_tool_stream_reconnect(manage, temporary, token, account_token, headers, follow,
-                                                     received, continue_tool_stream, finish_stream, callbacks)
+                if slow_tool_stream:
+                    proof = verify_connected_slow_tool_stream(
+                        manage, temporary, token, account_token, headers, follow, received, callbacks,
+                        continue_tool_stream, finish_stream, slow_stream_finished, initial_request_id, sender_state_after_failure,
+                    )
+                else:
+                    proof = verify_tool_stream_reconnect(manage, temporary, token, account_token, headers, follow,
+                                                         received, continue_tool_stream, finish_stream, callbacks)
             finally:
                 continue_tool_stream.set()
                 finish_stream.set()
@@ -1697,13 +1716,13 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
 
 
 def checked_messages(manage, token, body, headers, received, phase, *, expected_status=200, trace_startup=False,
-                     sender_status=None, observe_headers=None):
+                     sender_status=None, observe_response=None):
     """在断言前保留本轮公开响应与诊断归属。
     @param manage 管理入口。@param token 合成凭据。@param body 公开输入。@param headers 原入口头。
     @param received 隔离模型收件。@param phase 夹具阶段。@param expected_status 预期 HTTP 状态，空值保留实测状态。
     @param trace_startup 是否记录公开请求时间及失败后线程栈。
     @param sender_status 可选，只在已保留失败和请求诊断后读取隔离发送器状态。
-    @param observe_headers 可选，读取该调用方实际收到的公开头。
+    @param observe_response 可选，在连接仍打开时读取公开响应头或前缀。
     @return 实际状态、响应字节和公开请求 ID。
     """
     started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
@@ -1722,8 +1741,8 @@ def checked_messages(manage, token, body, headers, received, phase, *, expected_
             startup_event("public_response_headers", phase=phase, session_id=session_id,
                           request_id=evidence["request_id"], http_status=response.status,
                           model_posts_during=len(received) - before)
-        if observe_headers is not None:
-            observe_headers(response.headers)
+        if observe_response is not None:
+            observe_response(response)
 
     def report(failed_at, **details):
         failed_ns = monotonic_ns() if trace_startup else None
@@ -1948,6 +1967,116 @@ def verify_cancelled_question(manage, token, headers, history, received, release
     }
 
 
+def read_tool_stream_data_lines(response, count):
+    """从同一个公开响应读取指定数量的 SSE 数据行。@param response HTTP 响应。
+    @param count 本阶段预期数据行数。@return 按原顺序读出的字节。
+    """
+    lines = []
+    while len(lines) < count and (line := response.readline()):
+        if line.startswith(b"data:"):
+            lines.append(line)
+    assert len(lines) == count, (count, lines)
+    return lines
+
+
+def next_tool_stream_receipt(follow, tool):
+    """提交刚收到的工具 ID。@param follow 原续轮请求。@param tool 完整调用。@return 下一个合法回执。"""
+    rows = [
+        {"role": "assistant", "content": [{"type": "text", "text": RECONNECT_PREFIX}, tool]},
+        {"role": "user", "content": [{"type": "tool_result", "tool_use_id": tool["id"], "content": SECOND_REPLY}]},
+    ]
+    return {**follow, "stream": False, "messages": [*follow["messages"], *rows]}
+
+
+def verify_connected_slow_tool_stream(manage, temporary, token, account_token, headers, follow, received, callbacks,
+                                      continue_tool_stream, finish_stream, model_finished, initial_request_id, sender_status):
+    """慢读同一个公开续轮响应，核对实际交付和记账。
+    @param manage 管理入口。@param temporary 隔离数据库目录。@param token 合成调用方。
+    @param account_token 合成账号凭据。@param headers 原请求会话。@param follow 原工具回执。
+    @param received 隔离模型实收。@param callbacks 合成工具执行记录。
+    @param continue_tool_stream 放行参数余段。@param finish_stream 放行终帧。
+    @param model_finished 隔离模型已写出终帧。@param initial_request_id 根轮公开请求。
+    @param sender_status 失败后读取发送器。@return 慢读、模型和用量证据。
+    """
+    def usage_rows(count):
+        with closing(connect(temporary / "gateway.db")) as database:
+            rows = database.execute(
+                "SELECT record_id,input_tokens,output_tokens,partial FROM usage_records WHERE account_id=1 ORDER BY started_at"
+            ).fetchall()
+        return rows if len(rows) >= count else None
+
+    (first_usage,) = wait_for(lambda: usage_rows(1))
+    assert first_usage[1:] == (10, 8, 0), first_usage
+    prefix, pause = [], {}
+
+    def hold_reader(response):
+        if response.status != 200:
+            return
+        request_id = response.getheader("x-cc2api-request-id")
+        prefix.extend(read_tool_stream_data_lines(response, 6))
+        assert len(received) == 2 and not response.isclosed()
+        assert not continue_tool_stream.is_set() and not finish_stream.is_set() and not model_finished.is_set()
+        startup_event("slow_reader_prefix", request_id=request_id, data_frames=len(prefix))
+        continue_tool_stream.set()
+        finish_stream.set()
+        assert model_finished.wait(30), "隔离模型未写出终帧"
+        completed = monotonic()
+        sleep(SLOW_READER_PAUSE_SECONDS)
+        assert not response.isclosed() and len(received) == 2
+        pause["after_model_finish_ms"] = round((monotonic() - completed) * 1000)
+        startup_event("slow_reader_resuming", request_id=request_id, **pause)
+
+    _, wire, request_id = checked_messages(
+        manage, token, follow, headers, received, "slow_connected_reader", trace_startup=True,
+        sender_status=sender_status, observe_response=hold_reader,
+    )
+    data = [*prefix, *(line for line in wire.splitlines(keepends=True) if line.startswith(b"data:"))]
+    observed = [json.loads(line[5:]) for line in data]
+    expected = [json.loads(line[5:]) for part in fixture_reconnect_sse(NATIVE_TOOL_NAME, usage=SLOW_READER_USAGE)
+                for line in part.splitlines() if line.startswith(b"data:")]
+    # 公开消息 ID 在首帧分配。其余模型数据只应用既有工具名映射。
+    message_id = json.loads(prefix[0][5:])["message"]["id"]
+    assert UUID(message_id.removeprefix("msg_")).version == 4
+    expected[0]["message"]["id"] = message_id
+    expected[4]["content_block"]["name"] = TOOL["name"]
+    assert observed == expected, observed
+    assert pause["after_model_finish_ms"] >= SLOW_READER_PAUSE_SECONDS * 1000
+    assert len(received) == 2
+
+    initial_usage, slow_usage = wait_for(lambda: usage_rows(2))
+    assert initial_usage == first_usage and slow_usage[1:] == (*SLOW_READER_USAGE, 0), slow_usage
+    tool = {**observed[4]["content_block"], "input": json.loads(
+        observed[5]["delta"]["partial_json"] + observed[6]["delta"]["partial_json"]
+    )}
+    callbacks.append(tool["id"])
+    assert callbacks == [NEW_ID, RECONNECT_ID] and tool["input"] == SECOND_ARGS
+    _, final, next_id = checked_messages(
+        manage, token, next_tool_stream_receipt(follow, tool), headers, received, "slow_reader_next_receipt",
+        trace_startup=True, sender_status=sender_status,
+    )
+    assert len(received) == 3 and json.loads(final)["content"] == [{"type": "text", "text": FINAL}]
+    (role, result), = find_blocks(received[-1][1], "tool_use_id", RECONNECT_ID)
+    assert role == "user" and result["content"].count(SECOND_REPLY) == 1
+    duplicate, _, _ = checked_messages(
+        manage, token, follow, headers, received, "slow_reader_stale_receipt", expected_status=400,
+        trace_startup=True, sender_status=sender_status,
+    )
+    assert len(received) == 3
+    usage = wait_for(lambda: usage_rows(3))
+    assert usage[:2] == [first_usage, slow_usage] and len(usage) == 3 and usage[2][1:] == (10, 8, 0), usage
+    captures = verify_captures(manage, received, account_token)
+    assert [attempt["request_id"] for attempt in captures] == [initial_request_id, request_id, next_id]
+    assert all(attempt["confirmed_model_responses"] == 1 for attempt in captures), captures
+    detail = manage("GET", "request-diagnostics/" + request_id)
+    assert detail["request"]["outcome"] == "success" and len(detail["attempts"]) == 1, detail
+    assert detail["attempts"][0]["attempt_id"] == captures[1]["attempt_id"], detail
+    return {"connected_reader_request_id": request_id, "model_message_id": RECONNECT_MESSAGE_ID,
+            "public_message_id": message_id, "tool_id": tool["id"], "tool_input": tool["input"],
+            "data_frames": len(data), "data_sha256": sha256(b"".join(data)).hexdigest(), **pause,
+            "model_posts_during_slow_receipt": 1, "model_posts": len(received), "usage_records": usage,
+            "client_tool_calls": callbacks, "old_tool_calls": 0, "stale_receipt_status": duplicate, "attempts": captures}
+
+
 def verify_tool_stream_reconnect(manage, temporary, token, account_token, headers, follow,
                                  received, continue_tool_stream, finish_stream, callbacks):
     """断开真实续轮读者，再读取同一次交付。@param manage 管理入口。@param temporary 本次私有数据库目录。
@@ -1956,14 +2085,6 @@ def verify_tool_stream_reconnect(manage, temporary, token, account_token, header
     @param continue_tool_stream 放行余下参数。@param finish_stream 放行终帧。
     @param callbacks 客户端已执行的合成工具。@return 实测证据。
     """
-    def read_data_lines(response, count):
-        lines = []
-        while len(lines) < count and (line := response.readline()):
-            if line.startswith(b"data:"):
-                lines.append(line)
-        assert len(lines) == count, (count, lines)
-        return lines
-
     def disconnect_after_prefix(previous=None):
         with closing(HTTPConnection("127.0.0.1", 18090, timeout=30)) as connection:
             connection.request("POST", "/v1/messages", encoded(follow), {
@@ -1972,13 +2093,13 @@ def verify_tool_stream_reconnect(manage, temporary, token, account_token, header
             })
             with closing(connection.getresponse()) as response:
                 assert response.status == 200, response.status
-                lines = read_data_lines(response, 6)
+                lines = read_tool_stream_data_lines(response, 6)
                 assert len(received) == 2 and not continue_tool_stream.is_set() and not finish_stream.is_set()
                 if previous is not None:
                     # 第二个读者先收到原始前缀，再允许模型向同一条打开的连接交付新参数。
                     assert lines == previous
                     continue_tool_stream.set()
-                    lines.extend(read_data_lines(response, 1))
+                    lines.extend(read_tool_stream_data_lines(response, 1))
                     assert not finish_stream.is_set()
                 connection.sock.shutdown(SHUT_RDWR)
                 return lines, response.getheader("x-cc2api-request-id")
@@ -2029,11 +2150,7 @@ def verify_tool_stream_reconnect(manage, temporary, token, account_token, header
     callbacks.append(RECONNECT_ID)
     assert callbacks == [NEW_ID, RECONNECT_ID]
 
-    rows = [
-        {"role": "assistant", "content": [{"type": "text", "text": RECONNECT_PREFIX}, tool]},
-        {"role": "user", "content": [{"type": "tool_result", "tool_use_id": RECONNECT_ID, "content": SECOND_REPLY}]},
-    ]
-    next_request = {**follow, "stream": False, "messages": [*follow["messages"], *rows]}
+    next_request = next_tool_stream_receipt(follow, tool)
     status, raw = call(18090, "POST", "/v1/messages", token, next_request, headers)
     assert status == 200 and len(received) == 3, (status, raw, len(received))
     assert json.loads(raw)["content"] == [{"type": "text", "text": FINAL}]
@@ -2549,14 +2666,14 @@ def verify_provider_quota(manage, token, identifier, received, quota_windows, se
         public_headers = {}
 
         def observe(response):
-            public_headers["retry_after"] = response.get("Retry-After")
-            public_headers["content_type"] = response.get_content_type()
+            public_headers["retry_after"] = response.getheader("Retry-After")
+            public_headers["content_type"] = response.headers.get_content_type()
 
         before = len(received)
         allowed = phase == "allowed"
         status, raw, request_id = checked_messages(
             manage, token, request_body, headers, received, "quota_" + phase, expected_status=200 if allowed else 429,
-            trace_startup=True, sender_status=sender_status, observe_headers=observe,
+            trace_startup=True, sender_status=sender_status, observe_response=observe,
         )
         if allowed and stream:
             frames = [json.loads(line[5:]) for line in raw.splitlines() if line.startswith(b"data:")]
@@ -3702,6 +3819,7 @@ def main():
     scenario.add_argument("--split-history-tools", action="store_true")
     scenario.add_argument("--parallel-new-tools", action="store_true")
     scenario.add_argument("--reconnect-tool-stream", action="store_true")
+    scenario.add_argument("--slow-tool-stream", action="store_true")
     scenario.add_argument("--cancel-and-change-question", action="store_true")
     scenario.add_argument("--mixed-release", nargs=3, type=Path,
                           metavar=("OLD_SOURCE", "OLD_GATEWAY", "OLD_SENDER"))
@@ -3746,6 +3864,7 @@ def main():
                      or args.recovery_readiness_rejection
                      or args.structured_output_contract or bool(args.forced_tool_choice_contract) or args.no_tool_choice_contract
                      or args.disable_parallel_tool_use_contract or bool(args.oauth_rotation or args.provider_quota)
+                     or args.slow_tool_stream
                      or bool(auxiliary_mode or args.agent_progress)
                      or bool(args.thinking_display_contract)
                      or (bool(args.message_system_roles) and args.v1_runtime is None))
@@ -3774,7 +3893,8 @@ def main():
                        signed_tool_history=args.signed_tool_history, signed_tool_response=args.signed_tool_response,
                        split_history_tools=args.split_history_tools,
                        v1_runtime=args.v1_runtime, parallel_tools=args.parallel_new_tools,
-                       reconnect_tool_stream=args.reconnect_tool_stream, current_images=args.current_images,
+                       reconnect_tool_stream=args.reconnect_tool_stream, slow_tool_stream=args.slow_tool_stream,
+                       current_images=args.current_images,
                        cancel_and_change_question=args.cancel_and_change_question,
                        current_image_ending=args.current_image_ending,
                        auto_tool_choice=args.auto_tool_choice,
