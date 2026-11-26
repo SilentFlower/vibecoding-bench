@@ -2817,12 +2817,7 @@ impl GatewayService {
                     wake,
                     (returning_tool && owner.is_some()).then_some(route.binding.as_str()),
                 )
-                .await
-                .inspect_err(|error| {
-                    if matches!(error, AppError::ServiceUnavailable(_)) {
-                        diagnostics::error_stage("tui_v2_readiness");
-                    }
-                })?;
+                .await?;
                 let checking_recovery = recovery.is_some();
                 let (binding, mut turn, draining) = route
                     .begin_v2(

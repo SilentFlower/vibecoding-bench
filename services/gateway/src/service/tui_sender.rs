@@ -44,6 +44,7 @@ use crate::service::runtime_transport::{
     TUI_MODEL_HEADER_POLICY, TUI_PREPARE_BIND, TUI_PREPARE_EXCHANGE, TUI_PREPARE_LEDGER,
     TUI_REPAIR_ATTEMPT, TUI_SEND_CLAIM, TUI_SENDER_CONFIG, TUI_SIGNATURE_REPAIR,
     TUI_SUBMISSION_LEDGER, TUI_SYSTEM_PROMPT_POLICY, TUI_WORKSPACE_BIND, TuiReceiptProbe,
+    TuiV2Unavailable,
 };
 use crate::service::session_policy_block;
 use crate::service::tui_sender_response;
@@ -538,17 +539,30 @@ impl TuiSender {
         binding: &TransportBinding,
         config: Option<&Value>,
         receipt: Option<&TuiReceiptProbe>,
-    ) -> Option<(bool, Option<bool>, bool, bool)> {
-        setting(config).ok()?;
-        let source = timeout(Duration::from_secs(1), async {
-            submission_log::was_consumed(&self.submission_storage, binding, None).await?;
-            verify_source(&self.path, binding, "status", receipt).await
-        })
+    ) -> Result<(bool, Option<bool>, bool, bool), TuiV2Unavailable> {
+        setting(config).map_err(|_| TuiV2Unavailable::ReadinessConfig)?;
+        let deadline = Instant::now() + Duration::from_secs(1);
+        timeout_at(
+            deadline,
+            submission_log::was_consumed(
+                &self.submission_storage,
+                binding,
+                None,
+                deadline.into_std(),
+            ),
+        )
         .await
-        .ok()?
-        .ok()?;
+        .map_err(|_| TuiV2Unavailable::ReadinessLedger)?
+        .map_err(|_| TuiV2Unavailable::ReadinessLedger)?;
+        let source = timeout_at(
+            deadline,
+            verify_source(&self.path, binding, "status", receipt),
+        )
+        .await
+        .map_err(|_| TuiV2Unavailable::ReadinessSource)?
+        .map_err(|_| TuiV2Unavailable::ReadinessSource)?;
         let inactive = self.active() == 0;
-        Some((
+        Ok((
             source.idle && inactive,
             source.receipt_idle.map(|idle| idle && inactive),
             source.agent_summary,
@@ -701,6 +715,7 @@ impl TuiSender {
                 &self.submission_storage,
                 binding,
                 Some(&identity.reservation_id),
+                deadline.into_std(),
             )
             .await
             .map_err(|_| unavailable())?
@@ -2798,7 +2813,7 @@ mod tests {
                 write_json(&mut socket, &reply).await.unwrap();
             }
         );
-        assert_eq!(status, Some((false, Some(true), true, false)));
+        assert_eq!(status, Ok((false, Some(true), true, false)));
     }
 
     #[tokio::test]
@@ -2815,7 +2830,7 @@ mod tests {
                 write_json(&mut socket, &reply).await.unwrap();
             }
         );
-        assert_eq!(idle, Some((true, None, false, false)));
+        assert_eq!(idle, Ok((true, None, false, false)));
         let mut identity = source.identity();
         identity.continuation_only = true;
         let (prepared, mut socket) = tokio::join!(source.prepare(&identity, body), async {
@@ -3236,7 +3251,7 @@ mod tests {
         let source = Source::new();
         assert_eq!(
             source.sender.status(&source.binding, None, None).await,
-            None
+            Err(TuiV2Unavailable::ReadinessConfig)
         );
         let (idle, ()) = tokio::join!(
             source
@@ -3248,7 +3263,7 @@ mod tests {
                 write_json(&mut socket, &reply).await.unwrap();
             }
         );
-        assert_eq!(idle, None);
+        assert_eq!(idle, Err(TuiV2Unavailable::ReadinessSource));
         let identity = source.identity();
         let (prepared, mut socket) = tokio::join!(source.prepare(&identity, b"{}"), async {
             let (mut socket, mut reply) = source.receive("prepare").await;
@@ -3320,7 +3335,8 @@ mod tests {
                 submission_log::was_consumed(
                     &source.sender.submission_storage,
                     &source.binding,
-                    Some(&identity.reservation_id)
+                    Some(&identity.reservation_id),
+                    (Instant::now() + Duration::from_secs(1)).into_std(),
                 )
                 .await
                 .unwrap()
@@ -3380,6 +3396,7 @@ mod tests {
                     &source.sender.submission_storage,
                     &source.binding,
                     Some(&identity.reservation_id),
+                    (Instant::now() + Duration::from_secs(1)).into_std(),
                 )
                 .await
                 .unwrap()
@@ -3444,9 +3461,14 @@ mod tests {
         assert_eq!(result.unwrap_err().kind(), io::ErrorKind::TimedOut);
         drop(lock);
         assert!(
-            !submission_log::was_consumed(root, &source.binding, Some(&identity.reservation_id))
-                .await
-                .unwrap()
+            !submission_log::was_consumed(
+                root,
+                &source.binding,
+                Some(&identity.reservation_id),
+                (Instant::now() + Duration::from_secs(1)).into_std(),
+            )
+            .await
+            .unwrap()
         );
     }
 

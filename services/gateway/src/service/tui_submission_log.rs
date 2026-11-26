@@ -1,7 +1,7 @@
 //! 持久记录已认领发送或已确认取消的预留 ID。
 
 use std::collections::BTreeMap;
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, File, Metadata, OpenOptions};
 use std::io::{self, Read, Write};
 use std::os::fd::AsRawFd;
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
@@ -82,26 +82,58 @@ pub(super) fn directory(path: &Path) -> io::Result<File> {
     Ok(file)
 }
 
-pub(super) fn private_file(file: &File) -> io::Result<()> {
+fn private_metadata(file: &File) -> io::Result<Metadata> {
     let meta = file.metadata()?;
-    if !meta.is_file()
-        || meta.uid() != unsafe { libc::geteuid() }
-        || meta.mode() & 0o777 != 0o600
-        || meta.nlink() != 1
-    {
+    if !meta.is_file() || meta.uid() != unsafe { libc::geteuid() } || meta.mode() & 0o777 != 0o600 {
+        return Err(invalid());
+    }
+    Ok(meta)
+}
+
+/// 校验持久文件的属主、权限及唯一链接。@param file 已打开的私有文件。@return 核验结果。
+pub(super) fn private_file(file: &File) -> io::Result<()> {
+    if private_metadata(file)?.nlink() != 1 {
         return Err(invalid());
     }
     Ok(())
 }
 
-fn load(path: &Path, account_id: i64, environment_id: String) -> io::Result<Ledger> {
-    let file = match OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
-        .open(path.join(FILE))
-    {
+fn open_ledger(
+    mut open: impl FnMut() -> io::Result<File>,
+    read_deadline: Option<Instant>,
+) -> io::Result<Option<File>> {
+    let mut file = match open() {
         Ok(file) => file,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    loop {
+        match (private_metadata(&file)?.nlink(), read_deadline) {
+            (1, _) => return Ok(Some(file)),
+            // 无锁读取可能先打开旧版本，随后写者完成原子替换。重开当前路径，依然只接纳单链接文件。
+            (0, Some(deadline)) if Instant::now() < deadline => file = open()?,
+            (0, Some(_)) => return Err(io::ErrorKind::TimedOut.into()),
+            _ => return Err(invalid()),
+        }
+    }
+}
+
+fn load(
+    root: &Path,
+    account_id: i64,
+    environment_id: String,
+    read_deadline: Option<Instant>,
+) -> io::Result<Ledger> {
+    let path = root.join(FILE);
+    let open = || {
+        OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+            .open(&path)
+    };
+    let file = match open_ledger(open, read_deadline)? {
+        Some(file) => file,
+        None => {
             return Ok(Ledger {
                 account_id,
                 environment_id,
@@ -109,9 +141,7 @@ fn load(path: &Path, account_id: i64, environment_id: String) -> io::Result<Ledg
                 cancelled: BTreeMap::new(),
             });
         }
-        Err(error) => return Err(error),
     };
-    private_file(&file)?;
     let mut raw = Vec::new();
     file.take(MAX_BYTES as u64 + 1).read_to_end(&mut raw)?;
     if raw.len() > MAX_BYTES {
@@ -195,11 +225,13 @@ fn save(root: &Path, directory: &File, ledger: &Ledger) -> io::Result<()> {
 }
 
 /// 只读核对账号存储及可选终态。@param root 私有持久目录。@param binding 当前账号绑定。
-/// @param id 预留 ID，状态探测时为空。@return 截止尚未通过的 ID 是否已被消费。
+/// @param id 预留 ID，状态探测时为空。@param deadline 原调用单调截止。
+/// @return 截止尚未通过的 ID 是否已被消费。
 pub(super) async fn was_consumed(
     root: &Path,
     binding: &TransportBinding,
     id: Option<&str>,
+    deadline: Instant,
 ) -> io::Result<bool> {
     let root = root.to_owned();
     let account_id = binding.account_id;
@@ -207,7 +239,7 @@ pub(super) async fn was_consumed(
     let id = id.map(str::to_owned);
     tokio::task::spawn_blocking(move || {
         directory(&root)?;
-        let ledger = load(&root, account_id, environment_id)?;
+        let ledger = load(&root, account_id, environment_id, Some(deadline))?;
         Ok(id
             .and_then(|id| ledger.deadline(&id))
             .is_some_and(|deadline| deadline > now_ms()))
@@ -234,7 +266,7 @@ pub(super) async fn consume(
     tokio::task::spawn_blocking(move || {
         let directory = directory(&root)?;
         let _lock = lock_until(&root, deadline)?;
-        let mut ledger = load(&root, account_id, environment_id)?;
+        let mut ledger = load(&root, account_id, environment_id, None)?;
         let wall_now = now_ms();
         if deadline_ms <= wall_now || Instant::now() >= deadline {
             return Err(io::ErrorKind::TimedOut.into());
@@ -254,4 +286,58 @@ pub(super) async fn consume(
         Ok(true)
     })
     .await?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::DirBuilderExt;
+
+    /// 原子替换时，无锁读重新打开同一路径。多链接文件仍拒绝。@return 无。
+    #[test]
+    fn ledger_reader_reopens_replaced_inode_within_deadline() {
+        let root = std::env::temp_dir().join(format!("ledger-read-{}", Uuid::new_v4()));
+        fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+        let path = root.join(FILE);
+        let replacement = root.join(PENDING);
+        for (file, data) in [(&path, b"old"), (&replacement, b"new")] {
+            OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(file)
+                .unwrap()
+                .write_all(data)
+                .unwrap();
+        }
+        let deadline = Instant::now() + Duration::from_secs(1);
+        let mut opened = 0;
+        let mut file = open_ledger(
+            || {
+                let file = File::open(&path)?;
+                opened += 1;
+                if opened == 1 {
+                    fs::rename(&replacement, &path)?;
+                    assert_eq!(file.metadata()?.nlink(), 0);
+                }
+                Ok(file)
+            },
+            Some(deadline),
+        )
+        .unwrap()
+        .unwrap();
+        let mut value = String::new();
+        file.read_to_string(&mut value).unwrap();
+        assert_eq!(opened, 2);
+        assert_eq!(value, "new");
+        drop(file);
+        fs::hard_link(&path, &replacement).unwrap();
+        assert_eq!(
+            open_ledger(|| File::open(&path), Some(deadline))
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::InvalidData
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
 }

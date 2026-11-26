@@ -308,14 +308,18 @@ pub struct SenderConfig {
     pub quota_identity: String,
 }
 
+/// 私有 sender 就绪与绑定核验的失败类别。
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
-enum TuiV2Unavailable {
+pub(super) enum TuiV2Unavailable {
     NotConfigured,
     NotRunning,
     BindingUnverified,
     MessagesToolAndUsageEventsUnavailable,
     ReadinessUnverified,
+    ReadinessConfig,
+    ReadinessLedger,
+    ReadinessSource,
 }
 
 impl TuiV2Unavailable {
@@ -327,10 +331,23 @@ impl TuiV2Unavailable {
                 Self::MessagesToolAndUsageEventsUnavailable => {
                     "V2 缺少官方交互终端的完整 Messages 工具和用量事件源"
                 }
-                Self::ReadinessUnverified => "V2 账号发送器就绪状态待核对",
+                Self::ReadinessUnverified
+                | Self::ReadinessConfig
+                | Self::ReadinessLedger
+                | Self::ReadinessSource => "V2 账号发送器就绪状态待核对",
             }
             .into(),
         )
+    }
+
+    fn readiness_stage(self) -> &'static str {
+        match self {
+            Self::BindingUnverified => "tui_v2_binding",
+            Self::ReadinessConfig => "tui_readiness_config",
+            Self::ReadinessLedger => "tui_readiness_ledger",
+            Self::ReadinessSource => "tui_readiness_source",
+            _ => "tui_v2_readiness",
+        }
     }
 }
 
@@ -1428,7 +1445,10 @@ pub(super) async fn ready_tui_sender(
     })
     .await
     .map_err(|_| AppError::AdmissionLimited { retry_after: 1 })?
-    .map_err(|reason| reject_tui(account.id, reason))?;
+    .map_err(|reason| {
+        super::diagnostics::error_stage(reason.readiness_stage());
+        reject_tui(account.id, reason)
+    })?;
     let TuiTransport {
         client,
         binding,
@@ -3381,7 +3401,7 @@ async fn status(
                 .status(&config.binding, Some(configuration), receipt_probe.as_ref())
                 .await
             {
-                Some((idle, receipt_idle, agent_summary, system_prompt_policy)) => {
+                Ok((idle, receipt_idle, agent_summary, system_prompt_policy)) => {
                     if agent_summary {
                         status["agent_summary_protocol"] = json!(1);
                     }
@@ -3397,7 +3417,7 @@ async fn status(
                     status.as_object_mut().unwrap().remove("reason");
                     tui_active = state.tui.active().max(u64::from(!idle));
                 }
-                None => status["reason"] = json!(TuiV2Unavailable::ReadinessUnverified),
+                Err(reason) => status["reason"] = json!(reason),
             }
         }
         (status, active + tui_active)

@@ -559,10 +559,14 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             original_history = original_file.read_bytes()
             manage("PUT", f"accounts/{identifier}", {"client_system_prompt_policy": "user_reminder"})
             modified_system = {**follow, "system": "更改已经冻结的指令"}
-            changed_policy, response = call(18090, "POST", "/v1/messages", token, modified_system, headers)
+            changed_policy, response, _ = checked_messages(
+                manage, token, modified_system, headers, received, "recovered_changed_system", expected_status=422,
+            )
             assert changed_policy == 422 and len(received) == 1, (changed_policy, response, len(received))
             modified_effort = {**follow, "output_config": {"effort": "low"}}
-            changed_effort, response = call(18090, "POST", "/v1/messages", token, modified_effort, headers)
+            changed_effort, response, _ = checked_messages(
+                manage, token, modified_effort, headers, received, "recovered_changed_effort", expected_status=422,
+            )
             assert changed_effort == 422 and len(received) == 1, (changed_effort, response, len(received))
         if current_text_blocks:
             merged = {"role": "user", "content": QUESTION + QUESTION_TAIL}
