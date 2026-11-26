@@ -2785,7 +2785,7 @@ def verify_provider_quota(manage, token, identifier, received, quota_windows, se
 
 
 def verify_external_signed_history(manage, token, identifier, received, sender_status):
-    """核对普通客户端带外部签名历史的当前兼容入口。
+    """核对外部签名历史的模型实收、调用与结果归属，以及本轮公开终态。
     @param manage 管理入口。@param token 合成调用方。@param identifier 合成账号。
     @param received 隔离模型实收。@param sender_status 失败后读取 sender。@return 按请求关联的证据。
     """
@@ -2850,9 +2850,10 @@ def verify_external_signed_history(manage, token, identifier, received, sender_s
             assert sum(text.count(SYSTEM[0]) for text in system_texts) == int(not reminder), (phase, system_texts)
             assert reply["stop_reason"] == "end_turn" and reply["content"] == [{"type": "text", "text": FINAL}]
             case.update(provider_path=source, model_body_sha256=digest, cli_body_sha256=claim["cli_sha256"],
-                        observed_signed_blocks=signed_blocks, old_tool_id=PAST_ID, old_tool_result=old_result)
+                        observed_signed_blocks=signed_blocks, old_tool_id=PAST_ID, old_tool_result=old_result,
+                        client_stop_reason=reply["stop_reason"])
     assert len(received) == 5 and not any(path.is_file() for path in Path("/flows/api").rglob("*"))
-    return {"cases": cases, "model_posts": len(received), "historical_tool_executions": 0, "wire_final": "unavailable"}
+    return {"cases": cases, "model_posts": len(received), "wire_final": "unavailable"}
 
 
 def verify_disable_parallel_tool_use(manage, token, identifier, received, sender_status):
