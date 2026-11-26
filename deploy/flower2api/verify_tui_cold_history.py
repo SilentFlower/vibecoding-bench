@@ -2,8 +2,9 @@
 
 import argparse
 from base64 import b64encode
-from contextlib import ExitStack, closing
+from contextlib import ExitStack, closing, suppress
 from datetime import datetime, timezone
+from faulthandler import dump_traceback
 from fcntl import LOCK_EX, flock
 from hashlib import sha256
 from http.client import HTTPConnection, HTTPException
@@ -23,12 +24,13 @@ from subprocess import PIPE, Popen, run
 from sys import executable, stderr
 from tempfile import TemporaryDirectory
 from threading import Event, Timer
-from time import monotonic, sleep, time_ns
+from time import monotonic, monotonic_ns, sleep, time_ns
 from urllib.parse import parse_qs, urlencode, urlsplit
 from uuid import UUID, uuid4
 from zlib import compress, crc32
 
 from fixtures.native_model_send.fixture_tunnel import _relay
+from fixtures.native_model_send.tui_startup_trace import startup_event
 from verify_tui_concurrency import frame
 from verify_tui_final_tls import call, encoded, serve, stop, wait_for
 from verify_tui_http_handoff import MODEL, message_sse
@@ -89,14 +91,17 @@ class QuietHandler(BaseHTTPRequestHandler):
         """省略验收请求日志。@return 无。"""
 
 
-def install_source(root=ROOT):
-    """安装与发送器配套的生产事件源。@param root 检出的源代码。@return 无。"""
+def install_source(root=ROOT, *, trace_startup=False):
+    """安装配套事件源。@param root 检出目录。@param trace_startup 是否启用隔离观测。@return 无。"""
     target = Path("/opt/flower/tui")
     for file in (root / "images/account").glob("tui_*.py"):
         copy2(file, target / file.name)
     copytree(root / "images/account/tui-mod", target / "tui-mod", dirs_exist_ok=True)
     for name in ("runtime_files.py", "tui_workspace_launch.py", "tui_capacity.py"):
         copy2(root / "services/orchestrator" / name, target / name)
+    if trace_startup:
+        (target / "tui_source.py").rename(target / "fixture_tui_source.py")
+        copy2(ROOT / "deploy/flower2api/fixtures/native_model_send/tui_startup_trace.py", target / "tui_source.py")
 
 
 def build_cutover_record(temporary, old, deployment, release):
@@ -166,7 +171,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            current_text_blocks=False, signed_tool_history=False, split_history_tools=False, v1_runtime=None,
            parallel_tools=False, reconnect_tool_stream=False, current_images=False, auto_tool_choice=False,
            recovery_ledger_contention=False, recovery_ledger_deadline=False, recovery_workspace_rejection=False,
-           recovery_slow_model=False, initial_idle_model_connection=False):
+           recovery_slow_model=False, initial_idle_model_connection=False, trace_startup=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -193,6 +198,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param recovery_workspace_rejection 是否核对工作区绑定拒绝及原回执再次认领。
     @param recovery_slow_model 是否验证隔离模型收件后的公开超时和诊断归属。
     @param initial_idle_model_connection 是否先占用一个未握手的模型 TCP 连接。
+    @param trace_startup 是否记录隔离启动阶段。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -231,9 +237,13 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                     or self.headers.get("Authorization") != "Bearer " + account_token):
                 self.send_error(403)
                 return
+            if trace_startup:
+                startup_event("model_http_headers", peer_port=self.client_address[1])
             raw = self.rfile.read(int(self.headers["Content-Length"]))
             body = json.loads(raw)
             received.append((sha256(raw).hexdigest(), body, self.connection.version()))
+            if trace_startup:
+                startup_event("model_received", peer_port=self.client_address[1], model_posts=len(received))
             if v1_runtime is not None:
                 v1_betas.append(self.headers.get("anthropic-beta", ""))
             if failure_boundaries and any(block.get("text") == DROP_REPLY
@@ -283,7 +293,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 denied_tunnels.append(self.path)
                 self.send_error(502)
                 return
+            if trace_startup:
+                startup_event("proxy_connect_accepted", peer_port=self.client_address[1])
             with create_connection(("127.0.0.1", receiver.server_port), timeout=10) as target:
+                if trace_startup:
+                    startup_event("proxy_model_tcp_connected", peer_port=target.getsockname()[1])
                 _relay(self, target, proxy_targets.append)
 
     class Registry(QuietHandler):
@@ -308,15 +322,31 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                     pass
             self.send_error(404)
 
+    class TracedServer(ThreadingHTTPServer):
+        """记录监听线程接收 TCP 的时点，握手由请求线程完成。"""
+
+        def __init__(self, handler, stage):
+            """设置探针边界。@param handler 回环处理器。@param stage 接收阶段。@return 无。"""
+            self.stage = stage
+            super().__init__(("127.0.0.1", 0), handler)
+
+        def get_request(self):
+            """保留原 accept 结果。@return 已接受的连接与对端地址。"""
+            connection, peer = super().get_request()
+            startup_event(self.stage, peer_port=peer[1])
+            return connection, peer
+
     with ExitStack() as stack:
-        receiver = ThreadingHTTPServer(("127.0.0.1", 0), Receiver)
+        receiver = (TracedServer(Receiver, "model_tcp_accepted") if trace_startup
+                    else ThreadingHTTPServer(("127.0.0.1", 0), Receiver))
         tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         tls.load_cert_chain(temporary / "leaf.pem", temporary / "leaf.key")
         # 握手由已接收连接的工作线程完成，空闲 TCP 不会占住监听线程。
         receiver.socket = tls.wrap_socket(receiver.socket, server_side=True, do_handshake_on_connect=False)
         serve(stack, receiver)
         stack.callback(finish_stream.set)
-        proxy = serve(stack, ThreadingHTTPServer(("127.0.0.1", 0), Proxy))
+        proxy = serve(stack, TracedServer(Proxy, "proxy_tcp_accepted") if trace_startup
+                      else ThreadingHTTPServer(("127.0.0.1", 0), Proxy))
         registry = serve(stack, ThreadingHTTPServer(("127.0.0.1", 0), Registry))
         proxy_url = f"http://127.0.0.1:{proxy.server_port}"
 
@@ -349,7 +379,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 "DATABASE_DSN": str(temporary / "gateway.db"), "ADMIN_PASSWORD": admin,
                 "V3_INTERNAL_TOKEN": internal, "V3_DEPLOYMENT_ID": deployment,
                 "V3_RELEASE": version, "V3_RUNTIME_URL": f"http://127.0.0.1:{registry.server_port}",
-                "LOG_LEVEL": "warn", **gate,
+                "LOG_LEVEL": "warn", "FLOWER_V2_STARTUP_TRACE": str(int(trace_startup)), **gate,
             })
             stack.callback(stop, process)
             wait_for(lambda: call(18090, "GET", "/admin/accounts", admin)[0] == 200)
@@ -488,8 +518,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             body["output_config"] = {"effort": "medium"}
         with ExitStack() as initial_connections:
             if initial_idle_model_connection:
-                initial_connections.enter_context(create_connection(("127.0.0.1", receiver.server_port), timeout=5))
-            initial_status, raw, initial_request_id = checked_messages(manage, token, body, headers, received, "initial")
+                idle = initial_connections.enter_context(create_connection(("127.0.0.1", receiver.server_port), timeout=5))
+                startup_event("idle_model_tcp_connected", peer_port=idle.getsockname()[1])
+            initial_status, raw, initial_request_id = checked_messages(
+                manage, token, body, headers, received, "initial", trace_startup=trace_startup,
+            )
             if initial_idle_model_connection:
                 assert len(received) == 1
         events = [json.loads(line[5:]) for line in raw.splitlines() if line.startswith(b"data:")]
@@ -933,10 +966,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         return proof
 
 
-def checked_messages(manage, token, body, headers, received, phase, *, expected_status=200):
+def checked_messages(manage, token, body, headers, received, phase, *, expected_status=200, trace_startup=False):
     """在断言前保留本轮公开响应与诊断归属。
     @param manage 管理入口。@param token 合成凭据。@param body 公开输入。@param headers 原入口头。
     @param received 隔离模型收件。@param phase 夹具阶段。@param expected_status 预期 HTTP 状态。
+    @param trace_startup 是否记录首请求时间及失败后线程栈。
     @return 实际状态、响应字节和公开请求 ID。
     """
     started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
@@ -947,15 +981,26 @@ def checked_messages(manage, token, body, headers, received, phase, *, expected_
 
     def observe(response):
         evidence.update(http_status=response.status, request_id=response.getheader("x-cc2api-request-id"))
+        if trace_startup:
+            startup_event("public_response_headers", request_id=evidence["request_id"], http_status=response.status)
 
     def report(**details):
+        failed_ns = monotonic_ns() if trace_startup else None
         event = {**evidence, **details, "elapsed_ms": round((monotonic() - started) * 1000),
                  "model_posts_before": before, "model_body_sha256": [sha for sha, _, _ in received[before:]]}
+        if failed_ns is not None:
+            event["monotonic_ns"] = failed_ns
         event["model_posts_during"] = len(event["model_body_sha256"])
         # 先留下原始观测。诊断读回失败时仍能保留同一请求的 HTTP 和模型收件情况。
         print(json.dumps(event, ensure_ascii=False), file=stderr, flush=True)
+        if trace_startup:
+            startup_event("fixture_threads_after_failure")
+            with suppress(OSError, RuntimeError):
+                dump_traceback(file=stderr)
         report_request_diagnostics(manage, phase, evidence["request_id"], headers["x-session-id"], started_at)
 
+    if trace_startup:
+        startup_event("public_request_start")
     try:
         status, raw = call(18090, "POST", "/v1/messages", token, body, headers, observe_headers=observe)
     except (HTTPException, OSError) as error:
@@ -1546,6 +1591,7 @@ def main():
     parser.add_argument("--current-images", action="store_true")
     parser.add_argument("--auto-tool-choice", action="store_true")
     parser.add_argument("--signed-tool-history", action="store_true")
+    parser.add_argument("--trace-initial-startup", action="store_true", help="记录源码 V2 夹具的启动阶段")
     fault = parser.add_mutually_exclusive_group()
     fault.add_argument("--recovery-ledger-contention", action="store_true")
     fault.add_argument("--recovery-ledger-deadline", action="store_true")
@@ -1581,12 +1627,15 @@ def main():
             or Path("/run/v3/sender.json").exists() or any(Path("/native").glob("*"))):
         raise RuntimeError("请在空白的 docker --network none 账号容器中运行")
     previous = args.mixed_release
+    trace_startup = args.initial_idle_model_connection or args.trace_initial_startup
+    if trace_startup and (previous or args.mixed_image_peers or args.v1_runtime):
+        parser.error("启动观测需要当前 V2 源码夹具")
     if args.mixed_image_peers:
         if args.shared_state is None:
             parser.error("镜像混跑须使用私有共享夹具目录")
         previous = (None, *args.mixed_image_peers)
     elif args.v1_runtime is None:
-        install_source(previous[0] if previous else ROOT)
+        install_source(previous[0] if previous else ROOT, trace_startup=trace_startup)
     elif sha256(args.v1_runtime.read_bytes()).hexdigest() != V1_RUNTIME_SHA256:
         parser.error("V1 启动器摘要与固定版不符")
     with TemporaryDirectory(prefix="cold-history-", dir=args.shared_state) as directory:
@@ -1606,7 +1655,7 @@ def main():
                        recovery_ledger_deadline=args.recovery_ledger_deadline,
                        recovery_workspace_rejection=args.recovery_workspace_rejection,
                        recovery_slow_model=args.recovery_slow_model,
-                       initial_idle_model_connection=args.initial_idle_model_connection)
+                       initial_idle_model_connection=args.initial_idle_model_connection, trace_startup=trace_startup)
         print(json.dumps(proof, ensure_ascii=False))
 
 

@@ -10,8 +10,16 @@ use axum::http::{HeaderMap, HeaderValue};
 use axum::response::Response;
 use chrono::{Duration as ChronoDuration, SecondsFormat, Utc};
 use http_body::{Body as HttpBody, Frame, SizeHint};
+#[cfg(all(target_os = "linux", feature = "v3-verification"))]
+use libc::{CLOCK_MONOTONIC, clock_gettime, timespec};
 use serde_json::Value;
+#[cfg(all(target_os = "linux", feature = "v3-verification"))]
+use serde_json::json;
 use sha2::{Digest, Sha256};
+#[cfg(all(target_os = "linux", feature = "v3-verification"))]
+use std::env::var;
+#[cfg(all(target_os = "linux", feature = "v3-verification"))]
+use std::io::{Write, stderr};
 use uuid::Uuid;
 
 use crate::error::AppError;
@@ -450,6 +458,25 @@ pub(crate) fn error_stage(stage: &'static str) {
 
 /// 关联当前公开请求和账号发送器预留。@param id 网关生成的预留 ID。@return 无。
 pub(super) fn tui_reservation(id: &str) {
+    #[cfg(all(target_os = "linux", feature = "v3-verification"))]
+    if var("FLOWER_V2_STARTUP_TRACE").as_deref() == Ok("1")
+        && let Some(request_id) = current_request_id()
+    {
+        let mut clock = timespec {
+            tv_sec: 0,
+            tv_nsec: 0,
+        };
+        // 与同一隔离容器中的 Python 探针使用同一个单调时钟。
+        if unsafe { clock_gettime(CLOCK_MONOTONIC, &mut clock) } == 0 {
+            let ticks = clock.tv_sec as u64 * 1_000_000_000 + clock.tv_nsec as u64;
+            let line = format!(
+                "{}\n",
+                json!({"event": "tui_startup", "stage": "gateway_reservation",
+                "monotonic_ns": ticks, "request_id": request_id, "reservation_id": id})
+            );
+            let _ = stderr().lock().write_all(line.as_bytes());
+        }
+    }
     let _ = CURRENT_TRACE.try_with(|trace| {
         let mut state = trace.lock();
         let context = state.request.context.get_or_insert_with(Default::default);
