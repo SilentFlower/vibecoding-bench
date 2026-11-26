@@ -1,5 +1,6 @@
 """固定 2.1.293 交互 CLI 的普通 Messages 历史导入与受管 MCP 描述。"""
 
+from base64 import b64decode
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from itertools import zip_longest
@@ -26,12 +27,26 @@ def _plain_text(block):
             and isinstance(block["text"], str) and bool(block["text"]))
 
 
+def _inline_png(block):
+    if block.keys() != {"type", "source"} or block["type"] != "image":
+        return False
+    source = block["source"]
+    if (not isinstance(source, dict) or source.keys() != {"type", "media_type", "data"}
+            or source["type"] != "base64" or source["media_type"] != "image/png"
+            or not isinstance(source["data"], str)):
+        return False
+    try:
+        return b64decode(source["data"], validate=True).startswith(b"\x89PNG\r\n\x1a\n")
+    except ValueError:
+        return False
+
+
 def _closed_history(rows, *, result_types=(str,)):
     pending, seen = set(), set()
     for row in rows:
         results = set()
         for block in _blocks(row):
-            if _plain_text(block):
+            if _plain_text(block) or (row["role"] == "user" and _inline_png(block)):
                 continue
             if (row["role"] == "assistant" and block.get("type") == "tool_use"
                     and block.keys() == {"type", "id", "name", "input"}

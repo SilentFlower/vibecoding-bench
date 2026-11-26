@@ -71,7 +71,8 @@ def install_source():
 
 
 def verify(gateway, sender, temporary, *, restart_history=False, text_input=False, system_policy=False,
-           toggle_pending_policy=False, tool_policy=None, recover_pending=False, output_effort=False):
+           toggle_pending_policy=False, tool_policy=None, recover_pending=False, output_effort=False,
+           history_png=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -80,6 +81,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param tool_policy 工具往返前显式设置的 V2 动作。
     @param recover_pending 是否结束等待进程并在发送器重启后恢复真实工具回执。
     @param output_effort 是否核对 CLI 实际生成的推理强度和 Token 上限。
+    @param history_png 是否核对用户历史里的内嵌 PNG。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -230,6 +232,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             return verify_text_inputs(manage, token, account_token, headers, messages, received)
         if output_effort:
             return verify_output_effort(manage, token, account_token, headers, received)
+        if history_png:
+            return verify_history_png(manage, token, account_token, identifier, headers, received)
         if system_policy:
             account_path = f"accounts/{identifier}"
             first = manage("GET", account_path)
@@ -493,6 +497,40 @@ def verify_output_effort(manage, token, account_token, headers, received):
     return {"output_effort": outcomes, "model_posts": len(received)}
 
 
+def verify_history_png(manage, token, account_token, account_id, headers, received):
+    """核对历史用户 PNG 与新问题的真实出站。
+    @param manage 管理接口。@param token 公共令牌。@param account_token 合成账号凭据。
+    @param account_id 当前账号。@param headers 固定公开会话。@param received 模型实收。@return 测试摘要。
+    """
+    image = {"type": "image", "source": {"type": "base64", "media_type": "image/png",
+             "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j4uoAAAAASUVORK5CYII="}}
+    history = [{"role": "user", "content": [{"type": "text", "text": HISTORY[0][1]}, image]},
+               {"role": "assistant", "content": HISTORY[1][1]}]
+    cases = []
+    for index, policy in enumerate(("append", "user_reminder"), 1):
+        manage("PUT", f"accounts/{account_id}", {"client_system_prompt_policy": policy})
+        question = f"确认上一轮保留的图像 {index}"
+        body = {"model": MODEL, "max_tokens": 128, "stream": False, "system": SYSTEM[0],
+                "messages": [*history, {"role": "user", "content": question}]}
+        status, raw = call(18090, "POST", "/v1/messages", token, body, headers)
+        assert status == 200 and len(received) == index, (status, raw, len(received))
+        _, native, _ = received[-1]
+        rows = native["messages"]
+        row, = [row for row in rows if any(block["type"] == "image" for block in blocks(row))]
+        assert row["role"] == "user" and [block for block in blocks(row) if block["type"] == "image"] == [image]
+        assert blocks(row)[0] == history[0]["content"][0]
+        texts = [(message["role"], block.get("text")) for message in rows for block in blocks(message)]
+        assert texts.count(("assistant", HISTORY[1][1])) == 1 and texts.count(("user", question)) == 1
+        in_system = "\n".join(block["text"] for block in native["system"])
+        assert in_system.count(SYSTEM[0]) == (policy == "append")
+        assert json.dumps(row, ensure_ascii=False).count(SYSTEM[0]) == (policy == "user_reminder")
+        cases.append({"policy": policy, "body_sha256": sha256(encoded(body)).hexdigest()})
+    for case, capture in zip(cases, verify_captures(manage, received, account_token), strict=True):
+        assert case["body_sha256"] == capture["ingress_body_sha256"]
+        case.update(capture)
+    return {"history_png": cases, "model_posts": len(received)}
+
+
 def fixture_command_has(path, argument):
     """仅比较隔离夹具的进程标记。@param path 进程参数。@param argument 合成会话标记。@return 是否匹配。"""
     try:
@@ -589,6 +627,7 @@ def main():
     scenario.add_argument("--tool-policy", choices=("replace", "user_reminder"))
     scenario.add_argument("--recover-pending-tool", action="store_true")
     scenario.add_argument("--output-effort", action="store_true")
+    scenario.add_argument("--history-png", action="store_true")
     args = parser.parse_args()
     if (not Path("/.dockerenv").exists() or {name for _, name in if_nameindex()} != {"lo"}
             or Path("/run/v3/sender.json").exists() or any(Path("/native").glob("*"))):
@@ -599,7 +638,7 @@ def main():
                        restart_history=args.restart_history, text_input=args.text_input,
                        system_policy=args.system_policy, toggle_pending_policy=args.toggle_pending_policy,
                        tool_policy=args.tool_policy, recover_pending=args.recover_pending_tool,
-                       output_effort=args.output_effort)
+                       output_effort=args.output_effort, history_png=args.history_png)
         print(json.dumps(proof, ensure_ascii=False))
 
 

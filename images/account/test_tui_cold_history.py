@@ -219,3 +219,17 @@ class ColdHistoryTests(TestCase):
         self.assertNotEqual(expected.receipt_boundary(), ColdHistory.from_request(self.body).receipt_boundary())
         for output in ({"effort": "unknown"}, {"format": {"type": "json_schema", "schema": {}}}):
             self.assertIsNone(ColdHistory.from_request({**self.body, "output_config": output}))
+
+    def test_only_confirmed_inline_png_enters_native_history(self):
+        """闭合的用户记录可以保留内嵌 PNG。@return 无。"""
+        picture = {"type": "image", "source": {"type": "base64", "media_type": "image/png",
+                  "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j4uoAAAAASUVORK5CYII="}}
+        raw = deepcopy(self.body)
+        raw["messages"][0]["content"] = [{"type": "text", "text": "历史图像"}, picture]
+        self.assertEqual(ColdHistory.from_request(raw).history[0]["content"][-1], picture)
+        self.assertIsNone(ColdHistory.from_request({**raw, "messages": raw["messages"][:1]}))
+        for source in ({"type": "url", "url": "https://example.invalid/picture.png"},
+                       {**picture["source"], "data": "invalid base64"}):
+            with self.subTest(source=source):
+                raw["messages"][0]["content"][-1] = {"type": "image", "source": source}
+                self.assertIsNone(ColdHistory.from_request(raw))
