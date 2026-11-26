@@ -28,7 +28,9 @@ from uuid import UUID, uuid4
 
 from runtime_files import atomic_text
 from tui_capacity import TuiCapacity, TuiCapacityError
-from tui_cold_history import ColdHistory, MCP_SERVER, SIGNED_THINKING_TYPES, tool_result_has_images
+from tui_cold_history import (
+    ColdHistory, MCP_SERVER, SIGNED_THINKING_TYPES, tool_result_has_images, tool_result_is_empty,
+)
 from tui_reconnect import ReceiptCheckpoints, digest
 from tui_input_policy import CONTEXT_BETA, InputRejection, native_input
 from tui_messages import (
@@ -964,12 +966,13 @@ class _Actor:
                     if not self.cold_history.matches_history_cache_markers(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
                             "code": "unsupported_parameter", "message": "CLI 未保留历史缓存标记"}}))
-                    if not (self.recovery_history or self.cold_history).matches_history_tool_images(native):
+                    output_history = self.recovery_history or self.cold_history
+                    if not output_history.matches_history_tool_images(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
                             "code": "unsupported_parameter", "message": "CLI 未保留历史工具结果中的图文"}}))
-                    if not self.cold_history.matches_history_empty_tool_results(native):
+                    if not output_history.matches_history_empty_tool_results(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
-                            "code": "unsupported_parameter", "message": "CLI 未保留已闭合的空工具结果"}}))
+                            "code": "unsupported_parameter", "message": "CLI 未保留空工具结果"}}))
                     if handle.kind == "recovered" and not self.recovery_history.matches_recovered_signatures(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
                             "code": "unsupported_parameter", "message": "CLI 未保留已核对的签名工具历史"}}))
@@ -1633,7 +1636,7 @@ class SessionDriver:
 
         checkpoint = None
         native_checkpoint = None
-        retire_for_images = None
+        retire_for_recovery = None
         if not summary and (returned or reservation["continuation_only"]):
             if not returned:
                 raise ValueError("缺少原轮工具结果")
@@ -1693,11 +1696,13 @@ class SessionDriver:
                         )
                         if not native_body_policy or plan != actor.cold_history or not tool_results_only:
                             raise InputRejection("unsupported_parameter")
-                    if actor.cold_history is not None and any(tool_result_has_images(answer) for answer in answers.values()):
+                    if actor.cold_history is not None and any(
+                        tool_result_has_images(answer) or tool_result_is_empty(answer) for answer in answers.values()
+                    ):
                         checkpoint = self.checkpoints.find(actor_key)
                         if checkpoint is None or checkpoint[4] != actor.receipt_revision or checkpoint[5] is None:
                             raise InputRejection("unrecoverable_tool")
-                        retire_for_images = actor
+                        retire_for_recovery = actor
                     else:
                         handle = _Reserved(actor, "continuation", history, answers, body, stream, frozen, reservation,
                                            active_request, input_observation=input_observation)
@@ -1734,15 +1739,15 @@ class SessionDriver:
             cold = ColdHistory.from_request(body, system_policy, cache_ttl=native_cache_ttl)
         if cold is None and system_policy != "append" and not is_native and checkpoint is None:
             raise InputRejection("unsupported_parameter")
-        if retire_for_images is not None:
-            # 热续轮会移除结果图片。校验完整回执和可恢复历史后，复用同一修订的磁盘恢复入口。
+        if retire_for_recovery is not None:
+            # 热续轮会改写空结果或移除图片。校验完整回执后复用同一修订的磁盘恢复入口。
             with self.lock:
-                with retire_for_images.changed:
-                    if retire_for_images.claim is not None or retire_for_images.receipt_revision != revision:
+                with retire_for_recovery.changed:
+                    if retire_for_recovery.claim is not None or retire_for_recovery.receipt_revision != revision:
                         raise ValueError("原工具回执已经换轮")
                     remaining()
-                    retire_for_images.abort()
-                while self.sessions.get(actor_key) is retire_for_images:
+                    retire_for_recovery.abort()
+                while self.sessions.get(actor_key) is retire_for_recovery:
                     self.lock.wait(min(remaining(), 0.05))
                 if actor_key in self.sessions:
                     raise ValueError("原工具回执已被认领")

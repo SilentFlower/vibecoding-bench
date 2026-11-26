@@ -131,6 +131,11 @@ def tool_result_has_images(block):
                                              for nested in content)
 
 
+def tool_result_is_empty(block):
+    """识别无内容的工具结果。@param block 已核对的工具结果。@return 内容是否缺省、为空串或为空数组。"""
+    return block.get("content", "") in ("", [])
+
+
 def _historical_image_results(rows):
     return [(row["role"], block) for row in rows for block in _blocks(row)
             if block.get("type") == "tool_result" and tool_result_has_images(block)]
@@ -425,10 +430,6 @@ class ColdHistory:
                        and not _result_blocks(block["content"], allow_images=not block.get("is_error", False))
                        for block in content):
                     return None
-                # 已确认的空结果保持原字段形状。新回执沿用现有的缺省值。
-                if index > len(self.history):
-                    content = [{**block, "content": block.get("content", "")} if block["type"] == "tool_result"
-                               else block for block in content]
             if history and history[-1]["role"] == role:
                 history[-1]["content"] += content
             else:
@@ -507,9 +508,9 @@ class ColdHistory:
         return _matches_history_results(native, _historical_image_results(self.history))
 
     def matches_history_empty_tool_results(self, native):
-        """核对已闭合的空结果。@param native CLI 实际正文。@return 原结果形状和工具 ID 是否保留。"""
+        """核对历史及纳入恢复记录的空结果。@param native CLI 实际正文。@return 原结果块是否保留。"""
         expected = [(row["role"], block) for row in self.history for block in _blocks(row)
-                    if block.get("type") == "tool_result" and block.get("content", "") in ("", [])]
+                    if block.get("type") == "tool_result" and tool_result_is_empty(block)]
         return _matches_history_results(native, expected)
 
     def matches_history_cache_markers(self, native):

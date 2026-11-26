@@ -489,15 +489,18 @@ class ColdHistoryTests(TestCase):
                 self.assertIsNone(ColdHistory.from_request(changed))
                 self.assertFalse(plan.matches_history_empty_tool_results(changed))
 
+                new_result = {"type": "tool_result", "tool_use_id": "toolu_new", **fields}
                 continuation = [*body["messages"],
                                 {"role": "assistant", "content": [
                                     {"type": "tool_use", "id": "toolu_new", "name": "LookupNote", "input": {}}]},
-                                {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_new"}]}]
+                                {"role": "user", "content": [new_result]}]
                 resumed = plan.resume_receipts(continuation)
                 self.assertEqual(resumed.history[2]["content"], [result])
-                self.assertEqual(resumed.history[-1]["content"], [
-                    {"type": "tool_result", "tool_use_id": "toolu_new", "content": ""},
-                ])
+                self.assertEqual(resumed.history[-1]["content"], [new_result])
+                modeled = {"messages": deepcopy(resumed.history)}
+                self.assertTrue(resumed.matches_history_empty_tool_results(modeled))
+                modeled["messages"][-1]["content"][0]["content"] = [] if fields.get("content") == "" else ""
+                self.assertFalse(resumed.matches_history_empty_tool_results(modeled))
 
     def test_completed_tool_result_images_keep_content_and_ownership(self):
         """核对旧工具图文的原位置、归属及内嵌来源。@return 无。"""
