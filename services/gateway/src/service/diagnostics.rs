@@ -456,12 +456,16 @@ pub(crate) fn error_stage(stage: &'static str) {
     let _ = CURRENT_TRACE.try_with(|trace| trace.lock().request.error_stage = Some(stage.into()));
 }
 
-/// 关联当前公开请求和账号发送器预留。@param id 网关生成的预留 ID。@return 无。
-pub(super) fn tui_reservation(id: &str) {
+/// 写入隔离验证的单调时钟事件。@param stage 固定阶段。@param id sender 预留 ID。
+/// @param request 仅网关持有的公开请求 ID。@param result 固定阶段结果。@return 无。
+pub(super) fn tui_startup_event(
+    stage: &'static str,
+    id: &str,
+    request: Option<&str>,
+    result: Option<&'static str>,
+) {
     #[cfg(all(target_os = "linux", feature = "v3-verification"))]
-    if var("FLOWER_V2_STARTUP_TRACE").as_deref() == Ok("1")
-        && let Some(request_id) = current_request_id()
-    {
+    if var("FLOWER_V2_STARTUP_TRACE").as_deref() == Ok("1") {
         let mut clock = timespec {
             tv_sec: 0,
             tv_nsec: 0,
@@ -469,13 +473,27 @@ pub(super) fn tui_reservation(id: &str) {
         // 与同一隔离容器中的 Python 探针使用同一个单调时钟。
         if unsafe { clock_gettime(CLOCK_MONOTONIC, &mut clock) } == 0 {
             let ticks = clock.tv_sec as u64 * 1_000_000_000 + clock.tv_nsec as u64;
-            let line = format!(
-                "{}\n",
-                json!({"event": "tui_startup", "stage": "gateway_reservation",
-                "monotonic_ns": ticks, "request_id": request_id, "reservation_id": id})
-            );
+            let mut event = json!({"event": "tui_startup", "stage": stage,
+                "monotonic_ns": ticks, "reservation_id": id});
+            if let Some(request) = request {
+                event["request_id"] = json!(request);
+            }
+            if let Some(result) = result {
+                event["result"] = json!(result);
+            }
+            let line = format!("{event}\n");
             let _ = stderr().lock().write_all(line.as_bytes());
         }
+    }
+    #[cfg(not(all(target_os = "linux", feature = "v3-verification")))]
+    let _ = (stage, id, request, result);
+}
+
+/// 关联当前公开请求和账号发送器预留。@param id 网关生成的预留 ID。@return 无。
+pub(super) fn tui_reservation(id: &str) {
+    #[cfg(all(target_os = "linux", feature = "v3-verification"))]
+    if let Some(request) = current_request_id() {
+        tui_startup_event("gateway_reservation", id, Some(&request), None);
     }
     let _ = CURRENT_TRACE.try_with(|trace| {
         let mut state = trace.lock();

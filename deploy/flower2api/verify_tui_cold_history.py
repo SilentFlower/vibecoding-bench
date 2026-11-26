@@ -465,6 +465,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             tui = {"V3_TUI_SESSION_HOST": "1", "V3_TUI_MANAGED_OAUTH": "1"} if v1_runtime is None else {}
             process = Popen([program], user=1001, group=1001, extra_groups=[], env={
                 **common, **tui, "RUST_LOG": "warn", "V3_SENDER_CONFIG": str(config),
+                "FLOWER_V2_STARTUP_TRACE": str(int(trace_startup)),
             })
             stack.callback(stop, process)
             return process
@@ -892,6 +893,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                     started = monotonic()
                     expired_status, _, expired_request = checked_messages(
                         manage, token, follow, headers, received, "recovered_receipt_ledger_deadline", expected_status=429,
+                        trace_startup=trace_startup,
                     )
                     elapsed_ms = round((monotonic() - started) * 1000)
                     posts_before_retry = len(received)
@@ -920,6 +922,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 binding_file.write_text(json.dumps(mismatched))
                 rejection_status, _, rejected_request = checked_messages(
                     manage, token, follow, headers, received, "recovered_receipt_workspace", expected_status=503,
+                    trace_startup=trace_startup,
                 )
                 assert rejected_request and len(received) == 1
                 evidence = report_request_diagnostics(

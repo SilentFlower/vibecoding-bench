@@ -12,6 +12,7 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::service::diagnostics::tui_startup_event;
 use crate::service::runtime_transport::{TransportBinding, now_ms};
 
 use super::MAX_RECORDS;
@@ -265,7 +266,20 @@ pub(super) async fn consume(
     let id = id.to_owned();
     tokio::task::spawn_blocking(move || {
         let directory = directory(&root)?;
-        let _lock = lock_until(&root, deadline)?;
+        let submitting = matches!(terminal, Terminal::Submitted);
+        if submitting {
+            tui_startup_event("sender_submission_ledger_lock", &id, None, Some("started"));
+        }
+        let lock = lock_until(&root, deadline);
+        if submitting {
+            let result = match &lock {
+                Ok(_) => "acquired",
+                Err(error) if error.kind() == io::ErrorKind::TimedOut => "deadline",
+                Err(_) => "failed",
+            };
+            tui_startup_event("sender_submission_ledger_lock", &id, None, Some(result));
+        }
+        let _lock = lock?;
         let mut ledger = load(&root, account_id, environment_id, None)?;
         let wall_now = now_ms();
         if deadline_ms <= wall_now || Instant::now() >= deadline {

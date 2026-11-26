@@ -24,6 +24,7 @@ use uuid::Uuid;
 
 use crate::error::AppError;
 use crate::model::account::TuiSystemPromptPolicy;
+use crate::service::diagnostics::tui_startup_event;
 use crate::service::gateway::is_passive_usage_header;
 use crate::service::native_capture::tui_wire::CaptureJob;
 use crate::service::native_capture::{TuiCaptureInput, tui_writer};
@@ -1111,6 +1112,9 @@ impl TuiSender {
         capture: Option<(PathBuf, TuiCaptureInput)>,
     ) -> Result<Response, AppError> {
         let identity = Identity::decode(headers, binding)?;
+        let reservation_id = identity.reservation_id.clone();
+        let observe = |stage, result| tui_startup_event(stage, &reservation_id, None, Some(result));
+        observe("sender_private_send", "entered");
         let (deadline, _) = identity.deadlines(binding, now_ms())?;
         if let Err(error) = setting(config) {
             return Ok(stage_response(error, TUI_SENDER_CONFIG));
@@ -1143,6 +1147,7 @@ impl TuiSender {
             })
             .transpose()?;
         let oauth_file = oauth_file_payload(headers)?;
+        observe("sender_send_claim", "started");
         let (slot, mut connection, workspace, signature_repair, cli_submission) = match self.claim(
             binding,
             &identity,
@@ -1150,13 +1155,21 @@ impl TuiSender {
             account_token.is_some(),
             oauth_file.is_some(),
         ) {
-            Ok(claimed) => claimed,
+            Ok(claimed) => {
+                observe("sender_send_claim", "accepted");
+                claimed
+            }
             Err(error @ AppError::ServiceUnavailable(_)) => {
+                observe("sender_send_claim", "rejected");
                 return Ok(stage_response(error, TUI_SEND_CLAIM));
             }
-            Err(error) => return Err(error),
+            Err(error) => {
+                observe("sender_send_claim", "rejected");
+                return Err(error);
+            }
         };
         // 先同步提交事实。进程退出或回包丢失后，重放的 prepare 与 send 仍无法触发第二次提交。
+        observe("sender_submission_ledger", "started");
         let committed = timeout_at(
             deadline,
             submission_log::consume(
@@ -1171,8 +1184,12 @@ impl TuiSender {
         .await
         .unwrap_or_else(|_| Err(io::ErrorKind::TimedOut.into()));
         let committed = match committed {
-            Ok(committed) => committed,
+            Ok(committed) => {
+                observe("sender_submission_ledger", if committed { "committed" } else { "already_consumed" });
+                committed
+            }
             Err(error) => {
+                observe("sender_submission_ledger", if error.kind() == io::ErrorKind::TimedOut { "deadline" } else { "failed" });
                 let error = match error.kind() {
                     io::ErrorKind::TimedOut => limited(),
                     kind => {
@@ -1253,22 +1270,36 @@ impl TuiSender {
             captured: capture.is_some() || wire_captured,
         };
         if let Some(candidate) = workspace {
+            observe("sender_workspace_bind", "started");
             let root = self.submission_storage.clone();
             let launch = tokio::task::spawn_blocking(move || candidate.bind(&root, &identity));
             let resolved = timeout_at(deadline, async { launch.await.map_err(|_| unavailable())? })
                 .await
                 .unwrap_or_else(|_| Err(limited()));
             command["workspace"] = match resolved {
-                Ok(workspace) if Instant::now() < deadline => workspace,
-                Ok(_) => return Ok(stage_response(limited(), TUI_WORKSPACE_BIND)),
+                Ok(workspace) if Instant::now() < deadline => {
+                    observe("sender_workspace_bind", "bound");
+                    workspace
+                }
+                Ok(_) => {
+                    observe("sender_workspace_bind", "deadline");
+                    return Ok(stage_response(limited(), TUI_WORKSPACE_BIND));
+                }
                 Err(error @ AppError::ServiceUnavailable(_))
                 | Err(error @ AppError::AdmissionLimited { .. }) => {
+                    observe("sender_workspace_bind", if matches!(error, AppError::AdmissionLimited { .. }) { "deadline" } else { "failed" });
                     // 预留已认领，但事件源还没收到 send。网关可以归还原回执。
                     return Ok(stage_response(error, TUI_WORKSPACE_BIND));
                 }
-                Err(error) => return Err(error),
+                Err(error) => {
+                    observe("sender_workspace_bind", "rejected");
+                    return Err(error);
+                }
             };
+        } else {
+            observe("sender_workspace_bind", "skipped");
         }
+        observe("sender_unix_send", "started");
         let reply = timeout(IO_TIMEOUT, async {
             write_json(&mut connection, &command).await?;
             if let Some(file) = &oauth_file {
