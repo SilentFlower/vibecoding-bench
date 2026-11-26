@@ -166,8 +166,14 @@ impl Candidate {
     /// @param root 账号私有卷。@param identity 已校验的账号、主体与会话。@return 交给源的启动资料位置及原生会话号。
     pub(super) fn bind(self, root: &Path, identity: &Identity) -> Result<Value, AppError> {
         let unavailable = |_| AppError::ServiceUnavailable("V2 工作区绑定存储不可用".into());
+        let missing = || AppError::BadRequest("V2 原会话缺少可核对的工作区绑定".into());
         submission_log::directory(root).map_err(unavailable)?;
-        let _lock = submission_log::lock(root).map_err(unavailable)?;
+        // 已发布的绑定只在首次创建时原子写入。续轮读取不应等待不相关的提交或取消写入账本。
+        let _lock = self
+            .new_turn
+            .then(|| submission_log::lock(root))
+            .transpose()
+            .map_err(unavailable)?;
         let scope = (
             identity.account_id,
             &identity.environment_id,
@@ -177,7 +183,17 @@ impl Candidate {
         let session = self.branch.as_deref().unwrap_or(&identity.session_id);
         let session_key = scoped_key((scope, session));
         let base = root.join("tui-workspaces");
-        let directory = create_private(&base).map_err(unavailable)?;
+        let directory = if self.new_turn {
+            create_private(&base).map_err(unavailable)?
+        } else {
+            submission_log::directory(&base).map_err(|error| {
+                if error.kind() == io::ErrorKind::NotFound {
+                    missing()
+                } else {
+                    unavailable(error)
+                }
+            })?
+        };
         let path = base.join(format!("{session_key}.json"));
         let file = OpenOptions::new()
             .read(true)
@@ -206,9 +222,7 @@ impl Candidate {
                 true,
             ),
             Err(e) if e.kind() == io::ErrorKind::NotFound => {
-                return Err(AppError::BadRequest(
-                    "V2 原会话缺少可核对的工作区绑定".into(),
-                ));
+                return Err(missing());
             }
             Err(e) => return Err(unavailable(e)),
         };
@@ -298,6 +312,30 @@ mod tests {
         for field in ["native_session_id", "work_dir", "binding_file"] {
             assert_ne!(child[field], parent[field]);
         }
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// 既有会话读回独立于提交账本写锁，且始终核对原主体。@return 无。
+    #[test]
+    fn workspace_resume_reads_published_binding_while_ledger_is_locked() {
+        let root = std::env::temp_dir().join(format!("workspace-{}", Uuid::new_v4()));
+        DirBuilder::new().mode(0o700).create(&root).unwrap();
+        let identity = turn(1, "same");
+        let initial = Candidate::from_request(b"{}", true, None)
+            .unwrap()
+            .bind(&root, &identity)
+            .unwrap();
+        let path = initial["binding_file"].as_str().unwrap();
+        let before = fs::read(path).unwrap();
+        let lock = submission_log::lock(&root).unwrap();
+        let resume = || Candidate::from_request(b"{}", false, None).unwrap();
+        assert_eq!(resume().bind(&root, &identity).unwrap(), initial);
+        assert!(matches!(
+            resume().bind(&root, &turn(2, "same")),
+            Err(AppError::BadRequest(_))
+        ));
+        assert_eq!(fs::read(path).unwrap(), before);
+        drop(lock);
         fs::remove_dir_all(&root).unwrap();
     }
 
