@@ -41,8 +41,8 @@ use crate::service::runtime_transport::{
 };
 use crate::service::runtime_transport::{
     TUI_CAPTURE, TUI_CLI_SUBMISSION, TUI_ERROR_SOURCE, TUI_FINAL_CAPTURE, TUI_MODEL_ACCEPT_OMITTED,
-    TUI_MODEL_HEADER_POLICY, TUI_REPAIR_ATTEMPT, TUI_SIGNATURE_REPAIR, TUI_SYSTEM_PROMPT_POLICY,
-    TuiReceiptProbe,
+    TUI_MODEL_HEADER_POLICY, TUI_REPAIR_ATTEMPT, TUI_SIGNATURE_REPAIR, TUI_SUBMISSION_LEDGER,
+    TUI_SYSTEM_PROMPT_POLICY, TuiReceiptProbe,
 };
 use crate::service::session_policy_block;
 use crate::service::tui_sender_response;
@@ -1118,12 +1118,35 @@ impl TuiSender {
                 binding,
                 &identity.reservation_id,
                 identity.deadline_unix_ms,
+                deadline.into_std(),
                 submission_log::Terminal::Submitted,
             ),
         )
         .await
-        .map_err(|_| limited())?
-        .map_err(|_| unavailable())?;
+        .unwrap_or_else(|_| Err(io::ErrorKind::TimedOut.into()));
+        let committed = match committed {
+            Ok(committed) => committed,
+            Err(error) => {
+                let error = match error.kind() {
+                    io::ErrorKind::TimedOut => limited(),
+                    kind => {
+                        tracing::warn!(
+                            account_id = binding.account_id,
+                            ?kind,
+                            "V2 发送前写入提交账本失败"
+                        );
+                        unavailable()
+                    }
+                };
+                // 账本失败时尚未向事件源发送 send，网关可以安全归还原工具回执。
+                let mut response = error.into_response();
+                response.headers_mut().insert(
+                    TUI_ERROR_SOURCE,
+                    HeaderValue::from_static(TUI_SUBMISSION_LEDGER),
+                );
+                return Ok(response);
+            }
+        };
         if !committed {
             return Err(consumed());
         }
@@ -1623,6 +1646,7 @@ impl TuiSender {
                     binding,
                     &identity.reservation_id,
                     identity.deadline_unix_ms,
+                    replay_until.into_std(),
                     submission_log::Terminal::Cancelled,
                 ),
             )
@@ -3287,6 +3311,106 @@ mod tests {
         assert_eq!(source.sender.active(), 0);
     }
 
+    /// 合法恢复续轮沿原截止等待账本锁，锁内提交后才通知事件源。@return 无。
+    #[tokio::test]
+    async fn recovered_send_waits_for_ledger_within_its_deadline() {
+        let source = Source::new();
+        let mut identity = source.identity();
+        identity.continuation_only = true;
+        let (prepared, mut socket) = tokio::join!(source.prepare(&identity, b"{}"), async {
+            let (mut socket, mut reply) = source.receive("prepare").await;
+            socket.read_exact(&mut [0; 2]).await.unwrap();
+            reply["kind"] = json!("recovered");
+            write_json(&mut socket, &reply).await.unwrap();
+            socket
+        });
+        assert_eq!(prepared.unwrap().status(), StatusCode::NO_CONTENT);
+        let lock = submission_log::lock(&source.sender.submission_storage).unwrap();
+        let (sent, ()) = tokio::join!(source.send(&identity), async {
+            assert!(
+                timeout(Duration::from_millis(1250), read_json(&mut socket))
+                    .await
+                    .is_err()
+            );
+            drop(lock);
+            let command = read_json(&mut socket).await.unwrap();
+            assert_eq!(command["action"], "send");
+            assert_eq!(command["reservation_id"], identity.reservation_id);
+            assert!(
+                submission_log::was_consumed(
+                    &source.sender.submission_storage,
+                    &source.binding,
+                    Some(&identity.reservation_id),
+                )
+                .await
+                .unwrap()
+            );
+            write_json(
+                &mut socket,
+                &json!({"status":200,"content_type":"text/event-stream"}),
+            )
+            .await
+            .unwrap();
+            socket.get_mut().write_u32(0).await.unwrap();
+        });
+        assert_eq!(sent.unwrap().status(), StatusCode::OK);
+        assert!(matches!(
+            source.send(&identity).await,
+            Err(AppError::BadRequest(_))
+        ));
+    }
+
+    /// 写账本失败有独立阶段，私有事件源在该失败中收不到发送指令。@return 无。
+    #[tokio::test]
+    async fn ledger_failure_stops_before_source_submission() {
+        let source = Source::new();
+        let identity = source.identity();
+        let (prepared, mut socket) = tokio::join!(source.prepare(&identity, b"{}"), async {
+            let (mut socket, mut reply) = source.receive("prepare").await;
+            socket.read_exact(&mut [0; 2]).await.unwrap();
+            reply["kind"] = json!("new");
+            write_json(&mut socket, &reply).await.unwrap();
+            socket
+        });
+        assert_eq!(prepared.unwrap().status(), StatusCode::NO_CONTENT);
+        let path = source
+            .sender
+            .submission_storage
+            .join("tui-v2-submissions.lock");
+        std::fs::write(&path, b"").unwrap();
+        set_permissions(&path, Permissions::from_mode(0o644)).unwrap();
+        let response = source.send(&identity).await.unwrap();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(response.headers()[TUI_ERROR_SOURCE], TUI_SUBMISSION_LEDGER);
+        assert_eq!(socket.read(&mut [0]).await.unwrap(), 0);
+        assert_eq!(source.sender.active(), 0);
+    }
+
+    /// 等锁耗尽本次预算时，截止后释放锁也不会补写提交事实。@return 无。
+    #[tokio::test]
+    async fn ledger_lock_deadline_leaves_no_submission() {
+        let source = Source::new();
+        let root = &source.sender.submission_storage;
+        let lock = submission_log::lock(root).unwrap();
+        let identity = source.identity();
+        let result = submission_log::consume(
+            root,
+            &source.binding,
+            &identity.reservation_id,
+            identity.deadline_unix_ms,
+            (Instant::now() + Duration::from_millis(30)).into_std(),
+            submission_log::Terminal::Submitted,
+        )
+        .await;
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::TimedOut);
+        drop(lock);
+        assert!(
+            !submission_log::was_consumed(root, &source.binding, Some(&identity.reservation_id))
+                .await
+                .unwrap()
+        );
+    }
+
     /// 两种终态共享文件锁。写入新终态时清除两类已过期记录。@return 无。
     #[tokio::test]
     async fn send_and_cancel_share_durable_admission_and_expiry_cleanup() {
@@ -3312,6 +3436,7 @@ mod tests {
                 &source.binding,
                 &identity.reservation_id,
                 identity.deadline_unix_ms,
+                (Instant::now() + Duration::from_secs(5)).into_std(),
                 terminal,
             )
         };

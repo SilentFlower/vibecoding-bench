@@ -2596,6 +2596,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `verify_tui_cold_history.py --system-policy` 从管理 API 保存并读回动作，按公开 Messages 的模型实收核对三种落点。`--tool-policy` 对照替换和用户提醒的工具往返。`--toggle-pending-policy` 在原工具等待时更改动作，核对回执隔离及原轮指令。
 - `verify_tui_cold_history.py --recover-pending-tool` 结束唯一等待中的真实 CLI 并重启其账号发送器。修改账号动作和客户端指令后，原回执仅继续其冻结策略，恢复模型步骤的正文来自真实 CLI。
 - 公开首轮和原工具回执的意外状态或断连先写出 HTTP 状态、请求 ID、夹具阶段与隔离模型收件，再在网关退出前读取对应请求的诊断阶段及所属尝试。无响应头时只列同一合成会话和本次时间窗口内的候选。失败证据输出到 stderr，原失败仍使验收退出。
+- 发送器在向本机事件源发出 `send` 之前同步写入提交账本。账本终态写入沿原预留的单调截止等待文件锁。发送前账本拒绝的私有回包标为 `tui_submission_ledger`，网关记录同名诊断阶段并归还原工具回执。将 `--recovery-ledger-contention` 与 `--recover-pending-tool` 同用，核对持锁两秒后合法回执完成、模型总收件两次、原归档保留。
 - `verify_tui_cold_history.py --output-effort` 核对四档强度、显式禁用思考及不同 `max_tokens` 的公开入口实收。`--recover-pending-tool` 核对原轮强度与拒绝改写。
 - `verify_tui_cold_history.py --history-png` 核对追加、用户提醒两种动作下的原角色、历史图像字节和单次当前问题。
 - `verify_tui_cold_history.py --history-images` 在同一旧用户消息中核对 PNG、JPEG、GIF、WebP 的顺序和原始数据。

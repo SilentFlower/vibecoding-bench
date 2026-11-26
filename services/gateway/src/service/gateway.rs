@@ -3026,6 +3026,17 @@ impl GatewayService {
                             trace.transport_error();
                         }
                     })?;
+                let ledger_rejected_before_model = matches!(
+                    response.status(),
+                    StatusCode::TOO_MANY_REQUESTS | StatusCode::SERVICE_UNAVAILABLE
+                ) && runtime_transport::tui_projection_marker(
+                    response.headers(),
+                    runtime_transport::TUI_ERROR_SOURCE,
+                    runtime_transport::TUI_SUBMISSION_LEDGER,
+                );
+                if ledger_rejected_before_model {
+                    diagnostics::error_stage(runtime_transport::TUI_SUBMISSION_LEDGER);
+                }
                 let file_rejected_before_model = failed_token.is_some()
                     && response.status() == StatusCode::SERVICE_UNAVAILABLE
                     && runtime_transport::tui_projection_marker(
@@ -3033,11 +3044,11 @@ impl GatewayService {
                         runtime_transport::TUI_ERROR_SOURCE,
                         "oauth_file_before_model",
                     );
-                if file_rejected_before_model
+                if (file_rejected_before_model || ledger_rejected_before_model)
                     && let Some(turn) = &turn
                     && let Err(error) = turn.release_tui_before_model().await
                 {
-                    warn!(account_id = account.id, %error, "V2 凭据拒绝后的回执待对账");
+                    warn!(account_id = account.id, %error, "V2 发送前拒绝后的回执待对账");
                 }
                 if !prepared.repair_pending {
                     runtime_transport::recover_tui_oauth_after_response(
@@ -3059,7 +3070,7 @@ impl GatewayService {
                         capture_state,
                         started,
                         fixture,
-                        file_rejected_before_model,
+                        file_rejected_before_model || ledger_rejected_before_model,
                         false,
                     )
                     .await?;
@@ -3142,6 +3153,7 @@ impl GatewayService {
                 }
                 let codings = response_content_codings(response.headers());
                 if response.status().is_client_error()
+                    && !ledger_rejected_before_model
                     && let Some(turn) = turn.as_mut()
                     && let Err(error) = turn.retire_v2_rejection().await
                 {
@@ -4330,11 +4342,11 @@ impl GatewayService {
         capture_state: Option<&'static str>,
         started: std::time::Instant,
         fixture: bool,
-        file_rejected_before_model: bool,
+        rejected_before_model: bool,
         repaired: bool,
     ) -> Result<Response, AppError> {
         // 账号端在模型提交前终止时，这次预留不会再产生 TLS 快照。
-        let capture_state = if capture_state == Some("queued") && file_rejected_before_model {
+        let capture_state = if capture_state == Some("queued") && rejected_before_model {
             Some("not_submitted")
         } else if capture_state == Some("queued") {
             match response

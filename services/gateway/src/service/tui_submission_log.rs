@@ -136,7 +136,12 @@ fn load(path: &Path, account_id: i64, environment_id: String) -> io::Result<Ledg
     Ok(ledger)
 }
 
+/// 取得用于工作区发布的文件锁。@param root 私有目录。@return 关闭时释放锁的文件。
 pub(super) fn lock(root: &Path) -> io::Result<File> {
+    lock_until(root, Instant::now() + Duration::from_secs(1))
+}
+
+fn lock_until(root: &Path, deadline: Instant) -> io::Result<File> {
     let file = OpenOptions::new()
         .read(true)
         .write(true)
@@ -145,8 +150,11 @@ pub(super) fn lock(root: &Path) -> io::Result<File> {
         .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
         .open(root.join(LOCK))?;
     private_file(&file)?;
-    let deadline = Instant::now() + Duration::from_secs(1);
     loop {
+        let remaining = deadline
+            .checked_duration_since(Instant::now())
+            .filter(|remaining| !remaining.is_zero())
+            .ok_or(io::ErrorKind::TimedOut)?;
         if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0 {
             return Ok(file);
         }
@@ -154,11 +162,10 @@ pub(super) fn lock(root: &Path) -> io::Result<File> {
         if !matches!(
             error.kind(),
             io::ErrorKind::WouldBlock | io::ErrorKind::Interrupted
-        ) || Instant::now() >= deadline
-        {
+        ) {
             return Err(error);
         }
-        thread::sleep(Duration::from_millis(5));
+        thread::sleep(remaining.min(Duration::from_millis(5)));
     }
 }
 
@@ -209,13 +216,15 @@ pub(super) async fn was_consumed(
 }
 
 /// 以互斥方式原子保存并同步预留终态。@param root 私有持久目录。
-/// @param binding 当前账号绑定。@param id 原预留 ID。@param deadline_ms 原截止。
+/// @param binding 当前账号绑定。@param id 原预留 ID。@param deadline_ms 原信封截止。
+/// @param deadline 当前 sender 对本次操作的单调截止。
 /// @param terminal 发送认领或取消。@return 此次是否首次消费该 ID。
 pub(super) async fn consume(
     root: &Path,
     binding: &TransportBinding,
     id: &str,
     deadline_ms: u64,
+    deadline: Instant,
     terminal: Terminal,
 ) -> io::Result<bool> {
     let root = root.to_owned();
@@ -224,11 +233,11 @@ pub(super) async fn consume(
     let id = id.to_owned();
     tokio::task::spawn_blocking(move || {
         let directory = directory(&root)?;
-        let _lock = lock(&root)?;
+        let _lock = lock_until(&root, deadline)?;
         let mut ledger = load(&root, account_id, environment_id)?;
         let wall_now = now_ms();
-        if deadline_ms <= wall_now {
-            return Err(invalid());
+        if deadline_ms <= wall_now || Instant::now() >= deadline {
+            return Err(io::ErrorKind::TimedOut.into());
         }
         ledger.prune(wall_now);
         if ledger.deadline(&id).is_some() {

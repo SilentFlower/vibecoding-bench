@@ -91,6 +91,7 @@ const TUI_ACCOUNT_MODEL: &str = "x-v3-tui-account-model";
 pub(super) const TUI_SIGNATURE_REPAIR: &str = "x-v3-tui-signature-repair";
 pub(super) const TUI_REPAIR_ATTEMPT: &str = "x-v3-tui-repair-attempt";
 pub(super) const TUI_ERROR_SOURCE: &str = "x-v3-tui-error-source";
+pub(super) const TUI_SUBMISSION_LEDGER: &str = "tui_submission_ledger";
 pub(super) const TUI_JSON_PROJECTION_V1: &str = "gateway-json-v1";
 pub(super) const TUI_SSE_PROJECTION_HEADER: &str = "x-v3-tui-sse-projection";
 pub(super) const TUI_SSE_PROJECTION_V1: &str = "gateway-sse-v1";
@@ -1712,6 +1713,7 @@ pub(super) async fn tui_public_response(
     let retry_after = (response.status() == StatusCode::TOO_MANY_REQUESTS
         && (tui_projection_marker(headers, TUI_ERROR_SOURCE, "local_provider_http")
             || tui_projection_marker(headers, TUI_ERROR_SOURCE, "managed_oauth_http")
+            || tui_projection_marker(headers, TUI_ERROR_SOURCE, TUI_SUBMISSION_LEDGER)
             || tui_projection_marker(headers, TUI_ERROR_SOURCE, "local_provider_backoff")))
     .then(|| tui_retry_seconds(headers))
     .flatten()

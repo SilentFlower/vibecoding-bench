@@ -4,6 +4,7 @@ import argparse
 from base64 import b64encode
 from contextlib import ExitStack, closing
 from datetime import datetime, timezone
+from fcntl import LOCK_EX, flock
 from hashlib import sha256
 from http.client import HTTPConnection, HTTPException
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -21,7 +22,7 @@ from struct import pack
 from subprocess import PIPE, Popen, run
 from sys import executable, stderr
 from tempfile import TemporaryDirectory
-from threading import Event
+from threading import Event, Timer
 from time import monotonic, sleep, time_ns
 from urllib.parse import parse_qs, urlencode, urlsplit
 from uuid import uuid4
@@ -162,7 +163,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            toggle_pending_policy=False, tool_policy=None, recover_pending=False, output_effort=False,
            history_png=False, history_images=False, history_tool_blocks=False, previous=None, failure_boundaries=False,
            current_text_blocks=False, signed_tool_history=False, split_history_tools=False, v1_runtime=None,
-           parallel_tools=False, reconnect_tool_stream=False, current_images=False, auto_tool_choice=False):
+           parallel_tools=False, reconnect_tool_stream=False, current_images=False, auto_tool_choice=False,
+           recovery_ledger_contention=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -184,6 +186,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param reconnect_tool_stream 是否在真实续轮流中断开再接回。
     @param current_images 是否用本轮原生图文替换纯文本问题。
     @param auto_tool_choice 是否核对显式自动选择和并行工具。
+    @param recovery_ledger_contention 是否在提交原回执时短暂占用账号账本锁。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -584,6 +587,13 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                                  received, finish_stream, callbacks)
             verify_model(received[:2], policy="append", old_content=old_result, current_text_blocks=current_text_blocks)
             return proof
+        if recovery_ledger_contention:
+            # 在合法回执进入 sender 前持锁，覆盖旧固定一秒等待超时的区间。
+            lock = stack.enter_context(Path("/native/tui-v2-submissions.lock").open("rb"))
+            flock(lock, LOCK_EX)
+            release_lock = Timer(2, lock.close)
+            stack.callback(release_lock.cancel)
+            release_lock.start()
         expected_status = 422 if signed_tool_history and recover_pending else 200
         status, raw, continuation_request_id = checked_messages(
             manage, token, follow, headers, received, "recovered_receipt" if recover_pending else "receipt",
@@ -714,6 +724,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                               "old_session_id": original_id, "recovered_session_id": restored_id,
                                               "original_history_preserved": True,
                                               "continue_prompt_count": continue_prompt_count}
+            if recovery_ledger_contention:
+                assert lock.closed
+                proof["recovered_pending_tool"]["ledger_lock_delay_seconds"] = 2
         if current_images and not recover_pending and not restart_history:
             proof["image_only"] = verify_image_only_requests(
                 manage, token, account_token, headers, received,
@@ -1404,6 +1417,7 @@ def main():
     parser.add_argument("--current-images", action="store_true")
     parser.add_argument("--auto-tool-choice", action="store_true")
     parser.add_argument("--signed-tool-history", action="store_true")
+    parser.add_argument("--recovery-ledger-contention", action="store_true")
     scenario = parser.add_mutually_exclusive_group()
     scenario.add_argument("--restart-history", action="store_true")
     scenario.add_argument("--text-input", action="store_true")
@@ -1424,6 +1438,8 @@ def main():
     scenario.add_argument("--failure-boundaries", action="store_true")
     scenario.add_argument("--v1-runtime", type=Path)
     args = parser.parse_args()
+    if args.recovery_ledger_contention and (not args.recover_pending_tool or args.signed_tool_history):
+        parser.error("--recovery-ledger-contention 需要可提交的 --recover-pending-tool 原回执")
     if (not Path("/.dockerenv").exists() or {name for _, name in if_nameindex()} != {"lo"}
             or Path("/run/v3/sender.json").exists() or any(Path("/native").glob("*"))):
         raise RuntimeError("请在空白的 docker --network none 账号容器中运行")
@@ -1448,7 +1464,8 @@ def main():
                        signed_tool_history=args.signed_tool_history, split_history_tools=args.split_history_tools,
                        v1_runtime=args.v1_runtime, parallel_tools=args.parallel_new_tools,
                        reconnect_tool_stream=args.reconnect_tool_stream, current_images=args.current_images,
-                       auto_tool_choice=args.auto_tool_choice)
+                       auto_tool_choice=args.auto_tool_choice,
+                       recovery_ledger_contention=args.recovery_ledger_contention)
         print(json.dumps(proof, ensure_ascii=False))
 
 
