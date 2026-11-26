@@ -321,7 +321,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            auxiliary_mode=None,
            auxiliary_kind="title", auxiliary_sample=None, agent_progress=None, stock_client=False,
            cancel_and_change_question=False, oauth_rotation=False, provider_quota=None, slow_tool_stream=False,
-           model_connection_contract=None):
+           model_connection_contract=None, external_signed_history=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -348,6 +348,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param reconnect_tool_stream 是否在真实续轮流中断开再接回。
     @param slow_tool_stream 是否在原公开连接上慢读真实续轮，核对独立用量。
     @param model_connection_contract 可选，验证模型连接复用、模型端关闭或 sender 重启后的连接归属。
+    @param external_signed_history 是否核对普通客户端提交的外部签名历史。
     @param current_images 是否用本轮原生图文替换纯文本问题。
     @param current_image_ending 本轮九块图文以文字或图片结尾。
     @param auto_tool_choice 原请求中自动选择的字段形状。
@@ -397,7 +398,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         directory.mkdir(mode=0o700, parents=True, exist_ok=True)
         os.chown(directory, 1001, 1001)
     inspect_model_body = (cache_markers or message_system_roles or thinking_display_model or structured_output
-                          or forced_tool_choice or no_tool_choice or disable_parallel_tool_use or provider_quota)
+                          or forced_tool_choice or no_tool_choice or disable_parallel_tool_use or provider_quota
+                          or external_signed_history)
     if inspect_model_body and v1_runtime is None:
         MODEL_BODY_TRACE.touch(mode=0o600, exist_ok=False)
         os.chown(MODEL_BODY_TRACE, 1001, 1001)
@@ -852,6 +854,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             return {**proof, "active_quota_queries": len(quota_reads)}
         if structured_output:
             return verify_structured_output(manage, token, identifier, received)
+        if external_signed_history:
+            return verify_external_signed_history(manage, token, identifier, received, sender_state_after_failure)
         if no_tool_choice:
             return verify_no_tool_choice(manage, token, identifier, received)
         if disable_parallel_tool_use:
@@ -2780,6 +2784,77 @@ def verify_provider_quota(manage, token, identifier, received, quota_windows, se
     return {"cases": cases, "stream": stream, "model_posts": len(received), "wire_final": "unavailable"}
 
 
+def verify_external_signed_history(manage, token, identifier, received, sender_status):
+    """核对普通客户端带外部签名历史的当前兼容入口。
+    @param manage 管理入口。@param token 合成调用方。@param identifier 合成账号。
+    @param received 隔离模型实收。@param sender_status 失败后读取 sender。@return 按请求关联的证据。
+    """
+    question = "请直接确认这条合成历史。"
+    old_call = {"type": "tool_use", "id": PAST_ID, "name": "PreviousNote", "input": ARGS}
+    old_result = {"type": "tool_result", "tool_use_id": PAST_ID, "is_error": True, "content": "合成历史错误。\n第二行。"}
+    cases = {}
+    for policy in ("append", "replace", "user_reminder"):
+        account = manage("PUT", f"accounts/{identifier}", {"client_system_prompt_policy": policy})
+        assert account["client_system_prompt_policy"] == policy
+        for label, signature in (("unsigned", None), ("thinking", SIGNED_THINKING),
+                                 ("redacted_thinking", {"type": "redacted_thinking", "data": "c3ludGhldGlj"})):
+            blocks_before_result = [signature, old_call] if signature else [old_call]
+            body = {"model": MODEL, "max_tokens": 128, "system": SYSTEM[0], "stream": False, "messages": [
+                {"role": "user", "content": "先查询旧合成便签。"},
+                {"role": "assistant", "content": blocks_before_result},
+                {"role": "user", "content": [old_result]},
+                {"role": "assistant", "content": "旧合成便签查询已经结束。"},
+                {"role": "user", "content": question},
+            ]}
+            headers = {"User-Agent": "flower2api-external-history-fixture/1", "x-session-id": str(uuid4())}
+            phase = f"external_signature_{policy}_{label}"
+            expected = 200 if signature is None or policy == "append" else 422
+            before = len(received)
+            status, raw, request_id = checked_messages(
+                manage, token, body, headers, received, phase, expected_status=expected, trace_startup=True,
+                sender_status=sender_status,
+            )
+            reservation, record, claims = cache_marker_claims(manage, request_id)
+            attempts = manage("GET", "request-diagnostics/" + request_id)["attempts"]
+            reply = json.loads(raw)
+            case = {"http_status": status, "request_id": request_id, "reservation_id": reservation,
+                    "model_posts": len(received) - before, "attempt_count": record["attempt_count"],
+                    "ingress_body_sha256": sha256(encoded(body)).hexdigest()}
+            cases[phase] = case
+            if expected == 422:
+                assert reply["error"]["code"] == "unsupported_parameter", (phase, reply)
+                assert not (claims or attempts or case["attempt_count"] or case["model_posts"]), (phase, case)
+                case["error_code"] = reply["error"]["code"]
+                continue
+            ((digest, model, _),), (claim,), (attempt,) = received[before:], claims, attempts
+            from_cli = signature is None
+            source = "interactive_cli" if from_cli else "account_sender"
+            assert case["attempt_count"] == case["model_posts"] == 1 and attempt["attempt_id"] == reservation
+            assert attempt["context"]["tui_body_source"] == source, (phase, attempt)
+            assert claim["from_interactive_cli"] is claim["uses_native_history"] is from_cli, (phase, claim)
+            assert claim["sha256"] == digest and claim["cli_sha256"], (phase, claim)
+            assert (claim["cli_sha256"] == digest) is from_cli, (phase, claim)
+            assert find_blocks(model, "id", PAST_ID) == [("assistant", old_call)]
+            assert find_blocks(model, "tool_use_id", PAST_ID) == [("user", old_result)]
+            (old_turn,) = [blocks(row) for row in model["messages"] if any(b.get("id") == PAST_ID for b in blocks(row))]
+            assert [block for block in old_turn if block["type"] != "text"] == blocks_before_result, (phase, old_turn)
+            signed_blocks = [(row["role"], block) for row in model["messages"] for block in blocks(row)
+                             if block["type"] in ("thinking", "redacted_thinking")]
+            assert signed_blocks == ([("assistant", signature)] if signature else []), (phase, signed_blocks)
+            texts = [b.get("text", "") for row in model["messages"] if row["role"] == "user" for b in blocks(row)]
+            assert sum(text.count(question) for text in texts) == 1, (phase, texts)
+            system = model["system"]
+            system_texts = [system] if isinstance(system, str) else [block["text"] for block in system]
+            reminder = policy == "user_reminder"
+            assert sum(text.count(SYSTEM[0]) for text in texts) == int(reminder), (phase, texts)
+            assert sum(text.count(SYSTEM[0]) for text in system_texts) == int(not reminder), (phase, system_texts)
+            assert reply["stop_reason"] == "end_turn" and reply["content"] == [{"type": "text", "text": FINAL}]
+            case.update(provider_path=source, model_body_sha256=digest, cli_body_sha256=claim["cli_sha256"],
+                        observed_signed_blocks=signed_blocks, old_tool_id=PAST_ID, old_tool_result=old_result)
+    assert len(received) == 5 and not any(path.is_file() for path in Path("/flows/api").rglob("*"))
+    return {"cases": cases, "model_posts": len(received), "historical_tool_executions": 0, "wire_final": "unavailable"}
+
+
 def verify_disable_parallel_tool_use(manage, token, identifier, received, sender_status):
     """核对禁并行、普通选择及账号策略的能力回报。
     @param manage 管理入口。@param token 调用方。@param identifier 合成账号 ID。
@@ -3875,6 +3950,8 @@ def main():
     scenario.add_argument("--initial-idle-model-connection", action="store_true")
     scenario.add_argument("--output-effort", action="store_true")
     scenario.add_argument("--structured-output-contract", action="store_true")
+    scenario.add_argument("--external-signed-history-contract", action="store_true",
+                          help="核对普通客户端提交的外部签名历史")
     scenario.add_argument("--forced-tool-choice-contract",
                           choices=("live", "restart", "restart-metadata-only", "restart-closed-metadata-only"))
     scenario.add_argument("--no-tool-choice-contract", action="store_true")
@@ -3938,7 +4015,7 @@ def main():
     previous = args.mixed_release
     cache_markers = args.cache_markers or args.cache_marker_capabilities is not None
     trace_startup = (args.initial_idle_model_connection or args.trace_initial_startup or args.trace_recovery_resend or cache_markers
-                     or args.model_connection_contract is not None
+                     or args.model_connection_contract is not None or args.external_signed_history_contract
                      or args.recovery_readiness_rejection
                      or args.structured_output_contract or bool(args.forced_tool_choice_contract) or args.no_tool_choice_contract
                      or args.disable_parallel_tool_use_contract or bool(args.oauth_rotation or args.provider_quota)
@@ -3966,6 +4043,7 @@ def main():
                        recover_pending=(args.recover_pending_tool or args.oauth_rotation == "restart"
                                         or args.model_connection_contract == "restart"),
                        model_connection_contract=args.model_connection_contract,
+                       external_signed_history=args.external_signed_history_contract,
                        oauth_rotation=bool(args.oauth_rotation), provider_quota=args.provider_quota,
                        output_effort=args.output_effort, history_png=args.history_png,
                        history_images=args.history_images, history_tool_blocks=args.history_tool_blocks,
