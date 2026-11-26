@@ -323,7 +323,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            cancel_and_change_question=False, oauth_rotation=False, provider_quota=None, slow_tool_stream=False,
            model_connection_contract=None, external_signed_history=False, history_tool_images=None,
            tool_receipt_images=None, explicit_custom_tool_type=False, history_empty_tool_result=None,
-           empty_tool_receipt=None, tool_receipt_text_blocks=None, tool_receipt_nested_cache=None):
+           empty_tool_receipt=None, tool_receipt_text_blocks=None, tool_receipt_nested_cache=None,
+           tool_receipt_outer_cache=None):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -339,6 +340,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param empty_tool_receipt 本轮实际回执的空结果形状及错误标志。
     @param tool_receipt_text_blocks 本轮实际回执的重复文本块、换行及错误标志。
     @param tool_receipt_nested_cache 本轮结果首个文本块的内层缓存 TTL，default 表示省略 TTL。
+    @param tool_receipt_outer_cache 本轮整个工具结果的外层缓存 TTL，default 表示省略 TTL。
     @param history_tool_images 核对已闭合工具结果的图文块，可显式声明成功或省略错误标志。
     @param tool_receipt_images 核对本轮实际工具调用的图文回执及拒绝边界。
     @param explicit_custom_tool_type 是否通过显式 custom 的客户端声明进行原生工具往返。
@@ -1121,6 +1123,10 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 if parallel_tools:
                     (other,) = [item for item in result["content"] if item["tool_use_id"] == SECOND_ID]
                     other["content"] = [{"type": "text", "text": other["content"]}]
+            if tool_receipt_outer_cache:
+                block["cache_control"] = {"type": "ephemeral"}
+                if tool_receipt_outer_cache != "default":
+                    block["cache_control"]["ttl"] = tool_receipt_outer_cache
         exact_tool_receipts = bool(empty_tool_receipt or tool_receipt_text_blocks)
         if tool_receipt_images:
             png, jpeg, gif, webp = fixture_image_blocks(all_formats=True)
@@ -1554,8 +1560,13 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                     "old_release_tool_callbacks": 1, "historical_tool_callbacks": 0,
                     "old_model_posts": 2, "new_model_posts": 1,
                     "new_attempt": new_attempt}
+        expected_receipts = result["content"] if exact_tool_receipts else ()
+        if tool_receipt_outer_cache and history_cache_ttl:
+            # 平台 TTL 冻结在工具根轮。出站外层断点应用该值，原客户端回执和内层断点照原样。
+            expected_receipts = [{**item, "cache_control": {"type": "ephemeral", "ttl": history_cache_ttl}}
+                                 if "cache_control" in item else item for item in expected_receipts]
         verify_model(received, policy=tool_policy or "append", old_content=old_result, current_text_blocks=current_text_blocks,
-                     exact_receipts=result["content"] if exact_tool_receipts else ())
+                     exact_receipts=expected_receipts)
         captures = verify_captures(manage, received, account_token, additional_secrets=(
             (refresh_token, rotated_token, rotated_refresh) if oauth_rotation else ()
         ))
@@ -1631,12 +1642,18 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                 "submitted_results": result["content"], "observed_results": observed,
                                 "initial_http": initial_status, "receipt_http": status,
                                 "initial_process_lost": recover_pending}
-            if tool_receipt_nested_cache:
+            if tool_receipt_nested_cache or tool_receipt_outer_cache:
                 direct_markers = observed_cache_breakpoints(received[-1][1])
+                current_markers = [marker[-1] for marker in direct_markers if marker[-1].get("tool_use_id") in expected_ids]
+                assert current_markers == [item for item in expected_receipts if "cache_control" in item], direct_markers
                 if not history_cache_markers:
-                    assert direct_markers == [], direct_markers
-                proof[proof_key]["nested_cache_ttl"] = tool_receipt_nested_cache
+                    assert len(direct_markers) == len(current_markers), direct_markers
                 proof[proof_key]["direct_message_cache_breakpoints"] = direct_markers
+            if tool_receipt_nested_cache:
+                proof[proof_key]["nested_cache_ttl"] = tool_receipt_nested_cache
+            if tool_receipt_outer_cache:
+                proof[proof_key]["outer_cache_ttl"] = tool_receipt_outer_cache
+                proof[proof_key]["expected_model_results"] = expected_receipts
         if tool_receipt_images:
             actual = {}
             for block in result["content"]:
@@ -1707,7 +1724,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         if history_tool_blocks:
             proof["historical_tool_result_blocks"] = len(old_result)
         if history_cache_markers:
-            observed = [observed_cache_breakpoints(model) for _, model, _ in received]
+            observed = [[mark for mark in observed_cache_breakpoints(model)
+                         if not tool_receipt_outer_cache or mark[-1].get("tool_use_id") != NEW_ID]
+                        for _, model, _ in received]
             expected = original_markers
             if history_cache_ttl:
                 expected = [(i, offset, role, {**block, "cache_control": {"type": "ephemeral", "ttl": history_cache_ttl}})
@@ -4130,6 +4149,8 @@ def main():
                                   help="逐块核对本轮工具回执的重复文本、换行、错误标志及继续提示")
     parser.add_argument("--tool-receipt-nested-cache", choices=("5m", "1h", "default"),
                         help="在本轮工具结果的首个文本块上添加显式缓存断点")
+    parser.add_argument("--tool-receipt-outer-cache", choices=("5m", "1h", "default"),
+                        help="在本轮工具结果外层添加显式缓存断点")
     parser.add_argument("--explicit-custom-tool-type", action="store_true")
     system_roles = parser.add_mutually_exclusive_group()
     system_roles.add_argument("--message-system-roles", dest="message_system_roles", action="store_const", const="observe")
@@ -4223,6 +4244,8 @@ def main():
         parser.error("--history-empty-tool-result 需要独立的历史工具结果形状")
     if args.tool_receipt_nested_cache and not args.tool_receipt_text_blocks:
         parser.error("--tool-receipt-nested-cache 需要同用 --tool-receipt-text-blocks")
+    if args.tool_receipt_outer_cache and not args.tool_receipt_text_blocks:
+        parser.error("--tool-receipt-outer-cache 需要同用 --tool-receipt-text-blocks")
     if args.trace_recovery_resend and not (args.recover_pending_tool or args.model_connection_contract == "restart"):
         parser.error("--trace-recovery-resend 需要 --recover-pending-tool 或 --model-connection-contract restart")
     if (args.recovery_ledger_contention or args.recovery_ledger_deadline or args.recovery_workspace_rejection
@@ -4278,6 +4301,7 @@ def main():
                        tool_receipt_images=args.tool_receipt_images,
                        tool_receipt_text_blocks=args.tool_receipt_text_blocks,
                        tool_receipt_nested_cache=args.tool_receipt_nested_cache,
+                       tool_receipt_outer_cache=args.tool_receipt_outer_cache,
                        explicit_custom_tool_type=args.explicit_custom_tool_type,
                        previous=previous,
                        failure_boundaries=args.failure_boundaries, current_text_blocks=args.current_text_blocks,

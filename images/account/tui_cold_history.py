@@ -44,13 +44,16 @@ def _plain_text(block):
             and isinstance(block["text"], str) and bool(block["text"]))
 
 
+def _ephemeral_cache_marker(marker):
+    return (isinstance(marker, dict) and marker.keys() <= {"type", "ttl"}
+            and marker.get("type") == "ephemeral" and marker.get("ttl", "5m") in ("5m", "1h"))
+
+
 def _history_text(block):
     if "cache_control" not in block:
         return _plain_text(block)
-    marker = block["cache_control"]
     return (_plain_text({key: value for key, value in block.items() if key != "cache_control"})
-            and isinstance(marker, dict) and marker.keys() <= {"type", "ttl"}
-            and marker.get("type") == "ephemeral" and marker.get("ttl", "5m") in ("5m", "1h"))
+            and _ephemeral_cache_marker(block["cache_control"]))
 
 
 def _jpeg_dimensions(data):
@@ -144,12 +147,19 @@ def tool_result_has_text_blocks(block):
     )
 
 
+def tool_result_has_cache_marker(block):
+    """识别结果外层的显式缓存断点。@param block 工具结果。@return 是否为受支持的断点。"""
+    return _ephemeral_cache_marker(block.get("cache_control"))
+
+
 def _historical_image_results(rows):
     return [(row["role"], block) for row in rows for block in _blocks(row)
             if block.get("type") == "tool_result" and tool_result_has_images(block)]
 
 
 def _matches_history_results(native, expected):
+    # 带外层断点的整块统一按生效 TTL 由缓存断点核验。
+    expected = [(role, block) for role, block in expected if "cache_control" not in block]
     if not expected:
         return True
     ids = {block["tool_use_id"] for _, block in expected}
@@ -206,10 +216,11 @@ def _closed_history(rows, *, result_types=(str,), signed_rows=()):
                 seen.add(block["id"])
                 pending.add(block["id"])
             elif (row["role"] == "user" and block.get("type") == "tool_result"
-                    and block.keys() <= {"type", "tool_use_id", "content", "is_error"}
+                    and block.keys() <= {"type", "tool_use_id", "content", "is_error", "cache_control"}
+                    and ("cache_control" not in block or tool_result_has_cache_marker(block))
                     and isinstance(block.get("tool_use_id"), str)
                     and block["tool_use_id"] not in results
-                    and (isinstance(block.get("content", ""), result_types)
+                    and (isinstance(block.get("content", ""), str if "cache_control" in block else result_types)
                          # 固定 CLI 会移除错误工具结果中的图像，并将原文本块合并。
                          or _result_blocks(block.get("content"), allow_images=not block.get("is_error", False)))
                     and type(block.get("is_error", False)) is bool):

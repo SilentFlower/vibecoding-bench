@@ -523,6 +523,35 @@ class ColdHistoryTests(TestCase):
         second["content"] = [marked, text]
         self.assertFalse(resumed.matches_history_tool_text_blocks(modeled))
 
+    def test_resumed_tool_result_outer_cache_requires_original_fields_and_effective_ttl(self):
+        """核对外层有效 TTL、原 ID 和结果字段，保留内层断点。@return 无。"""
+        body = deepcopy(self.body)
+        marker = {"type": "ephemeral", "ttl": "5m"}
+        body["messages"][2]["content"][0]["cache_control"] = marker
+        plan = ColdHistory.from_request(body, cache_ttl="1h")
+        result = {"type": "tool_result", "tool_use_id": "toolu_new", "is_error": False,
+                  "cache_control": marker, "content": [{"type": "text", "text": "结果", "cache_control": marker}]}
+        messages = [*body["messages"],
+                    {"role": "assistant", "content": [
+                        {"type": "tool_use", "id": "toolu_new", "name": "LookupNote", "input": {}}]},
+                    {"role": "user", "content": [result]}]
+        resumed = plan.resume_receipts(messages)
+        modeled = {"messages": deepcopy(resumed.history)}
+        self.assertFalse(resumed.matches_history_cache_markers(modeled))
+        effective_marker = {**marker, "ttl": "1h"}
+        modeled["messages"][2]["content"][0]["cache_control"] = effective_marker
+        observed = modeled["messages"][-1]["content"][0]
+        observed["cache_control"] = effective_marker
+        self.assertTrue(resumed.matches_history_cache_markers(modeled))
+        self.assertTrue(resumed.matches_history_tool_text_blocks(modeled))
+        observed.pop("is_error")
+        self.assertFalse(resumed.matches_history_cache_markers(modeled))
+        observed["is_error"] = False
+        observed["tool_use_id"] = "toolu_other"
+        self.assertFalse(resumed.matches_history_cache_markers(modeled))
+        result["cache_control"] = {"type": "ephemeral", "ttl": "unsupported"}
+        self.assertIsNone(plan.resume_receipts(messages))
+
     def test_completed_empty_results_keep_content_shape_when_resumed(self):
         """核对空结果的三种入站形状、旧归属及回执冻结。@return 无。"""
         for fields in ({}, {"content": []}, {"content": ""}, {"is_error": True}):

@@ -29,7 +29,8 @@ from uuid import UUID, uuid4
 from runtime_files import atomic_text
 from tui_capacity import TuiCapacity, TuiCapacityError
 from tui_cold_history import (
-    ColdHistory, MCP_SERVER, SIGNED_THINKING_TYPES, tool_result_has_images, tool_result_has_text_blocks, tool_result_is_empty,
+    ColdHistory, MCP_SERVER, SIGNED_THINKING_TYPES, tool_result_has_cache_marker, tool_result_has_images,
+    tool_result_has_text_blocks, tool_result_is_empty,
 )
 from tui_reconnect import ReceiptCheckpoints, digest
 from tui_input_policy import CONTEXT_BETA, InputRejection, native_input
@@ -1701,9 +1702,10 @@ class SessionDriver:
                             raise InputRejection("unsupported_parameter")
                         requires_recovery = any(tool_result_has_images(answer) or tool_result_is_empty(answer)
                                                 for answer in answers.values())
-                        # 纯文本数组仅在整轮可恢复时转入磁盘，保留扩展字段或缺少签名来源时的在线续轮。
+                        # 文本数组和外层断点仅在整轮可恢复时切换。签名缺少来源时仍交回活跃进程。
                         if requires_recovery or (
-                            any(tool_result_has_text_blocks(answer) for answer in answers.values())
+                            any(tool_result_has_text_blocks(answer) or tool_result_has_cache_marker(answer)
+                                for answer in answers.values())
                             and plan.resume_receipts(messages, signed_tool_models=actor.signed_tool_models) is not None
                         ):
                             checkpoint = self.checkpoints.find(actor_key)
