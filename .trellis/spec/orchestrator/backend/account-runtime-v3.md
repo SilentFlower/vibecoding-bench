@@ -2597,6 +2597,8 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `verify_tui_cold_history.py --restart-history` 在原工具续轮收口后核对已导入消息的 `role` 和 `content`。以账号权限预先落盘改写后的历史，再重启发送器并从公开入口提交分叉确认历史，未推进时须复用同一 UUID。完整答复写入后再次重启并重发相同输入，检查独立响应、一次额外模型投递、确认历史、旧档案字节及工具归属。已推进的内容可由后续分支承接，报告记录实际 UUID 和持久档案数量。
 - `verify_tui_cold_history.py --text-input` 从公开入口核对纯新轮、同公开会话另起新轮、纯文本历史以及缺省、空串、空数组和多段系统指令实收。
 - `9aed7a1f` 的 `--cache-markers` 记录退役前基线。当前同名用例覆盖三种账号动作、嵌套历史断点和强制 `5m`、`1h` 的原生出站，以及本轮文本和工具声明的旧路径对照。请求根、顶层系统块上的标记，以及使用替换或用户提醒时的已测本轮文本标记返回 `422 / unsupported_parameter`，模型零收件。夹具按预留比对已认领正文及隔离 HTTPS 实收摘要，最终 TLS 写出保持未采集。`--history-cache-markers` 核对一次工具往返的两次模型请求，兼容 `--recover-pending-tool` 验证冷恢复和改写历史断点拒绝。同用 `--history-cache-ttl 5m`，等待中切换到 `off`，核对原回执继续使用 `5m`，同一公开会话的新轮应用 `off`。
+- `--cache-marker-capabilities baseline` 核对 `405147a9` 的当前轮双文本块与双工具声明。追加动作下，首位及末位的显式标记都沿旧账号代发保留原位置及缺省 TTL、`5m`、`1h` 三种表示。替换、用户提醒的四个对照返回 422，模型零收件。无标记对照沿 CLI 原生路径。
+- `--cache-marker-capabilities native-default` 和 `native-no-auto` 仅用于隔离能力实验。当前块通过 `prompt.submit` 与 `session.append` 交给固定 2.1.293；MCP `tools/list` 在声明及 `_meta` 中提供相同标记。默认配置的模型实收与无标记对照相同，当前用户末块自动标为 `1h`，工具声明无标记。关闭自动缓存后，两种位置均无标记。实收保留用户角色、两块的相邻顺序及工具名称映射、描述和 schema。末块 `1h` 样本同时检查无标记和关闭自动缓存对照，以免把默认行为认作客户端标记保真。此能力缺口影响调用方显式断点的前缀和时长，保留旧账号路径直至原生合同通过。最终 TLS 写出保持未采集。
 - `verify_tui_cold_history.py --system-policy` 从管理 API 保存并读回动作，按公开 Messages 的模型实收核对三种落点。`--tool-policy` 对照替换和用户提醒的工具往返。`--toggle-pending-policy` 在原工具等待时更改动作，核对回执隔离及原轮指令。
 - `verify_tui_cold_history.py --recover-pending-tool` 结束唯一等待中的真实 CLI 并重启其账号发送器。修改账号动作和客户端指令后，原回执仅继续其冻结策略，恢复模型步骤的正文来自真实 CLI。
 - 公开首轮和原工具回执的意外状态或断连先写出 HTTP 状态、请求 ID、夹具阶段与隔离模型收件，再在网关退出前读取对应请求的诊断阶段及所属尝试。无响应头时只列同一合成会话和本次时间窗口内的候选。失败证据输出到 stderr，原失败仍使验收退出。

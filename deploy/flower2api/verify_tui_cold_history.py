@@ -93,8 +93,10 @@ class QuietHandler(BaseHTTPRequestHandler):
         """省略验收请求日志。@return 无。"""
 
 
-def install_source(root=ROOT, *, trace_startup=False):
-    """安装配套事件源。@param root 检出目录。@param trace_startup 是否启用隔离观测。@return 无。"""
+def install_source(root=ROOT, *, trace_startup=False, cache_capability=None):
+    """安装配套事件源。@param root 检出目录。@param trace_startup 是否启用隔离观测。
+    @param cache_capability 可选的 CLI 缓存探针模式。@return 无。
+    """
     target = Path("/opt/flower/tui")
     for file in (root / "images/account").glob("tui_*.py"):
         copy2(file, target / file.name)
@@ -103,7 +105,13 @@ def install_source(root=ROOT, *, trace_startup=False):
         copy2(root / "services/orchestrator" / name, target / name)
     if trace_startup:
         (target / "tui_source.py").rename(target / "fixture_tui_source.py")
-        copy2(ROOT / "deploy/flower2api/fixtures/native_model_send/tui_startup_trace.py", target / "tui_source.py")
+        fixtures = ROOT / "deploy/flower2api/fixtures/native_model_send"
+        copy2(fixtures / "tui_startup_trace.py", target / "tui_source.py")
+        if cache_capability in ("native-default", "native-no-auto"):
+            (target / "tui_source.py").rename(target / "fixture_startup_trace.py")
+            copy2(fixtures / "tui_cache_capability_probe.py", target / "tui_source.py")
+            if cache_capability == "native-no-auto":
+                (target / "fixture_disable_automatic_cache").touch()
 
 
 def build_cutover_record(temporary, old, deployment, release):
@@ -174,7 +182,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            parallel_tools=False, reconnect_tool_stream=False, current_images=False, auto_tool_choice=False,
            recovery_ledger_contention=False, recovery_ledger_deadline=False, recovery_workspace_rejection=False,
            recovery_slow_model=False, initial_idle_model_connection=False, trace_startup=False, cache_markers=False,
-           history_cache_markers=False, history_cache_ttl=None):
+           history_cache_markers=False, history_cache_ttl=None, cache_capability=None):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -205,6 +213,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param cache_markers 是否核对普通 Messages 显式缓存标记的模型实收和出站归属。
     @param history_cache_markers 是否冻结历史标记并验证工具往返。
     @param history_cache_ttl 工具往返启用的平台历史断点时长。
+    @param cache_capability 对照生产入口或 CLI 提示词和工具的缓存标记能力。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -452,6 +461,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                           for name in ("cold-history-owner", "cold-history-foreign"))
         headers = {"x-session-id": str(uuid4()), "User-Agent": "flower2api-cold-history-fixture/1"}
         messages = [{"role": role, "content": text} for role, text in HISTORY]
+        if cache_capability:
+            return verify_cache_capabilities(manage, token, identifier, headers, received, cache_capability)
         if history_cache_markers:
             for row, marker in zip(messages[:2], HISTORY_CACHE, strict=True):
                 row["content"] = [{"type": "text", "text": row["content"], "cache_control": marker}]
@@ -1413,6 +1424,96 @@ def verify_text_inputs(manage, token, account_token, headers, history, received,
     return {"text_inputs": requests, "model_posts": len(received) - start}
 
 
+def cache_marker_claims(manage, request_id):
+    """读回公开请求的预留与正文认领。@param manage 隔离管理入口。@param request_id 请求 ID。@return 预留、诊断和认领。"""
+    query = "request-diagnostics?" + urlencode({"correlation_id": request_id})
+    (record,) = wait_for(lambda: [item for item in manage("GET", query)["items"] if item.get("finished_at")])
+    assert record["request_id"] == request_id
+    details = manage("GET", "request-diagnostics/" + request_id)["request"]
+    reservation = details["context"]["tui_reservation_id"]
+    claims = (json.loads(line) for line in MODEL_BODY_TRACE.read_text().splitlines())
+    return reservation, record, [claim for claim in claims if claim["reservation_id"] == reservation]
+
+
+def verify_cache_capabilities(manage, token, account_id, headers, received, mode):
+    """比对当前块与工具声明的显式断点。@param manage 管理入口。@param token 合成令牌。
+    @param account_id 测试账号。@param headers 公开头。@param received 模型实收。@param mode 对照模式。
+    @return 出站角色、位置、TTL 与认领证据。
+    """
+    manage("PUT", "settings", {"message_cache_control_rewrite": "off", "cache_control_ttl_rewrite": "off"})
+    tools = [{"name": name, "description": f"缓存实验声明 {name}",
+              "input_schema": {"type": "object", "properties": {}}} for name in ("ProbeFirst", "ProbeLast")]
+    texts = ["当前缓存探针第一段。", "当前缓存探针末段。"]
+    cases = [(f"{surface}_{side}_{ttl or 'implicit'}", "append", surface, index, ttl)
+             for surface in ("text", "tool") for index, side in enumerate(("first", "last")) for ttl in (None, "5m", "1h")]
+    cases.extend((f"unmarked_{surface}", "append", surface, None, None) for surface in ("text", "tool"))
+    if mode == "baseline":
+        cases.extend((f"{policy}_{surface}", policy, surface, 0, "5m")
+                     for policy in ("replace", "user_reminder") for surface in ("text", "tool"))
+    proof = {}
+    policy = None
+    for name, system_policy, surface, offset, ttl in cases:
+        if policy != system_policy:
+            policy = system_policy
+            account = manage("PUT", f"accounts/{account_id}", {"client_system_prompt_policy": policy})
+            assert account["request_backend"] == "tui_v2" and account["client_system_prompt_policy"] == policy
+        current = [{"type": "text", "text": text} for text in texts]
+        body = {"model": MODEL, "max_tokens": 128, "stream": False, "messages": [
+            {"role": role, "content": text} for role, text in HISTORY[:2]
+        ] + [{"role": "user", "content": current}]}
+        if surface == "tool":
+            body["tools"] = [tool.copy() for tool in tools]
+        expected = [None, None]
+        if offset is not None:
+            marker = {"type": "ephemeral"}
+            if ttl is not None:
+                marker["ttl"] = ttl
+            targets = current if surface == "text" else body["tools"]
+            targets[offset]["cache_control"] = expected[offset] = marker
+        before = len(received)
+        status, raw, request_id = checked_messages(
+            manage, token, body, {**headers, "x-session-id": str(uuid4())}, received, name,
+            expected_status=200 if policy == "append" else 422, trace_startup=True,
+        )
+        reservation, record, claims = cache_marker_claims(manage, request_id)
+        evidence = {"http_status": status, "model_posts": len(received) - before, "request_id": request_id,
+                    "reservation_id": reservation, "surface": surface, "client_markers": expected, "policy": policy,
+                    "attempt_count": record["attempt_count"]}
+        if status == 422:
+            assert json.loads(raw)["error"]["code"] == "unsupported_parameter"
+            assert before == len(received) and not claims and record["attempt_count"] == 0
+        else:
+            assert record["attempt_count"] == 1
+            assert json.loads(raw)["content"] == [{"type": "text", "text": FINAL}]
+            ((model_digest, model, _),) = received[before:]
+            (claim,) = claims
+            from_cli = mode != "baseline" or offset is None
+            assert claim["sha256"] == model_digest and claim["from_interactive_cli"] is from_cli
+            ((message_index, user),) = [(i, row) for i, row in enumerate(model["messages"])
+                                        if any(block.get("text") in texts for block in blocks(row))]
+            assert user["role"] == "user"
+            content = [(i, block) for i, block in enumerate(blocks(user)) if block.get("text") in texts]
+            assert [block["text"] for _, block in content] == texts and content[1][0] == content[0][0] + 1
+            projected = model.get("tools", [])
+            if surface == "tool":
+                assert [(tool["name"].removeprefix("mcp__flower__"), tool["description"], tool["input_schema"])
+                        for tool in projected] == [(tool["name"], tool["description"], tool["input_schema"]) for tool in tools]
+            else:
+                assert not projected
+            observed = ([block.get("cache_control") for _, block in content] if surface == "text" else
+                        [tool.get("cache_control") for tool in projected])
+            if mode == "baseline" and offset is not None:
+                assert observed == expected, (name, observed)
+            evidence.update(from_interactive_cli=from_cli, model_body_sha256=model_digest, model_markers=observed,
+                            user_message_index=message_index, user_block_indexes=[i for i, _ in content],
+                            user_role=user["role"], model_tool_names=[tool["name"] for tool in projected],
+                            system_markers=[block["cache_control"] for block in model.get("system", [])
+                                            if "cache_control" in block])
+        proof[name] = evidence
+    assert not any(path.is_file() for path in Path("/flows/api").rglob("*"))
+    return {"mode": mode, "cases": proof, "model_posts": len(received), "wire_final": "unavailable"}
+
+
 def verify_cache_markers(manage, token, account_id, headers, received):
     """对照普通请求的缓存标记、模型实收和账号出站选择。
     @param manage 隔离管理入口。@param token 合成用户令牌。@param account_id 本次 V2 账号。
@@ -1478,13 +1579,7 @@ def verify_cache_markers(manage, token, account_id, headers, received):
             expected_status=http_status, trace_startup=True,
         )
         assert request_id
-        query = "request-diagnostics?" + urlencode({"correlation_id": request_id})
-        (record,) = wait_for(lambda: [item for item in manage("GET", query)["items"] if item.get("finished_at")])
-        assert record["request_id"] == request_id
-        details = manage("GET", "request-diagnostics/" + request_id)["request"]
-        reservation = details["context"]["tui_reservation_id"]
-        claims = [json.loads(line) for line in MODEL_BODY_TRACE.read_text().splitlines()]
-        own_claims = [claim for claim in claims if claim["reservation_id"] == reservation]
+        reservation, record, own_claims = cache_marker_claims(manage, request_id)
         evidence = {"http_status": status, "model_posts": len(received) - before, "account_policy": policy,
                     "ttl_policy": forced_ttl,
                     "request_id": request_id, "reservation_id": reservation, "attempt_count": record["attempt_count"]}
@@ -1800,6 +1895,7 @@ def main():
     scenario.add_argument("--restart-history", action="store_true")
     scenario.add_argument("--text-input", action="store_true")
     scenario.add_argument("--cache-markers", action="store_true")
+    scenario.add_argument("--cache-marker-capabilities", choices=("baseline", "native-default", "native-no-auto"))
     scenario.add_argument("--system-policy", action="store_true")
     scenario.add_argument("--toggle-pending-policy", action="store_true")
     scenario.add_argument("--tool-policy", choices=("replace", "user_reminder"))
@@ -1829,7 +1925,8 @@ def main():
             or Path("/run/v3/sender.json").exists() or any(Path("/native").glob("*"))):
         raise RuntimeError("请在空白的 docker --network none 账号容器中运行")
     previous = args.mixed_release
-    trace_startup = args.initial_idle_model_connection or args.trace_initial_startup or args.cache_markers
+    cache_markers = args.cache_markers or args.cache_marker_capabilities is not None
+    trace_startup = args.initial_idle_model_connection or args.trace_initial_startup or cache_markers
     if trace_startup and (previous or args.mixed_image_peers or args.v1_runtime):
         parser.error("启动观测需要当前 V2 源码夹具")
     if args.mixed_image_peers:
@@ -1837,7 +1934,8 @@ def main():
             parser.error("镜像混跑须使用私有共享夹具目录")
         previous = (None, *args.mixed_image_peers)
     elif args.v1_runtime is None:
-        install_source(previous[0] if previous else ROOT, trace_startup=trace_startup)
+        install_source(previous[0] if previous else ROOT, trace_startup=trace_startup,
+                       cache_capability=args.cache_marker_capabilities)
     elif sha256(args.v1_runtime.read_bytes()).hexdigest() != V1_RUNTIME_SHA256:
         parser.error("V1 启动器摘要与固定版不符")
     with TemporaryDirectory(prefix="cold-history-", dir=args.shared_state) as directory:
@@ -1858,8 +1956,8 @@ def main():
                        recovery_workspace_rejection=args.recovery_workspace_rejection,
                        recovery_slow_model=args.recovery_slow_model,
                        initial_idle_model_connection=args.initial_idle_model_connection, trace_startup=trace_startup,
-                       cache_markers=args.cache_markers, history_cache_markers=args.history_cache_markers,
-                       history_cache_ttl=args.history_cache_ttl)
+                       cache_markers=cache_markers, history_cache_markers=args.history_cache_markers,
+                       history_cache_ttl=args.history_cache_ttl, cache_capability=args.cache_marker_capabilities)
         print(json.dumps(proof, ensure_ascii=False))
 
 
