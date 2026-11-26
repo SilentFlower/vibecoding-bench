@@ -96,6 +96,7 @@ class ColdHistory:
     thinking: dict | None
     system_policy: str
     effort: str | None = None
+    current_blocks: tuple[str, ...] = ()
 
     @classmethod
     def from_request(cls, body, system_policy="append"):
@@ -120,7 +121,7 @@ class ColdHistory:
                 or not _closed_history(history)):
             return None
         content = _blocks(current)
-        if len(content) != 1 or not _plain_text(content[0]):
+        if not content or not all(_plain_text(block) for block in content):
             return None
         declared = body.get("tools", [])
         for tool in declared:
@@ -138,7 +139,8 @@ class ColdHistory:
             system = system or ""
         tools = {MCP_PREFIX + tool["name"]: tool for tool in declared}
         return cls(history, body["model"], content[0]["text"], system, tools, body["max_tokens"],
-                   body.get("thinking"), system_policy, output.get("effort"))
+                   body.get("thinking"), system_policy, output.get("effort"),
+                   tuple(block["text"] for block in content) if len(content) > 1 else ())
 
     def system_argument(self):
         """选择原生 CLI 提示词文件选项。@return 参数和文件正文，或缺省值。"""
@@ -149,10 +151,19 @@ class ColdHistory:
         return None
 
     def submitted_prompt(self):
-        """取得提交给当前交互轮的问题。@return 正文，必要时包含用户提醒。"""
+        """取得单文本提交内容。@return 正文，必要时包含用户提醒。"""
         if self._reminder_index() == len(self.history):
             return f"{self.prompt}\n\n{self._reminder()}"
         return self.prompt
+
+    def submitted_blocks(self):
+        """取得原生用户行的有序文本块。@return 本轮文本，以及适用的用户提醒。"""
+        if not self.current_blocks:
+            return [{"type": "text", "text": self.submitted_prompt()}]
+        text = self.current_blocks
+        if self._reminder_index() == len(self.history):
+            text = (*text, self._reminder())
+        return [{"type": "text", "text": part} for part in text]
 
     def _scope(self):
         scope = (self.model, self.system_policy, self.system, self.tools, self.max_tokens, self.thinking)
@@ -164,7 +175,7 @@ class ColdHistory:
         return {
             "prompt_index": len(self.history) + 1,
             "system_policy": self.system_policy,
-            "digest": digest([self._scope(), self.history, self.prompt]),
+            "digest": digest([self._scope(), self.history, self.current_blocks or self.prompt]),
         }
 
     def resume_receipts(self, messages):
@@ -197,7 +208,7 @@ class ColdHistory:
         if not _closed_history(history, result_types=(str, list)):
             return None
         # 交互 CLI 从闭合的工具结果开始读取。新模型步骤仍由受管 PTY 标记认领。
-        return replace(self, history=history, prompt=RESUME_PROMPT)
+        return replace(self, history=history, prompt=RESUME_PROMPT, current_blocks=())
 
     def _reminder(self):
         return f"<system-reminder>\n{self.system}\n</system-reminder>"
@@ -232,7 +243,7 @@ class ColdHistory:
                 return None
             question = next(rows, {}).get("message", {})
             if (not isinstance(question, dict) or question.get("role") != "user" or "content" not in question
-                    or _blocks(question) != [{"type": "text", "text": self.submitted_prompt()}]):
+                    or _blocks(question) != self.submitted_blocks()):
                 return None
             last = {}
             for row in rows:

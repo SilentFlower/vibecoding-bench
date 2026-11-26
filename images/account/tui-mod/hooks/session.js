@@ -13,6 +13,7 @@ async function post($, action, value = {}) {
 
 /** 安装该进程的回合观察和外部工具回执钩子。@param on 官方事件注册器。@return 无。 */
 export function register(on) {
+  let pendingBlocks = null
   on('session.start', async ($, e, next) => {
     const result = await next(e)
     await post($, 'ready')
@@ -20,9 +21,23 @@ export function register(on) {
   })
   on('prompt.submit', async ($, e, next) => {
     // 终端只输入发送器产生的固定标记。客户文本到达这里时已经越过终端命令解析。
-    const { prompt, guard } = await post($, 'prompt', { marker: e.text })
+    const { prompt, guard, blocks } = await post($, 'prompt', { marker: e.text })
+    if (blocks) pendingBlocks = { marker: prompt, blocks }
     return next({ ...e, text: prompt, context: [...(e.context ?? []), guard] })
   }).catch(() => ({ drop: '交互请求归属已失效' }))
+
+  on('session.append', { door: 'prompt' }, ($, e, next) => {
+    if (!pendingBlocks || e.agentId) return next(e)
+    const { content } = e.message
+    const { marker, blocks } = pendingBlocks
+    const index = content.findIndex(block => block.type === 'text' && block.text === marker)
+    if (index < 0) return next(e)
+    // 文本块在 CLI 保存用户行前替换同会话标记。CLI 随后自行组装请求和缓存标记。
+    pendingBlocks = null
+    return next({ ...e, message: { ...e.message,
+      content: [...content.slice(0, index), ...blocks, ...content.slice(index + 1)],
+    } })
+  })
 
   on('turn.step', async function* ($, e, next) {
     if (e.agentId) throw new Error('当前会话不接受子代理回合')

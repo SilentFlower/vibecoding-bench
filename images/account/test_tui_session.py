@@ -1851,6 +1851,31 @@ class SessionTests(unittest.TestCase):
                 with self.subTest(case=case):
                     self.assertFalse(actor._main_request({**native, "messages": messages}, handle))
 
+    def test_current_text_blocks_must_reach_model_request_in_original_order(self):
+        """原标记出站或 Mod 改写缺块时，保留本轮发送许可。@return 无。"""
+        body = self._body()
+        blocks = [{"type": "text", "text": part} for part in ("第一段", "第一段", "第二段")]
+        body["messages"][-1]["content"] = blocks
+        with closing(self._driver()) as driver:
+            driver.managed_oauth = True
+            identity = {**self._identity("x"), "native_cold_history": True}
+            with closing(driver.prepare(identity, encode(body))) as handle:
+                actor = handle.actor
+                prompt = actor.callback("/prompt", {"marker": actor.marker})
+                self.assertEqual(prompt["blocks"], blocks)
+                self.assertEqual(prompt["prompt"], actor.marker)
+                actor.step = WireStep([])
+                actor.step.native_model = "chosen"
+                guard = {"type": "text", "text": "<system-reminder>\nprompt.submit hook additional context: "
+                                                   + actor.guard_text + "\n</system-reminder>"}
+                user = {"role": "user", "content": [guard, *blocks]}
+                native = {"model": "chosen", "stream": True, "messages": [user]}
+                self.assertTrue(actor._main_request(native, handle))
+                user["content"] = [guard, *reversed(blocks)]
+                self.assertFalse(actor._main_request(native, handle))
+                user["content"] = [guard, blocks[0], {"type": "text", "text": actor.marker}]
+                self.assertFalse(actor._main_request(native, handle))
+
     def test_local_model_string_user_owns_only_its_trailing_system_guard(self):
         """DeepSeek 合并系统梯段时，用户正文、原生模型和独立随机标记行须同时匹配。@return 无。"""
         body = self._body()

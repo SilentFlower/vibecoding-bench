@@ -33,6 +33,7 @@ HISTORY = [
     ("user", "H3：订单号是 123。"), ("assistant", "H4：订单号已记录。"),
 ]
 QUESTION = "NOW：查询新便签并回答。"
+QUESTION_TAIL = "NOW：保留本轮问题第二段。"
 AFTER_RESTART = "RESTART：从已确认的旧问答开启另一轮。"
 DROP_REPLY = "FAILURE：模型收到正文后关闭响应连接。"
 SYSTEM = ["RULE1：你是便签助手。", "RULE2：请只使用已声明的工具。"]
@@ -101,7 +102,8 @@ def build_cutover_record(temporary, old, deployment, release):
 
 def verify(gateway, sender, temporary, *, restart_history=False, text_input=False, system_policy=False,
            toggle_pending_policy=False, tool_policy=None, recover_pending=False, output_effort=False,
-           history_png=False, history_tool_blocks=False, previous=None, failure_boundaries=False):
+           history_png=False, history_tool_blocks=False, previous=None, failure_boundaries=False,
+           current_text_blocks=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -114,6 +116,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param history_tool_blocks 是否核对已完成工具结果的原始文本块。
     @param previous 可选，旧发行源码、网关、发送器三个离线制品。
     @param failure_boundaries 是否分别在模型收件前后切断隔离连接。
+    @param current_text_blocks 是否验证本轮文本块顺序及边界归属。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -309,7 +312,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                     "after_model_posts": 1, "next_request": status, "next_model_posts": 1,
                     "attempts": [failed, success]}
         if text_input:
-            return verify_text_inputs(manage, token, account_token, headers, messages, received)
+            return verify_text_inputs(manage, token, account_token, headers, messages, received,
+                                      current_text_blocks=current_text_blocks)
         if output_effort:
             return verify_output_effort(manage, token, account_token, headers, received)
         if history_png:
@@ -327,7 +331,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 assert manage("PUT", account_path, {"client_system_prompt_policy": policy})[
                     "client_system_prompt_policy"] == policy
                 assert manage("GET", account_path)["client_system_prompt_policy"] == policy
-                proof[policy] = verify_text_inputs(manage, token, account_token, headers, messages, received, policy=policy)
+                proof[policy] = verify_text_inputs(manage, token, account_token, headers, messages, received,
+                                                   policy=policy, current_text_blocks=current_text_blocks)
             return proof
         if tool_policy:
             assert manage("PUT", f"accounts/{identifier}", {"client_system_prompt_policy": tool_policy})[
@@ -339,7 +344,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             {"role": "assistant", "content": [{"type": "tool_use", "name": "OldNote", "id": PAST_ID, "input": ARGS}]},
             {"role": "user", "content": [{"type": "tool_result", "tool_use_id": PAST_ID, "content": old_result}]},
         ]
-        messages.append({"role": "user", "content": QUESTION})
+        current = ([{"type": "text", "text": part} for part in (QUESTION, QUESTION_TAIL)]
+                   if current_text_blocks else QUESTION)
+        messages.append({"role": "user", "content": current})
         # 历史中的旧工具结果和当前问题之间保留完成边界，CLI 启动后只提交当前问题。
         body = {"model": MODEL, "max_tokens": 128, "stream": True, "messages": messages,
                 "tools": [TOOL], "system": [{"type": "text", "text": part} for part in SYSTEM]}
@@ -408,6 +415,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             modified_effort = {**follow, "output_config": {"effort": "low"}}
             changed_effort, response = call(18090, "POST", "/v1/messages", token, modified_effort, headers)
             assert changed_effort == 422 and len(received) == 1, (changed_effort, response, len(received))
+        if current_text_blocks:
+            merged = {"role": "user", "content": QUESTION + QUESTION_TAIL}
+            changed = {**follow, "messages": [*messages[:-1], merged, *follow["messages"][-2:]]}
+            changed_blocks, response = call(18090, "POST", "/v1/messages", token, changed, headers)
+            assert changed_blocks == 422 and len(received) == 1, (changed_blocks, response, len(received))
         status, raw = call(18090, "POST", "/v1/messages", token, follow, headers)
         if status != 200:
             trace = [{key: row.get(key) for key in ("status_code", "outcome", "error_stage", "attempt_count")}
@@ -450,7 +462,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                     "old_release_tool_callbacks": 1, "historical_tool_callbacks": 0,
                     "old_model_posts": 2, "new_model_posts": 1,
                     "new_attempt": new_attempt}
-        verify_model(received, policy=tool_policy or "append", old_content=old_result)
+        verify_model(received, policy=tool_policy or "append", old_content=old_result, current_text_blocks=current_text_blocks)
         captures = verify_captures(manage, received, account_token)
         for attempt, request_body, reply_id, model_id in zip(
             captures, (body, follow), (events[0]["message"]["id"], final["id"]),
@@ -467,6 +479,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                  "proxy_connections": len(proxy_targets), "attempts": captures}
         if history_tool_blocks:
             proof["historical_tool_result_blocks"] = len(old_result)
+        if current_text_blocks:
+            proof.update(current_text_blocks=2, changed_current_blocks_status=changed_blocks)
         if toggle_pending_policy:
             proof["pending_policy"] = "append"
         if tool_policy:
@@ -576,11 +590,12 @@ def stage_history_branch(config, work, native_id, body):
     return output.stdout.decode().strip()
 
 
-def verify_text_inputs(manage, token, account_token, headers, history, received, *, policy="append"):
+def verify_text_inputs(manage, token, account_token, headers, history, received, *, policy="append",
+                       current_text_blocks=False):
     """核对模型端的默认原生指令及用户提供的文本。
     @param manage 临时管理接口。@param token 合成客户端。@param account_token 合成账号授权。
     @param headers 同一个客户端会话。@param history 合成的已确认旧问答。@param received 独立 HTTPS 实收。
-    @param policy 管理端冻结的系统提示词动作。
+    @param policy 管理端冻结的系统提示词动作。@param current_text_blocks 是否核对当前消息的文本分块。
     @return 各输入形状的复跑证据。
     """
     cases = [
@@ -596,8 +611,11 @@ def verify_text_inputs(manage, token, account_token, headers, history, received,
     start = len(received)
     for index, (name, system, earlier) in enumerate(cases):
         question = f"纯文本首轮问题 {policy}-{index}"
+        tail = f"本轮第二个独立文本块 {policy}-{index}"
+        current = ([{"type": "text", "text": text} for text in (question, tail)]
+                   if current_text_blocks else question)
         body = {"model": MODEL, "max_tokens": 128, "stream": False,
-                "messages": [*earlier, {"role": "user", "content": question}]}
+                "messages": [*earlier, {"role": "user", "content": current}]}
         if system is not None:
             body["system"] = system
         status, raw = call(18090, "POST", "/v1/messages", token, body, headers)
@@ -620,6 +638,9 @@ def verify_text_inputs(manage, token, account_token, headers, history, received,
         texts = [(row["role"], b.get("text")) for row in native["messages"] for b in blocks(row)]
         user_questions = [text for role, text in texts if role == "user" and isinstance(text, str) and question in text]
         assert len(user_questions) == 1 and user_questions[0].count(question) == 1 and not native.get("tools"), name
+        if current_text_blocks:
+            assert user_questions == [question] and texts.count(("user", tail)) == 1
+            assert texts[texts.index(("user", question)) + 1] == ("user", tail)
         reminders = [row for row in native["messages"]
                      if any(SYSTEM[0] in b.get("text", "") for b in blocks(row))]
         assert len(reminders) == int(reminder)
@@ -724,9 +745,10 @@ def find_blocks(body, key, identifier):
     return [(row["role"], b) for row in body["messages"] for b in blocks(row) if b.get(key) == identifier]
 
 
-def verify_model(received, *, policy, old_content):
+def verify_model(received, *, policy, old_content, current_text_blocks=False):
     """检验历史、系统提示、原生动态 MCP 和续轮。@param received HTTPS 实收。
-    @param policy 原工具轮的有效动作。@param old_content 已确认的旧工具结果。@return 无。
+    @param policy 原工具轮的有效动作。@param old_content 已确认的旧工具结果。
+    @param current_text_blocks 是否包含分块问题。@return 无。
     """
     (_, first, _), (_, second, _) = received
     for body in (first, second):
@@ -748,6 +770,10 @@ def verify_model(received, *, policy, old_content):
         history_texts = {text for _, text in HISTORY}
         assert [(role, text) for role, text in messages if text in history_texts] == HISTORY
         assert messages.count(("user", QUESTION)) == 1
+        if current_text_blocks:
+            assert messages.count(("user", QUESTION_TAIL)) == 1
+            index = messages.index(("user", QUESTION))
+            assert messages[index + 1] == ("user", QUESTION_TAIL)
         (old,) = find_blocks(body, "id", PAST_ID)
         (old_result,) = find_blocks(body, "tool_use_id", PAST_ID)
         assert old == ("assistant", {"type": "tool_use", "id": PAST_ID, "name": "OldNote", "input": ARGS})
@@ -797,6 +823,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--gateway", type=Path, required=True)
     parser.add_argument("--sender", type=Path, required=True)
+    parser.add_argument("--current-text-blocks", action="store_true")
     scenario = parser.add_mutually_exclusive_group()
     scenario.add_argument("--restart-history", action="store_true")
     scenario.add_argument("--text-input", action="store_true")
@@ -822,7 +849,7 @@ def main():
                        tool_policy=args.tool_policy, recover_pending=args.recover_pending_tool,
                        output_effort=args.output_effort, history_png=args.history_png,
                        history_tool_blocks=args.history_tool_blocks, previous=args.mixed_release,
-                       failure_boundaries=args.failure_boundaries)
+                       failure_boundaries=args.failure_boundaries, current_text_blocks=args.current_text_blocks)
         print(json.dumps(proof, ensure_ascii=False))
 
 

@@ -357,6 +357,15 @@ class ColdHistoryTests(TestCase):
         result["content"][1]["cache_control"] = {"type": "ephemeral"}
         self.assertIsNone(ColdHistory.from_request(body))
 
+    def test_current_text_boundaries_are_part_of_the_tool_receipt(self):
+        """冻结本轮文本块的顺序与边界，对照同一字符串的不同切分。@return 无。"""
+        body = deepcopy(self.body)
+        current = [{"type": "text", "text": part} for part in ("本轮", "输入")]
+        body["messages"][-1]["content"] = current
+        plan = ColdHistory.from_request(body)
+        self.assertEqual(plan.submitted_blocks(), current)
+        self.assertNotEqual(plan.receipt_boundary(), ColdHistory.from_request(self.body).receipt_boundary())
+
     def test_replace_distinguishes_omitted_and_empty_system(self):
         """省略保留工作正文，显式空值使用空的原生替换文件。@return 无。"""
         body = deepcopy(self.body)

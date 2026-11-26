@@ -550,6 +550,9 @@ class _Actor:
                 and data.get("marker") == self.marker
             ):
                 prompt, self.prompt = self.prompt, None
+                if self.cold_history is not None and self.cold_history.current_blocks and self.recovery_history is None:
+                    return {"prompt": self.marker, "guard": self.guard_text,
+                            "blocks": self.cold_history.submitted_blocks()}
                 return {"prompt": prompt, "guard": self.guard_text}
             elif path == "/results":
                 return self._tool_results(data)
@@ -739,6 +742,16 @@ class _Actor:
             return False
         content = rows[last_user].get("content")
         line = "prompt.submit hook additional context: " + self.guard_text
+        multiple = self.cold_history is not None and self.cold_history.current_blocks and self.recovery_history is None
+        if multiple:
+            # Mod 失效时 CLI 可能保留标记。只有按原顺序出现全部文本块才能认领本轮。
+            if not isinstance(content, list):
+                return False
+            expected = [block["text"] for block in self.cold_history.submitted_blocks()]
+            actual = [block.get("text") if isinstance(block, dict) and block.get("type") == "text" else None
+                      for block in content[-len(expected):]]
+            if actual != expected:
+                return False
         if isinstance(content, list):
             marker = "<system-reminder>\n" + line + "\n</system-reminder>"
             guard_count = sum(
@@ -756,7 +769,7 @@ class _Actor:
                 return False
             content = latest.get("text")
         # 合并用户行和原生字符串用户行都要求精确提示和单独的当前系统标记行。
-        if (
+        if not multiple and (
             not isinstance(content, str)
             or sha256(content.encode()).digest() != self.prompt_hash
         ):
