@@ -191,6 +191,17 @@ class _ObservedHTTPConnection(HTTPConnection):
         self.observed_headers.append((decoded(header), "\r\n\t".join(map(decoded, values))))
 
 
+def _read_model_error(response):
+    try:
+        raw = response.read(BODY_LIMIT + 1)
+    except (OSError, HTTPException):
+        # 已知 HTTP 状态仍可交付，截断正文不能取得修复许可。
+        return b"", False
+    if len(raw) > BODY_LIMIT:
+        return b"", False
+    return raw, response.isclosed()
+
+
 @contextmanager
 def local_model_response(raw: bytes, *, headers: dict[str, str] | None = None, capture=None) -> Iterator[HTTPResponse]:
     """将已认领的一轮业务正文投递给本账号显式配置的独立回环模型。
@@ -229,22 +240,23 @@ def local_model_response(raw: bytes, *, headers: dict[str, str] | None = None, c
                     seconds = _retry_seconds(response.headers.get_all("Retry-After", []))
                     if seconds is not None:
                         seconds = _provider_wait(provider, seconds=seconds)
-                try:
-                    raw_error = response.read(BODY_LIMIT + 1)
-                except (OSError, HTTPException):
-                    # 模型已经返回 HTTP 状态。异常截断的可选错误正文不能覆盖鉴权或限流语义。
-                    raw_error = b""
-                raise ModelResponseError(response.status, raw_error if len(raw_error) <= BODY_LIMIT else b"",
+                raw_error, complete = _read_model_error(response)
+                raise ModelResponseError(response.status, raw_error,
                                          source="local_provider_http" if 400 <= response.status < 600 else None,
-                                         retry_after=seconds)
+                                         retry_after=seconds, complete=complete)
             yield response
 
 
 @contextmanager
-def managed_model_response(raw, *, account_token, reservation, headers, capture=None, expires_at=None, capture_assembly=False):
+def managed_model_response(
+    raw, *, account_token, reservation, headers, capture=None, expires_at=None,
+    capture_assembly=False, attempt_id=None,
+):
     """经原账号 sender 的固定 TLS 出站路径发送已认领的模型请求。
     @param raw 冻结的 Messages 正文。@param account_token 本轮账号 AT。
     @param expires_at 文件模式的真实 UTC 毫秒有效期。
+    @param capture_assembly 是否按原预留提供已认证的组装标记。
+    @param attempt_id 经原预留确认的额外模型投递 UUID。
     @param reservation 受信预留。@param headers 已核对的模型头。@param capture 可选脱敏采集。
     @return 流式上游响应。
     """
@@ -275,7 +287,7 @@ def managed_model_response(raw, *, account_token, reservation, headers, capture=
                 or name.startswith("x-stainless-")):
             model_headers[name] = value
     metadata = {
-        **identity, "request_id": reservation["reservation_id"],
+        **identity, "request_id": attempt_id or reservation["reservation_id"],
         "deadline_unix_ms": reservation["deadline_unix_ms"],
         "method": "POST", "target_url": ACCOUNT_ORIGIN + "/v1/messages",
         "headers": list(model_headers.items()), "preserve_header_casing": False,
@@ -293,24 +305,25 @@ def managed_model_response(raw, *, account_token, reservation, headers, capture=
     with closing(HTTPConnection("127.0.0.1", 8091, timeout=120)) as connection:
         connection.request("POST", "/internal/send", raw, transport_headers)
         with closing(connection.getresponse()) as response:
+            rejection = None
             if response.status != 200:
-                try:
-                    error = response.read(BODY_LIMIT + 1)
-                except (OSError, HTTPException):
-                    error = b""
+                error, complete = _read_model_error(response)
                 error = error.replace(account_token.encode(), b"[REDACTED]")
-                if response.getheader("x-v3-transport-error"):
-                    raise ModelResponseError(response.status, b"")
+                transport_error = response.getheader("x-v3-transport-error")
+                if transport_error:
+                    raise ModelResponseError(response.status, b"", before_send=transport_error == "before-send")
                 retry = response.headers.get_all("Retry-After", []) if response.status == 429 else []
-                raise ModelResponseError(
+                rejection = ModelResponseError(
                     response.status, error if len(error) <= BODY_LIMIT else b"",
-                    source="managed_oauth_http", retry_after=_retry_seconds(retry),
+                    source="managed_oauth_http", retry_after=_retry_seconds(retry), complete=complete,
                     quota_headers=passive_quota_headers(response.headers) if response.status == 429 else None,
                 )
-            if capture is not None:
-                # 采集只记录交给实际发送器的内容，并在这里移除真实账号授权。
+            if capture is not None and (rejection is None or rejection.signature_evidence is not None or attempt_id):
+                # 与首次拒绝关联的记录也在账号端移除真实授权。
                 capture.append(([(name, "[REDACTED]" if name == "authorization" else value)
                                  for name, value in model_headers.items()], raw))
+            if rejection is not None:
+                raise rejection
             yield response
 
 

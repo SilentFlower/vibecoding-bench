@@ -102,6 +102,13 @@ def _reply(stream, fields, *, quota_headers=None):
     stream.write(data + b"\n")
 
 
+def _model_head(handle, status, content_type):
+    fields = {"status": status, "content_type": content_type, "message_id_mode": "gateway"}
+    if attempt_id := getattr(handle, "repair_attempt_id", None):
+        fields["repair_attempt_id"] = attempt_id
+    return fields
+
+
 class _Disconnected:
     """供本轮进程准入直接查询取消信号，排队时无需另开监视线程。"""
 
@@ -184,6 +191,7 @@ class AccountSource:
             "agent_scope_protocol": 1,
             "agent_summary_protocol": 1,
             "upstream_session_protocol": 1,
+            "signature_repair_protocol": 1,
         }
         receipt = hello.get("receipt") if action == "status" else None
         inspect = getattr(driver, "receipt_idle", None)
@@ -342,27 +350,80 @@ class AccountSource:
             elif "account_token" in command:
                 return
             connection.settimeout(IO_TIMEOUT)
-            if command.get("capture_http") is not True:
-                self._send_handle(writer, connection, handle, command)
-                return
-            handle.capture = []
+            if "signature_repair" in command:
+                if type(command["signature_repair"]) is not bool:
+                    return
+                handle.signature_known = command["signature_repair"]
+                send_deadline = time.monotonic() + max(0, deadline - time.time())
+                handle.signature_exchange = lambda raw, error=None: self._signature_exchange(
+                    reader, writer, connection, handle, send_deadline, epoch, raw, error
+                )
+            capturing = command.get("capture_http") is True
+            if capturing:
+                handle.capture = []
             try:
                 self._send_handle(writer, connection, handle, command)
-                # 正常客户端流已发出结束符；私有尾帧由 sender 后台收取。
-                pairs, raw = handle.capture[0] if handle.capture else ([], b"")
-                headers = json_bytes(pairs)
-                writer.write(struct.pack("!II", len(headers), len(raw)))
-                writer.write(headers)
-                writer.write(raw)
+                if capturing:
+                    # 正常客户端流已发出结束符，私有尾帧由 sender 后台收取。
+                    pairs, raw = handle.capture[0] if handle.capture else ([], b"")
+                    headers = json_bytes(pairs)
+                    writer.write(struct.pack("!II", len(headers), len(raw)))
+                    writer.write(headers)
+                    writer.write(raw)
             finally:
-                # 等待工具的进程可继续存活；本轮采集的正文和提供方凭据随本次发送释放。
-                handle.capture = None
+                if capturing:
+                    # 等待工具的进程可继续存活，本轮采集的正文随本次发送释放。
+                    handle.capture = None
+                if "signature_repair" in command:
+                    handle.signature_exchange = None
+
+    def _signature_exchange(self, reader, writer, connection, handle, deadline, epoch, raw, error):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return None
+        fields = {"signature_repair": "known", "body_len": len(raw)}
+        if error is not None:
+            capture = getattr(handle, "capture", None)
+            pairs = json_bytes(capture[0][0]) if capture and capture[0][1] == raw else b""
+            fields.update(signature_repair="rejected", error_len=len(error.signature_evidence),
+                          error_source=error.source, capture_headers_len=len(pairs))
+        try:
+            # 该交互发生在首个业务事件发布前，发送循环此时只等待原进程的事件。
+            connection.settimeout(remaining)
+            _reply(writer, fields)
+            writer.write(raw)
+            if error is not None:
+                writer.write(error.signature_evidence)
+                writer.write(pairs)
+            decision = _control(reader)
+            if decision == {"body_len": 0}:
+                return None
+            size = decision["body_len"]
+            attempt_id = decision.get("attempt_id")
+            if (type(size) is not int or not 0 < size <= BODY_LIMIT
+                    or (error is None and attempt_id is not None)
+                    or (error is not None and (
+                        not isinstance(attempt_id, str) or str(UUID(attempt_id)) != attempt_id
+                        or attempt_id == handle.reservation["reservation_id"]))):
+                raise ValueError("V2 签名修复决定无效")
+            repaired = reader.read(size)
+            if len(repaired) != size or self._config()[2] != epoch or time.monotonic() >= deadline:
+                raise EOFError("V2 签名修复的原轮已失效")
+            if error is not None and capture is not None:
+                capture.clear()
+            return repaired, attempt_id
+        except (EOFError, OSError):
+            if error is not None:
+                return None
+            raise
+        finally:
+            connection.settimeout(IO_TIMEOUT)
 
     def _send_handle(self, writer, connection, handle, command):
         try:
             events = iter(handle.send(command))
         except ModelResponseError as exc:
-            self._json_end(writer, exc.status, exc.private_body, error=exc)
+            self._json_end(writer, handle, exc.status, exc.private_body, error=exc)
             return
         with closing(events):
             if not handle.stream:
@@ -372,11 +433,11 @@ class AccountSource:
             try:
                 first = next(events, None)
             except ModelResponseError as exc:
-                self._json_end(writer, exc.status, exc.private_body, error=exc)
+                self._json_end(writer, handle, exc.status, exc.private_body, error=exc)
                 return
             if not first:
                 return
-            _reply(writer, {"status": 200, "content_type": "text/event-stream", "message_id_mode": "gateway"},
+            _reply(writer, _model_head(handle, 200, "text/event-stream"),
                    quota_headers=handle.quota_headers)
             self._chunks(writer, first)
             for event in events:
@@ -384,7 +445,7 @@ class AccountSource:
             writer.write(struct.pack("!I", 0))
 
     def _message_json(self, writer, events, connection, handle):
-        # 主轮始终只提交一次。与下游网关已有的 JSON 正常化容量一致。
+        # 只聚合最终模型流。与下游网关已有的 JSON 正常化容量一致。
         output = MessageJSON(BODY_LIMIT)
         sent = False
         error = None
@@ -398,7 +459,7 @@ class AccountSource:
                     if data is not None:
                         output.add(data)
                 if not sent and (output.message is not None or time.monotonic() - last >= IO_TIMEOUT / 2):
-                    _reply(writer, {"status": 200, "content_type": "application/json", "message_id_mode": "gateway"},
+                    _reply(writer, _model_head(handle, 200, "application/json"),
                            quota_headers=handle.quota_headers)
                     sent = True
                 if sent and time.monotonic() - last >= IO_TIMEOUT / 2:
@@ -416,11 +477,11 @@ class AccountSource:
         except (ValueError, KeyError, TypeError, RuntimeError, OverflowError):
             status = 502
             payload = json_bytes({"type": "error", "error": {"type": "api_error", "message": "V2 模型响应无效或提前终止"}})
-        self._json_end(writer, status, payload, sent=sent, error=error)
+        self._json_end(writer, handle, status, payload, sent=sent, error=error)
 
-    def _json_end(self, writer, status, payload, *, sent=False, error=None):
+    def _json_end(self, writer, handle, status, payload, *, sent=False, error=None):
         if not sent:
-            head = {"status": status, "content_type": "application/json", "message_id_mode": "gateway"}
+            head = _model_head(handle, status, "application/json")
             if error and error.source is not None:
                 head["error_source"] = error.source
                 if error.retry_after is not None:

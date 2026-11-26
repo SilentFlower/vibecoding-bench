@@ -85,6 +85,8 @@ pub(super) const TUI_MODEL_HEADER_POLICY: &str = "x-v3-tui-model-header-policy";
 pub(super) const TUI_OAUTH_FILE: &str = "x-v3-tui-oauth-file";
 pub(super) const TUI_ACCOUNT_EXPIRY: &str = "x-v3-tui-account-expiry";
 const TUI_ACCOUNT_MODEL: &str = "x-v3-tui-account-model";
+pub(super) const TUI_SIGNATURE_REPAIR: &str = "x-v3-tui-signature-repair";
+pub(super) const TUI_REPAIR_ATTEMPT: &str = "x-v3-tui-repair-attempt";
 pub(super) const TUI_ERROR_SOURCE: &str = "x-v3-tui-error-source";
 pub(super) const TUI_JSON_PROJECTION_V1: &str = "gateway-json-v1";
 pub(super) const TUI_SSE_PROJECTION_HEADER: &str = "x-v3-tui-sse-projection";
@@ -1422,6 +1424,8 @@ pub(super) struct TuiReservation {
     capture: Option<Bytes>,
     agent_header_used: bool,
     submission_started: bool,
+    signature_repair: bool,
+    pub(super) repair_pending: bool,
     input_policy: bool,
     model_header_policy: bool,
     session_mapping: bool,
@@ -1522,7 +1526,7 @@ impl TuiReservation {
     /// 使用已准备的单次预留发出实际请求。@param timeout 回包头期限。@return 原 sender 响应。
     #[cfg(test)]
     pub(super) async fn submit(
-        self,
+        mut self,
         ttfb_timeout: Duration,
     ) -> Result<reqwest::Response, AppError> {
         self.submit_with_account_credentials(ttfb_timeout, None)
@@ -1532,7 +1536,7 @@ impl TuiReservation {
     /// 提交原预留，按原来源协商的凭据协议发放本轮凭据。
     /// @param ttfb_timeout 回包头期限。@param credentials 敏感私有凭据头。@return 原 sender 响应。
     pub(super) async fn submit_with_account_credentials(
-        mut self,
+        &mut self,
         ttfb_timeout: Duration,
         credentials: Option<HeaderValue>,
     ) -> Result<reqwest::Response, AppError> {
@@ -1571,16 +1575,57 @@ impl TuiReservation {
         } else {
             request.body(reqwest::Body::wrap_stream(empty::<Result<Bytes, IoError>>()))
         };
-        timeout(ttfb_timeout, request.send())
+        let response = timeout(ttfb_timeout, request.send())
             .await
             .map_err(|_| unknown())?
-            .map_err(|_| unknown())
+            .map_err(|_| unknown())?;
+        self.repair_pending = self.signature_repair
+            && response.status() == StatusCode::BAD_REQUEST
+            && tui_projection_marker(response.headers(), TUI_SIGNATURE_REPAIR, "pending");
+        Ok(response)
+    }
+
+    /// 恢复已暂停的原轮。@param attempt 额外发送 UUID。@param remaining 原请求剩余时间。
+    /// @return 已关联的第二次响应或明确拒绝提交。
+    pub(super) async fn submit_signature_repair(
+        &mut self,
+        attempt: Uuid,
+        remaining: Duration,
+    ) -> Result<Option<reqwest::Response>, AppError> {
+        debug_assert!(self.repair_pending);
+        let id = attempt.to_string();
+        let request = self
+            .request("repair")
+            .header(TUI_REPAIR_ATTEMPT, &id)
+            .header(TUI_GATEWAY_ID_HEADER, TUI_JSON_PROJECTION_V1)
+            .header(TUI_SSE_PROJECTION_HEADER, TUI_SSE_PROJECTION_V1)
+            .body(reqwest::Body::wrap_stream(empty::<Result<Bytes, IoError>>()));
+        let unknown = || AppError::BadGateway("V2 签名修复提交状态未知".into());
+        let response = timeout(remaining, request.send())
+            .await
+            .map_err(|_| unknown())?
+            .map_err(|_| unknown())?;
+        if tui_projection_marker(response.headers(), TUI_REPAIR_ATTEMPT, &id) {
+            self.repair_pending = false;
+            return Ok(Some(response));
+        }
+        if response.status() == StatusCode::CONFLICT
+            && tui_projection_marker(response.headers(), TUI_SIGNATURE_REPAIR, "declined")
+        {
+            self.repair_pending = false;
+            return Ok(None);
+        }
+        if tui_projection_marker(response.headers(), ERROR_HEADER, "before-send") {
+            // 旧中继明确未转发恢复请求，原发送器仍在等待，需要按原预留取消。
+            return Ok(None);
+        }
+        Err(unknown())
     }
 }
 
 impl Drop for TuiReservation {
     fn drop(&mut self) {
-        if !self.submission_started
+        if (!self.submission_started || self.repair_pending)
             && let Ok(runtime) = tokio::runtime::Handle::try_current()
         {
             let request = self.request("cancel").timeout(Duration::from_secs(2));
@@ -1721,6 +1766,7 @@ pub(super) struct TuiMessagesInput<'a> {
     pub agent_summary: bool,
     pub oauth_file: bool,
     pub body_policy: TuiBodyPolicy,
+    pub signature_repair: Option<bool>,
 }
 
 /// 仅在已鉴权的预留链路传递本轮生效的系统设置。
@@ -1956,9 +2002,14 @@ pub(super) async fn prepare_tui(
         oauth_file: false,
         tui_oauth_profile,
         submission_started: false,
+        signature_repair: false,
+        repair_pending: false,
         continuation: false,
     };
     let mut prepare = reservation.request("prepare");
+    if let Some(known) = input.signature_repair {
+        prepare = prepare.header(TUI_SIGNATURE_REPAIR, if known { "known" } else { "1" });
+    }
     if input.oauth_file {
         prepare = prepare.header(TUI_OAUTH_FILE, "1");
     }
@@ -2018,6 +2069,8 @@ pub(super) async fn prepare_tui(
                 tui_projection_marker(response.headers(), TUI_MODEL_HEADER_POLICY, "1");
             reservation.session_mapping =
                 tui_projection_marker(response.headers(), TUI_UPSTREAM_SESSION, "1");
+            reservation.signature_repair = input.signature_repair.is_some()
+                && tui_projection_marker(response.headers(), TUI_SIGNATURE_REPAIR, "1");
             if observe {
                 reservation.wire_capture = tui_projection_marker(response.headers(), TUI_FINAL_CAPTURE, "1");
                 reservation.capture_state = match response
@@ -3382,6 +3435,16 @@ async fn tui_cancel(
     state.tui.cancel(&document.config.binding, &headers).await
 }
 
+#[cfg(target_os = "linux")]
+async fn tui_repair(
+    State(state): State<SenderState>,
+    request: Request,
+) -> Result<Response, AppError> {
+    let headers = tui_control_request(request, "V2 签名修复只接收原预留信封").await?;
+    let document = tui_document(&state, &headers)?;
+    state.tui.repair(&document.config.binding, &headers).await
+}
+
 async fn forward(State(state): State<SenderState>, headers: HeaderMap, body: Bytes) -> Response {
     let mut submitted = false;
     let result =
@@ -4168,6 +4231,7 @@ fn sender_components(config_path: String) -> (Router, Arc<AgyPool>) {
     let router = router
         .route("/internal/tui-v2/prepare", post(tui_prepare))
         .route("/internal/tui-v2/send", post(tui_send))
+        .route("/internal/tui-v2/repair", post(tui_repair))
         .route("/internal/tui-v2/cancel", post(tui_cancel));
     let router = router
         .route_layer(from_fn_with_state(state.clone(), authenticate_sender_post))
@@ -4406,6 +4470,14 @@ mod tests {
                     assert!(tui_delegates_json(&headers));
                     let reservation = headers["x-v3-tui-reservation"].to_str().unwrap().to_owned();
                     sends.send(reservation.clone()).unwrap();
+                    if reservation == "legacy-relay" {
+                        return (
+                            StatusCode::BAD_REQUEST,
+                            [(TUI_SIGNATURE_REPAIR, "pending")],
+                            "首个签名拒绝",
+                        )
+                            .into_response();
+                    }
                     if reservation == "delegated" {
                         let body = Body::from_stream(once(async move {
                             sender_barrier.notified().await;
@@ -4439,6 +4511,14 @@ mod tests {
                     response
                 }
             }),
+        )
+        .route(
+            "/internal/tui-v2/repair",
+            post(async |headers: HeaderMap| {
+                assert_eq!(headers["x-v3-tui-reservation"], "legacy-relay");
+                assert!(Uuid::parse_str(headers[TUI_REPAIR_ATTEMPT].to_str().unwrap()).is_ok());
+                (StatusCode::NOT_FOUND, [(ERROR_HEADER, "before-send")])
+            }),
         );
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let endpoint = format!("http://{}", listener.local_addr().unwrap());
@@ -4471,6 +4551,8 @@ mod tests {
             oauth_file: false,
             tui_oauth_profile: None,
             submission_started: false,
+            signature_repair: false,
+            repair_pending: false,
             continuation: false,
         };
         drop(reservation("before-send"));
@@ -4482,6 +4564,32 @@ mod tests {
             (action, identity.to_str().unwrap()),
             ("cancel", "before-send")
         );
+        let mut legacy_relay = reservation("legacy-relay");
+        legacy_relay.signature_repair = true;
+        let first = legacy_relay
+            .submit_with_account_credentials(Duration::from_secs(2), None)
+            .await
+            .unwrap();
+        assert_eq!(first.status(), StatusCode::BAD_REQUEST);
+        assert!(legacy_relay.repair_pending);
+        assert_eq!(sent.recv().await.unwrap(), "legacy-relay");
+        assert!(
+            legacy_relay
+                .submit_signature_repair(Uuid::new_v4(), Duration::from_secs(2))
+                .await
+                .unwrap()
+                .is_none()
+        );
+        drop(legacy_relay);
+        let (action, identity) = timeout(Duration::from_secs(2), events.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            (action, identity.to_str().unwrap()),
+            ("cancel", "legacy-relay")
+        );
+        assert_eq!(first.text().await.unwrap(), "首个签名拒绝");
         for status in [401, 403, 429] {
             let id = status.to_string();
             let response = reservation(&id)
@@ -5890,6 +5998,7 @@ mod tests {
                 body: &body,
                 headers: &headers,
                 native_cc: false,
+                signature_repair: None,
                 agent_summary: false,
                 oauth_file: false,
                 body_policy,
@@ -6038,6 +6147,7 @@ mod tests {
                 body: &body,
                 headers: &headers,
                 native_cc: true,
+                signature_repair: None,
                 agent_summary: false,
                 oauth_file: false,
                 body_policy: TuiBodyPolicy::default(),
@@ -6050,6 +6160,7 @@ mod tests {
                 body: &body,
                 headers: &headers,
                 native_cc: false,
+                signature_repair: None,
                 agent_summary: false,
                 oauth_file: false,
                 body_policy: TuiBodyPolicy::default(),
@@ -6063,6 +6174,7 @@ mod tests {
                 body: &body,
                 headers: &headers,
                 native_cc: true,
+                signature_repair: None,
                 agent_summary: false,
                 oauth_file: false,
                 body_policy: TuiBodyPolicy::default(),

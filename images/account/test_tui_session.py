@@ -1689,6 +1689,38 @@ class SessionTests(unittest.TestCase):
             self.assertTrue(actor._main_request(native, h))
             h.kind = "new"
 
+    def test_resumed_user_blocks_bind_the_latest_prompt_and_system_guard(self):
+        """恢复失败轮后认领最后一个提示文本块及当前标记。@return 无。"""
+        body = self._body()
+        with (
+            closing(self._driver()) as driver,
+            closing(driver.prepare(self._identity("x"), encode(body))) as handle,
+        ):
+            actor = handle.actor
+            actor.step = WireStep([])
+            actor.step.native_model = "chosen"
+            line = "prompt.submit hook additional context: " + actor.guard_text
+            historical = {"type": "text", "text": "失败轮的用户输入\n"}
+            prompt = {"type": "text", "text": body["messages"][0]["content"]}
+            user = {"role": "user", "content": [historical, prompt]}
+            system = {
+                "role": "system",
+                "content": [{"type": "text", "text": "原生环境\n\n" + line}],
+            }
+            native = {"model": "chosen", "stream": True, "messages": [user, system]}
+            self.assertTrue(actor._main_request(native, handle))
+            wrong = {
+                "旧轮提示在末尾": [{**user, "content": [prompt, historical]}, system],
+                "旧轮标记": [user, {**system, "content": [
+                    {"type": "text", "text": "prompt.submit hook additional context: 旧轮"},
+                ]}],
+                "标记重复": [user, system, system],
+                "缺少后续系统标记": [system, user],
+            }
+            for case, messages in wrong.items():
+                with self.subTest(case=case):
+                    self.assertFalse(actor._main_request({**native, "messages": messages}, handle))
+
     def test_local_model_string_user_owns_only_its_trailing_system_guard(self):
         """DeepSeek 合并系统梯段时，用户正文、原生模型和独立随机标记行须同时匹配。@return 无。"""
         body = self._body()
@@ -1768,6 +1800,60 @@ class SessionTests(unittest.TestCase):
                         native = {**request, "messages": [{"role": "user", "content": [{"type": "text", "text": marker}]}]}
                         actor.serve_model(Mock(headers={}), native)
                         self.assertEqual(handle.quota_headers, quota)
+                        actor.callback("/end", {**turn, "reason": "end_turn"})
+                        actor.callback("/complete", {"turn": turn["turn"], "aborted": False})
+                        self.assertEqual(b"".join(output.result(2)), wire)
+                    finally:
+                        actor.abort()
+
+    def test_signature_repair_sends_twice_in_one_claimed_native_step(self):
+        """签名拒绝由原步骤恢复，同一请求的原生回调只认领一次。@return 无。"""
+        events = [
+            {"type": "message_start", "message": {}},
+            {"type": "message_delta", "delta": {"stop_reason": "end_turn"}},
+            {"type": "message_stop"},
+        ]
+        wire = b"".join(b"data: " + encode(event) + b"\n\n" for event in events)
+        response = BytesIO(wire)
+        response.status = 200
+        response.getheader = lambda _name, _default=None: "text/event-stream"
+        first = ModelResponseError(
+            400,
+            encode({"error": {"type": "invalid_request_error", "message": "Invalid signature in thinking block"}}),
+            source="local_provider_http", complete=True,
+        )
+        self.assertIsNotNone(first.signature_evidence)
+        with closing(self._driver()) as driver, ThreadPoolExecutor(1) as pool:
+            driver.launcher = Mock()
+            driver.launcher.local_model_response.side_effect = [first, response]
+            request = {**self._body(), "thinking": {"type": "adaptive"}}
+            repaired = encode(self._body())
+            with closing(driver.prepare(self._identity("repair"), encode(request))) as handle:
+                actor = handle.actor
+                admitted = Mock(return_value=(repaired, "714b32be-b08a-464a-bae9-83cce37cd225"))
+                handle.signature_exchange = admitted
+                with patch.object(actor, "start") as start:
+                    output = pool.submit(list, handle.send({}))
+                    try:
+                        with actor.changed:
+                            self.assertTrue(actor.changed.wait_for(lambda: actor.step is not None, 2))
+                        step = actor.step
+                        turn = {"turn": "repair", "step": 0, "model": "chosen"}
+                        actor.callback("/begin", turn)
+                        marker = f"<system-reminder>\nprompt.submit hook additional context: {actor.guard_text}\n</system-reminder>"
+                        native = {**request, "messages": [{"role": "user", "content": [{"type": "text", "text": marker}]}]}
+                        actor.serve_model(Mock(headers={}), native)
+                        duplicate = Mock(headers={})
+                        actor.serve_model(duplicate, native)
+                        duplicate.send_error.assert_called_once_with(409, "No pending model step")
+                        self.assertIs(actor.step, step)
+                        self.assertTrue(step.claimed)
+                        self.assertEqual(handle.repair_attempt_id, "714b32be-b08a-464a-bae9-83cce37cd225")
+                        start.assert_called_once()
+                        calls = driver.launcher.local_model_response.call_args_list
+                        self.assertEqual(len(calls), 2)
+                        admitted.assert_called_once_with(calls[0].args[0], first)
+                        self.assertEqual(calls[1].args[0], repaired)
                         actor.callback("/end", {**turn, "reason": "end_turn"})
                         actor.callback("/complete", {"turn": turn["turn"], "aborted": False})
                         self.assertEqual(b"".join(output.result(2)), wire)

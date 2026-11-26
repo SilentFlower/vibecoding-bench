@@ -878,7 +878,7 @@ fn append_wire(value: &mut Value, wire: &Value, secrets: &[String]) -> io::Resul
 }
 
 /// 已脱敏的网关入站副本，以及已交给该 sender 的业务数据中需要逐字脱敏的值。
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct TuiCaptureInput {
     ingress: Value,

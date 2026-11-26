@@ -17,7 +17,12 @@ from cluster_store import ClusterStore
 from system_update_gate import UPDATE_GATE
 
 
-_TUI_METHODS = {'internal/tui-v2/prepare': 'POST', 'internal/tui-v2/send': 'POST', 'internal/tui-v2/cancel': 'POST'}
+_TUI_METHODS = {
+    'internal/tui-v2/prepare': 'POST',
+    'internal/tui-v2/send': 'POST',
+    'internal/tui-v2/repair': 'POST',
+    'internal/tui-v2/cancel': 'POST',
+}
 _METHODS = {'internal/send': 'POST', 'internal/native/status': 'GET', 'internal/native/prepare': 'POST',
     'internal/native/readiness': 'POST', 'internal/native/idle-policy': 'POST',
     'internal/native/prepare-switch': 'POST', 'internal/native/prepare/cancel': 'POST',
