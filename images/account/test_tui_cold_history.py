@@ -18,6 +18,8 @@ from tui_workspace_launch import (
     HistoryReplay, WorkspaceLaunchObservation, _key, _project_history_dir, _resume_path, launch_workspace_cli,
 )
 
+PNG_DATA = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII="
+
 
 class ColdHistoryTests(TestCase):
     """使用合成输入测试固定 CLI 的历史合同。"""
@@ -653,7 +655,7 @@ class ColdHistoryTests(TestCase):
     def test_only_matching_inline_image_enters_native_input(self):
         """历史和本轮的内嵌图像须匹配声明格式。@return 无。"""
         picture = {"type": "image", "source": {"type": "base64", "media_type": "image/png",
-                  "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII="}}
+                  "data": PNG_DATA}}
         raw = deepcopy(self.body)
         raw["messages"][0]["content"] = [{"type": "text", "text": "历史图像"}, picture]
         self.assertEqual(ColdHistory.from_request(raw).history[0]["content"][-1], picture)
@@ -670,3 +672,18 @@ class ColdHistoryTests(TestCase):
                 raw["messages"][0]["content"][-1] = {"type": "image", "source": source}
                 self.assertIsNone(ColdHistory.from_request(raw))
                 self.assertIsNone(ColdHistory.from_request(current))
+
+    def test_current_image_keeps_cache_markers_in_confirmed_history(self):
+        """本轮图像可和历史断点共存。@return 无。"""
+        marker = {"type": "ephemeral", "ttl": "1h"}
+        picture = {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": PNG_DATA}}
+        body = deepcopy(self.body)
+        body["messages"][0]["content"] = [{"type": "text", "text": "历史文本", "cache_control": marker}]
+        body["messages"][-1]["content"] = [picture]
+        plan = ColdHistory.from_request(body)
+        self.assertEqual(plan.submitted_blocks(), [picture])
+        self.assertTrue(plan.matches_history_cache_markers(body))
+        self.assertEqual(ColdHistory.from_receipt_boundary(body, plan.receipt_boundary()), plan)
+        body["messages"][-1]["content"] = [{**picture, "cache_control": marker}]
+        self.assertFalse(plan.matches_history_cache_markers(body))
+        self.assertIsNone(ColdHistory.from_request(body))

@@ -243,8 +243,8 @@ class ColdHistory:
         if cache_ttl != "off" and not cache_blocks:
             return None
         if cache_blocks:
-            # 原生路径仅承接已验证的历史文本。保留默认 TTL，并限制断点数量和前缀的时长顺序。
-            if len(cache_blocks) > 4 or not all(_plain_text(b) for b in content):
+            # 断点只出现在已确认历史。当前图像仍须通过独立的原生粘贴边界。
+            if len(cache_blocks) > 4:
                 return None
             ttls = [block["cache_control"].get("ttl", "5m") for block in cache_blocks]
             if ttls != sorted(ttls, key=lambda ttl: ttl != "1h"):

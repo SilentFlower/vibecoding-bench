@@ -1404,6 +1404,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             stages = ("first", "recovered" if recover_pending else "warm_receipt")
             raw_media = {stage: verify_raw_current_image_row(native, current, stage=stage)
                          for stage, (_, native, _) in zip(stages, received, strict=True)}
+            if history_cache_markers:
+                assert all(not row["cli_source_cache_control"] for row in raw_media.values()), raw_media
+                assert all(attempt["diagnostic_body_source"] == "interactive_cli" for attempt in captures), captures
             proof.update(current_images=[block["source"]["media_type"] for block in current if block["type"] == "image"],
                          changed_current_images_status=changed_media, raw_current_image_content=raw_media)
         if auto_tool_choice:
