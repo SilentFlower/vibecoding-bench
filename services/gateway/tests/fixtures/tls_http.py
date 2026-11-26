@@ -44,15 +44,18 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
-def certificates(root):
-    """生成仅供回环请求验证的短期证书。@param root 临时目录。@return 无。"""
+def certificates(root, *, extra_dns_names=()):
+    """生成仅供回环请求验证的短期证书。@param root 临时目录。
+    @param extra_dns_names 本次回环服务同时承接的固定主机名。@return 无。
+    """
     commands = [
         ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-subj", "/CN=Local v3 Test CA", "-keyout", "ca.key", "-out", "ca.pem"],
         ["req", "-newkey", "rsa:2048", "-nodes", "-subj", "/CN=api.anthropic.com", "-keyout", "leaf.key", "-out", "leaf.csr"],
         ["x509", "-req", "-in", "leaf.csr", "-CA", "ca.pem", "-CAkey", "ca.key", "-CAcreateserial", "-days", "1", "-extfile", "leaf.ext", "-out", "leaf.pem"],
         ["x509", "-in", "ca.pem", "-outform", "DER", "-out", "ca.der"],
     ]
-    (root / "leaf.ext").write_text("subjectAltName=DNS:api.anthropic.com\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\n")
+    names = ",".join("DNS:" + name for name in ("api.anthropic.com", *extra_dns_names))
+    (root / "leaf.ext").write_text(f"subjectAltName={names}\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\n")
     for command in commands:
         subprocess.run(["openssl", *command], cwd=root, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 

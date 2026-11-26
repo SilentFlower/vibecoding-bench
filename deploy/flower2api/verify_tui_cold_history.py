@@ -308,7 +308,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            structured_output=False, forced_tool_choice=None, no_tool_choice=False, disable_parallel_tool_use=False,
            auxiliary_mode=None,
            auxiliary_kind="title", auxiliary_sample=None, agent_progress=None, stock_client=False,
-           cancel_and_change_question=False):
+           cancel_and_change_question=False, oauth_rotation=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -324,6 +324,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param failure_boundaries 是否分别在模型收件前后切断隔离连接。
     @param stock_client 是否通过真实外部 CLI 验证完整 V2 输入与工具回执。
     @param cancel_and_change_question 是否在首轮工具参数未完成时取消并从确认历史改问。
+    @param oauth_rotation 是否在原轮等待工具期间通过正式管理入口轮换账号凭据。
     @param current_text_blocks 是否验证本轮文本块顺序及边界归属。
     @param signed_tool_history 是否核对隔离模型原工具轮的签名块。
     @param signed_tool_response 可选，模拟空思考正文或缺少助手模型的隔离响应。
@@ -362,6 +363,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
+    refresh_token = token_hex(32)
+    rotated_token, rotated_refresh = (token_hex(32), token_hex(32)) if oauth_rotation else (None, None)
+    expected_token = account_token
+    credential_observations, refresh_calls = [], []
+    oauth_host = "platform.claude.com"
     nonce = uuid4().hex
     deployment = "cold-history-" + nonce
     release, next_release = ("ci-4311-1", "ci-4312-1") if previous else ("cold-history-fixture", None)
@@ -378,7 +384,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     if inspect_model_body and v1_runtime is None:
         MODEL_BODY_TRACE.touch(mode=0o600, exist_ok=False)
         os.chown(MODEL_BODY_TRACE, 1001, 1001)
-    certificates(temporary)
+    certificates(temporary, extra_dns_names=(oauth_host,) if oauth_rotation else ())
     config = Path("/run/v3/sender.json")
     copy2(temporary / "ca.der", config.with_name("verification-ca.der"))
     received, callbacks, proxy_targets = [], [], []
@@ -405,10 +411,26 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
 
         def do_POST(self):
             """验证合成凭据并返回同一轮 SSE。@return 无。"""
+            if oauth_rotation and self.path == "/v1/oauth/token":
+                payload = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                accepted = (self.headers.get("Host") == oauth_host and payload.get("grant_type") == "refresh_token"
+                            and payload.get("refresh_token") == refresh_token and not refresh_calls)
+                refresh_calls.append(accepted)
+                startup_event("isolated_oauth_refresh", accepted=accepted, refresh_count=len(refresh_calls))
+                if accepted:
+                    response_json(self, {"access_token": rotated_token, "refresh_token": rotated_refresh,
+                                         "expires_in": 3600})
+                else:
+                    response_json(self, {"error": "invalid_grant"}, status=400)
+                return
             accepted_path = (self.path == "/v1/messages"
                              or (v1_runtime is not None and self.path == "/v1/messages?beta=true"))
-            if (not accepted_path
-                    or self.headers.get("Authorization") != "Bearer " + account_token):
+            bearer = self.headers.get("Authorization")
+            if not accepted_path or bearer != "Bearer " + expected_token:
+                if oauth_rotation:
+                    credential_observations.append({"credential": "rejected"})
+                    startup_event("isolated_model_credential_rejected", model_posts=len(received),
+                                  previous_credential=bearer == "Bearer " + account_token)
                 self.send_error(403)
                 return
             if trace_startup:
@@ -424,6 +446,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 else:
                     is_auxiliary = body.get("output_config", {}).get("format") == sample["output_config"]["format"]
             (auxiliary_received if is_auxiliary else received).append((model_digest, body, self.connection.version()))
+            if oauth_rotation:
+                generation = "initial" if bearer == "Bearer " + account_token else "rotated"
+                credential_observations.append({"credential": generation, "model_body_sha256": model_digest})
             if is_auxiliary:
                 auxiliary_provider_sessions.append(self.headers.get("x-claude-code-session-id"))
             if trace_startup:
@@ -535,7 +560,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
 
         def do_CONNECT(self):
             """保持代理与模型的 TLS 边界。@return 无。"""
-            if self.path != "api.anthropic.com:443":
+            if self.path != "api.anthropic.com:443" and not (oauth_rotation and self.path == oauth_host + ":443"):
                 self.send_error(403)
                 return
             if deny_proxy:
@@ -705,7 +730,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         if history_cache_ttl:
             manage("PUT", "settings", {"message_cache_control_rewrite": "off",
                                        "cache_control_ttl_rewrite": history_cache_ttl})
-        credentials = {"auth_type": "oauth", "access_token": account_token, "refresh_token": token_hex(32),
+        credentials = {"auth_type": "oauth", "access_token": account_token, "refresh_token": refresh_token,
                        "expires_at": time_ns() // 1_000_000 + 1_800_000, "subscription_type": "max"}
         if v1_runtime is not None:
             credentials = {"setup_token": account_token, "account_uuid": str(uuid4()), "organization_uuid": str(uuid4())}
@@ -1040,6 +1065,13 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         if history_cache_ttl:
             manage("PUT", "settings", {"cache_control_ttl_rewrite": "off"})
             assert manage("GET", "settings")["cache_control_ttl_rewrite"] == "off"
+        if oauth_rotation:
+            snapshot = manage("POST", f"accounts/{identifier}/oauth-credentials/resolve", {"force_refresh": True})
+            assert snapshot["account_id"] == identifier and snapshot["access_token"] == rotated_token
+            assert snapshot["refresh_token"] == rotated_refresh and refresh_calls == [True]
+            assert len(received) == 1
+            expected_token = rotated_token
+            startup_event("oauth_credential_rotated", model_posts=len(received), refresh_count=len(refresh_calls))
         if recover_pending:
             marker = ("--name=" + headers["x-session-id"]).encode()
             original, = [int(path.parent.name) for path in Path("/proc").glob("[0-9]*/cmdline")
@@ -1331,7 +1363,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                     "old_model_posts": 2, "new_model_posts": 1,
                     "new_attempt": new_attempt}
         verify_model(received, policy=tool_policy or "append", old_content=old_result, current_text_blocks=current_text_blocks)
-        captures = verify_captures(manage, received, account_token)
+        captures = verify_captures(manage, received, account_token, additional_secrets=(
+            (refresh_token, rotated_token, rotated_refresh) if oauth_rotation else ()
+        ))
         if restart_history or recover_pending:
             assert [attempt["diagnostic_session_origin"] for attempt in captures] == [
                 "external_import", "disk_resume" if recover_pending else "live_process",
@@ -1357,6 +1391,17 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                  "changed_tool_arguments_status": wrong_arguments,
                  "duplicate_receipt_status": duplicate, "tls_versions": [tls for _, _, tls in received],
                  "proxy_connections": len(proxy_targets), "attempts": captures}
+        if oauth_rotation:
+            assert refresh_calls == [True]
+            assert [row["credential"] for row in credential_observations] == ["initial", "rotated"]
+            for observed, attempt in zip(credential_observations, captures, strict=True):
+                assert observed["model_body_sha256"] == attempt["cli_and_https_body_sha256"]
+                assert attempt["diagnostic_body_source"] == "interactive_cli" and attempt["confirmed_model_responses"] == 1
+                observed.update(request_id=attempt["request_id"], attempt_id=attempt["attempt_id"],
+                                session_origin=attempt["diagnostic_session_origin"])
+            assert credential_observations[1]["session_origin"] == ("disk_resume" if recover_pending else "live_process")
+            proof["oauth_rotation"] = {"refresh_calls": len(refresh_calls), "model_credentials": credential_observations,
+                                       "capture_credentials_redacted": True}
         if auxiliary_mode:
             auxiliary_model = auxiliary_sample["body"]["model"] if auxiliary_received else None
             rows = wait_for(lambda: auxiliary_usage_rows(
@@ -3448,9 +3493,10 @@ def verify_model(received, *, policy, old_content, current_text_blocks=False):
     assert reply[0] == "user" and REPLY in json.dumps(reply[1], ensure_ascii=False)
 
 
-def verify_captures(manage, received, account_token):
+def verify_captures(manage, received, account_token, *, additional_secrets=()):
     """从管理接口按尝试比对实际 CLI 正文与 HTTPS 收件摘要。@param manage 本次管理请求。
-    @param received TLS 实收。@param account_token 合成凭据。@return 按模型请求顺序的对应关系。
+    @param received TLS 实收。@param account_token 合成凭据。
+    @param additional_secrets 可选，需检查脱敏的其他合成凭据。@return 按模型请求顺序的对应关系。
     """
     expected = {raw_sha: i for i, (raw_sha, _, _) in enumerate(received)}
 
@@ -3470,7 +3516,8 @@ def verify_captures(manage, received, account_token):
                 stages = {s["stage"]: s for s in snap["stages"]}
                 assert stages["wire_final"]["status"] == "unavailable" and "wire_final" not in snap
                 assert stages["tui_provider_request"]["representation"] == "request_from_interactive_cli"
-                assert account_token not in json.dumps(snap)
+                serialized = json.dumps(snap)
+                assert all(secret not in serialized for secret in (account_token, *additional_secrets))
                 captures[digest] = {"request_id": request_id, "attempt_id": attempt_id,
                                     "ingress_body_sha256": snap["ingress"]["original_body_sha256"],
                                     "cli_and_https_body_sha256": digest, "final_tls_capture": "unavailable",
@@ -3524,6 +3571,7 @@ def main():
     scenario.add_argument("--toggle-pending-policy", action="store_true")
     scenario.add_argument("--tool-policy", choices=("replace", "user_reminder"))
     scenario.add_argument("--recover-pending-tool", action="store_true")
+    scenario.add_argument("--oauth-rotation", choices=("live", "restart"))
     scenario.add_argument("--initial-idle-model-connection", action="store_true")
     scenario.add_argument("--output-effort", action="store_true")
     scenario.add_argument("--structured-output-contract", action="store_true")
@@ -3589,7 +3637,7 @@ def main():
     trace_startup = (args.initial_idle_model_connection or args.trace_initial_startup or cache_markers
                      or args.recovery_readiness_rejection
                      or args.structured_output_contract or bool(args.forced_tool_choice_contract) or args.no_tool_choice_contract
-                     or args.disable_parallel_tool_use_contract
+                     or args.disable_parallel_tool_use_contract or bool(args.oauth_rotation)
                      or bool(auxiliary_mode or args.agent_progress)
                      or bool(args.thinking_display_contract)
                      or (bool(args.message_system_roles) and args.v1_runtime is None))
@@ -3609,7 +3657,8 @@ def main():
                        restart_history=args.restart_history, text_input=args.text_input,
                        system_policy=args.system_policy, toggle_pending_policy=args.toggle_pending_policy,
                        stock_client=args.stock_client,
-                       tool_policy=args.tool_policy, recover_pending=args.recover_pending_tool,
+                       tool_policy=args.tool_policy, recover_pending=args.recover_pending_tool or args.oauth_rotation == "restart",
+                       oauth_rotation=bool(args.oauth_rotation),
                        output_effort=args.output_effort, history_png=args.history_png,
                        history_images=args.history_images, history_tool_blocks=args.history_tool_blocks,
                        previous=previous,
