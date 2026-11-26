@@ -69,10 +69,14 @@ def install_source():
         copy2(ROOT / "services/orchestrator" / name, target / name)
 
 
-def verify(gateway, sender, temporary, *, restart_history=False, text_input=False):
+def verify(gateway, sender, temporary, *, restart_history=False, text_input=False, system_policy=False,
+           toggle_pending_policy=False, tool_policy=None):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
+    @param system_policy 是否按账号验证原生正文的三种动作。
+    @param toggle_pending_policy 是否在客户端工具等待时更改账号动作。
+    @param tool_policy 工具往返前显式设置的 V2 动作。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -211,6 +215,24 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         messages = [{"role": role, "content": text} for role, text in HISTORY]
         if text_input:
             return verify_text_inputs(manage, token, account_token, headers, messages, received)
+        if system_policy:
+            account_path = f"accounts/{identifier}"
+            first = manage("GET", account_path)
+            assert first["client_system_prompt_policy"] == "append" and first["tui_system_prompt_policy_available"]
+            # 公开请求自报的私有字段只能作为普通头，模型落点仍由选定账号决定。
+            headers["x-v3-tui-system-prompt-policy"] = "user_reminder"
+            assert call(18090, "PUT", "/admin/" + account_path, admin,
+                        {"client_system_prompt_policy": "independent"})[0] == 400
+            proof = {}
+            for policy in ("append", "replace", "user_reminder"):
+                assert manage("PUT", account_path, {"client_system_prompt_policy": policy})[
+                    "client_system_prompt_policy"] == policy
+                assert manage("GET", account_path)["client_system_prompt_policy"] == policy
+                proof[policy] = verify_text_inputs(manage, token, account_token, headers, messages, received, policy=policy)
+            return proof
+        if tool_policy:
+            assert manage("PUT", f"accounts/{identifier}", {"client_system_prompt_policy": tool_policy})[
+                "client_system_prompt_policy"] == tool_policy
         messages[3:3] = [
             {"role": "assistant", "content": [{"type": "tool_use", "name": "OldNote", "id": PAST_ID, "input": ARGS}]},
             {"role": "user", "content": [{"type": "tool_result", "tool_use_id": PAST_ID, "content": "已完成的旧工具结果。"}]},
@@ -230,6 +252,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         assert tool["input"] == ARGS
         # 合成客户端只执行登记过的这一个调用。旧工具的 ID 不经过公开回执。
         callbacks.append(tool["id"])
+        if toggle_pending_policy:
+            changed = manage("PUT", f"accounts/{identifier}", {"client_system_prompt_policy": "replace"})
+            assert changed["client_system_prompt_policy"] == "replace"
         result = {"role": "user", "content": [{"type": "tool_result", "tool_use_id": NEW_ID, "content": REPLY}]}
         follow = {**body, "stream": False, "messages": [*messages, {"role": "assistant", "content": [tool]}, result]}
         wrong_subject, _ = call(18090, "POST", "/v1/messages", foreign, follow, headers)
@@ -237,9 +262,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                 {**headers, "x-session-id": str(uuid4())})
         changed = {**follow, "messages": [*messages, {"role": "assistant", "content": [
             {**tool, "input": {"key": "another-note"}}]}, result]}
-        wrong_arguments, _ = call(18090, "POST", "/v1/messages", token, changed, headers)
+        wrong_arguments, rejection = call(18090, "POST", "/v1/messages", token, changed, headers)
         rejected = wrong_subject, wrong_session, wrong_arguments, len(received)
-        assert rejected == (400, 400, 422, 1), rejected
+        assert rejected == (400, 400, 422, 1), (rejected, rejection)
         with closing(connect(temporary / "gateway.db")) as database:
             stored = database.execute("SELECT tools FROM tui_native_turns WHERE tools IN (?, ?)",
                                       (json.dumps([NEW_ID]), "!" + json.dumps([NEW_ID]))).fetchall()
@@ -255,7 +280,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         duplicate, _ = call(18090, "POST", "/v1/messages", token, follow, headers)
         assert duplicate == 400 and len(received) == 2, (duplicate, len(received))
         assert callbacks == [NEW_ID]
-        verify_model(received)
+        verify_model(received, policy=tool_policy or "append")
         captures = verify_captures(manage, received, account_token)
         for attempt, request_body, reply_id, model_id in zip(
             captures, (body, follow), (events[0]["message"]["id"], final["id"]),
@@ -270,6 +295,10 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                  "changed_tool_arguments_status": wrong_arguments,
                  "duplicate_receipt_status": duplicate, "tls_versions": [tls for _, _, tls in received],
                  "proxy_connections": len(proxy_targets), "attempts": captures}
+        if toggle_pending_policy:
+            proof["pending_policy"] = "append"
+        if tool_policy:
+            proof["tool_policy"] = tool_policy
         if restart_history:
             wait_for(lambda: sender_state().get("idle"))
             (binding_file,) = Path("/native/tui-workspaces").glob("*.json")
@@ -325,49 +354,70 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         return proof
 
 
-def verify_text_inputs(manage, token, account_token, headers, history, received):
+def verify_text_inputs(manage, token, account_token, headers, history, received, *, policy="append"):
     """核对模型端的默认原生指令及用户提供的文本。
     @param manage 临时管理接口。@param token 合成客户端。@param account_token 合成账号授权。
     @param headers 同一个客户端会话。@param history 合成的已确认旧问答。@param received 独立 HTTPS 实收。
+    @param policy 管理端冻结的系统提示词动作。
     @return 各输入形状的复跑证据。
     """
-    cases = (
+    cases = [
         ("omitted", None, []),
         ("empty_string", "", []),
         ("empty_array", [], history),
         ("multiple_blocks", [{"type": "text", "text": part} for part in SYSTEM], history),
-    )
+    ]
+    if policy != "append":
+        cases.append(("nonempty_string", "\n".join(SYSTEM), []))
     requests = []
     native_ids = set()
+    start = len(received)
     for index, (name, system, earlier) in enumerate(cases):
-        question = "纯文本首轮问题 " + str(index)
+        question = f"纯文本首轮问题 {policy}-{index}"
         body = {"model": MODEL, "max_tokens": 128, "stream": False,
                 "messages": [*earlier, {"role": "user", "content": question}]}
         if system is not None:
             body["system"] = system
         status, raw = call(18090, "POST", "/v1/messages", token, body, headers)
-        assert status == 200 and len(received) == index + 1, (name, status, raw, len(received))
+        assert status == 200 and len(received) == start + index + 1, (name, status, raw, len(received))
         reply = json.loads(raw)
-        _, native, _ = received[index]
+        _, native, _ = received[start + index]
         assert reply["content"] == [{"type": "text", "text": FINAL}]
-        joined = "\n".join(b["text"] for b in native["system"])
-        assert "You are Claude Code" in joined and len(native["system"]) > 2
-        assert all(joined.count(part) == int(name == "multiple_blocks") for part in SYSTEM)
-        if name == "multiple_blocks":
+        system_blocks = [b["text"] for b in native["system"]]
+        joined = "\n".join(system_blocks)
+        assert "You are Claude Code" in joined and "billing" in joined.lower()
+        explicit = name in ("multiple_blocks", "nonempty_string")
+        reminder = policy == "user_reminder" and explicit
+        if policy == "replace" and name != "omitted":
+            assert system_blocks[2:] == (["\n".join(SYSTEM)] if explicit else []), (name, system_blocks)
+        else:
+            assert len(system_blocks) > 2
+        assert all(joined.count(part) == int(explicit and not reminder) for part in SYSTEM)
+        if explicit and not reminder:
             assert joined.index(SYSTEM[0]) < joined.index(SYSTEM[1])
         texts = [(row["role"], b.get("text")) for row in native["messages"] for b in blocks(row)]
-        assert texts.count(("user", question)) == 1 and not native.get("tools"), name
+        user_questions = [text for role, text in texts if role == "user" and isinstance(text, str) and question in text]
+        assert len(user_questions) == 1 and user_questions[0].count(question) == 1 and not native.get("tools"), name
+        reminders = [row for row in native["messages"]
+                     if any(SYSTEM[0] in b.get("text", "") for b in blocks(row))]
+        assert len(reminders) == int(reminder)
+        if reminder:
+            message, = reminders
+            assert message["role"] == "user"
+            content = "\n".join(b.get("text", "") for b in blocks(message))
+            assert all(content.count(part) == 1 for part in SYSTEM) and content.index(SYSTEM[0]) < content.index(SYSTEM[1])
+            assert (HISTORY[0][1] if earlier else question) in content
         earlier_texts = {text for _, text in HISTORY}
         assert [(role, text) for role, text in texts if text in earlier_texts] == (HISTORY if earlier else []), name
-        assert [text for _, text in texts if isinstance(text, str) and text.startswith("纯文本首轮问题 ")] == [question]
+        assert [text for _, text in texts if isinstance(text, str) and text.startswith("纯文本首轮问题 ")] == user_questions
         native_id = json.loads(native["metadata"]["user_id"])["session_id"]
         assert native_id not in native_ids
         native_ids.add(native_id)
         requests.append({"case": name, "body_sha256": sha256(encoded(body)).hexdigest(), "client_message_id": reply["id"]})
-    for info, attempt in zip(requests, verify_captures(manage, received, account_token), strict=True):
+    for info, attempt in zip(requests, verify_captures(manage, received[start:], account_token), strict=True):
         assert info["body_sha256"] == attempt["ingress_body_sha256"]
         info.update(attempt)
-    return {"text_inputs": requests, "model_posts": len(received)}
+    return {"text_inputs": requests, "model_posts": len(received) - start}
 
 
 def blocks(row):
@@ -382,14 +432,26 @@ def find_blocks(body, key, identifier):
     return [(row["role"], b) for row in body["messages"] for b in blocks(row) if b.get(key) == identifier]
 
 
-def verify_model(received):
-    """检验模型端的历史、系统提示、原生动态 MCP 和续轮。@param received HTTPS 实收。@return 无。"""
+def verify_model(received, *, policy):
+    """检验历史、系统提示、原生动态 MCP 和续轮。@param received HTTPS 实收。
+    @param policy 原工具轮的有效动作。@return 无。
+    """
     (_, first, _), (_, second, _) = received
     for body in (first, second):
         assert body["max_tokens"] == 128, body["max_tokens"]
-        system = "\n".join(b["text"] for b in body["system"])
-        assert "You are Claude Code" in system and all(system.count(part) == 1 for part in SYSTEM)
-        assert system.index(SYSTEM[0]) < system.index(SYSTEM[1])
+        system_blocks = [b["text"] for b in body["system"]]
+        system = "\n".join(system_blocks)
+        assert "You are Claude Code" in system and "billing" in system.lower()
+        if policy == "user_reminder":
+            assert all(part not in system for part in SYSTEM)
+            row, = [row for row in body["messages"] if any(SYSTEM[0] in b.get("text", "") for b in blocks(row))]
+            user = "\n".join(b.get("text", "") for b in blocks(row))
+            assert row["role"] == "user" and HISTORY[0][1] in user
+            assert all(user.count(part) == 1 for part in SYSTEM) and user.index(SYSTEM[0]) < user.index(SYSTEM[1])
+        else:
+            assert all(system.count(part) == 1 for part in SYSTEM) and system.index(SYSTEM[0]) < system.index(SYSTEM[1])
+            if policy == "replace":
+                assert system_blocks[2:] == ["\n".join(SYSTEM)]
         messages = [(row["role"], b.get("text")) for row in body["messages"] for b in blocks(row)]
         history_texts = {text for _, text in HISTORY}
         assert [(role, text) for role, text in messages if text in history_texts] == HISTORY
@@ -446,6 +508,9 @@ def main():
     scenario = parser.add_mutually_exclusive_group()
     scenario.add_argument("--restart-history", action="store_true")
     scenario.add_argument("--text-input", action="store_true")
+    scenario.add_argument("--system-policy", action="store_true")
+    scenario.add_argument("--toggle-pending-policy", action="store_true")
+    scenario.add_argument("--tool-policy", choices=("replace", "user_reminder"))
     args = parser.parse_args()
     if (not Path("/.dockerenv").exists() or {name for _, name in if_nameindex()} != {"lo"}
             or Path("/run/v3/sender.json").exists() or any(Path("/native").glob("*"))):
@@ -453,7 +518,9 @@ def main():
     install_source()
     with TemporaryDirectory(prefix="cold-history-") as directory:
         proof = verify(args.gateway, args.sender, Path(directory),
-                       restart_history=args.restart_history, text_input=args.text_input)
+                       restart_history=args.restart_history, text_input=args.text_input,
+                       system_policy=args.system_policy, toggle_pending_policy=args.toggle_pending_policy,
+                       tool_policy=args.tool_policy)
         print(json.dumps(proof, ensure_ascii=False))
 
 

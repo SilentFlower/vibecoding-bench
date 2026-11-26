@@ -414,10 +414,13 @@ class _Actor:
                     resume = None
                     if self.cold_history is not None:
                         plan = self.cold_history
-                        instructions = plugin / "instructions.md"
-                        if plan.system:
-                            atomic_text(instructions, plan.system)
-                            opts.extend(["--append-system-prompt-file", str(instructions)])
+                        # 本轮设置来自当前账号，恢复时也应按当前轮构造系统正文。
+                        opts.extend(["--system-prompt-snapshot", "off"])
+                        if system_prompt := plan.system_argument():
+                            flag, text = system_prompt
+                            instructions = plugin / "instructions.md"
+                            atomic_text(instructions, text)
+                            opts.extend([flag, str(instructions)])
                         if plan.tools:
                             mcp = plugin / "mcp.json"
                             atomic_text(mcp, _json({"mcpServers": {MCP_SERVER: {
@@ -1508,7 +1511,9 @@ class SessionDriver:
                     if actor.cold_history is not None:
                         prompt_index = len(actor.cold_history.history) + 1
                         # 继续使用原进程的生效设置，校验通过后才把回执交给等待工具。
-                        plan = ColdHistory.from_request({**body, "messages": messages[:prompt_index]})
+                        plan = ColdHistory.from_request(
+                            {**body, "messages": messages[:prompt_index]}, actor.cold_history.system_policy,
+                        )
                         if not native_cache_policy or plan != actor.cold_history or any(
                             row["role"] != "user" or not isinstance(row["content"], list)
                             or not row["content"] or any(block["type"] != "tool_result" for block in row["content"])
@@ -1519,11 +1524,15 @@ class SessionDriver:
                     return handle
 
         cold = None
+        system_policy = reservation.get("client_system_prompt_policy", "append")
+        is_native = native_input(body, reservation.get("input_format"))
         if (self.managed_oauth and reservation.get("native_cold_history") is True
                 and native_cache_policy and agent_hint is None and checkpoint is None
-                and not native_input(body, reservation.get("input_format"))):
-            cold = ColdHistory.from_request(body)
-        prompt = cold.prompt if cold is not None else prompt_text(messages)
+                and not is_native):
+            cold = ColdHistory.from_request(body, system_policy)
+        if cold is None and system_policy != "append" and not is_native:
+            raise InputRejection("unsupported_parameter")
+        prompt = cold.submitted_prompt() if cold is not None else prompt_text(messages)
         with self.lock:
             if agent_hint is not None and not summary and (
                 actor_key in self.sessions

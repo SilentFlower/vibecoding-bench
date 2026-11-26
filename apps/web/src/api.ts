@@ -72,7 +72,7 @@ export interface OverallWorkStatus {
 }
 
 export type RequestBackend = 'legacy' | 'native293' | 'tui_v2'
-export type ClientSystemPromptPolicy = 'independent' | 'user_reminder'
+export type ClientSystemPromptPolicy = 'append' | 'replace' | 'independent' | 'user_reminder'
 
 export interface Account {
   id: number
@@ -124,6 +124,7 @@ export interface Account {
   request_backend_revision?: number
   request_backend_wait_reason?: 'draining' | 'runtime_unconfirmed'
   tui_v2_available?: boolean
+  tui_system_prompt_policy_available?: boolean
   account_uuid?: string | null
   organization_uuid?: string | null
   subscription_type?: string | null

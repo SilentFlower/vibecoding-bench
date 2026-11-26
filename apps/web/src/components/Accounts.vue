@@ -599,7 +599,7 @@ function openEdit(a: Account) {
     platform: a.platform ?? 'claude_code',
     agy_system_prompt_homoglyph_enabled: a.agy_system_prompt_homoglyph_enabled ?? false,
     client_system_prompt_policy: a.client_system_prompt_policy
-      ?? (a.agy_system_prompt_as_user_reminder ? 'user_reminder' : 'independent'),
+      ?? (a.platform === 'antigravity' ? (a.agy_system_prompt_as_user_reminder ? 'user_reminder' : 'independent') : 'append'),
     agy_gif_frames_enabled: a.agy_gif_frames_enabled ?? false,
     agy_disable_safety_filtering: a.agy_disable_safety_filtering ?? false,
     name: a.name,
@@ -1686,6 +1686,16 @@ async function copyText(text: string) {
               </NoticeStrip>
             </div>
             <ProxyPicker v-model="proxyChoice" :current-label="editingProxyLabel" /></section>
+          <section v-if="!isAgyForm && editing?.tui_system_prompt_policy_available && form.request_backend === 'tui_v2'" class="account-form-section">
+            <ChoiceSelect v-model="form.client_system_prompt_policy" label="客户端系统提示词" :options="[
+              {value:'append',label:'追加到原生系统提示词（默认）'},
+              {value:'replace',label:'用客户端指令替换默认工作正文'},
+              {value:'user_reminder',label:'放入用户提醒'},
+            ]" />
+            <p v-if="form.client_system_prompt_policy === 'replace'" class="form-help">普通 Messages 请求省略指令时保留默认工作正文。显式空值清空工作正文，保留身份和计费。</p>
+            <p v-else-if="form.client_system_prompt_policy === 'user_reminder'" class="form-help">普通 Messages 请求的非空指令进入首条适合的用户消息。省略或传空时仅使用默认工作正文。</p>
+            <p v-else class="form-help">普通 Messages 请求的非空指令按顺序追加。省略或传空时保留默认工作正文。</p>
+          </section>
           <section v-if="!isAgyForm" class="account-form-section"><h3>用量与调度</h3><div class="account-edit-grid three"><NumberInput v-model="numberDrafts.concurrency" label="并发上限" :min="1" required /><NumberInput v-model="numberDrafts.rpm_limit" label="RPM 上限" :min="0" required /><NumberInput v-model="numberDrafts.priority" label="调度优先级" :min="1" required /></div><div class="account-edit-grid"><NumberInput v-model="numberDrafts.five_hour_usage_limit_percent" label="5 小时用量上限（%）" :min="0" :max="100" required /><NumberInput v-model="numberDrafts.seven_day_usage_limit_percent" label="7 天用量上限（%）" :min="0" :max="100" required /></div><p class="form-help">RPM 和用量上限填 0 表示不限。达到任一用量上限后停止分配新消息，窗口重置后恢复。未知用量保持可用，单次或并发请求可能越线。</p></section>
           <section v-if="!isAgyForm" class="account-form-section"><h3>请求与模型</h3><div class="account-edit-grid"><ChoiceSelect v-model="form.billing_mode" label="Billing 模式" :options="[{value:'strip',label:'清除（Strip）'},{value:'rewrite',label:'重写（Rewrite）'}]" /><label class="approved-field"><span>允许 1M 上下文的模型</span><Input v-model="form.allow_1m_models"  /></label></div><div class="model-presets"><span>模型预设</span><Button type="button" size="sm" variant="secondary" @click="form.allow_1m_models = 'opus'">仅 Opus</Button><Button type="button" size="sm" variant="secondary" @click="form.allow_1m_models = DEFAULT_ALLOW_1M_MODELS">Opus + Sonnet 5</Button><Button type="button" size="sm" variant="secondary" @click="form.allow_1m_models = ''">全部关闭</Button></div><p class="form-help">模型以逗号分隔，按子串匹配。留空关闭 1M 上下文。Sonnet 5 使用完整名称以区分 Sonnet 4.6。</p>
             <Checkbox v-model="form.allow_fast_mode" class="account-check"><strong>允许客户端 Fast Mode</strong><small>允许后保留客户端申请，可能增加计费和限流风险。</small></Checkbox><Checkbox v-model="form.auto_telemetry" class="account-check"><strong>自动遥测</strong><small>由网关代替客户端发送遥测请求。</small></Checkbox><Checkbox v-if="form.auth_type==='oauth'" v-model="form.auto_poll_usage" class="account-check"><strong>自动轮询用量</strong><small>后台定时拉取 OAuth 账号的用量数据。</small></Checkbox></section>

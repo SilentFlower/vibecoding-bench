@@ -209,6 +209,7 @@ class AccountSource:
                 ))
         if managed_oauth:
             state["managed_oauth_protocol"] = 1
+            state["client_system_prompt_policy_protocol"] = 1
         file_available = managed_oauth and getattr(driver, "oauth_file_available", False)
         if file_available:
             state["oauth_file_protocol"] = 1
@@ -254,6 +255,11 @@ class AccountSource:
                     or prepared["native_cold_history_protocol"] != 1 or not managed_oauth):
                 return
             reservation = {**reservation, "native_cold_history": True}
+        if "client_system_prompt_policy" in prepared:
+            policy = prepared["client_system_prompt_policy"]
+            if reservation.get("native_cold_history") is not True or policy not in ("replace", "user_reminder"):
+                return
+            reservation = {**reservation, "client_system_prompt_policy": policy}
         size = prepared["body_len"]
         if type(size) is not int or not 0 < size <= BODY_LIMIT:
             return
@@ -323,6 +329,8 @@ class AccountSource:
                 "workspace_protocol": 1,
                 "workspace_resume": getattr(handle, "workspace_resume", False),
             }
+            if "client_system_prompt_policy" in reservation:
+                reply["client_system_prompt_policy"] = reservation["client_system_prompt_policy"]
             cold = bool(getattr(getattr(handle, "actor", None), "cold_history", None))
             if cold:
                 if reservation.get("native_cold_history") is not True:

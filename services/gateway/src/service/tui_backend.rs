@@ -320,12 +320,13 @@ fn view(
     runtime: Option<&TuiBindingStatus>,
 ) -> Value {
     let mut value = json!(account);
-    attach_status(&mut value, state, runtime);
+    attach_status(&mut value, account, state, runtime);
     value
 }
 
 fn attach_status(
     value: &mut Value,
+    account: &Account,
     state: &TuiBackendSnapshot,
     runtime: Option<&TuiBindingStatus>,
 ) {
@@ -337,6 +338,12 @@ fn attach_status(
             || tui_same_binding(&state.binding, &status.key)
             || (status.idle && status.can_advance(&state.binding))
     }));
+    if state.active == TUI_V2 {
+        value["client_system_prompt_policy"] = json!(account.tui_system_prompt_policy);
+        value["tui_system_prompt_policy_available"] = json!(runtime.is_some_and(|status| {
+            status.system_prompt_policy && tui_same_binding(&state.binding, &status.key)
+        }));
+    }
     if !state.target.is_empty() {
         value["request_backend_wait_reason"] = json!(if runtime
             .is_some_and(|status| status.can_advance(&state.binding))
@@ -361,6 +368,7 @@ pub(crate) async fn append_view(
     let state = service.tui_backend(account.id).await?;
     attach_status(
         value,
+        account,
         &state,
         tui_transition_status(account).await.as_ref().ok(),
     );

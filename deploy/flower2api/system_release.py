@@ -33,6 +33,7 @@ BENCH_SCHEMA_SOURCES = {
 RECEIPT_SCHEMA_SOURCE = 'orchestrator/tui_tool_receipts_schema.py'
 RECEIPT_SCHEMA_V1_CHECKSUM = '788a8c34215042c6f6ab1a48a32ae37a004bc9d71b062e026d4a67aa68daeaa3'
 GATEWAY_SCHEMA_SOURCES = {
+    'gateway.tui-system-prompt.16': 'cc2api/src/store/tui_system_prompt_schema.rs',
     'gateway.tui-oauth-refresh.15': 'cc2api/src/store/tui_oauth_refresh_schema.rs',
     'gateway.usage-history.12': 'cc2api/src/store/usage_history_schema.rs',
     'gateway.agy-recovery.14': 'cc2api/src/store/agy_recovery_schema.rs',

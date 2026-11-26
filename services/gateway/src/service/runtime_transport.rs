@@ -44,7 +44,7 @@ use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 
 use crate::error::AppError;
-use crate::model::account::{Account, AccountAuthType};
+use crate::model::account::{Account, AccountAuthType, TuiSystemPromptPolicy};
 use crate::model::request_diagnostics::{ExecutionLocation, RequestLogMode};
 use crate::service::account::{AccountService, CredentialActivity};
 use crate::service::agy_contract::{
@@ -82,6 +82,7 @@ pub(super) const TUI_FINAL_CAPTURE: &str = "x-v3-tui-final-capture";
 pub(super) const TUI_CLI_SUBMISSION: &str = "x-v3-tui-cli-submission";
 pub(super) const TUI_UPSTREAM_SESSION: &str = "x-v3-tui-upstream-session";
 pub(super) const TUI_MANAGED_OAUTH: &str = "x-v3-tui-managed-oauth";
+pub(super) const TUI_SYSTEM_PROMPT_POLICY: &str = "x-v3-tui-system-prompt-policy";
 pub(super) const TUI_MODEL_HEADER_POLICY: &str = "x-v3-tui-model-header-policy";
 pub(super) const TUI_MODEL_ACCEPT_OMITTED: &str = "x-v3-tui-model-accept-omitted";
 pub(super) const TUI_OAUTH_FILE: &str = "x-v3-tui-oauth-file";
@@ -991,7 +992,7 @@ async fn tui_status(
     binding: &TransportBinding,
     fixture: bool,
     probe: Option<&TuiReceiptProbe>,
-) -> Result<(bool, bool), TuiV2Unavailable> {
+) -> Result<(bool, bool, bool), TuiV2Unavailable> {
     let mut request = client
         .get(format!(
             "{}/internal/status",
@@ -1021,6 +1022,7 @@ async fn tui_status(
         .map_err(|_| TuiV2Unavailable::ReadinessUnverified)?;
     let idle = tui_status_snapshot(binding, &status, fixture)?;
     let summary = status["tui_v2"]["agent_summary_protocol"] == 1;
+    let system_prompt_policy = status["tui_v2"]["client_system_prompt_policy_protocol"] == 1;
     if probe.is_some() {
         if !fixture && status["evidence_ok"] != true {
             return Err(TuiV2Unavailable::ReadinessUnverified);
@@ -1029,9 +1031,10 @@ async fn tui_status(
         return Ok((
             status["tui_v2"]["receipt_idle"].as_bool().unwrap_or(idle),
             summary,
+            system_prompt_policy,
         ));
     }
-    Ok((idle, summary))
+    Ok((idle, summary, system_prompt_policy))
 }
 
 fn tui_status_snapshot(
@@ -1139,10 +1142,11 @@ async fn probe_tui_account(
             predecessors,
             ..
         } = tui_transport(account, None, registered, false).await?;
-        let (idle, _) = tui_status(&client, &binding, fixture, probe).await?;
+        let (idle, _, system_prompt_policy) = tui_status(&client, &binding, fixture, probe).await?;
         Ok(TuiBindingStatus {
             key: tui_sender_key(&binding, fixture),
             idle,
+            system_prompt_policy,
             predecessors,
         })
     })
@@ -1163,6 +1167,7 @@ pub(crate) async fn tui_account_status(account: &Account) -> Result<(String, boo
 pub(super) struct TuiBindingStatus {
     pub(super) key: String,
     pub(super) idle: bool,
+    pub(super) system_prompt_policy: bool,
     predecessors: Vec<String>,
 }
 
@@ -1214,6 +1219,7 @@ pub(super) async fn tui_switch_status(account: &Account) -> Result<TuiBindingSta
             Ok(TuiBindingStatus {
                 key: sender.key,
                 idle: sender.idle,
+                system_prompt_policy: sender.system_prompt_policy,
                 predecessors: sender.predecessors,
             })
         }
@@ -1351,6 +1357,7 @@ pub(super) struct TuiReadySender {
     pub(super) key: String,
     pub(super) idle: bool,
     agent_summary: bool,
+    system_prompt_policy: bool,
     predecessors: Vec<String>,
     tui_oauth_profile: Option<Map<String, Value>>,
 }
@@ -1382,7 +1389,7 @@ pub(super) async fn ready_tui_sender(
     let budget = deadline
         .checked_duration_since(Instant::now())
         .ok_or(AppError::AdmissionLimited { retry_after: 1 })?;
-    let (transport, (idle, agent_summary)) = timeout(budget, async {
+    let (transport, (idle, agent_summary, system_prompt_policy)) = timeout(budget, async {
         let transport = tui_transport(account, wake.then_some(budget), registered, true).await?;
         let idle = tui_status(
             &transport.client,
@@ -1410,6 +1417,7 @@ pub(super) async fn ready_tui_sender(
         key,
         idle,
         agent_summary,
+        system_prompt_policy,
         predecessors,
         tui_oauth_profile,
     })
@@ -1769,6 +1777,7 @@ pub(super) struct TuiMessagesInput<'a> {
     pub agent_summary: bool,
     pub oauth_file: bool,
     pub body_policy: TuiBodyPolicy,
+    pub system_prompt_policy: TuiSystemPromptPolicy,
     pub signature_repair: Option<bool>,
 }
 
@@ -1960,6 +1969,13 @@ pub(super) async fn prepare_tui(
             "原生进度请求需要支持独立摘要的账号发送器".into(),
         ));
     }
+    let explicit_system_policy =
+        !input.native_cc && input.system_prompt_policy != TuiSystemPromptPolicy::Append;
+    if explicit_system_policy && !sender.system_prompt_policy {
+        return Err(AppError::ServiceUnavailable(
+            "原生账号发送器尚未支持客户端系统提示词动作".into(),
+        ));
+    }
     let TuiReadySender {
         client,
         binding,
@@ -2033,6 +2049,12 @@ pub(super) async fn prepare_tui(
                 .map_err(|_| AppError::Internal("V2 本轮正文设置无法编码".into()))?,
         );
     }
+    if explicit_system_policy {
+        prepare = prepare.header(
+            TUI_SYSTEM_PROMPT_POLICY,
+            input.system_prompt_policy.as_str(),
+        );
+    }
     if input.native_cc
         && let Some(format) = tui_cli_format(input.headers)
     {
@@ -2104,6 +2126,13 @@ pub(super) async fn prepare_tui(
             {
                 return Err(AppError::ServiceUnavailable(
                     "V2 sender 未确认本轮正文设置".into(),
+                ));
+            }
+            if explicit_system_policy
+                && !tui_projection_marker(response.headers(), TUI_SYSTEM_PROMPT_POLICY, "1")
+            {
+                return Err(AppError::ServiceUnavailable(
+                    "V2 sender 未确认客户端系统提示词动作".into(),
                 ));
             }
             match response
@@ -3303,9 +3332,12 @@ async fn status(
                 .status(&config.binding, Some(configuration), receipt_probe.as_ref())
                 .await
             {
-                Some((idle, receipt_idle, agent_summary)) => {
+                Some((idle, receipt_idle, agent_summary, system_prompt_policy)) => {
                     if agent_summary {
                         status["agent_summary_protocol"] = json!(1);
+                    }
+                    if system_prompt_policy {
+                        status["client_system_prompt_policy_protocol"] = json!(1);
                     }
                     status["ready"] = json!(true);
                     status["idle"] = json!(idle);
@@ -4308,6 +4340,7 @@ mod tests {
             let mut state = TuiBindingStatus {
                 key: tui_sender_key(&current, false),
                 idle: true,
+                system_prompt_policy: false,
                 predecessors: tui_predecessor_keys(
                     &current,
                     vec![
@@ -6009,6 +6042,7 @@ mod tests {
                 binding,
                 idle: true,
                 agent_summary: false,
+                system_prompt_policy: false,
                 predecessors: Vec::new(),
                 tui_oauth_profile: None,
             };
@@ -6019,6 +6053,7 @@ mod tests {
                 signature_repair: None,
                 agent_summary: false,
                 oauth_file: false,
+                system_prompt_policy: TuiSystemPromptPolicy::Append,
                 body_policy,
             };
             let result = prepare_tui(
@@ -6168,6 +6203,7 @@ mod tests {
                 signature_repair: None,
                 agent_summary: false,
                 oauth_file: false,
+                system_prompt_policy: TuiSystemPromptPolicy::Append,
                 body_policy: TuiBodyPolicy::default(),
             })
             .unwrap(),
@@ -6181,6 +6217,7 @@ mod tests {
                 signature_repair: None,
                 agent_summary: false,
                 oauth_file: false,
+                system_prompt_policy: TuiSystemPromptPolicy::Append,
                 body_policy: TuiBodyPolicy::default(),
             })
             .unwrap(),
@@ -6195,6 +6232,7 @@ mod tests {
                 signature_repair: None,
                 agent_summary: false,
                 oauth_file: false,
+                system_prompt_policy: TuiSystemPromptPolicy::Append,
                 body_policy: TuiBodyPolicy::default(),
             })
             .is_err()

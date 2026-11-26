@@ -63,14 +63,18 @@ class ColdHistory:
     history: list
     model: str
     prompt: str
-    system: str
+    system: str | None
     tools: dict
     max_tokens: int
     thinking: dict | None
+    system_policy: str
 
     @classmethod
-    def from_request(cls, body):
-        """识别普通文本首轮及受支持的闭合历史。@param body 已校验的请求。@return 原生输入计划或空。"""
+    def from_request(cls, body, system_policy="append"):
+        """识别普通文本首轮及受支持的闭合历史。
+        @param body 已校验的请求。@param system_policy 本轮冻结的账号系统指令动作。
+        @return 原生输入计划或空。
+        """
         if body.keys() - {"model", "max_tokens", "thinking", "system", "messages", "tools", "stream"}:
             return None
         if type(body.get("max_tokens")) is not int or body["max_tokens"] <= 0:
@@ -93,56 +97,87 @@ class ColdHistory:
                     or not isinstance(tool.get("description", ""), str)
                     or "input_schema" not in tool):
                 return None
-        system = body.get("system", "")
+        system = body.get("system")
         if isinstance(system, list):
             if any(block.keys() != {"type", "text"} for block in system):
                 return None
             system = "\n".join(block["text"] for block in system)
+        if system_policy != "replace":
+            system = system or ""
         tools = {MCP_PREFIX + tool["name"]: tool for tool in declared}
-        return cls(history, body["model"], content[0]["text"], system, tools, body["max_tokens"], body.get("thinking"))
+        return cls(history, body["model"], content[0]["text"], system, tools, body["max_tokens"],
+                   body.get("thinking"), system_policy)
+
+    def system_argument(self):
+        """选择原生 CLI 提示词文件选项。@return 参数和文件正文，或缺省值。"""
+        if self.system_policy == "replace" and self.system is not None:
+            return "--system-prompt-file", self.system
+        if self.system_policy == "append" and self.system:
+            return "--append-system-prompt-file", self.system
+        return None
+
+    def submitted_prompt(self):
+        """取得提交给当前交互轮的问题。@return 正文，必要时包含用户提醒。"""
+        if self._reminder_index() == len(self.history):
+            return f"{self.prompt}\n\n{self._reminder()}"
+        return self.prompt
+
+    def _reminder(self):
+        return f"<system-reminder>\n{self.system}\n</system-reminder>"
+
+    def _reminder_index(self):
+        if self.system_policy != "user_reminder" or not self.system:
+            return None
+        for index, row in enumerate(self.history):
+            if row["role"] == "user" and all(block["type"] != "tool_result" for block in _blocks(row)):
+                return index
+        return len(self.history)
 
     def import_session(self, config, work, native_id):
         """在已绑定的工作区选择新会话或发布已完成的外部历史。
         @param config 私有配置。@param work 已核验工作目录。@param native_id 绑定的原生会话。
         @return 本次启动的原生会话 UUID。
         """
-        def render(session_id):
-            return self._transcript(work, session_id)
+        reminder_index = self._reminder_index()
+        history = []
+        for index, row in enumerate(self.history):
+            blocks = _blocks(row)
+            if index == reminder_index:
+                blocks = [*blocks, {"type": "text", "text": self._reminder()}]
+            history.append((row["role"], blocks))
 
         boundary = sha256(json.dumps(
-            (self.model, self.system, self.tools, self.max_tokens, self.thinking,
-             [(row["role"], _blocks(row)) for row in self.history]),
+            (self.model, self.system_policy, self.system, self.tools, self.max_tokens, self.thinking, history),
             ensure_ascii=False, separators=(",", ":"), sort_keys=True, allow_nan=False,
         ).encode()).hexdigest()
         return publish_workspace_history(
-            config, work, native_id, self._matches_history, render if self.history else None,
+            config, work, native_id, lambda rows: self._matches_history(rows, history),
+            (lambda session_id: self._transcript(work, session_id, history)) if history else None,
             boundary=boundary,
         )
 
-    def _matches_history(self, rows):
+    def _matches_history(self, rows, history):
         matches = True
         parent = None
-        for row, expected in zip_longest(rows, self.history):
+        for row, expected in zip_longest(rows, history):
             # 当前问题由新轮提交。已经追加过的真实原生对话只能作为独立分支的依据。
-            if row is None or expected is None or row["type"] != expected["role"]:
+            if row is None or expected is None or row["type"] != expected[0]:
                 matches = False
                 continue
             message = row.get("message", {})
             if (row.get("parentUuid") != parent or not isinstance(row.get("uuid"), str)
-                    or message.get("role") != expected["role"] or message.get("content") != _blocks(expected)
+                    or (message.get("role"), message.get("content")) != expected
                     or row["type"] == "assistant" and message.get("model") != self.model):
                 matches = False
             parent = row.get("uuid")
         return matches
 
-    def _transcript(self, work, session_id):
+    def _transcript(self, work, session_id, history):
         timestamp = datetime.now(timezone.utc).isoformat()
         parent = None
         rows = []
-        for row in self.history:
+        for role, content in history:
             uid = str(uuid4())
-            role = row["role"]
-            content = _blocks(row)
             message = {"role": role, "content": content}
             if role == "assistant":
                 message.update(id="msg_" + uuid4().hex, type="message", model=self.model,

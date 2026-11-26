@@ -143,6 +143,8 @@ apps/web/src/components/Accounts.vue
 
 `accounts.request_backend TEXT NOT NULL DEFAULT 'legacy'` 同步双库建表、幂等补列、投影、绑定、局部更新及 DTO；账号配置及空闲切换语义由 [按账号选择固定 293 原生后端](service-architecture.md#scenario-按账号选择固定-293-原生后端)所有。
 
+`accounts.tui_system_prompt_policy` 由 SQLite 第 16 版登记迁移及 PostgreSQL 初始化补齐。存储值为 `append`、`replace`、`user_reminder`，缺省追加。管理接口为 `client_system_prompt_policy`。账号切换回 V1 后保留已存的 V2 动作。凭据刷新和省略动作的全量账号更新保持原值。非默认动作写入前核对当前 V2 绑定的发送器能力。
+
 `five_hour_usage_limit_percent`、`seven_day_usage_limit_percent` 的账号字段、双库升级和局部更新合同见 [每账号 5h/7d 用量控制线](service-architecture.md#scenario-每账号-5h7d-用量控制线)。凭据刷新、进程指标更新和状态快捷操作必须保留这两个配置；状态与控制线同时提交时用独立控制线 SQL 避免旧 Account 快照覆盖新凭据或状态。
 
 ## 时间字段

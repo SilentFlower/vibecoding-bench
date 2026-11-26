@@ -171,6 +171,38 @@ class ColdHistoryTests(TestCase):
         cached["system"][0]["cache_control"] = {"type": "ephemeral"}
         self.assertIsNone(ColdHistory.from_request(cached))
 
+    def test_replace_distinguishes_omitted_and_empty_system(self):
+        """省略保留工作正文，显式空值使用空的原生替换文件。@return 无。"""
+        body = deepcopy(self.body)
+        self.assertEqual(ColdHistory.from_request(body, "replace").system_argument(),
+                         ("--system-prompt-file", "业务指令一\n业务指令二"))
+        del body["system"]
+        self.assertIsNone(ColdHistory.from_request(body, "replace").system_argument())
+        for value in ("", []):
+            self.assertEqual(ColdHistory.from_request({**body, "system": value}, "replace").system_argument(),
+                             ("--system-prompt-file", ""))
+
+    def test_reminder_is_added_only_to_first_suitable_user_message(self):
+        """导入优先附在首条用户消息，纯新轮保留原始问题和提醒顺序。@return 无。"""
+        marker = "<system-reminder>\n业务指令一\n业务指令二\n</system-reminder>"
+        plan = ColdHistory.from_request(self.body, "user_reminder")
+        self.assertEqual(plan.submitted_prompt(), "本轮输入")
+        self.assertIsNone(plan.system_argument())
+        work = Path("/native/workspace")
+        session = str(uuid4())
+        with TemporaryDirectory() as directory, ExitStack() as stack:
+            config = Path(directory)
+            plan.import_session(config, work, session)
+            path = _resume_path(stack, config, work, session, required=True)
+            rows = [json.loads(line) for line in path.read_bytes().splitlines()]
+            self.assertEqual(rows[0]["message"]["content"], [
+                {"type": "text", "text": "上一轮输入"}, {"type": "text", "text": marker},
+            ])
+            self.assertEqual(rows[2]["message"]["content"], self.body["messages"][2]["content"])
+            self.assertEqual(path.read_text().count("<system-reminder>"), 1)
+        fresh = ColdHistory.from_request({**self.body, "messages": self.body["messages"][-1:]}, "user_reminder")
+        self.assertEqual(fresh.submitted_prompt(), f"本轮输入\n\n{marker}")
+
     def test_mcp_only_advertises_this_sessions_declarations(self):
         """检查 MCP 只提供本次准入的定义，执行由原回执链处理。@return 无。"""
         plan = ColdHistory.from_request(self.body)

@@ -23,6 +23,7 @@ use tokio::time::{Instant, sleep_until, timeout, timeout_at};
 use uuid::Uuid;
 
 use crate::error::AppError;
+use crate::model::account::TuiSystemPromptPolicy;
 use crate::service::gateway::is_passive_usage_header;
 use crate::service::native_capture::tui_wire::CaptureJob;
 use crate::service::native_capture::{TuiCaptureInput, tui_writer};
@@ -40,7 +41,8 @@ use crate::service::runtime_transport::{
 };
 use crate::service::runtime_transport::{
     TUI_CAPTURE, TUI_CLI_SUBMISSION, TUI_ERROR_SOURCE, TUI_FINAL_CAPTURE, TUI_MODEL_ACCEPT_OMITTED,
-    TUI_MODEL_HEADER_POLICY, TUI_REPAIR_ATTEMPT, TUI_SIGNATURE_REPAIR, TuiReceiptProbe,
+    TUI_MODEL_HEADER_POLICY, TUI_REPAIR_ATTEMPT, TUI_SIGNATURE_REPAIR, TUI_SYSTEM_PROMPT_POLICY,
+    TuiReceiptProbe,
 };
 use crate::service::session_policy_block;
 use crate::service::tui_sender_response;
@@ -436,6 +438,7 @@ struct VerifiedSource {
     managed_oauth: bool,
     oauth_file: bool,
     signature_repair: bool,
+    system_prompt_policy: bool,
 }
 
 async fn verify_source(
@@ -471,6 +474,7 @@ async fn verify_source(
         managed_oauth: reply["managed_oauth_protocol"].as_u64() == Some(1),
         oauth_file: reply["oauth_file_protocol"].as_u64() == Some(1),
         signature_repair: reply["signature_repair_protocol"].as_u64() == Some(1),
+        system_prompt_policy: reply["client_system_prompt_policy_protocol"].as_u64() == Some(1),
     })
 }
 
@@ -525,7 +529,7 @@ impl TuiSender {
         binding: &TransportBinding,
         config: Option<&Value>,
         receipt: Option<&TuiReceiptProbe>,
-    ) -> Option<(bool, Option<bool>, bool)> {
+    ) -> Option<(bool, Option<bool>, bool, bool)> {
         setting(config).ok()?;
         let source = timeout(Duration::from_secs(1), async {
             submission_log::was_consumed(&self.submission_storage, binding, None).await?;
@@ -539,6 +543,7 @@ impl TuiSender {
             source.idle && inactive,
             source.receipt_idle.map(|idle| idle && inactive),
             source.agent_summary,
+            source.managed_oauth && source.system_prompt_policy,
         ))
     }
 
@@ -642,6 +647,21 @@ impl TuiSender {
                     .map_err(|_| invalid_identity())
             })
             .transpose()?;
+        let mut system_policy_headers = request.headers().get_all(TUI_SYSTEM_PROMPT_POLICY).iter();
+        let system_prompt = system_policy_headers
+            .next()
+            .map(|value| {
+                if system_policy_headers.next().is_some() {
+                    return Err(invalid_identity());
+                }
+                value
+                    .to_str()
+                    .ok()
+                    .and_then(TuiSystemPromptPolicy::parse)
+                    .filter(|policy| *policy != TuiSystemPromptPolicy::Append)
+                    .ok_or_else(invalid_identity)
+            })
+            .transpose()?;
         let (deadline, replay_until) = identity.deadlines(binding, now_ms())?;
         let (mut slot, mut cancelled) = self.reserve(
             identity.clone(),
@@ -689,6 +709,7 @@ impl TuiSender {
                 managed_oauth,
                 oauth_file,
                 signature_repair,
+                system_prompt_policy,
                 ..
             } = verify_source(&self.path, binding, "bind", None)
                 .await
@@ -704,6 +725,9 @@ impl TuiSender {
                 return Err(AppError::TuiInputUnsupported);
             }
             if policy.is_some() && !body_policy {
+                return Err(unavailable());
+            }
+            if system_prompt.is_some() && (!managed_oauth || !system_prompt_policy) {
                 return Err(unavailable());
             }
             let model_header_policy = offer_header_policy && model_header_policy && model_headers;
@@ -739,6 +763,9 @@ impl TuiSender {
             control["reservation"] = json!(identity);
             if managed_oauth {
                 control["native_cold_history_protocol"] = json!(1);
+            }
+            if let Some(policy) = system_prompt {
+                control["client_system_prompt_policy"] = json!(policy);
             }
             if offer_oauth_file {
                 control["oauth_file_protocol"] = json!(1);
@@ -823,6 +850,11 @@ impl TuiSender {
                 Some("recovered") if identity.continuation_only => "recovered",
                 _ => return Err(invalid_identity()),
             };
+            if let Some(policy) = system_prompt
+                && reply["client_system_prompt_policy"] != policy.as_str()
+            {
+                return Err(unavailable());
+            }
             // 支持绑定的源在准备时仅预留容量，到 send 才获得实际启动目录。
             let branch = match (identity.agent_hint.as_ref(), reply.get("agent_session")) {
                 (None, None) => None,
@@ -957,6 +989,11 @@ impl TuiSender {
             response
                 .headers_mut()
                 .insert(TUI_BODY_POLICY, HeaderValue::from_static("1"));
+        }
+        if system_prompt.is_some() {
+            response
+                .headers_mut()
+                .insert(TUI_SYSTEM_PROMPT_POLICY, HeaderValue::from_static("1"));
         }
         Ok(response)
     }
@@ -2698,7 +2735,7 @@ mod tests {
                 write_json(&mut socket, &reply).await.unwrap();
             }
         );
-        assert_eq!(status, Some((false, Some(true), true)));
+        assert_eq!(status, Some((false, Some(true), true, false)));
     }
 
     #[tokio::test]
@@ -2715,7 +2752,7 @@ mod tests {
                 write_json(&mut socket, &reply).await.unwrap();
             }
         );
-        assert_eq!(idle, Some((true, None, false)));
+        assert_eq!(idle, Some((true, None, false, false)));
         let mut identity = source.identity();
         identity.continuation_only = true;
         let (prepared, mut socket) = tokio::join!(source.prepare(&identity, body), async {

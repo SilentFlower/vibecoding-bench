@@ -384,6 +384,7 @@ fn new_account(email: &str) -> Account {
         agy_gif_frames_enabled: false,
         agy_disable_safety_filtering: false,
         agy_system_prompt_as_user_reminder: false,
+        tui_system_prompt_policy: Default::default(),
         id: 0,
         name: "ts-test".into(),
         email: email.into(),

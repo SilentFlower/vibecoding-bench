@@ -2856,6 +2856,7 @@ impl GatewayService {
                         agent_summary: native_summary,
                         oauth_file: account.auth_type == AccountAuthType::Oauth,
                         body_policy,
+                        system_prompt_policy: account.tui_system_prompt_policy,
                         signature_repair: Some(repair_session.as_deref().is_some_and(|session| {
                             self.native_signature_repairs.contains(session, &body_map)
                         })),
@@ -10660,6 +10661,7 @@ mod tests {
             agy_gif_frames_enabled: false,
             agy_disable_safety_filtering: false,
             agy_system_prompt_as_user_reminder: false,
+            tui_system_prompt_policy: Default::default(),
             id: 42,
             name: "测试账号".into(),
             email: "user@example.com".into(),

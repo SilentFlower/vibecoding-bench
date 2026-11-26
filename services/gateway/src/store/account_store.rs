@@ -9,7 +9,7 @@ use crate::error::AppError;
 use crate::model::account::{
     Account, AccountStatus, DEFAULT_ALLOW_1M_MODELS, DEFAULT_UPSTREAM_SESSION_POOL_SIZE,
     DEFAULT_UPSTREAM_SESSION_REFRESH_POLICY, DEFAULT_UPSTREAM_SESSION_TTL_MINUTES,
-    OAuthCredentialImport,
+    OAuthCredentialImport, TuiSystemPromptPolicy,
 };
 use crate::model::credential_ownership::CredentialOwnershipChange;
 use crate::service::version_profile::IdentityProfile;
@@ -374,6 +374,11 @@ impl AccountStore {
                 .try_get::<i32, _>("agy_system_prompt_as_user_reminder")
                 .unwrap_or(0)
                 != 0,
+            tui_system_prompt_policy: row
+                .try_get::<String, _>("tui_system_prompt_policy")
+                .ok()
+                .and_then(|value| TuiSystemPromptPolicy::parse(&value))
+                .unwrap_or_default(),
             agy_gif_frames_enabled: row.try_get::<i32, _>("agy_gif_frames_enabled").unwrap_or(0)
                 != 0,
             agy_disable_safety_filtering: row.try_get::<i32, _>("agy_disable_safety_filtering").unwrap_or(0)
@@ -599,6 +604,16 @@ impl AccountStore {
     /// @param a 已校验的完整账号配置。
     /// @return 数据库写入结果。
     pub async fn update(&self, a: &Account) -> Result<(), AppError> {
+        self.update_with_system_prompt(a, None).await
+    }
+
+    /// 同次保存配置和显式提交的 V2 动作。@param a 已校验的完整配置。
+    /// @param system_prompt 显式动作，省略时保留现值。@return 数据库写入结果。
+    pub async fn update_with_system_prompt(
+        &self,
+        a: &Account,
+        system_prompt: Option<TuiSystemPromptPolicy>,
+    ) -> Result<(), AppError> {
         let expires_at = a.expires_at.map(|t| self.fmt_time(t));
         let oauth_refreshed_at = a.oauth_refreshed_at.map(|t| self.fmt_time(t));
         let auto_telemetry_int: i32 = if a.auto_telemetry { 1 } else { 0 };
@@ -618,7 +633,8 @@ impl AccountStore {
                 allow_1m_models=$21, allow_fast_mode=$22, upstream_session_pool_enabled=$23,
                 upstream_session_pool_size=$24, upstream_session_ttl_minutes=$25,
                 upstream_session_refresh_policy=$26, five_hour_usage_limit_percent=$27,
-                seven_day_usage_limit_percent=$28, rate_limit_tier=$29, request_backend=$30, agy_system_prompt_homoglyph_enabled=$32, agy_gif_frames_enabled=$33, agy_disable_safety_filtering=$34, agy_system_prompt_as_user_reminder=$35, updated_at={}
+                seven_day_usage_limit_percent=$28, rate_limit_tier=$29, request_backend=$30, agy_system_prompt_homoglyph_enabled=$32, agy_gif_frames_enabled=$33, agy_disable_safety_filtering=$34, agy_system_prompt_as_user_reminder=$35,
+                tui_system_prompt_policy=COALESCE(NULLIF($36,''),tui_system_prompt_policy), updated_at={}
             WHERE id=$31"#,
             self.ts(8),
             self.ts(9),
@@ -661,6 +677,11 @@ impl AccountStore {
             .bind(i32::from(a.agy_gif_frames_enabled))
             .bind(i32::from(a.agy_disable_safety_filtering))
             .bind(i32::from(a.agy_system_prompt_as_user_reminder))
+            .bind(
+                system_prompt
+                    .map(TuiSystemPromptPolicy::as_str)
+                    .unwrap_or_default(),
+            )
             .execute(&self.pool)
             .await?;
         Ok(())
@@ -679,6 +700,9 @@ impl AccountStore {
                 "proxy_url" => Some(Some(account.proxy_url.clone())),
                 "billing_mode" => Some(Some(account.billing_mode.to_string())),
                 "request_backend" => Some(Some(account.request_backend.clone())),
+                "tui_system_prompt_policy" => {
+                    Some(Some(account.tui_system_prompt_policy.as_str().into()))
+                }
                 "subscription_type" => Some(account.subscription_type.clone()),
                 "rate_limit_tier" => Some(account.rate_limit_tier.clone()),
                 "allow_1m_models" => Some(Some(account.allow_1m_models.clone())),
@@ -1404,7 +1428,7 @@ impl AccountStore {
 }
 
 // 将原生 JSON/时间列统一投影为文本，避免 SQLx Any 无法解码 PostgreSQL 类型。
-const ACCOUNT_COLS: &str = r#"id, platform, agy_system_prompt_homoglyph_enabled, agy_system_prompt_as_user_reminder, agy_gif_frames_enabled, agy_disable_safety_filtering, name, email, status, token, auth_type, access_token, refresh_token,
+const ACCOUNT_COLS: &str = r#"id, platform, agy_system_prompt_homoglyph_enabled, agy_system_prompt_as_user_reminder, tui_system_prompt_policy, agy_gif_frames_enabled, agy_disable_safety_filtering, name, email, status, token, auth_type, access_token, refresh_token,
     CAST(oauth_expires_at AS TEXT) AS oauth_expires_at,
     CAST(oauth_refreshed_at AS TEXT) AS oauth_refreshed_at, auth_error, proxy_url, device_id,
     CAST(canonical_env AS TEXT) AS canonical_env,

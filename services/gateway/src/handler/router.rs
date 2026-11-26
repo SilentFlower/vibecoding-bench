@@ -32,7 +32,7 @@ use crate::model::account::{
     Account, AccountAuthType, AccountStatus, CanonicalEnvData, CanonicalProcessData,
     CanonicalPromptEnvData, CliProcessImport, DEFAULT_ALLOW_1M_MODELS,
     DEFAULT_UPSTREAM_SESSION_POOL_SIZE, DEFAULT_UPSTREAM_SESSION_REFRESH_POLICY,
-    DEFAULT_UPSTREAM_SESSION_TTL_MINUTES, OAuthCredentialImport,
+    DEFAULT_UPSTREAM_SESSION_TTL_MINUTES, OAuthCredentialImport, TuiSystemPromptPolicy,
 };
 use crate::model::api_token::{self, ApiToken};
 use crate::model::credential_ownership::CredentialOwnershipInput;
@@ -1312,6 +1312,7 @@ async fn create_account(
             .map(ClientSystemPromptPolicy::agy_user_reminder)
             .or(req.agy_system_prompt_as_user_reminder)
             .unwrap_or_default(),
+        tui_system_prompt_policy: Default::default(),
         agy_gif_frames_enabled: req.agy_gif_frames_enabled.unwrap_or_default(),
         agy_disable_safety_filtering: req.agy_disable_safety_filtering.unwrap_or_default(),
         id: 0,
@@ -1622,8 +1623,34 @@ async fn update_account(
         return Ok(Json(account_api_value(&saved)));
     }
 
-    if updates.get("client_system_prompt_policy").is_some() {
-        return Err(AppError::BadRequest("当前账号内核未提供可保存的提示词动作".into()));
+    let system_prompt_changed = if let Some(value) = updates.get("client_system_prompt_policy") {
+        let policy = value
+            .as_str()
+            .and_then(TuiSystemPromptPolicy::parse)
+            .ok_or_else(|| AppError::BadRequest("当前账号的客户端系统提示词动作无效".into()))?;
+        let mut view = json!({});
+        crate::service::tui_backend::append_view(&state.account_svc, &existing, &mut view).await?;
+        if view.get("client_system_prompt_policy").is_none() {
+            return Err(AppError::BadRequest(
+                "当前账号内核未提供可保存的提示词动作".into(),
+            ));
+        }
+        if policy != TuiSystemPromptPolicy::Append
+            && view["tui_system_prompt_policy_available"] != true
+        {
+            return Err(AppError::ServiceUnavailable(
+                "账号发送器尚未确认系统提示词动作能力".into(),
+            ));
+        }
+        existing.tui_system_prompt_policy = policy;
+        true
+    } else {
+        false
+    };
+    if updates.get("tui_system_prompt_policy").is_some() {
+        return Err(AppError::BadRequest(
+            "请使用公开的客户端系统提示词动作".into(),
+        ));
     }
 
     if updates
@@ -1658,7 +1685,13 @@ async fn update_account(
         .as_object()
         .ok_or_else(|| AppError::BadRequest("账号更新必须是对象".into()))?
         .keys()
-        .map(String::as_str)
+        .map(|field| {
+            if field == "client_system_prompt_policy" {
+                "tui_system_prompt_policy"
+            } else {
+                field.as_str()
+            }
+        })
         .collect();
     if let Some(value) = updates.get("request_backend") {
         existing.request_backend = validate_request_backend(
@@ -1848,6 +1881,12 @@ async fn update_account(
                         .update_account_options(&existing, &["request_backend"])
                         .await?;
                 }
+                if system_prompt_changed {
+                    state
+                        .account_svc
+                        .update_account_options(&existing, &["tui_system_prompt_policy"])
+                        .await?;
+                }
                 existing = state.account_svc.get_account(id).await?;
                 drop(_runtime_permit);
                 if updates.get("request_backend").is_some()
@@ -1856,7 +1895,16 @@ async fn update_account(
                 {
                     state.account_svc.request_native_wake(id);
                 }
-                return Ok(Json(json!(existing)));
+                let mut result = json!(existing);
+                if system_prompt_changed {
+                    crate::service::tui_backend::append_view(
+                        &state.account_svc,
+                        &existing,
+                        &mut result,
+                    )
+                    .await?;
+                }
+                return Ok(Json(result));
             }
         }
     }
@@ -1915,7 +1963,13 @@ async fn update_account(
     }
 
     if runtime_update {
-        state.account_svc.update_account(&existing).await?;
+        state
+            .account_svc
+            .update_account_with_system_prompt(
+                &existing,
+                system_prompt_changed.then_some(existing.tui_system_prompt_policy),
+            )
+            .await?;
     } else {
         state
             .account_svc
@@ -1931,7 +1985,12 @@ async fn update_account(
     {
         state.account_svc.request_native_wake(id);
     }
-    Ok(Json(json!(existing)))
+    let mut result = json!(existing);
+    if system_prompt_changed {
+        crate::service::tui_backend::append_view(&state.account_svc, &existing, &mut result)
+            .await?;
+    }
+    Ok(Json(result))
 }
 
 /// 在 cc2api 账号锁内解析满足有效期要求的 OAuth 凭据。
