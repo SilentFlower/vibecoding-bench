@@ -43,6 +43,7 @@ HISTORY = [
     ("user", "H1：项目名是海棠。"), ("assistant", "H2：项目名已记录。"),
     ("user", "H3：订单号是 123。"), ("assistant", "H4：订单号已记录。"),
 ]
+HISTORY_CACHE = ({"type": "ephemeral", "ttl": "1h"}, {"type": "ephemeral"})
 QUESTION = "NOW：查询新便签并回答。"
 QUESTION_TAIL = "NOW：保留本轮问题第二段。"
 AFTER_RESTART = "RESTART：从已确认的旧问答开启另一轮。"
@@ -171,7 +172,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            current_text_blocks=False, signed_tool_history=False, split_history_tools=False, v1_runtime=None,
            parallel_tools=False, reconnect_tool_stream=False, current_images=False, auto_tool_choice=False,
            recovery_ledger_contention=False, recovery_ledger_deadline=False, recovery_workspace_rejection=False,
-           recovery_slow_model=False, initial_idle_model_connection=False, trace_startup=False, cache_markers=False):
+           recovery_slow_model=False, initial_idle_model_connection=False, trace_startup=False, cache_markers=False,
+           history_cache_markers=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -200,6 +202,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param initial_idle_model_connection 是否先占用一个未握手的模型 TCP 连接。
     @param trace_startup 是否记录隔离启动阶段。
     @param cache_markers 是否核对普通 Messages 显式缓存标记的模型实收和出站归属。
+    @param history_cache_markers 是否冻结历史标记并验证工具往返。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -444,6 +447,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                           for name in ("cold-history-owner", "cold-history-foreign"))
         headers = {"x-session-id": str(uuid4()), "User-Agent": "flower2api-cold-history-fixture/1"}
         messages = [{"role": role, "content": text} for role, text in HISTORY]
+        if history_cache_markers:
+            for row, marker in zip(messages[:2], HISTORY_CACHE, strict=True):
+                row["content"] = [{"type": "text", "text": row["content"], "cache_control": marker}]
         if cache_markers:
             return verify_cache_markers(manage, token, identifier, headers, received)
         if failure_boundaries:
@@ -638,6 +644,14 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             changed = {**follow, "tool_choice": {"type": "none"}}
             changed_choice, response = call(18090, "POST", "/v1/messages", token, changed, headers)
             assert changed_choice == 422 and len(received) == 1, (changed_choice, response, len(received))
+        if history_cache_markers:
+            first, = messages[0]["content"]
+            changed_prefix = {**messages[0], "content": [{**first, "cache_control": {"type": "ephemeral", "ttl": "5m"}}]}
+            changed = {**follow, "messages": [changed_prefix, *follow["messages"][1:]]}
+            changed_cache, _, _ = checked_messages(
+                manage, token, changed, headers, received, "changed_history_cache", expected_status=422,
+            )
+            assert len(received) == 1
         if signed_tool_history:
             tampered = {**SIGNED_THINKING, "signature": "Y2hhbmdlZA=="}
             changed = {**follow, "messages": [*messages, {"role": "assistant", "content": [tampered, *offered[1:]]}, result]}
@@ -817,6 +831,12 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             proof["initial_idle_model_connection"] = {"http_status": initial_status, "model_posts": 1}
         if history_tool_blocks:
             proof["historical_tool_result_blocks"] = len(old_result)
+        if history_cache_markers:
+            observed = [observed_cache_breakpoints(model) for _, model, _ in received]
+            expected = [(i, 0, role, row["content"][0])
+                        for i, ((role, _), row) in enumerate(zip(HISTORY[:2], messages[:2], strict=True))]
+            assert observed == [expected, expected], observed
+            proof.update(history_cache_markers=observed, changed_history_cache_status=changed_cache)
         if parallel_tools:
             first, second = (document for _, document, _ in received)
             for native in (first, second):
@@ -1386,6 +1406,8 @@ def verify_cache_markers(manage, token, account_id, headers, received):
         ("unmarked", "append", {}, plain, None, 200),
         ("current", "append", {}, current, current, 200),
         ("history", "append", {}, history, history, 200),
+        ("history_replace", "replace", {"system": [system]}, history, history, 200),
+        ("history_user_reminder", "user_reminder", {"system": [system]}, history, history, 200),
         ("tool", "append", {"tools": [tool]}, plain, plain, 200),
         ("nested_result", "append", {}, closed, closed, 200),
         ("root", "append", {"cache_control": implied}, plain, None, 422),
@@ -1428,12 +1450,21 @@ def verify_cache_markers(manage, token, account_id, headers, received):
             ((digest, model, _),) = received[before:]
             (claim,) = own_claims
             assert claim["sha256"] == digest, (name, evidence, claim)
-            assert claim["from_interactive_cli"] is (name == "unmarked"), (name, claim)
+            from_cli = name == "unmarked" or name in ("history", "history_replace", "history_user_reminder")
+            assert claim["from_interactive_cli"] is from_cli, (name, claim)
             assert model.get("tools", []) == body.get("tools", []), name
-            if expected is None:
+            if from_cli:
                 user_texts = [b.get("text") for message in model["messages"] if message["role"] == "user"
                               for b in blocks(message)]
                 assert user_texts.count(question["text"]) == user_texts.count(tail["text"]) == 1
+                if expected is not None:
+                    markers = observed_cache_breakpoints(model)
+                    assert markers == [(i, 0, row["role"], row["content"][0])
+                                       for i, row in enumerate(expected[:2])], (name, markers)
+                    system_text = "\n".join(block["text"] for block in model["system"])
+                    assert system_text.count(system["text"]) == int(policy == "replace"), name
+                    assert sum(text.count(system["text"]) for text in user_texts if text) == int(policy == "user_reminder")
+                    evidence["cache_markers"] = markers
             else:
                 assert model["messages"] == expected, (name, model["messages"])
                 evidence["model_messages"] = model["messages"]
@@ -1448,6 +1479,14 @@ def verify_cache_markers(manage, token, account_id, headers, received):
 def blocks(row):
     """读取模型端实际内容块。@param row 模型消息。@return 内容块序列。"""
     return row["content"] if isinstance(row["content"], list) else [{"type": "text", "text": row["content"]}]
+
+
+def observed_cache_breakpoints(model):
+    """读取模型实际收到的断点。@param model 隔离模型正文。@return 有序消息、块位置与标记。"""
+    assert "cache_control" not in model
+    assert not any("cache_control" in block for key in ("system", "tools") for block in model.get(key, []))
+    return [(index, offset, row["role"], block) for index, row in enumerate(model["messages"])
+            for offset, block in enumerate(blocks(row)) if "cache_control" in block]
 
 
 def verify_output_effort(manage, token, account_token, headers, received):
@@ -1691,6 +1730,7 @@ def main():
     parser.add_argument("--shared-state", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--current-text-blocks", action="store_true")
     parser.add_argument("--current-images", action="store_true")
+    parser.add_argument("--history-cache-markers", action="store_true")
     parser.add_argument("--auto-tool-choice", action="store_true")
     parser.add_argument("--signed-tool-history", action="store_true")
     parser.add_argument("--trace-initial-startup", action="store_true", help="记录源码 V2 夹具的启动阶段")
@@ -1759,7 +1799,7 @@ def main():
                        recovery_workspace_rejection=args.recovery_workspace_rejection,
                        recovery_slow_model=args.recovery_slow_model,
                        initial_idle_model_connection=args.initial_idle_model_connection, trace_startup=trace_startup,
-                       cache_markers=args.cache_markers)
+                       cache_markers=args.cache_markers, history_cache_markers=args.history_cache_markers)
         print(json.dumps(proof, ensure_ascii=False))
 
 

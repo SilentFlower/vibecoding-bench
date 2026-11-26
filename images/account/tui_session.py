@@ -487,6 +487,9 @@ class _Actor:
                     )
                     if self.settings.get("thinking", {}).get("type") == "disabled":
                         env["MAX_THINKING_TOKENS"] = "0"
+                    if self.cold_history is not None and self.cold_history.has_history_cache_markers():
+                        # CLI 的自动断点会与客户前缀同时出现，还可能改变 TTL 顺序。
+                        env["DISABLE_PROMPT_CACHING"] = "1"
                     self.process = self.driver.launcher.launch_session(
                         self.reservation,
                         command,
@@ -936,6 +939,9 @@ class _Actor:
                     if not self.cold_history.matches_tool_choice(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
                             "code": "unsupported_parameter", "message": "CLI 未保留请求的自动工具选择"}}))
+                    if not self.cold_history.matches_history_cache_markers(native):
+                        raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
+                            "code": "unsupported_parameter", "message": "CLI 未保留历史缓存标记"}}))
                 if handle.kind == "recovered" and not self.driver.checkpoints.submit(
                     self.identity, self.receipt_revision, handle.request_digest, True
                 ):

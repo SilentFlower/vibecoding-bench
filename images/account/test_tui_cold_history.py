@@ -340,6 +340,43 @@ class ColdHistoryTests(TestCase):
         cached["system"][0]["cache_control"] = {"type": "ephemeral"}
         self.assertIsNone(ColdHistory.from_request(cached))
 
+    def test_native_historical_cache_markers_keep_block_positions_and_ttl(self):
+        """相同文本上的断点依块位置核对，支持原始 TTL 缺省。@return 无。"""
+        long = {"type": "ephemeral", "ttl": "1h"}
+        short = {"type": "ephemeral"}
+        same = {"type": "text", "text": "重复历史段"}
+        cached = {**same, "cache_control": long}
+        body = {**self.body, "messages": [
+            {"role": "user", "content": [cached]},
+            {"role": "user", "content": [same]},
+            {"role": "assistant", "content": [{"type": "text", "text": "已回复", "cache_control": short}]},
+            self.body["messages"][-1],
+        ]}
+        plan = ColdHistory.from_request(body)
+        self.assertTrue(plan.has_history_cache_markers())
+        native = {**body, "messages": [{"role": "user", "content": [cached, same]}, *body["messages"][2:]]}
+        self.assertTrue(plan.matches_history_cache_markers(native))
+        moved = deepcopy(native)
+        moved["messages"][0]["content"] = [same, cached]
+        self.assertFalse(plan.matches_history_cache_markers(moved))
+        rewritten = deepcopy(native)
+        rewritten["messages"][1]["content"][0]["cache_control"]["ttl"] = "5m"
+        self.assertFalse(plan.matches_history_cache_markers(rewritten))
+        self.assertFalse(plan.matches_history_cache_markers({**native, "cache_control": long}))
+        self.assertFalse(plan.matches_history_cache_markers({**native, "system": [cached]}))
+
+    def test_history_cache_native_selection_leaves_other_cache_shapes_to_existing_contract(self):
+        """仅准入已验证的断点类型、数量、时长顺序及历史位置。@return 无。"""
+        marker = {"type": "ephemeral", "ttl": "1h"}
+        marked = {"type": "text", "text": "合成标记", "cache_control": marker}
+        cases = ([marked] * 5, [{**marked, "cache_control": {"type": "ephemeral"}}, marked],
+                 [{**marked, "cache_control": {**marker, "scope": "global"}}])
+        for blocks in cases:
+            rows = [{"role": "user", "content": blocks}, *self.body["messages"][1:]]
+            self.assertIsNone(ColdHistory.from_request({**self.body, "messages": rows}))
+        rows = [*self.body["messages"][:-1], {"role": "user", "content": [marked]}]
+        self.assertIsNone(ColdHistory.from_request({**self.body, "messages": rows}))
+
     def test_preserves_completed_tool_result_text_blocks(self):
         """导入旧工具结果的文本块顺序及配对，扩展块沿原入口合同。@return 无。"""
         body = deepcopy(self.body)

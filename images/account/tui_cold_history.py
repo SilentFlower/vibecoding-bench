@@ -42,6 +42,15 @@ def _plain_text(block):
             and isinstance(block["text"], str) and bool(block["text"]))
 
 
+def _history_text(block):
+    if "cache_control" not in block:
+        return _plain_text(block)
+    marker = block["cache_control"]
+    return (_plain_text({key: value for key, value in block.items() if key != "cache_control"})
+            and isinstance(marker, dict) and marker.keys() <= {"type", "ttl"}
+            and marker.get("type") == "ephemeral" and marker.get("ttl", "5m") in ("5m", "1h"))
+
+
 def _jpeg_dimensions(data):
     offset = 2
     while offset + 4 <= len(data) and data[offset] == 0xff:
@@ -122,7 +131,7 @@ def _closed_history(rows, *, result_types=(str,)):
     pending, seen, results = set(), set(), set()
     for index, row in enumerate(rows):
         for block in _blocks(row):
-            if _plain_text(block) or (row["role"] == "user" and _inline_image(block)):
+            if _history_text(block) or (row["role"] == "user" and _inline_image(block)):
                 continue
             if (row["role"] == "assistant" and block.get("type") == "tool_use"
                     and block.keys() == {"type", "id", "name", "input"}
@@ -191,6 +200,14 @@ class ColdHistory:
         content = _blocks(current)
         if not content or not all(_plain_text(block) or _inline_image(block, for_paste=True) for block in content):
             return None
+        cache_blocks = [block for row in history for block in _blocks(row) if "cache_control" in block]
+        if cache_blocks:
+            # 原生路径仅承接已验证的历史文本。保留默认 TTL，并限制断点数量和前缀的时长顺序。
+            if len(cache_blocks) > 4 or not all(_plain_text(b) for b in content):
+                return None
+            ttls = [block["cache_control"].get("ttl", "5m") for block in cache_blocks]
+            if ttls != sorted(ttls, key=lambda ttl: ttl != "1h"):
+                return None
         declared = body.get("tools", [])
         choice = body.get("tool_choice")
         if "tool_choice" in body and (not declared or not _automatic_tools(choice)):
@@ -306,12 +323,7 @@ class ColdHistory:
                 return index
         return len(self.history)
 
-    def import_session(self, config, work, native_id, *, replay_resources: ExitStack | None = None):
-        """在已绑定的工作区选择新会话或发布已完成的外部历史。
-        @param config 私有配置。@param work 已核验工作目录。@param native_id 绑定的原生会话。
-        @param replay_resources 可选，交互进程退出后清理本轮使用的临时确认前缀。
-        @return 本次启动的原生会话 UUID，或 UUID 与本轮临时确认前缀。
-        """
+    def _grouped_history(self):
         reminder_index = self._reminder_index()
         history = []
         for index, row in enumerate(self.history):
@@ -323,6 +335,35 @@ class ColdHistory:
                 history[-1][1].extend(blocks)
             else:
                 history.append((row["role"], list(blocks)))
+        return history
+
+    def has_history_cache_markers(self):
+        """检查已确认的历史是否带显式缓存标记。@return 是否需关闭 CLI 自动断点。"""
+        return any("cache_control" in block for row in self.history for block in _blocks(row))
+
+    def matches_history_cache_markers(self, native):
+        """核对原生出站的历史断点。@param native CLI 实际生成的请求。@return 原位置与标记是否完整保留。"""
+        if not self.has_history_cache_markers():
+            return True
+
+        def positions(rows):
+            return [(index, role, offset, block) for index, (role, content) in enumerate(rows)
+                    for offset, block in enumerate(content) if "cache_control" in block]
+
+        # 自动断点关闭后只允许已确认的历史标记。按消息和块位置匹配可区分重复文本。
+        return ("cache_control" not in native
+                and not any("cache_control" in block for field in ("system", "tools")
+                            for block in native.get(field, []) if isinstance(block, dict))
+                and positions((row["role"], _blocks(row)) for row in native["messages"])
+                == positions(self._grouped_history()))
+
+    def import_session(self, config, work, native_id, *, replay_resources: ExitStack | None = None):
+        """在已绑定的工作区选择新会话或发布已完成的外部历史。
+        @param config 私有配置。@param work 已核验工作目录。@param native_id 绑定的原生会话。
+        @param replay_resources 可选，交互进程退出后清理本轮使用的临时确认前缀。
+        @return 本次启动的原生会话 UUID，或 UUID 与本轮临时确认前缀。
+        """
+        history = self._grouped_history()
 
         boundary = digest((*self._scope(), history))
 

@@ -549,7 +549,8 @@ def launch_session(
             reservation, command, program=GUARD,
             arguments=[*network_guard, *media_guard, str(home), str(mod), f"/proc/self/fd/{fd}", *arguments],
             config_dir=config_dir, environment={
-                **{k: environment[k] for k in ("CLAUDE_CODE_MAX_OUTPUT_TOKENS", "MAX_THINKING_TOKENS")
+                **{k: environment[k] for k in ("CLAUDE_CODE_MAX_OUTPUT_TOKENS", "MAX_THINKING_TOKENS",
+                                               "DISABLE_PROMPT_CACHING")
                    if k in environment},
                 "HOME": str(home), "TMPDIR": str(home / "tmp"), "PATH": "/usr/bin:/bin",
                 "SHELL": "/bin/bash", "LANG": "C.UTF-8", "TERM": "xterm-256color",
