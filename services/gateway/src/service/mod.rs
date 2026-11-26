@@ -50,6 +50,7 @@ pub mod telemetry;
 pub(crate) mod tui_backend;
 mod tui_native_drain;
 pub(crate) mod tui_receipt_recovery;
+mod tui_reconnect;
 #[cfg(target_os = "linux")]
 mod tui_sender;
 mod tui_sender_response;

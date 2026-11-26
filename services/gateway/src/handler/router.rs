@@ -451,10 +451,7 @@ async fn gateway_fallback(State(state): State<AppState>, mut req: Request) -> Re
         Err(resp) => return resp,
     };
     req.extensions_mut().insert(state.gemini_svc.clone());
-    state
-        .gateway_svc
-        .handle_request(req, Some(&api_token))
-        .await
+    state.gateway_svc.handle_authenticated(req, api_token).await
 }
 
 /// count_tokens 专用入口：鉴权 + 代理 Anthropic token counting API。

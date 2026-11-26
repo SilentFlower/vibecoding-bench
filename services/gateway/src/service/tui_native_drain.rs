@@ -10,6 +10,7 @@ use sha2::{Digest, Sha256};
 use sqlx::{AnyPool, Row};
 use std::collections::BTreeSet;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, OnceLock};
 use tokio::runtime::Handle;
 use tracing::warn;
 use uuid::Uuid;
@@ -33,6 +34,61 @@ const RECEIPT_ORPHANED: &str = "原 V2 工具会话已退出，无法继续本�
 const ORPHANED_WAITING: &str = "tui-v2:orphan:waiting";
 const ORPHANED_UNKNOWN: &str = "tui-v2:orphan:delivery_unknown";
 
+const UNDELIVERED: &str = "tui-v2:reply:unacknowledged";
+
+/// 真实模型已结束和客户端已读取终帧是两个独立边界。
+pub(super) struct Delivery {
+    pool: AnyPool,
+    id: String,
+    marker: String,
+    open: String,
+    next_tools: OnceLock<String>,
+    pub(super) verified: AtomicBool,
+}
+
+impl Delivery {
+    /// 续轮已经产生下一组工具时核对它仍在等待客户端。@return 是否仍可重交此次回复。
+    pub(super) async fn replayable(&self) -> Result<bool, AppError> {
+        let Some(group) = self.next_tools.get() else {
+            return Ok(true);
+        };
+        let waiting = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM tui_native_turns WHERE id=$1 AND tools=$2 AND version=$3",
+        )
+        .bind(&self.id)
+        .bind(group)
+        .bind(TUI_V2_RECEIPT_VERSION)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(waiting == 1)
+    }
+
+    /// 按原步骤 ID 核销仅等待交付的终态。@return 对账结果。
+    pub(super) async fn acknowledge(&self) -> Result<(), AppError> {
+        if self.next_tools.get().is_some() {
+            return Ok(());
+        }
+        sqlx::query(
+            "UPDATE tui_native_turns SET version=$1 WHERE id=$2 AND version=$3 AND tools=$4",
+        )
+        .bind(TUI_V2_RECEIPT_VERSION)
+        .bind(&self.id)
+        .bind(UNDELIVERED)
+        .bind(&self.marker)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// 管理取消后终止原回执的再次生成资格。@return 条件更新结果。
+    pub(super) async fn cancel(&self) -> Result<(), AppError> {
+        sqlx::query("UPDATE tui_native_turns SET version=$1,tools=$2 WHERE id=$3 AND (tools=$4 OR (version=$5 AND tools=$2))")
+            .bind(TUI_V2_RECEIPT_VERSION).bind(&self.marker).bind(&self.id).bind(&self.open).bind(UNDELIVERED)
+            .execute(&self.pool).await?;
+        Ok(())
+    }
+}
+
 /// 一次已登记的公开请求。提交未知时保留原记录供对账。
 pub(super) struct NativeTurn {
     pool: AnyPool,
@@ -44,6 +100,8 @@ pub(super) struct NativeTurn {
     pub(super) binding: String,
     submitted: AtomicBool,
     remember_receipt: bool,
+    recovery: Option<ReceiptRow>,
+    delivery: Option<Arc<Delivery>>,
 }
 
 /// 核对是否仍有等待工具、执行中或提交未知的 V1 轮。@param pool 数据库。@param account 账号。@return 是否阻止切换。
@@ -511,6 +569,94 @@ pub(super) async fn continuation_account(
     }
 }
 
+/// 仅定位提交未决或有退出记录的 V2 步骤。@param pool 归属库。@param principal 原令牌。
+/// @param session 外部会话。@param body 完整回执。@return 仍须由原发送器出具证明的候选。
+pub(super) async fn recovery_row(
+    pool: &AnyPool,
+    principal: i64,
+    session: Option<&str>,
+    body: &Value,
+) -> Result<Option<ReceiptRow>, AppError> {
+    let Some(ids) = result_ids(body) else {
+        return Ok(None);
+    };
+    if preceding_tool_ids(body).as_ref() != Some(&ids) {
+        return Ok(None);
+    }
+    let tools = serde_json::to_string(&ids).expect("纯字符串集合可编码");
+    let query = format!(
+        "SELECT {RECEIPT_COLUMNS} FROM tui_native_turns t
+         LEFT JOIN tui_stateless_turn_proofs p ON p.turn_id=t.id WHERE t.principal_id=$1
+         AND ((t.version=$2 AND t.tools=$3) OR (t.version IN ($4,$5,$11) AND t.tools LIKE '#%'
+             AND substr(t.tools,2,20)>$6 AND substr(t.tools,23)=$7))
+         AND ((p.turn_id IS NULL AND $8<>'' AND t.session_id=$8)
+             OR (p.turn_id IS NOT NULL AND $8='' AND p.history=$9 AND p.declarations=$10)) LIMIT 2"
+    );
+    let candidates = sqlx::query_as::<_, ReceiptRow>(&query)
+        .bind(principal)
+        .bind(TUI_V2_RECEIPT_VERSION)
+        .bind(format!("!{tools}"))
+        .bind(ORPHANED_WAITING)
+        .bind(ORPHANED_UNKNOWN)
+        .bind(format!("{:020}", now_ms()))
+        .bind(tool_digest(&tools))
+        .bind(session.unwrap_or(""));
+    let (history, declarations) = continuation_proof(body, &ids).unwrap_or_default();
+    let mut rows = candidates
+        .bind(history)
+        .bind(declarations)
+        .bind(UNDELIVERED)
+        .fetch_all(pool)
+        .await?;
+    if rows.len() > 1 {
+        return Err(AppError::BadRequest(RECEIPT_MISMATCH.into()));
+    }
+    Ok(rows.pop())
+}
+
+impl ReceiptRow {
+    /// 在原路由锁内生成只读预留。@param pool 数据库。@param account 原账号。@param binding 当前绑定。
+    /// @param owner 当前主体与会话。@param body 已匹配的数据。@return 等待源端证明的预留。
+    pub(super) fn pending(
+        self,
+        pool: AnyPool,
+        account: i64,
+        binding: &str,
+        owner: (i64, Option<&str>),
+        body: &Value,
+    ) -> Result<NativeTurn, AppError> {
+        if self.account_id != account
+            || self.binding != binding
+            || self.principal_id != owner.0
+            || (self.stateless == 0 && owner.1 != Some(self.session_id.as_str()))
+        {
+            return Err(AppError::BadRequest(RECEIPT_MISMATCH.into()));
+        }
+        let ids = result_ids(body).ok_or_else(|| AppError::BadRequest(RECEIPT_MISMATCH.into()))?;
+        Ok(NativeTurn {
+            pool,
+            id: Uuid::new_v4().to_string(),
+            previous_tools: Some(serde_json::to_string(&ids).unwrap()),
+            background_agents: if self.stateless == 0 {
+                background_agent_hashes(body)
+            } else {
+                Vec::new()
+            },
+            stateless_history: if self.stateless != 0 {
+                body["messages"].as_array().map(|m| history_key(m))
+            } else {
+                None
+            },
+            session_id: self.session_id.clone(),
+            binding: self.binding.clone(),
+            submitted: AtomicBool::new(false),
+            remember_receipt: true,
+            recovery: Some(self),
+            delivery: None,
+        })
+    }
+}
+
 /// 认领受信的已交付工具组或登记新请求。调用方已持原账号配置锁。
 /// @param pool 数据库。@param account 账号。@param owner 真实主体与可选的客户端会话。@param version 已核验的执行合同。
 /// @param body 公开 Messages。@param binding 已核验代次。@param draining 是否只允许旧轮。
@@ -611,6 +757,8 @@ pub(super) async fn claim(
                 session_id,
                 binding,
                 submitted: AtomicBool::new(false),
+                recovery: None,
+                delivery: None,
                 remember_receipt: version != "legacy",
             });
         }
@@ -668,13 +816,15 @@ pub(super) async fn claim(
         session_id,
         binding,
         submitted: AtomicBool::new(false),
+        recovery: None,
+        delivery: None,
         remember_receipt: false,
     })
 }
 
 impl Drop for NativeTurn {
     fn drop(&mut self) {
-        if self.submitted.load(Ordering::Acquire) {
+        if self.recovery.is_some() || self.submitted.load(Ordering::Acquire) {
             return;
         }
         if let Ok(runtime) = Handle::try_current() {
@@ -714,6 +864,70 @@ async fn release_open_turn(
 }
 
 impl NativeTurn {
+    /// 将已获准的 V2 工具续轮关联到真实响应读者。@return 持久交付状态。
+    pub(super) fn track_delivery(&mut self) -> Arc<Delivery> {
+        let until = now_ms().saturating_add(BINDING_TTL_MS);
+        let separator = if self.stateless_history.is_none() {
+            'E'
+        } else {
+            ':'
+        };
+        let marker = format!(
+            "#{until:020}{separator}{}",
+            tool_digest(self.previous_tools.as_ref().expect("已认领的工具组"))
+        );
+        let delivery = Arc::new(Delivery {
+            pool: self.pool.clone(),
+            id: self.id.clone(),
+            marker,
+            open: self.open_tools(),
+            verified: AtomicBool::new(false),
+            next_tools: OnceLock::new(),
+        });
+        self.delivery = Some(delivery.clone());
+        delivery
+    }
+
+    /// 仅凭原发送器的冷恢复预留替换已死亡的原步骤。@param recovered 原绑定发送器的独立证明。
+    /// @return 唯一替代轮凭证。旧响应观察器即使迟到也只持旧行 ID。
+    pub(super) async fn confirm_recovery(&mut self, recovered: bool) -> Result<(), AppError> {
+        let Some(row) = self.recovery.as_ref() else {
+            return Ok(());
+        };
+        if !recovered {
+            return Err(AppError::ServiceUnavailable(
+                "原步骤仍在交付，请稍后接回".into(),
+            ));
+        }
+        let mut tx = self.pool.begin().await?;
+        let inserted=sqlx::query("INSERT INTO tui_native_turns(id,account_id,principal_id,session_id,binding,version,tools)
+             SELECT $1,account_id,principal_id,session_id,binding,$2,$3 FROM tui_native_turns
+             WHERE id=$4 AND binding=$5 AND tools=$6 AND version=$7")
+            .bind(&self.id).bind(TUI_V2_RECEIPT_VERSION).bind(self.open_tools()).bind(&row.id).bind(&row.binding)
+            .bind(&row.tools).bind(&row.version).execute(&mut *tx).await?;
+        if inserted.rows_affected() != 1 {
+            return Err(AppError::AdmissionLimited { retry_after: 1 });
+        }
+        sqlx::query("UPDATE tui_stateless_turn_proofs SET turn_id=$1 WHERE turn_id=$2")
+            .bind(&self.id)
+            .bind(&row.id)
+            .execute(&mut *tx)
+            .await?;
+        let removed =
+            sqlx::query("DELETE FROM tui_native_turns WHERE id=$1 AND tools=$2 AND version=$3")
+                .bind(&row.id)
+                .bind(&row.tools)
+                .bind(&row.version)
+                .execute(&mut *tx)
+                .await?;
+        if removed.rows_affected() != 1 {
+            return Err(AppError::AdmissionLimited { retry_after: 1 });
+        }
+        tx.commit().await?;
+        self.recovery = None;
+        Ok(())
+    }
+
     /// 在 Sender 确认工具尚未交付时归还原回执。@return 已条件恢复原可领状态。
     pub(super) async fn release_tui_before_model(&self) -> Result<(), AppError> {
         release_open_turn(&self.pool, &self.id, self.previous_tools.as_deref()).await
@@ -753,6 +967,7 @@ impl NativeTurn {
     /// 收口 V2 已返回的明确 HTTP 拒绝。@return 记录后的结果。
     pub(super) async fn retire_v2_rejection(&mut self) -> Result<(), AppError> {
         self.background_agents.clear();
+        self.delivery = None;
         self.finish(Some((Vec::new(), None))).await
     }
 
@@ -780,7 +995,8 @@ impl NativeTurn {
                 ':'
             };
             let marker = format!("#{until:020}{separator}{}", tool_digest(previous));
-            sqlx::query(
+            if self.delivery.is_none() || !tools.is_empty() {
+                sqlx::query(
                 "INSERT INTO tui_native_turns (id,account_id,principal_id,session_id,binding,version,tools)
                  SELECT $1,account_id,principal_id,session_id,binding,version,$2 FROM tui_native_turns
                  WHERE id=$3 AND tools=$4",
@@ -791,6 +1007,7 @@ impl NativeTurn {
             .bind(&open)
             .execute(&mut *tx)
             .await?;
+            }
             for hint in &self.background_agents {
                 // 只给已收口的原工具回执保留路由线索，不改变源端的代次或工具授权。
                 sqlx::query(
@@ -811,7 +1028,18 @@ impl NativeTurn {
                 .await?;
             }
         }
-        if tools.is_empty() {
+        if tools.is_empty()
+            && let Some(delivery) = &self.delivery
+        {
+            // 原响应已经结束，外部读者仍可能只拿到了一部分。沿用原行保留无头会话的依据。
+            sqlx::query("UPDATE tui_native_turns SET tools=$1,version=$2 WHERE id=$3 AND tools=$4")
+                .bind(&delivery.marker)
+                .bind(UNDELIVERED)
+                .bind(&self.id)
+                .bind(&open)
+                .execute(&mut *tx)
+                .await?;
+        } else if tools.is_empty() {
             sqlx::query("DELETE FROM tui_native_turns WHERE id=$1 AND tools=$2")
                 .bind(&self.id)
                 .bind(&open)
@@ -830,6 +1058,14 @@ impl NativeTurn {
                 .await?;
         }
         tx.commit().await?;
+        if let Some(delivery) = &self.delivery {
+            if !tools.is_empty() {
+                let _ = delivery
+                    .next_tools
+                    .set(serde_json::to_string(&tools).expect("已排序的工具 ID"));
+            }
+            delivery.verified.store(true, Ordering::Release);
+        }
         Ok(())
     }
 
@@ -918,6 +1154,231 @@ mod tests {
 
     fn sse(value: Value) -> Bytes {
         Bytes::from(format!("data: {value}\n\n"))
+    }
+
+    /// 原进程已退出时仅原发送器能替代认领，迟到观察器和并发竞争者均保留原修订。
+    #[tokio::test]
+    async fn reconnect_replaces_only_the_verified_turn_and_acknowledges_delivery() {
+        install_default_drivers();
+        let pool = AnyPoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        migrate(&pool, "sqlite").await.unwrap();
+        sqlx::query("INSERT INTO accounts(id,name,email,token,device_id) VALUES(1,'first','first@test.invalid','fixture','one')")
+            .execute(&pool).await.unwrap();
+        let group = r#"["tool_a"]"#;
+        let body = json!({"model":"chosen","messages":[{"role":"user","content":"question"},
+            {"role":"assistant","content":[{"type":"tool_use","id":"tool_a","name":"Bash","input":{}}]},
+            {"role":"user","content":[{"type":"tool_result","tool_use_id":"tool_a","content":"done"}]}]});
+        sqlx::query("INSERT INTO tui_native_turns VALUES('original',1,7,'scope','binding',$1,$2)")
+            .bind(TUI_V2_RECEIPT_VERSION)
+            .bind(group)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let owner = (7, Some("scope"));
+        let original = claim(
+            pool.clone(),
+            1,
+            owner,
+            TUI_V2_RECEIPT_VERSION,
+            &body,
+            "binding".into(),
+            false,
+            false,
+        )
+        .await
+        .unwrap();
+        original.mark_submitted();
+        for (principal, session) in [(8, Some("scope")), (7, Some("sibling")), (7, None)] {
+            assert!(
+                super::recovery_row(&pool, principal, session, &body)
+                    .await
+                    .unwrap()
+                    .is_none()
+            );
+        }
+        let candidate = || super::recovery_row(&pool, 7, Some("scope"), &body);
+        let pending =
+            |r: super::ReceiptRow| r.pending(pool.clone(), 1, "binding", owner, &body).unwrap();
+        let mut first = pending(candidate().await.unwrap().unwrap());
+        let mut other = pending(candidate().await.unwrap().unwrap());
+        assert!(first.confirm_recovery(false).await.is_err());
+        first.confirm_recovery(true).await.unwrap();
+        assert!(other.confirm_recovery(true).await.is_err());
+        original.finish(Some((Vec::new(), None))).await.unwrap();
+        let delivery = first.track_delivery();
+        first.mark_submitted();
+        first.finish(Some((Vec::new(), None))).await.unwrap();
+        let row = candidate().await.unwrap().unwrap();
+        assert_eq!(row.version, super::UNDELIVERED);
+        delivery.acknowledge().await.unwrap();
+        assert!(candidate().await.unwrap().is_none());
+        assert!(continuation_account(pool, owner, &body).await.is_err());
+    }
+
+    /// 生成结束后仍在慢读的连接持有原回复，直到断开后才开始重连窗口。
+    #[tokio::test]
+    async fn reconnect_preserves_completed_reply_for_slow_reader() {
+        use crate::service::tui_reconnect::{Reconnects, Reservation};
+        use std::sync::Arc;
+        use std::time::Duration;
+
+        install_default_drivers();
+        let pool = AnyPoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        migrate(&pool, "sqlite").await.unwrap();
+        let index = Reconnects::default();
+        let key = [2; 32];
+        let Reservation::First(writer) = index.reserve(key, 1, "original").unwrap() else {
+            panic!("应取得原写者")
+        };
+        let delivery = Arc::new(super::Delivery {
+            pool,
+            id: "slow".into(),
+            marker: "marker".into(),
+            open: "!tools".into(),
+            next_tools: Default::default(),
+            verified: true.into(),
+        });
+        let source = Response::new(Body::from("原回复"));
+        let mut slow = writer
+            .publish(source, None, delivery, None, None)
+            .await
+            .unwrap()
+            .into_body();
+        assert!(slow.frame().await.unwrap().is_ok());
+        tokio::time::sleep(Duration::from_secs(11)).await;
+        drop(slow);
+        let Reservation::Existing(reply) = index.reserve(key, 1, "original").unwrap() else {
+            panic!("慢读结束时原回复应仍可接回")
+        };
+        let bytes = reply
+            .subscribe(false)
+            .await
+            .unwrap()
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes();
+        assert_eq!(bytes.as_ref(), "原回复".as_bytes());
+    }
+
+    /// 超过缓存预算仍须向在线端逐字节交付，维护取消及时释放停滞的模型读取。
+    #[tokio::test]
+    async fn reconnect_keeps_large_live_response_and_observes_admin_cancel() {
+        use crate::service::system_update::{CutoverScope, InferenceCutover};
+        use crate::service::tui_reconnect::{Reconnects, Reservation};
+        use futures_util::StreamExt;
+        use std::sync::Arc;
+        use tokio::sync::{mpsc, watch};
+        use tokio_stream::wrappers::ReceiverStream;
+        install_default_drivers();
+        let pool = AnyPoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        migrate(&pool, "sqlite").await.unwrap();
+        let index = Reconnects::default();
+        for cancel in [false, true] {
+            let key = [u8::from(cancel); 32];
+            let Reservation::First(writer) = index.reserve(key, 1, "original").unwrap() else {
+                panic!("应获得初次提交权")
+            };
+            assert!(index.reserve(key, 2, "original").is_err());
+            assert!(index.reserve(key, 1, "other").is_err());
+            let (epoch, watch) = watch::channel(None);
+            let (send, recv) = mpsc::channel::<Bytes>(1);
+            let source = Body::from_stream(ReceiverStream::new(recv).map(Ok::<_, Error>));
+            let delivery = Arc::new(super::Delivery {
+                pool: pool.clone(),
+                id: "turn".into(),
+                marker: "marker".into(),
+                open: "!tools".into(),
+                next_tools: Default::default(),
+                verified: (!cancel).into(),
+            });
+            let mut response = writer
+                .publish(
+                    Response::new(source),
+                    Some(InferenceCutover::new(watch)),
+                    delivery,
+                    None,
+                    None,
+                )
+                .await
+                .unwrap()
+                .into_body();
+            if cancel {
+                epoch.send_replace(Some(CutoverScope {
+                    epoch: uuid::Uuid::new_v4(),
+                    preserve_tui: false,
+                }));
+                assert!(
+                    tokio::time::timeout(std::time::Duration::from_secs(2), response.frame())
+                        .await
+                        .unwrap()
+                        .unwrap()
+                        .is_err()
+                );
+                send.closed().await;
+            } else {
+                let first = Bytes::from_static(b"first");
+                send.send(first.clone()).await.unwrap();
+                assert_eq!(
+                    response
+                        .frame()
+                        .await
+                        .unwrap()
+                        .unwrap()
+                        .into_data()
+                        .unwrap(),
+                    first
+                );
+                drop(response);
+                let Reservation::Existing(reply) = index.reserve(key, 1, "original").unwrap()
+                else {
+                    panic!("已有响应")
+                };
+                response = reply.subscribe(false).await.unwrap().into_body();
+                assert_eq!(
+                    response
+                        .frame()
+                        .await
+                        .unwrap()
+                        .unwrap()
+                        .into_data()
+                        .unwrap(),
+                    first
+                );
+                let large = Bytes::from(vec![7; 64 * 1024 * 1024 + 1]);
+                send.send(large.clone()).await.unwrap();
+                assert_eq!(
+                    response
+                        .frame()
+                        .await
+                        .unwrap()
+                        .unwrap()
+                        .into_data()
+                        .unwrap(),
+                    large
+                );
+                let Reservation::Existing(reply) = index.reserve(key, 1, "original").unwrap()
+                else {
+                    panic!("已有响应")
+                };
+                assert!(reply.subscribe(false).await.is_err());
+                drop(send);
+                assert!(response.frame().await.is_none());
+            }
+        }
     }
 
     #[tokio::test]

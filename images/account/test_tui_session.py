@@ -17,6 +17,7 @@ from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/orchestrator"))
 from tui_capacity import TuiCapacity
+from tui_reconnect import ReceiptCheckpoints
 from tui_session import SessionDriver, _install_mod
 from tui_messages import (
     ModelResponseError,
@@ -123,6 +124,68 @@ class SessionTests(unittest.TestCase):
             "continuation_only": False,
             "deadline_unix_ms": int(1000 * (time.time() + 5)),
         }
+
+    def test_restore_original_receipt_after_source_restart(self):
+        """持久依据绑定原身份、参数和结果，恢复进程沿用原子代理工作区。@return 无。"""
+        identity = self._identity("external")
+        body = self._body()
+        group = [{"type": "tool_use", "id": "tool_a", "name": "Bash", "input": {"command": "true"}}]
+        raw = self._returning(body, group, "tool_a")
+        child = {**identity, "agent_hint": "child", "continuation_only": True}
+        key = (1, "e", 1, 9, "external", "child")
+        with TemporaryDirectory() as root, closing(self._driver()) as first:
+            first.checkpoints = ReceiptCheckpoints(root)
+            # 建立与真实子代理相同的身份、原声明和已接收的工具结果，再模拟进程退出。
+            with closing(first.prepare(identity, encode(body))) as initial:
+                actor = initial.actor
+                first.sessions.pop(actor.identity)
+                actor.identity = key
+                actor.reservation = {**identity, "session_id": "gateway-tools-private-child"}
+                first.sessions[key] = actor
+                self._offered(initial, *group)
+            with closing(first.prepare(child, raw)) as live:
+                self.assertEqual(live.kind, "continuation")
+                live.send({"account_token": "fixture"})
+            first.close()
+            with closing(self._driver()) as restarted:
+                restarted.checkpoints = ReceiptCheckpoints(root)
+                for other in ({**child, "principal_id": 10}, {**child, "agent_hint": "sibling"},
+                              {**child, "generation": 2}):
+                    with self.assertRaises(ValueError):
+                        restarted.prepare(other, raw)
+                changed = json.loads(raw)
+                changed["messages"][-1]["content"][0]["content"] = "different"
+                with self.assertRaises(ValueError):
+                    restarted.prepare(child, encode(changed))
+                with self.assertRaises(ValueError):
+                    restarted.prepare(child, self._returning({**body, "max_tokens": 256}, group, "tool_a"))
+                with closing(restarted.prepare(child, raw)) as restored:
+                    self.assertEqual(restored.kind, "recovered")
+                    self.assertEqual(restored.actor.reservation["session_id"], "gateway-tools-private-child")
+                    self.assertEqual(restored.answers["tool_a"]["content"], "合成回执")
+                    with self.assertRaises(ValueError):
+                        restarted.prepare(child, raw)
+                    self.assertTrue(restarted.checkpoints.submit(
+                        key, restored.actor.receipt_revision, restored.request_digest, True
+                    ))
+                with self.assertRaises(ValueError):
+                    restarted.prepare(child, raw)
+
+    def test_new_tool_immediately_revokes_old_recovery(self):
+        """新指令首帧可能已经到达客户端，拒绝重新生成上一份回执。@return 无。"""
+        body, identity = self._body(), self._identity("tool-start")
+        group = [{"type": "tool_use", "id": "first", "name": "Bash", "input": {}}]
+        with closing(self._driver()) as driver:
+            first = driver.prepare(identity, encode(body))
+            actor = self._offered(first, *group)
+            step = WireStep([{"name": "Bash"}])
+            step.observe({"type": "message_start", "message": {}})
+            actor._observe(step, {"type": "content_block_start", "index": 0, "content_block":
+                                  {"type": "tool_use", "name": "Bash", "id": "second", "input": {}}})
+            actor.abort()
+            driver._retire(actor)
+            with self.assertRaisesRegex(ValueError, "outstanding_tool"):
+                driver.prepare(identity, self._returning(body, group, "first"))
 
     def test_mod_install_preserves_private_directory_mode(self):
         """即使镜像安装目录为 0755，也严格保留每次原生启动所需的私有目录模式。@return 无。"""

@@ -307,7 +307,7 @@ class AccountSource:
                 # 旧网关须先沿当前文件模式收口原轮，不能用旧 AT 令牌接管活动进程。
                 _reply(writer, {**state, "error": "oauth_file_required"})
                 return
-            oauth_file = file_offer == 1 and (handle.kind == "new" or existing_file)
+            oauth_file = file_offer == 1 and (handle.kind != "continuation" or existing_file)
             reply = {
                 **state,
                 "kind": handle.kind,
@@ -318,8 +318,8 @@ class AccountSource:
                 reply.pop("oauth_file_protocol", None)
             if reservation.get("agent_hint") is not None:
                 reply["agent_session"] = handle.actor.reservation["session_id"]
-            if handle.kind not in ("new", "continuation") or (
-                reservation["continuation_only"] and handle.kind != "continuation"
+            if handle.kind not in ("new", "continuation", "recovered") or (
+                reservation["continuation_only"] and handle.kind == "new"
             ):
                 return
             _reply(writer, reply)
@@ -420,6 +420,7 @@ class AccountSource:
             connection.settimeout(IO_TIMEOUT)
 
     def _send_handle(self, writer, connection, handle, command):
+        handle.disconnected = _Disconnected(connection)
         try:
             events = iter(handle.send(command))
         except ModelResponseError as exc:
