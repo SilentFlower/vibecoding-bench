@@ -1,6 +1,6 @@
 use crate::service::session_policy_block::{self, SessionPolicyBlockService};
 use axum::Error as AxumError;
-use axum::body::Body;
+use axum::body::{Body, to_bytes};
 use axum::extract::Request;
 use axum::http::{
     HeaderMap, HeaderValue, Method, StatusCode,
@@ -54,11 +54,9 @@ use crate::service::native_error::{REJECTION_CAPTURE_HEADER, REJECTION_HEADER, r
 use crate::service::native_prewarm::NativePrewarmer;
 use crate::service::native_runtime::NativeSubmission;
 use crate::service::system_update::InferenceCutover;
-#[path = "native_signature_repair.rs"]
-mod native_signature_repair;
-
-use self::native_signature_repair::{
-    NativeSignatureRepairs, SignatureRejection, is_signature_rejection,
+use crate::service::native_signature_repair::{
+    CLEAR_THINKING, EMPTY_MESSAGE, NativeSignatureRepairs, SIGNATURE_ERROR_BODY_LIMIT,
+    SignatureRejection, ThinkingRewrite, is_signature_rejection, thinking_rewrite,
 };
 use crate::service::request_body_codec::{
     REQUEST_BODY_LIMIT, RequestBodyCodecError, RequestBodyEncoding,
@@ -157,8 +155,6 @@ const UPSTREAM_TTFB_TIMEOUT: std::time::Duration = std::time::Duration::from_sec
 /// 该超时不限制流总时长，健康长流（Opus 扩展思考等）可持续任意时间。
 const UPSTREAM_STREAM_IDLE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
 const STREAM_KEEPALIVE_BYTES: &[u8] = b": cc2api-keepalive\n\n";
-/// signature 错误体只用于识别上游错误类型，限制读取大小避免异常响应占用内存。
-const SIGNATURE_ERROR_BODY_LIMIT: usize = 1024 * 1024;
 const NATIVE_AUTH_ERROR_BODY_LIMIT: usize = 4096;
 /// 上游错误响应日志最多输出的字符数，避免异常错误体刷屏。
 const UPSTREAM_ERROR_LOG_BODY_LIMIT: usize = 4096;
@@ -2726,6 +2722,13 @@ impl GatewayService {
                     .or(assigned_session.as_deref())
                     .ok_or_else(|| AppError::Internal("V2 会话登记缺失".into()))?;
                 let owned_tool_group = turn.as_ref().is_some_and(NativeTurn::owns_continuation);
+                let repair_session = extract_session_id_from_body(&body_map).or_else(|| {
+                    native_session_candidate(
+                        native_header_map.get_all("x-claude-code-session-id").iter(),
+                        |value| value.to_str().ok(),
+                        &body_map,
+                    )
+                });
                 let mut prepared = runtime_transport::prepare_tui(
                     sender,
                     principal.id,
@@ -2741,6 +2744,9 @@ impl GatewayService {
                             tui_cache_ttl,
                             native_disabled_thinking.should_rewrite(&body_map),
                         ),
+                        signature_repair: Some(repair_session.as_deref().is_some_and(|session| {
+                            self.native_signature_repairs.contains(session, &body_map)
+                        })),
                     },
                     request.deadline(),
                     draining || owned_tool_group,
@@ -2772,7 +2778,7 @@ impl GatewayService {
                         GatewayAdmissionError::Rpm(error) => error,
                     })?;
                 let original_tool = owned_tool_group && prepared.continuation;
-                let (credentials, failed_token, activity) = await_preparation(
+                let (credentials, mut failed_token, activity) = await_preparation(
                     Some(request),
                     prepared.resolve_account_credentials(&self.account_svc, original_tool),
                 )
@@ -2837,6 +2843,7 @@ impl GatewayService {
                     )
                     .await?;
                 let ttfb_timeout = request.remaining()?.min(UPSTREAM_TTFB_TIMEOUT);
+                let repair_deadline = TokioInstant::now() + ttfb_timeout;
                 let started = std::time::Instant::now();
                 let usage_started_at = Utc::now();
                 send_permit.submitted();
@@ -2882,67 +2889,108 @@ impl GatewayService {
                 {
                     warn!(account_id = account.id, %error, "V2 凭据拒绝后的回执待对账");
                 }
-                runtime_transport::recover_tui_oauth_after_response(
-                    &self.account_svc,
-                    account.id,
-                    failed_token,
-                    &response,
-                )
-                .await;
-                // 账号端在模型提交前终止时，这次预留不会再产生 TLS 快照。
-                let capture_state = if capture_state == Some("queued") && file_rejected_before_model
-                {
-                    Some("not_submitted")
-                } else if capture_state == Some("queued") {
-                    match response
-                        .headers()
-                        .get(runtime_transport::TUI_CAPTURE)
-                        .map(HeaderValue::as_bytes)
-                    {
-                        Some(b"queued") => Some("queued"),
-                        Some(b"disabled") => Some("disabled"),
-                        _ => Some("dropped"),
-                    }
-                } else {
-                    capture_state
-                };
-                // 本轮结果可能已被模型接纳，V2 的授权错误随响应交付原请求和原工具轮。
-                let mut response = runtime_transport::tui_public_response(
-                    response,
-                    (!fixture).then_some(account.id),
-                )
-                .await
-                .inspect_err(|_| {
-                    if let Some(trace) = &mut wire_attempt {
-                        trace.transport_error();
-                    }
-                })?;
-                let projected = !fixture
-                    && response
-                        .extensions_mut()
-                        .remove::<runtime_transport::TuiGatewayIds>()
-                        .is_some();
-                let codings = response_content_codings(response.headers());
-                if projected || wire_attempt.is_some() {
-                    // HTTP 200 只代表已打开 SSE。账本和调度反馈必须等到正文终态。
-                    if let Some(mut attempt) = wire_attempt
-                        .or_else(|| diagnostics::prepare_tui_attempt(&account, &body_map))
-                    {
-                        attempt.tui_capture(attempt_id, capture_state);
-                        attempt.with_feedback(request.clone());
-                        attempt.commit_native(started);
-                        attempt.headers(
-                            response.status().as_u16(),
-                            response.headers(),
-                            codings.clone(),
-                        );
-                        response = attempt.wrap(response);
-                    } else if !response.status().is_success() {
-                        request.response_headers(account.id, response.status().as_u16());
-                    }
-                } else {
-                    request.response_headers(account.id, response.status().as_u16());
+                if !prepared.repair_pending {
+                    runtime_transport::recover_tui_oauth_after_response(
+                        &self.account_svc,
+                        account.id,
+                        failed_token.take(),
+                        &response,
+                    )
+                    .await;
                 }
+                let mut response = self
+                    .finish_tui_attempt(
+                        response,
+                        &account,
+                        request,
+                        &body_map,
+                        wire_attempt,
+                        attempt_id,
+                        capture_state,
+                        started,
+                        fixture,
+                        file_rejected_before_model,
+                        false,
+                    )
+                    .await?;
+                if prepared.repair_pending
+                    && response
+                        .extensions()
+                        .get::<session_policy_block::PolicyRefusal>()
+                        .is_none()
+                {
+                    // 先完成首次拒绝的观察。再次准入过程中保留它，原工具轮仍在同一发送器内。
+                    let (parts, body) = response.into_parts();
+                    let rejection = to_bytes(body, SIGNATURE_ERROR_BODY_LIMIT)
+                        .await
+                        .map_err(|_| AppError::BadGateway("V2 签名拒绝响应无效".into()))?;
+                    response = Response::from_parts(parts, Body::from(rejection));
+                    let admission = timeout_at(repair_deadline, async {
+                        let permit = request.admit(&account).await?;
+                        let configuration = route
+                            .allow_submit(
+                                &self.account_svc,
+                                account.id,
+                                &binding,
+                                prepared.continuation,
+                            )
+                            .await?;
+                        Ok::<_, AppError>(
+                            session_policy_block::check_current()
+                                .await?
+                                .is_none()
+                                .then_some((permit, configuration)),
+                        )
+                    })
+                    .await;
+                    if let Ok(Ok(Some((permit, configuration)))) = admission
+                        && let Some(remaining) =
+                            repair_deadline.checked_duration_since(TokioInstant::now())
+                        && !remaining.is_zero()
+                    {
+                        let retry_id = Uuid::new_v4();
+                        let retry_started = std::time::Instant::now();
+                        permit.submitted();
+                        drop(configuration);
+                        let retried = prepared
+                            .submit_signature_repair(retry_id, remaining)
+                            .await
+                            .inspect_err(|_| request.submission_failed(account.id))?;
+                        if let Some(retried) = retried {
+                            runtime_transport::recover_tui_oauth_after_response(
+                                &self.account_svc,
+                                account.id,
+                                failed_token,
+                                &retried,
+                            )
+                            .await;
+                            diagnostics::retry_reason("signature_repair");
+                            response = self
+                                .finish_tui_attempt(
+                                    retried,
+                                    &account,
+                                    request,
+                                    &body_map,
+                                    None,
+                                    retry_id.to_string(),
+                                    capture_state,
+                                    retry_started,
+                                    fixture,
+                                    false,
+                                    true,
+                                )
+                                .await?;
+                            if response.status().is_success()
+                                && let Some(session) = repair_session.as_deref()
+                            {
+                                self.native_signature_repairs.remember(session, &body_map);
+                            }
+                        } else {
+                            request.response_headers(account.id, response.status().as_u16());
+                        }
+                    }
+                }
+                let codings = response_content_codings(response.headers());
                 if response.status().is_client_error()
                     && let Some(turn) = turn.as_mut()
                     && let Err(error) = turn.retire_v2_rejection().await
@@ -4066,6 +4114,81 @@ impl GatewayService {
             let codings = response_content_codings(response.headers());
             session_policy_block::observe_response(response, account.id, codings)
         })
+    }
+
+    async fn finish_tui_attempt(
+        &self,
+        response: reqwest::Response,
+        account: &Account,
+        request: &SchedulingRequest,
+        body: &JsonValue,
+        mut wire_attempt: Option<diagnostics::AttemptTrace>,
+        attempt_id: String,
+        capture_state: Option<&'static str>,
+        started: std::time::Instant,
+        fixture: bool,
+        file_rejected_before_model: bool,
+        repaired: bool,
+    ) -> Result<Response, AppError> {
+        // 账号端在模型提交前终止时，这次预留不会再产生 TLS 快照。
+        let capture_state = if capture_state == Some("queued") && file_rejected_before_model {
+            Some("not_submitted")
+        } else if capture_state == Some("queued") {
+            match response
+                .headers()
+                .get(runtime_transport::TUI_CAPTURE)
+                .map(HeaderValue::as_bytes)
+            {
+                Some(b"queued") => Some("queued"),
+                Some(b"disabled") => Some("disabled"),
+                _ => Some("dropped"),
+            }
+        } else {
+            capture_state
+        };
+        let repaired = repaired
+            || runtime_transport::tui_projection_marker(
+                response.headers(),
+                runtime_transport::TUI_SIGNATURE_REPAIR,
+                "applied",
+            );
+        let mut response =
+            runtime_transport::tui_public_response(response, (!fixture).then_some(account.id))
+                .await
+                .inspect_err(|_| {
+                    if let Some(trace) = &mut wire_attempt {
+                        trace.transport_error();
+                    }
+                })?;
+        let projected = !fixture
+            && response
+                .extensions_mut()
+                .remove::<runtime_transport::TuiGatewayIds>()
+                .is_some();
+        if projected || wire_attempt.is_some() {
+            // 诊断反馈仍使用实际正文终态。收到 HTTP 200 只代表已经打开响应。
+            if let Some(mut attempt) =
+                wire_attempt.or_else(|| diagnostics::prepare_tui_attempt(account, body))
+            {
+                if repaired {
+                    attempt.tui_thinking_removed();
+                }
+                attempt.tui_capture(attempt_id, capture_state);
+                attempt.with_feedback(request.clone());
+                attempt.commit_native(started);
+                attempt.headers(
+                    response.status().as_u16(),
+                    response.headers(),
+                    response_content_codings(response.headers()),
+                );
+                return Ok(attempt.wrap(response));
+            }
+            if response.status().is_success() {
+                return Ok(response);
+            }
+        }
+        request.response_headers(account.id, response.status().as_u16());
+        Ok(response)
     }
 
     /// 共用被动额度观察与响应字节处理，业务重试由各自调用方决定。
@@ -8098,9 +8221,7 @@ fn remove_thinking_dependent_context_strategies(
     };
 
     let original_len = edits.len();
-    edits.retain(|edit| {
-        edit.get("type").and_then(|v| v.as_str()) != Some("clear_thinking_20251015")
-    });
+    edits.retain(|edit| edit.get("type").and_then(|v| v.as_str()) != Some(CLEAR_THINKING));
     if edits.len() == original_len {
         return false;
     }
@@ -8141,7 +8262,7 @@ fn sanitize_message_content(message: &mut serde_json::Value, strip_tools: bool) 
     if changed && sanitized.is_empty() {
         sanitized.push(serde_json::json!({
             "type": "text",
-            "text": "(content removed)"
+            "text": EMPTY_MESSAGE
         }));
     }
 
@@ -8160,38 +8281,17 @@ fn sanitize_content_block(block: serde_json::Value, strip_tools: bool) -> BlockS
         serde_json::Value::Object(obj) => obj,
         other => return BlockSanitizeResult::Keep(other),
     };
-    let block_type = obj
-        .get("type")
-        .and_then(|t| t.as_str())
-        .unwrap_or("")
-        .to_string();
-    match block_type.as_str() {
-        "thinking" => {
-            let thinking = obj
-                .get("thinking")
-                .and_then(|t| t.as_str())
-                .unwrap_or_default();
-            if thinking.is_empty() {
-                BlockSanitizeResult::Remove
-            } else {
-                BlockSanitizeResult::Replace(text_block(thinking.to_string()))
-            }
+    let block_type = obj.get("type").and_then(|t| t.as_str()).unwrap_or("");
+    match thinking_rewrite(block_type, obj.get("thinking").and_then(|v| v.as_str())) {
+        ThinkingRewrite::Text(text) => BlockSanitizeResult::Replace(text_block(text.to_owned())),
+        ThinkingRewrite::Drop => BlockSanitizeResult::Remove,
+        ThinkingRewrite::Keep if strip_tools && block_type == "tool_use" => {
+            BlockSanitizeResult::Replace(tool_use_text_block(&obj))
         }
-        "redacted_thinking" => BlockSanitizeResult::Remove,
-        "tool_use" if strip_tools => BlockSanitizeResult::Replace(tool_use_text_block(&obj)),
-        "tool_result" if strip_tools => BlockSanitizeResult::Replace(tool_result_text_block(&obj)),
-        "" => {
-            if let Some(thinking) = obj.get("thinking").and_then(|t| t.as_str()) {
-                if thinking.is_empty() {
-                    BlockSanitizeResult::Remove
-                } else {
-                    BlockSanitizeResult::Replace(text_block(thinking.to_string()))
-                }
-            } else {
-                BlockSanitizeResult::Keep(serde_json::Value::Object(obj))
-            }
+        ThinkingRewrite::Keep if strip_tools && block_type == "tool_result" => {
+            BlockSanitizeResult::Replace(tool_result_text_block(&obj))
         }
-        _ => BlockSanitizeResult::Keep(serde_json::Value::Object(obj)),
+        ThinkingRewrite::Keep => BlockSanitizeResult::Keep(serde_json::Value::Object(obj)),
     }
 }
 

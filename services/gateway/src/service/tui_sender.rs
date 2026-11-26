@@ -18,13 +18,16 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::UnixStream;
-use tokio::sync::watch;
+use tokio::sync::{SemaphorePermit, oneshot, watch};
 use tokio::time::{Instant, sleep_until, timeout, timeout_at};
 use uuid::Uuid;
 
 use crate::error::AppError;
 use crate::service::native_capture::tui_wire::CaptureJob;
 use crate::service::native_capture::{TuiCaptureInput, tui_writer};
+use crate::service::native_signature_repair::{
+    SIGNATURE_ERROR_BODY_LIMIT, is_signature_rejection, wire::repair_body,
+};
 use crate::service::request_body_codec::REQUEST_BODY_LIMIT;
 use crate::service::request_session::valid_id;
 use crate::service::runtime_transport::{
@@ -35,8 +38,10 @@ use crate::service::runtime_transport::{
     tui_input_rejection, tui_model_headers, tui_projection_marker, valid_tui_account_token,
 };
 use crate::service::runtime_transport::{
-    TUI_CAPTURE, TUI_ERROR_SOURCE, TUI_FINAL_CAPTURE, TUI_MODEL_HEADER_POLICY, TuiReceiptProbe,
+    TUI_CAPTURE, TUI_ERROR_SOURCE, TUI_FINAL_CAPTURE, TUI_MODEL_HEADER_POLICY, TUI_REPAIR_ATTEMPT,
+    TUI_SIGNATURE_REPAIR, TuiReceiptProbe,
 };
+use crate::service::session_policy_block;
 use crate::service::tui_sender_response;
 use crate::service::tui_tool_history::SERVER_SESSION_PREFIX;
 use axum::http::header::RETRY_AFTER;
@@ -142,12 +147,65 @@ enum Phase {
         session_mapping: bool,
         managed_oauth: bool,
         oauth_file: bool,
+        signature_repair: Option<bool>,
     },
     Submitted,
+    RepairPending(oneshot::Sender<RepairPermit>),
     Closed,
 }
 
+struct RepairPermit {
+    attempt: Uuid,
+    projection: ResponseProjection,
+    response: oneshot::Sender<Result<Response, AppError>>,
+}
+
+#[derive(Clone, Copy)]
+struct ResponseProjection {
+    json: bool,
+    sse: bool,
+}
+
+impl ResponseProjection {
+    fn from_headers(headers: &HeaderMap) -> Self {
+        Self {
+            json: tui_delegates_json(headers),
+            sse: tui_projection_marker(headers, TUI_SSE_PROJECTION_HEADER, TUI_SSE_PROJECTION_V1),
+        }
+    }
+}
+
+type Capture = (
+    PathBuf,
+    TuiCaptureInput,
+    i64,
+    Uuid,
+    SemaphorePermit<'static>,
+);
+
+struct SignatureOffer {
+    source: &'static str,
+    rejection: Vec<u8>,
+    repaired: Vec<u8>,
+    capture: Option<(Vec<(String, String)>, Vec<u8>)>,
+}
+
+enum SourceReply {
+    Final { head: Value, repaired: bool },
+    Signature(SignatureOffer),
+}
+
+#[derive(Clone, Copy)]
+struct SourceOptions {
+    projection: ResponseProjection,
+    managed: bool,
+    oauth_file: bool,
+    wire: bool,
+    captured: bool,
+}
+
 struct Record {
+    repair_attempt: Option<Uuid>,
     wire_capture: Option<CaptureJob>,
     identity: Identity,
     agent_probe: bool,
@@ -166,6 +224,20 @@ struct Slot {
     id: String,
     ticket: Uuid,
     armed: bool,
+}
+
+impl Slot {
+    fn install_wire_capture(&self, capture: CaptureJob) -> bool {
+        let mut book = self.book.lock().unwrap();
+        if let Some(record) = book.get_mut(&self.id).filter(|record| {
+            record.ticket == self.ticket && matches!(record.phase, Phase::Submitted)
+        }) {
+            record.wire_capture = Some(capture);
+            true
+        } else {
+            false
+        }
+    }
 }
 
 impl Drop for Slot {
@@ -250,7 +322,7 @@ fn prune(book: &mut HashMap<String, Record>) {
     let now = Instant::now();
     book.retain(|_, record| {
         match record.phase {
-            Phase::Submitted => return true,
+            Phase::Submitted | Phase::RepairPending(_) => return true,
             Phase::Preparing => {
                 if record.deadline <= now {
                     record.cancel.send_replace(true);
@@ -359,6 +431,7 @@ struct VerifiedSource {
     session_mapping: bool,
     managed_oauth: bool,
     oauth_file: bool,
+    signature_repair: bool,
 }
 
 async fn verify_source(
@@ -392,19 +465,28 @@ async fn verify_source(
         session_mapping: reply["upstream_session_protocol"].as_u64() == Some(1),
         managed_oauth: reply["managed_oauth_protocol"].as_u64() == Some(1),
         oauth_file: reply["oauth_file_protocol"].as_u64() == Some(1),
+        signature_repair: reply["signature_repair_protocol"].as_u64() == Some(1),
     })
 }
 
 impl TuiSender {
     /// 仅在已提交的原预留中取走一次写入观察。@param binding 当前已认证绑定。
-    /// @param id 内层模型请求的原预留 ID。@return 对应的后台快照作业。
+    /// @param id 内层模型请求的实际尝试 ID。@return 对应的后台快照作业。
     pub(super) fn take_wire_capture(
         &self,
         binding: &TransportBinding,
         id: &str,
     ) -> Option<CaptureJob> {
         let mut book = self.book.lock().unwrap();
-        let record = book.get_mut(id)?;
+        // 首发沿原索引。重试仍由原槽持有，只有已批准的额外尝试可以取走观察。
+        let record = if book.contains_key(id) {
+            book.get_mut(id)
+                .filter(|record| record.repair_attempt.is_none())?
+        } else {
+            let attempt = Uuid::parse_str(id).ok()?;
+            book.values_mut()
+                .find(|record| record.repair_attempt == Some(attempt))?
+        };
         if record.wire_capture.is_some()
             && matches!(record.phase, Phase::Submitted)
             && record.binding_proof == binding_proof(binding)
@@ -504,6 +586,7 @@ impl TuiSender {
             book.insert(
                 id.clone(),
                 Record {
+                    repair_attempt: None,
                     wire_capture: None,
                     identity,
                     agent_probe,
@@ -566,6 +649,14 @@ impl TuiSender {
         let wire_protocol = tui_projection_marker(request.headers(), TUI_FINAL_CAPTURE, "1");
         let offer_header_policy =
             tui_projection_marker(request.headers(), TUI_MODEL_HEADER_POLICY, "1");
+        let repair_requested =
+            if tui_projection_marker(request.headers(), TUI_SIGNATURE_REPAIR, "known") {
+                Some(true)
+            } else if tui_projection_marker(request.headers(), TUI_SIGNATURE_REPAIR, "1") {
+                Some(false)
+            } else {
+                None
+            };
         let prepared = async {
             if submission_log::was_consumed(
                 &self.submission_storage,
@@ -591,6 +682,7 @@ impl TuiSender {
                 session_mapping,
                 managed_oauth,
                 oauth_file,
+                signature_repair,
                 ..
             } = verify_source(&self.path, binding, "bind", None)
                 .await
@@ -747,6 +839,11 @@ impl TuiSender {
                 session_mapping,
                 managed_oauth,
                 oauth_file,
+                if signature_repair {
+                    repair_requested
+                } else {
+                    None
+                },
             ))
         };
         let (
@@ -759,6 +856,7 @@ impl TuiSender {
             session_mapping,
             managed_oauth,
             oauth_file,
+            signature_repair,
         ) = tokio::select! {
             biased;
             _ = cancelled.changed() => return Err(consumed()),
@@ -780,6 +878,7 @@ impl TuiSender {
             session_mapping,
             managed_oauth,
             oauth_file,
+            signature_repair,
         };
         slot.armed = false;
         let mut response = (StatusCode::NO_CONTENT, [(HANDOFF_HEADER, kind)]).into_response();
@@ -808,6 +907,11 @@ impl TuiSender {
                 .headers_mut()
                 .insert(TUI_OAUTH_FILE, HeaderValue::from_static("1"));
         }
+        if signature_repair.is_some() {
+            response
+                .headers_mut()
+                .insert(TUI_SIGNATURE_REPAIR, HeaderValue::from_static("1"));
+        }
         if capture_requested && capture_http {
             if wire_protocol {
                 response
@@ -833,7 +937,15 @@ impl TuiSender {
         requires_session_mapping: bool,
         has_account_token: bool,
         has_oauth_file: bool,
-    ) -> Result<(Slot, BufReader<UnixStream>, Option<workspace::Candidate>), AppError> {
+    ) -> Result<
+        (
+            Slot,
+            BufReader<UnixStream>,
+            Option<workspace::Candidate>,
+            Option<bool>,
+        ),
+        AppError,
+    > {
         let mut book = self.book.lock().unwrap();
         prune(&mut book);
         let record = book
@@ -861,6 +973,7 @@ impl TuiSender {
         let Phase::Ready {
             connection,
             workspace,
+            signature_repair,
             ..
         } = std::mem::replace(&mut record.phase, Phase::Submitted)
         else {
@@ -875,6 +988,7 @@ impl TuiSender {
             },
             connection,
             workspace,
+            signature_repair,
         ))
     }
 
@@ -918,7 +1032,7 @@ impl TuiSender {
             })
             .transpose()?;
         let oauth_file = oauth_file_payload(headers)?;
-        let (slot, mut connection, workspace) = self.claim(
+        let (slot, mut connection, workspace, signature_repair) = self.claim(
             binding,
             &identity,
             upstream_session.is_some(),
@@ -961,29 +1075,41 @@ impl TuiSender {
             let id = Uuid::parse_str(&identity.reservation_id).ok()?;
             Some((directory, input, identity.account_id, id, tui_writer()?))
         });
-        let capturing = capture.is_some();
+        let retry_capture = capture.as_ref().and_then(|(dir, input, account, _, _)| {
+            signature_repair
+                .is_some()
+                .then(|| (dir.clone(), input.clone(), *account))
+        });
         let wire_protocol = tui_projection_marker(headers, TUI_FINAL_CAPTURE, "1");
-        if managed_capture && wire_protocol {
-            if let Some((directory, input, _, _, permit)) = capture.take() {
-                if let Some(record) = self
-                    .book
-                    .lock()
-                    .unwrap()
-                    .get_mut(&identity.reservation_id)
-                    .filter(|record| record.ticket == slot.ticket)
-                {
-                    command["capture_assembly"] = json!(true);
-                    record.wire_capture = Some(CaptureJob {
+        let wire_captured = if managed_capture && wire_protocol {
+            capture
+                .take()
+                .is_some_and(|(directory, input, _, _, permit)| {
+                    slot.install_wire_capture(CaptureJob {
                         directory,
                         input,
                         permit,
-                    });
-                }
-            }
+                    })
+                })
+        } else {
+            false
+        };
+        if wire_captured {
+            command["capture_assembly"] = json!(true);
         }
         if capture.is_some() {
             command["capture_http"] = json!(true);
         }
+        if let Some(known) = signature_repair {
+            command["signature_repair"] = json!(known);
+        }
+        let options = SourceOptions {
+            projection: ResponseProjection::from_headers(headers),
+            managed: managed_capture,
+            oauth_file: oauth_file.is_some(),
+            wire: wire_protocol,
+            captured: capture.is_some() || wire_captured,
+        };
         if let Some(candidate) = workspace {
             let root = self.submission_storage.clone();
             let launch = tokio::task::spawn_blocking(move || candidate.bind(&root, &identity));
@@ -995,17 +1121,235 @@ impl TuiSender {
                 return Err(limited());
             }
         }
-        let head = timeout(IO_TIMEOUT, async {
+        let reply = timeout(IO_TIMEOUT, async {
             write_json(&mut connection, &command).await?;
             if let Some(file) = &oauth_file {
                 connection.get_mut().write_all(file).await?;
             }
-            read_json(&mut connection).await
+            read_initial_reply(&mut connection, signature_repair, managed_capture).await
         })
         .await
         .ok()
         .and_then(Result::ok)
         .ok_or_else(|| AppError::BadGateway("V2 本机事件源提交结果待核对".into()))?;
+        let (head, repaired) = match reply {
+            SourceReply::Final { head, repaired } => (head, repaired),
+            SourceReply::Signature(offer) => {
+                return self.pause_for_signature_repair(
+                    slot,
+                    connection,
+                    offer,
+                    capture,
+                    retry_capture,
+                    options,
+                    deadline,
+                );
+            }
+        };
+        let mut response = Self::source_response(head, connection, slot, capture, options).await?;
+        if repaired {
+            response
+                .headers_mut()
+                .insert(TUI_SIGNATURE_REPAIR, HeaderValue::from_static("applied"));
+        }
+        Ok(response)
+    }
+
+    fn pause_for_signature_repair(
+        &self,
+        slot: Slot,
+        mut connection: BufReader<UnixStream>,
+        offer: SignatureOffer,
+        capture: Option<Capture>,
+        retry_capture: Option<(PathBuf, TuiCaptureInput, i64)>,
+        options: SourceOptions,
+        deadline: Instant,
+    ) -> Result<Response, AppError> {
+        let (permit, wait) = oneshot::channel::<RepairPermit>();
+        {
+            let mut book = self.book.lock().unwrap();
+            let record = book
+                .get_mut(&slot.id)
+                .filter(|record| {
+                    record.ticket == slot.ticket && matches!(record.phase, Phase::Submitted)
+                })
+                .ok_or_else(consumed)?;
+            record.phase = Phase::RepairPending(permit);
+        }
+        let SignatureOffer {
+            source,
+            rejection,
+            repaired,
+            capture: first,
+        } = offer;
+        let mut response = (
+            StatusCode::BAD_REQUEST,
+            [(CONTENT_TYPE, "application/json")],
+            rejection,
+        )
+            .into_response();
+        response
+            .headers_mut()
+            .insert(TUI_SIGNATURE_REPAIR, HeaderValue::from_static("pending"));
+        response
+            .headers_mut()
+            .insert(TUI_ERROR_SOURCE, HeaderValue::from_static(source));
+        if options.projection.json {
+            response.headers_mut().insert(
+                TUI_GATEWAY_ID_HEADER,
+                HeaderValue::from_static(TUI_JSON_PROJECTION_V1),
+            );
+        }
+        let first_capture = if let (Some(capture), Some((pairs, raw))) = (capture, first) {
+            save_provider_capture(capture, pairs, raw, options);
+            true
+        } else {
+            options.wire && options.managed && options.captured
+        };
+        if first_capture {
+            response
+                .headers_mut()
+                .insert(TUI_CAPTURE, HeaderValue::from_static("queued"));
+        }
+        // 许可送达前由同一任务持有原连接、进程和活动位。取消与过期使用同一收口。
+        tokio::spawn(async move {
+            let Ok(Ok(permit)) = timeout_at(deadline, wait).await else {
+                let _ = timeout_at(deadline, write_repair_body(&mut connection, None, None)).await;
+                return;
+            };
+            let RepairPermit {
+                attempt,
+                projection,
+                response,
+            } = permit;
+            if Instant::now() >= deadline || response.is_closed() {
+                let _ = timeout_at(deadline, write_repair_body(&mut connection, None, None)).await;
+                let _ = response.send(Ok(repair_declined()));
+                return;
+            }
+            let result = async {
+                let mut capture = retry_capture.and_then(|(directory, input, account)| {
+                    Some((directory, input, account, attempt, tui_writer()?))
+                });
+                let captured = if options.managed && options.wire {
+                    capture
+                        .take()
+                        .is_some_and(|(directory, input, _, _, permit)| {
+                            slot.install_wire_capture(CaptureJob {
+                                directory,
+                                input,
+                                permit,
+                            })
+                        })
+                } else {
+                    capture.is_some()
+                };
+                let head = timeout_at(deadline, async {
+                    write_repair_body(&mut connection, Some(&repaired), Some(attempt)).await?;
+                    read_json(&mut connection).await
+                })
+                .await
+                .ok()
+                .and_then(Result::ok)
+                .ok_or_else(|| AppError::BadGateway("V2 签名修复提交状态未知".into()))?;
+                let attempt_id = attempt.to_string();
+                if head["repair_attempt_id"] != attempt_id {
+                    // 许可送达后，原进程或冻结凭据仍可能在写出前失效，来源此时交回首个拒绝。
+                    if head["repair_attempt_id"].is_null() && head["status"] == 400 {
+                        return Ok(repair_declined());
+                    }
+                    return Err(AppError::BadGateway("V2 签名修复缺少可核验的回包".into()));
+                }
+                let mut result = Self::source_response(
+                    head,
+                    connection,
+                    slot,
+                    capture,
+                    SourceOptions {
+                        projection,
+                        captured,
+                        ..options
+                    },
+                )
+                .await?;
+                result.headers_mut().insert(
+                    TUI_REPAIR_ATTEMPT,
+                    HeaderValue::from_str(&attempt_id).expect("UUID 可编码为头值"),
+                );
+                Ok(result)
+            }
+            .await;
+            let _ = response.send(result);
+        });
+        Ok(response)
+    }
+
+    /// 消费同一预留的额外发送许可。@param binding 当前受信绑定。@param headers 原预留和实际尝试。
+    /// @return 原轮的恢复响应，等待已失效时明确拒绝。
+    pub(super) async fn repair(
+        &self,
+        binding: &TransportBinding,
+        headers: &HeaderMap,
+    ) -> Result<Response, AppError> {
+        let identity = Identity::decode(headers, binding)?;
+        let mut ids = headers.get_all(TUI_REPAIR_ATTEMPT).iter();
+        let id = ids
+            .next()
+            .and_then(|id| id.to_str().ok())
+            .ok_or_else(invalid_identity)?;
+        let attempt = Uuid::parse_str(id).map_err(|_| invalid_identity())?;
+        if ids.next().is_some() || attempt.to_string() != id || id == identity.reservation_id {
+            return Err(invalid_identity());
+        }
+        let permit = {
+            let mut book = self.book.lock().unwrap();
+            let duplicate_attempt = book.contains_key(id)
+                || book
+                    .values()
+                    .any(|record| record.repair_attempt == Some(attempt));
+            let Some(record) = book.get_mut(&identity.reservation_id) else {
+                return Ok(repair_declined());
+            };
+            if record.identity != identity || record.binding_proof != binding_proof(binding) {
+                return Err(invalid_identity());
+            }
+            if record.deadline <= Instant::now() || !matches!(record.phase, Phase::RepairPending(_))
+            {
+                return Ok(repair_declined());
+            }
+            if duplicate_attempt {
+                return Err(invalid_identity());
+            }
+            let Phase::RepairPending(permit) =
+                std::mem::replace(&mut record.phase, Phase::Submitted)
+            else {
+                unreachable!()
+            };
+            record.repair_attempt = Some(attempt);
+            permit
+        };
+        let (response, wait) = oneshot::channel();
+        if permit
+            .send(RepairPermit {
+                attempt,
+                projection: ResponseProjection::from_headers(headers),
+                response,
+            })
+            .is_err()
+        {
+            return Ok(repair_declined());
+        }
+        wait.await
+            .map_err(|_| AppError::BadGateway("V2 签名修复提交状态未知".into()))?
+    }
+
+    async fn source_response(
+        head: Value,
+        connection: BufReader<UnixStream>,
+        slot: Slot,
+        capture: Option<Capture>,
+        options: SourceOptions,
+    ) -> Result<Response, AppError> {
         let status = head["status"]
             .as_u64()
             .and_then(|status| u16::try_from(status).ok())
@@ -1037,34 +1381,15 @@ impl TuiSender {
                 match chunk {
                     Ok(Some(bytes)) => Some((Ok(bytes), Some((connection, slot, capture)))),
                     Ok(None) => {
-                        if let Some((directory, input, account, id, permit)) = capture {
+                        if let Some(capture) = capture {
+                            let (_, _, account, id, _) = &capture;
+                            let (account, id) = (*account, *id);
                             tokio::spawn(async move {
                                 match timeout(IO_TIMEOUT, read_capture_footer(&mut connection))
                                     .await
                                 {
                                     Ok(Ok((pairs, raw))) => {
-                                        let written = tokio::task::spawn_blocking(move || {
-                                            let _permit = permit;
-                                            let format = if managed_capture {
-                                                "request_to_account_sender"
-                                            } else {
-                                                "http_request_written_to_loopback_provider"
-                                            };
-                                            input.save(
-                                                &directory,
-                                                account,
-                                                id,
-                                                pairs,
-                                                raw,
-                                                format,
-                                                !wire_protocol,
-                                                None,
-                                            )
-                                        })
-                                        .await;
-                                        if !matches!(written, Ok(Ok(()))) {
-                                            tracing::warn!(account_id=account, attempt_id=%id, "V2 提供方请求采集未保存");
-                                        }
+                                        save_provider_capture(capture, pairs, raw, options)
                                     }
                                     _ => {
                                         tracing::warn!(account_id=account, attempt_id=%id, "V2 提供方请求缺少已提交观察")
@@ -1082,29 +1407,27 @@ impl TuiSender {
             return Ok((status, [(CONTENT_TYPE, content_type)], body).into_response());
         }
         // 分开协商 JSON 和 SSE，使旧 Gateway 仍收到它接受的投影格式。
-        let (mut response, mode) =
-            if content_type == "application/json" && tui_delegates_json(headers) {
-                (
-                    (status, [(CONTENT_TYPE, content_type)], body).into_response(),
-                    TUI_JSON_PROJECTION_V1,
-                )
-            } else if content_type == "text/event-stream"
-                && tui_projection_marker(headers, TUI_SSE_PROJECTION_HEADER, TUI_SSE_PROJECTION_V1)
-            {
-                (
-                    (status, [(CONTENT_TYPE, content_type)], body).into_response(),
-                    TUI_SSE_PROJECTION_V1,
-                )
-            } else {
-                (
-                    tui_sender_response::project(status, content_type, body).await,
-                    "gateway",
-                )
-            };
+        let (mut response, mode) = if content_type == "application/json" && options.projection.json
+        {
+            (
+                (status, [(CONTENT_TYPE, content_type)], body).into_response(),
+                TUI_JSON_PROJECTION_V1,
+            )
+        } else if content_type == "text/event-stream" && options.projection.sse {
+            (
+                (status, [(CONTENT_TYPE, content_type)], body).into_response(),
+                TUI_SSE_PROJECTION_V1,
+            )
+        } else {
+            (
+                tui_sender_response::project(status, content_type, body).await,
+                "gateway",
+            )
+        };
         response
             .headers_mut()
             .insert(TUI_GATEWAY_ID_HEADER, HeaderValue::from_static(mode));
-        if capturing {
+        if options.captured {
             response
                 .headers_mut()
                 .insert(TUI_CAPTURE, HeaderValue::from_static("queued"));
@@ -1113,11 +1436,9 @@ impl TuiSender {
         if !status.is_success() && content_type == "application/json" {
             let origin = match head["error_source"].as_str() {
                 Some("local_provider_http") => Some("local_provider_http"),
-                Some("managed_oauth_http") if account_token.is_some() || oauth_file.is_some() => {
-                    Some("managed_oauth_http")
-                }
+                Some("managed_oauth_http") if options.managed => Some("managed_oauth_http"),
                 Some("oauth_file_before_model")
-                    if oauth_file.is_some() && status == StatusCode::SERVICE_UNAVAILABLE =>
+                    if options.oauth_file && status == StatusCode::SERVICE_UNAVAILABLE =>
                 {
                     Some("oauth_file_before_model")
                 }
@@ -1168,6 +1489,8 @@ impl TuiSender {
                         record.cancel.send_replace(true);
                     }
                     Phase::Ready { .. } => record.phase = Phase::Closed,
+                    // 关闭决定信道，由等待任务回收原连接和容量。
+                    Phase::RepairPending(_) => record.phase = Phase::Submitted,
                     _ => {}
                 }
             } else if let Some((deadline, replay_until)) = deadlines {
@@ -1178,6 +1501,7 @@ impl TuiSender {
                 book.insert(
                     identity.reservation_id.clone(),
                     Record {
+                        repair_attempt: None,
                         wire_capture: None,
                         identity: identity.clone(),
                         agent_probe: false,
@@ -1209,6 +1533,133 @@ impl TuiSender {
         }
         Ok(StatusCode::NO_CONTENT)
     }
+}
+
+fn repair_declined() -> Response {
+    (StatusCode::CONFLICT, [(TUI_SIGNATURE_REPAIR, "declined")]).into_response()
+}
+
+fn save_provider_capture(
+    capture: Capture,
+    pairs: Vec<(String, String)>,
+    raw: Vec<u8>,
+    options: SourceOptions,
+) {
+    let (directory, input, account, attempt, permit) = capture;
+    tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        let format = if options.managed {
+            "request_to_account_sender"
+        } else {
+            "http_request_written_to_loopback_provider"
+        };
+        if input
+            .save(
+                &directory,
+                account,
+                attempt,
+                pairs,
+                raw,
+                format,
+                !options.wire,
+                None,
+            )
+            .is_err()
+        {
+            tracing::warn!(account_id=account, attempt_id=%attempt, "V2 提供方请求采集未保存");
+        }
+    });
+}
+
+async fn read_sized_field(
+    connection: &mut BufReader<UnixStream>,
+    field: &Value,
+    limit: usize,
+) -> io::Result<Vec<u8>> {
+    let size = field
+        .as_u64()
+        .and_then(|size| usize::try_from(size).ok())
+        .filter(|size| *size <= limit)
+        .ok_or_else(source_error)?;
+    let mut bytes = vec![0; size];
+    connection.read_exact(&mut bytes).await?;
+    Ok(bytes)
+}
+
+async fn write_repair_body(
+    connection: &mut BufReader<UnixStream>,
+    body: Option<&[u8]>,
+    attempt: Option<Uuid>,
+) -> io::Result<()> {
+    let mut head = json!({"body_len": body.map_or(0, <[u8]>::len)});
+    if let Some(attempt) = attempt {
+        head["attempt_id"] = json!(attempt.to_string());
+    }
+    write_json(connection, &head).await?;
+    if let Some(body) = body {
+        connection.get_mut().write_all(body).await?;
+    }
+    Ok(())
+}
+
+async fn read_initial_reply(
+    connection: &mut BufReader<UnixStream>,
+    repair: Option<bool>,
+    managed_oauth: bool,
+) -> io::Result<SourceReply> {
+    let mut head = read_json(connection).await?;
+    let mut repaired = false;
+    if head["signature_repair"] == "known" {
+        if repair != Some(true) {
+            return Err(source_error());
+        }
+        let raw = read_sized_field(connection, &head["body_len"], REQUEST_BODY_LIMIT).await?;
+        let updated = repair_body(&raw).filter(|body| body.len() <= REQUEST_BODY_LIMIT);
+        repaired = updated.is_some();
+        write_repair_body(connection, updated.as_deref(), None).await?;
+        head = read_json(connection).await?;
+    }
+    if head["signature_repair"] != "rejected" {
+        return Ok(SourceReply::Final { head, repaired });
+    }
+    if repair.is_none() {
+        return Err(source_error());
+    }
+    let source = if managed_oauth {
+        "managed_oauth_http"
+    } else {
+        "local_provider_http"
+    };
+    if head["error_source"] != source {
+        return Err(source_error());
+    }
+    let raw = read_sized_field(connection, &head["body_len"], REQUEST_BODY_LIMIT).await?;
+    let rejection =
+        read_sized_field(connection, &head["error_len"], SIGNATURE_ERROR_BODY_LIMIT).await?;
+    let headers =
+        read_sized_field(connection, &head["capture_headers_len"], REQUEST_BODY_LIMIT).await?;
+    let policy_refusal = serde_json::from_slice(&rejection)
+        .ok()
+        .as_ref()
+        .and_then(session_policy_block::classify)
+        .is_some();
+    if !policy_refusal
+        && is_signature_rejection(&rejection)
+        && let Some(repaired) = repair_body(&raw).filter(|body| body.len() <= REQUEST_BODY_LIMIT)
+    {
+        return Ok(SourceReply::Signature(SignatureOffer {
+            source,
+            rejection,
+            repaired,
+            capture: serde_json::from_slice(&headers)
+                .ok()
+                .map(|pairs| (pairs, raw)),
+        }));
+    }
+    // 仅明确拒绝且可降级的正文才暂停原轮，其他错误由来源沿原路径交付。
+    write_repair_body(connection, None, None).await?;
+    let head = read_json(connection).await?;
+    Ok(SourceReply::Final { head, repaired })
 }
 
 /// 从同一次已鉴权发送的正文结束符后读取独立采集，保持首帧和终帧实时交付。
@@ -1334,6 +1785,7 @@ mod tests {
                 assert_eq!(control["action"], "bind");
                 assert!(control.get("reservation").is_none() && control.get("body_len").is_none());
                 let nonce = control["nonce"].clone();
+                control["signature_repair_protocol"] = json!(1);
                 control["ready"] = json!(true);
                 control["idle"] = json!(false);
                 write_json(&mut connection, &control).await.unwrap();
@@ -1345,6 +1797,136 @@ mod tests {
             control["ready"] = json!(true);
             control["idle"] = json!(false);
             (connection, control)
+        }
+    }
+
+    /// 明确拒绝在原连接等待许可。取消和重复控制都遵守同一预留的单次认领。
+    #[tokio::test]
+    async fn signature_repair_retains_original_source_until_resolution() {
+        let source = Source::new();
+        let raw = br#"{"thinking":{"type":"adaptive"},"messages":[{"role":"assistant","content":[{"type":"thinking","thinking":"sample","signature":"old"}]}]}"#;
+        let rejection = br#"{"type":"error","error":{"type":"invalid_request_error","message":"Invalid signature in thinking block"}}"#;
+        for (approve, observed) in [(true, true), (true, false), (false, false)] {
+            let id = source.identity();
+            let attempt = Uuid::new_v4();
+            let request = Request::builder()
+                .header(RESERVATION_HEADER, header(&id))
+                .header(TUI_SIGNATURE_REPAIR, "1")
+                .body(Body::from(raw.as_slice()))
+                .unwrap();
+            let (prepared, mut socket) = tokio::join!(
+                source
+                    .sender
+                    .prepare(&source.binding, Some(&source.config), request),
+                async {
+                    let (mut socket, mut reply) = source.receive("prepare").await;
+                    let mut prepared = vec![0; raw.len()];
+                    socket.read_exact(&mut prepared).await.unwrap();
+                    assert_eq!(prepared, raw);
+                    reply["kind"] = json!("continuation");
+                    write_json(&mut socket, &reply).await.unwrap();
+                    socket
+                }
+            );
+            assert_eq!(prepared.unwrap().headers()[TUI_SIGNATURE_REPAIR], "1");
+            tokio::join!(
+                async {
+                    let mut control = headers(&id);
+                    control.insert(
+                        TUI_GATEWAY_ID_HEADER,
+                        HeaderValue::from_static(TUI_JSON_PROJECTION_V1),
+                    );
+                    let first = source
+                        .sender
+                        .send(&source.binding, Some(&source.config), &control, None)
+                        .await
+                        .unwrap();
+                    assert_eq!(first.status(), StatusCode::BAD_REQUEST);
+                    assert_eq!(first.headers()[TUI_SIGNATURE_REPAIR], "pending");
+                    assert_eq!(
+                        first.into_body().collect().await.unwrap().to_bytes(),
+                        rejection.as_slice()
+                    );
+                    assert_eq!(source.sender.active(), 1);
+                    assert!(source.send(&id).await.is_err());
+                    control.insert(
+                        TUI_REPAIR_ATTEMPT,
+                        HeaderValue::from_str(&attempt.to_string()).unwrap(),
+                    );
+                    let mut foreign = source.binding.clone();
+                    foreign.release_id = "different".into();
+                    assert!(source.sender.repair(&foreign, &control).await.is_err());
+                    if approve {
+                        let second = source
+                            .sender
+                            .repair(&source.binding, &control)
+                            .await
+                            .unwrap();
+                        if observed {
+                            assert_eq!(second.status(), StatusCode::OK);
+                            assert_eq!(second.headers()[TUI_REPAIR_ATTEMPT], attempt.to_string());
+                            assert_eq!(
+                                second.into_body().collect().await.unwrap().to_bytes(),
+                                b"{}".as_slice()
+                            );
+                        } else {
+                            assert_eq!(second.status(), StatusCode::CONFLICT);
+                        }
+                    } else {
+                        assert_eq!(source.cancel(&id).await.unwrap(), StatusCode::NO_CONTENT);
+                    }
+                    let duplicate = source
+                        .sender
+                        .repair(&source.binding, &control)
+                        .await
+                        .unwrap();
+                    assert_eq!(duplicate.status(), StatusCode::CONFLICT);
+                },
+                async {
+                    let command = read_json(&mut socket).await.unwrap();
+                    assert_eq!(command["action"], "send");
+                    assert_eq!(command["signature_repair"], false);
+                    write_json(&mut socket, &json!({
+                        "signature_repair":"rejected","body_len":raw.len(),
+                        "error_len":rejection.len(),"error_source":"local_provider_http","capture_headers_len":0
+                    })).await.unwrap();
+                    socket.get_mut().write_all(raw).await.unwrap();
+                    socket.get_mut().write_all(rejection).await.unwrap();
+                    let decision = read_json(&mut socket).await.unwrap();
+                    if approve {
+                        assert_eq!(decision["attempt_id"], attempt.to_string());
+                        let body = read_sized_field(
+                            &mut socket,
+                            &decision["body_len"],
+                            REQUEST_BODY_LIMIT,
+                        )
+                        .await
+                        .unwrap();
+                        assert_eq!(
+                            serde_json::from_slice::<Value>(&body).unwrap()["messages"][0]["content"]
+                                [0]["text"],
+                            "sample"
+                        );
+                        if observed {
+                            write_json(&mut socket, &json!({
+                                "status":200,"content_type":"application/json","message_id_mode":"gateway",
+                                "repair_attempt_id":attempt.to_string()
+                            })).await.unwrap();
+                            socket
+                                .get_mut()
+                                .write_all(b"\x00\x00\x00\x02{}\x00\x00\x00\x00")
+                                .await
+                                .unwrap();
+                        } else {
+                            write_json(&mut socket, &json!({"status":400}))
+                                .await
+                                .unwrap();
+                        }
+                    } else {
+                        assert_eq!(decision, json!({"body_len":0}));
+                    }
+                }
+            );
         }
     }
 

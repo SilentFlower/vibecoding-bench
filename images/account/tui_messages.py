@@ -11,6 +11,7 @@ from tui_input_policy import InputRejection, native_input, validate_api, validat
 
 
 BODY_LIMIT = 10 * 1024 * 1024
+SIGNATURE_ERROR_BODY_LIMIT = 1024 * 1024
 OAUTH_FILE_LIMIT = 8192
 MODEL_VERSION_HEADERS = frozenset({"anthropic-version", "anthropic-beta"})
 MODEL_PROTOCOL_HEADERS = MODEL_VERSION_HEADERS | {
@@ -120,11 +121,16 @@ class SubagentAmbiguousError(SubagentBindingError):
 class ModelResponseError(RuntimeError):
     """本机模型在首帧前返回的 Messages 错误。@param status 模型 HTTP 状态。@param raw 上游错误正文。"""
 
-    def __init__(self, status, raw, *, source=None, retry_after=None):
-        """过滤错误扩展。@param source 受信传输归属。@param retry_after 已核验的退避秒数。@return 无。"""
+    def __init__(self, status, raw, *, source=None, retry_after=None, complete=False, before_send=False):
+        """过滤错误扩展。
+        @param status 模型 HTTP 状态。@param raw 错误正文。@param source 受信传输归属。
+        @param retry_after 已核验的退避秒数。@param complete 提供方确认错误正文完整。
+        @param before_send 账号发送器确认未提交模型。@return 无。
+        """
         self.status = status if 400 <= status < 600 else 502
         self.source = source
         self.retry_after = retry_after
+        self.before_send = before_send
         fallback = {401: "authentication_error", 403: "permission_error", 429: "rate_limit_error"}
         error = {"type": fallback.get(self.status, "api_error"), "message": f"本机模型返回 HTTP {self.status}"}
         try:
@@ -154,6 +160,14 @@ class ModelResponseError(RuntimeError):
             self.private_body = encode({
                 "type": "error", "error": error, "_tui_policy_evidence": {"error": evidence}
             })
+        self.signature_evidence = (
+            self.private_body
+            if complete and status == 400 and public_fields
+            and source in ("local_provider_http", "managed_oauth_http")
+            and data["type"] == "invalid_request_error" and "signature" in data["message"].lower()
+            and max(len(raw), len(self.private_body)) <= SIGNATURE_ERROR_BODY_LIMIT
+            else None
+        )
         super().__init__(f"模型返回 HTTP {self.status}")
 
 

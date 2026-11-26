@@ -24,6 +24,7 @@ pub mod native_runtime;
 #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
 #[path = "native_runtime_unsupported.rs"]
 pub mod native_runtime;
+mod native_signature_repair;
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 mod native_tls_observer;
 #[cfg(test)]

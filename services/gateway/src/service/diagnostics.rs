@@ -723,6 +723,14 @@ impl AttemptTrace {
         }
     }
 
+    /// 用发送器确认的降级更新出站思考参数。@return 无。
+    pub(super) fn tui_thinking_removed(&mut self) {
+        if let Some(record) = self.record.as_mut() {
+            record.parameters.thinking_type = None;
+            record.parameters.thinking_budget = None;
+        }
+    }
+
     /// 记录同一次实际提交的冻结定位，保留诊断的旁路语义。
     /// @param location 原已核验发送通道提供的非秘密定位。
     /// @return 无。

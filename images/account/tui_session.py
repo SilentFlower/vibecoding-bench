@@ -1,7 +1,7 @@
 """把同一 sender 内的官方交互会话绑定到一次次受权的客户端工具往返。"""
 
 from collections import Counter, deque
-from contextlib import closing, suppress
+from contextlib import ExitStack, closing, suppress
 from dataclasses import dataclass, field
 import fcntl
 import gzip
@@ -629,8 +629,7 @@ class _Actor:
                 and set(ids) == self.delivered == set(handle.answers)
                 and len(ids) == len(self.delivered)
             )
-        # 2.1.293 按模型生成两种原生布局。只检查最近用户输入及紧随的系统行；
-        # 旧会话历史、引述标记的标题和调用方提供的文本都不能单独消费本次许可。
+        # 2.1.293 在新轮或恢复后都只用最近用户输入及紧随的系统行认领本次许可。
         last_user = next(
             (
                 i
@@ -645,18 +644,21 @@ class _Actor:
         line = "prompt.submit hook additional context: " + self.guard_text
         if isinstance(content, list):
             marker = "<system-reminder>\n" + line + "\n</system-reminder>"
-            return (
-                sum(
-                    1
-                    for block in content
-                    if isinstance(block, dict)
-                    and block.get("type") == "text"
-                    and block.get("text") in (marker, marker + "\n")
-                )
-                == 1
+            guard_count = sum(
+                1
+                for block in content
+                if isinstance(block, dict)
+                and block.get("type") == "text"
+                and block.get("text") in (marker, marker + "\n")
             )
-        # DeepSeek 的真实主轮保留纯字符串用户行，把 hook context 收入其后的原生系统块。
-        # 校验完整用户文本和独立随机标记行，避免在系统摘要中搜到历史提示就认领。
+            if guard_count:
+                return guard_count == 1
+            # 恢复失败轮时 CLI 会合并相邻用户行。本轮提示是合并后的最后一个文本块。
+            latest = content[-1] if content else None
+            if not isinstance(latest, dict) or latest.get("type") != "text":
+                return False
+            content = latest.get("text")
+        # 合并用户行和原生字符串用户行都要求精确提示和单独的当前系统标记行。
         if (
             not isinstance(content, str)
             or sha256(content.encode()).digest() != self.prompt_hash
@@ -798,12 +800,41 @@ class _Actor:
                 options["capture_assembly"] = True
             if handle.expires_at is not None:
                 options["expires_at"] = handle.expires_at
-            model_response = self.driver.launcher.managed_model_response(
-                raw, account_token=account_token, reservation=handle.reservation, **options
-            )
+            send_model = self.driver.launcher.managed_model_response
+            options.update(account_token=account_token, reservation=handle.reservation)
         else:
-            model_response = self.driver.launcher.local_model_response(raw, **options)
-        with model_response as upstream:
+            send_model = self.driver.launcher.local_model_response
+        repair = handle.signature_exchange
+        if repair is not None and handle.signature_known:
+            prepared = repair(raw)
+            if prepared is not None:
+                raw, _ = prepared
+        with ExitStack() as active:
+            try:
+                upstream = active.enter_context(send_model(raw, **options))
+            except ModelResponseError as error:
+                if repair is None or error.signature_evidence is None:
+                    raise
+                # 只在首帧前等待同轮许可，CLI 与工具账本仍归原步骤。
+                restored = repair(raw, error)
+                if (
+                    restored is None or self.dead.is_set()
+                    or (handle.expires_at is not None and handle.expires_at <= time.time_ns() // 1_000_000)
+                ):
+                    raise
+                raw, attempt_id = restored
+                if self.driver.managed_oauth:
+                    options["attempt_id"] = attempt_id
+                try:
+                    upstream = active.enter_context(send_model(raw, **options))
+                except ModelResponseError as final_error:
+                    # 本机发送器明确确认尚未出站时，仍交付已经取得的签名拒绝。
+                    if final_error.before_send:
+                        raise error from None
+                    if final_error.source in ("managed_oauth_http", "local_provider_http"):
+                        handle.repair_attempt_id = attempt_id
+                    raise
+                handle.repair_attempt_id = attempt_id
             if upstream.status != 200:
                 raw_error = upstream.read(BODY_LIMIT + 1)
                 raise ModelResponseError(
@@ -907,6 +938,9 @@ class _Reserved:
         self.api_context = body.get("context_management") if "metadata" not in body else None
         self.thinking = body.get("thinking")
         self.capture_assembly = False
+        self.signature_exchange = None
+        self.signature_known = False
+        self.repair_attempt_id = None
         self.sent = self.completed = False
 
     def send(self, command):

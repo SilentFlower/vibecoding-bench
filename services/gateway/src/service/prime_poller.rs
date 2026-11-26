@@ -966,6 +966,7 @@ impl PrimePollerService {
                     body: &bytes,
                     headers: &HeaderMap::new(),
                     native_cc: false,
+                    signature_repair: None,
                     agent_summary: false,
                     oauth_file: account.auth_type == AccountAuthType::Oauth,
                     body_policy: TuiBodyPolicy::default(),
@@ -1032,7 +1033,8 @@ impl PrimePollerService {
         })
         .await
         .map_err(|_| timeout_error())??;
-        let (prepared, credentials, failed_token, _slot, _activity, send, config) = prepared_run;
+        let (mut prepared, credentials, failed_token, _slot, _activity, send, config) =
+            prepared_run;
         let remaining = deadline
             .checked_duration_since(TokioInstant::now())
             .filter(|duration| !duration.is_zero())

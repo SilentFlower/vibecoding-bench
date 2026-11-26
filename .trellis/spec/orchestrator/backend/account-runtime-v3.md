@@ -73,6 +73,47 @@ Claude Code 在父模型响应仍打开时，可能已为完整的 `Agent` 或 `
 
 `test_open_group_waits_until_tool_order_is_known`、`test_cancelled_parent_waiter_cannot_move_to_replacement_step` 和 `test_closed_agent_block_and_late_directed_message` 分别覆盖组封闭、同提示替代派工、晚到回执与追加消息。`test_cli_groups_agent_text_without_changing_tools_or_signatures` 覆盖父续轮分组及内容改动。
 
+## V2 思考签名 400 同轮恢复
+
+### 1. 适用范围
+
+Claude V2 的公开 Messages 请求。普通 API 和原生输入使用同一恢复协议，覆盖首轮、工具续轮、SSE 和 JSON。
+
+### 2. 私有接口
+
+- Unix 来源以 `signature_repair_protocol=1` 声明能力。Gateway 的 prepare 使用 `x-v3-tui-signature-repair: 1` 启用本轮，已命中失效历史时使用 `known`。sender 在准备响应确认 `1`。
+- 首次完整拒绝可随私有 HTTP 400 返回 `x-v3-tui-signature-repair: pending`。恢复使用空正文 `POST /internal/tui-v2/repair`，沿原 Bearer 和 `x-v3-tui-reservation`，附 `x-v3-tui-repair-attempt`。值为区别于原预留 ID 的规范 UUID。
+- 中继仅在 CC 路径放行此 POST，沿原节点、账号、环境代次及排空门禁。成功关联时响应必须回显同一尝试 UUID。明确拒绝使用私有 `409` 和 `x-v3-tui-signature-repair: declined`。私有控制字段由 Gateway 消费。
+
+### 3. 合同
+
+- 只接纳业务响应开始前实际提供方完整返回的 HTTP 400。错误体上限为 1 MiB，须符合 V1 的 `invalid_request_error` 思考签名拒绝判定。sender 核对正文确实可降级，保留原 Unix 连接和活跃预留。
+- Gateway 在原截止内再次获取同账号的发送准入，通过原账号和会话门禁才交付许可。sender 在原绑定内消费一次许可。原进程和同一模型步骤使用冻结的凭据、会话、模型、已组装的请求头和工具账本完成投递。实际 Content-Length 随修复正文计算。文件凭据仍以原快照的到期时间为准。已明确在出站前被拒绝时交付首次签名拒绝。
+- 降级只改出站正文。历史 thinking 转成文本，清理 redacted thinking、顶层 thinking 及相关策略。工具字段与工具数值保留。已有 CCH 随最终字节刷新。
+- 失败轮释放后，同会话按原生日志恢复时可以合并相邻用户行。认领主轮须匹配最后一个用户文本块的提示摘要与紧随系统消息中唯一独立的当前标记行。
+- Gateway 仅在核对第二次实际响应后记录第二条尝试，使用独立 UUID 和 `signature_repair` 原因。收到 2xx 后复用 V1 按真实会话和完整历史前缀保存的摘要。后续命中时首发前降级。诊断采集继续按原授权和脱敏门禁处理。已协商最终 TLS 收集时，原预留将写出观察绑定到该次实际 UUID。两个尝试各自占用原写入名额并独立收口。
+
+### 4. 校验与错误
+
+| 条件 | 结果 |
+| --- | --- |
+| 本轮取得恢复许可并收到第二次实际响应 | 公开接口交付第二次响应 |
+| 普通 400、错误不完整或业务 SSE 已开始 | 沿现有错误或事件流收口 |
+| 准入超时、旧组件缺能力或旧中继明确发送前拒绝 | 保留首个 400，待恢复预留按原取消和时限收口 |
+| 跨绑定、重复或过期的恢复指令 | 拒绝指令，额外模型投递为零 |
+| 发出恢复许可后缺少可核验的提交回执 | 按提交状态未知返回 502 |
+
+### 5. 场景
+
+已有 Read 工具回执的原进程首次收到 `Invalid signature in thinking block` 时，降级后的第二次模型请求保留同一回执。新的 prepare 无法恢复原轮已认领的步骤。恢复指令应沿仍持有该步骤的原预留送达。
+
+### 6. 回归
+
+- `signature_repair_retains_original_source_until_resolution` 验证原连接、错绑定、许可撤销、重复控制和实际发送证据。`v2_repair_preserves_tool_value_bytes_and_refreshes_cch` 核对高精度工具参数和 CCH。
+- `test_signature_repair_sends_twice_in_one_claimed_native_step` 核对只认领一次。`test_cluster_transport.py` 核对私有控制头、实际 sender 空正文及远端隔离规则。
+- `test_resumed_user_blocks_bind_the_latest_prompt_and_system_guard` 核对失败会话恢复布局、旧提示、旧标记和重复标记。
+- 隔离 HTTPS 回环逐次核对固定版 CLI 的真实模型收包、工具回执、原账号与会话、两条诊断及旧组件回退。
+
 ## V2 慢工具回执
 
 ### 1. 适用范围

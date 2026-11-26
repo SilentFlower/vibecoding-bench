@@ -2744,7 +2744,8 @@ fn compute_cch_attestation(mut body: Vec<u8>, version: &str) -> Vec<u8> {
     body
 }
 
-fn refresh_cch_attestation(mut body: Vec<u8>, version: &str) -> Vec<u8> {
+/// 刷新根级 billing 的已有校验值。@param body 最终正文。@param version 来源版本。@return 封口后的正文。
+pub(super) fn refresh_cch_attestation(mut body: Vec<u8>, version: &str) -> Vec<u8> {
     if let Some(pos) = find_cch_value(&body) {
         body[pos..pos + 5].copy_from_slice(&CCH_PLACEHOLDER[4..]);
         compute_cch_attestation(body, version)
