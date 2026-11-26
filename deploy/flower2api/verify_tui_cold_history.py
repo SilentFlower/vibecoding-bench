@@ -1542,6 +1542,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             assert not Path(f"/proc/{original}").exists()
             assert [attempt["diagnostic_session_origin"] for attempt in captures] == ["external_import", "disk_resume"]
             assert all(attempt["diagnostic_body_source"] == "interactive_cli" for attempt in captures)
+            continue_counts = [model_continue_prompt_count(model) for _, model, _ in received]
+            assert continue_counts == [0, 1], continue_counts
             actual = {}
             for block in result["content"]:
                 tool_id = block["tool_use_id"]
@@ -1553,6 +1555,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                                if item["type"] == "image"]}
             proof["tool_receipt_images"] = {"records": actual, "error_http": receipt_error_status,
                                            "error_request_id": receipt_error_request,
+                                           "standard_continue_count_by_model_post": continue_counts,
                                            "original_pid": original, "original_process_exited": True,
                                            "original_history_prefix_preserved": True, "binding_preserved": True,
                                            "original_history_bytes_equal": history_after_receipt == original_history,
@@ -1711,8 +1714,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 assert set(signed) == {"role", "content", "model"}
                 assert signed["model"] == events[0]["message"]["model"]
                 proof["recovered_signed_tool_model"] = signed["model"]
-            restored_text = [(row["role"], block.get("text")) for row in native_recovery["messages"] for block in blocks(row)]
-            continue_prompt_count = restored_text.count(("user", "Continue from where you left off."))
+            continue_prompt_count = model_continue_prompt_count(native_recovery)
             assert continue_prompt_count == 1
             proof["recovered_pending_tool"] = {"changed_system_http": changed_policy, "frozen_policy": "append",
                                               "changed_effort_http": changed_effort, "frozen_effort": "medium",
@@ -3685,6 +3687,12 @@ def verify_cache_markers(manage, token, account_id, headers, received):
 def blocks(row):
     """读取模型端实际内容块。@param row 模型消息。@return 内容块序列。"""
     return row["content"] if isinstance(row["content"], list) else [{"type": "text", "text": row["content"]}]
+
+
+def model_continue_prompt_count(model):
+    """统计完整的标准继续提示。@param model 隔离模型实收正文。@return 用户文本块里的实际出现次数。"""
+    return sum(block["type"] == "text" and block.get("text") == "Continue from where you left off."
+               for row in model["messages"] if row["role"] == "user" for block in blocks(row))
 
 
 def observed_cache_breakpoints(model):
