@@ -29,7 +29,8 @@ from uuid import UUID, uuid4
 from runtime_files import atomic_text
 from tui_capacity import TuiCapacity, TuiCapacityError
 from tui_cold_history import (
-    ColdHistory, MCP_SERVER, SIGNED_THINKING_TYPES, tool_result_has_images, tool_result_is_empty,
+    ColdHistory, MCP_SERVER, SIGNED_THINKING_TYPES, tool_result_has_images, tool_result_has_plain_text_blocks,
+    tool_result_is_empty,
 )
 from tui_reconnect import ReceiptCheckpoints, digest
 from tui_input_policy import CONTEXT_BETA, InputRejection, native_input
@@ -973,6 +974,9 @@ class _Actor:
                     if not output_history.matches_history_empty_tool_results(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
                             "code": "unsupported_parameter", "message": "CLI 未保留空工具结果"}}))
+                    if not output_history.matches_history_tool_text_blocks(native):
+                        raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
+                            "code": "unsupported_parameter", "message": "CLI 未保留工具结果中的原始文本块"}}))
                     if handle.kind == "recovered" and not self.recovery_history.matches_recovered_signatures(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
                             "code": "unsupported_parameter", "message": "CLI 未保留已核对的签名工具历史"}}))
@@ -1696,14 +1700,18 @@ class SessionDriver:
                         )
                         if not native_body_policy or plan != actor.cold_history or not tool_results_only:
                             raise InputRejection("unsupported_parameter")
-                    if actor.cold_history is not None and any(
-                        tool_result_has_images(answer) or tool_result_is_empty(answer) for answer in answers.values()
-                    ):
-                        checkpoint = self.checkpoints.find(actor_key)
-                        if checkpoint is None or checkpoint[4] != actor.receipt_revision or checkpoint[5] is None:
-                            raise InputRejection("unrecoverable_tool")
-                        retire_for_recovery = actor
-                    else:
+                        requires_recovery = any(tool_result_has_images(answer) or tool_result_is_empty(answer)
+                                                for answer in answers.values())
+                        # 纯文本数组仅在整轮可恢复时转入磁盘，保留扩展字段或缺少签名来源时的在线续轮。
+                        if requires_recovery or (
+                            any(tool_result_has_plain_text_blocks(answer) for answer in answers.values())
+                            and plan.resume_receipts(messages, signed_tool_models=actor.signed_tool_models) is not None
+                        ):
+                            checkpoint = self.checkpoints.find(actor_key)
+                            if checkpoint is None or checkpoint[4] != actor.receipt_revision or checkpoint[5] is None:
+                                raise InputRejection("unrecoverable_tool")
+                            retire_for_recovery = actor
+                    if retire_for_recovery is None:
                         handle = _Reserved(actor, "continuation", history, answers, body, stream, frozen, reservation,
                                            active_request, input_observation=input_observation)
                         actor.claim = handle
@@ -1740,7 +1748,7 @@ class SessionDriver:
         if cold is None and system_policy != "append" and not is_native and checkpoint is None:
             raise InputRejection("unsupported_parameter")
         if retire_for_recovery is not None:
-            # 热续轮会改写空结果或移除图片。校验完整回执后复用同一修订的磁盘恢复入口。
+            # 热续轮会改写空结果和纯文本数组，或移除图片。校验完整回执后沿同一修订恢复。
             with self.lock:
                 with retire_for_recovery.changed:
                     if retire_for_recovery.claim is not None or retire_for_recovery.receipt_revision != revision:

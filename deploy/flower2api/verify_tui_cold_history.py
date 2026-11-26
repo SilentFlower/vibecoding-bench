@@ -323,7 +323,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            cancel_and_change_question=False, oauth_rotation=False, provider_quota=None, slow_tool_stream=False,
            model_connection_contract=None, external_signed_history=False, history_tool_images=None,
            tool_receipt_images=None, explicit_custom_tool_type=False, history_empty_tool_result=None,
-           empty_tool_receipt=None):
+           empty_tool_receipt=None, tool_receipt_text_blocks=None):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -337,6 +337,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param history_tool_blocks 是否核对已完成工具结果的原始文本块。
     @param history_empty_tool_result 已闭合空结果的缺省、空数组或空串形状。
     @param empty_tool_receipt 本轮实际回执的空结果形状及错误标志。
+    @param tool_receipt_text_blocks 本轮实际回执的重复文本块、换行及错误标志。
     @param history_tool_images 核对已闭合工具结果的图文块，可显式声明成功或省略错误标志。
     @param tool_receipt_images 核对本轮实际工具调用的图文回执及拒绝边界。
     @param explicit_custom_tool_type 是否通过显式 custom 的客户端声明进行原生工具往返。
@@ -1104,6 +1105,14 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             block.pop("is_error", None)
             if flag:
                 block["is_error"] = flag == "error"
+        if tool_receipt_text_blocks:
+            (block,) = [item for item in result["content"] if item["tool_use_id"] == NEW_ID]
+            block["content"] = [{"type": "text", "text": value} for value in (
+                "合成工具回执：重复段。", "第二段\n保留换行。\n", "合成工具回执：重复段。",
+            )]
+            if tool_receipt_text_blocks != "implicit-success":
+                block["is_error"] = tool_receipt_text_blocks == "error"
+        exact_tool_receipts = bool(empty_tool_receipt or tool_receipt_text_blocks)
         if tool_receipt_images:
             png, jpeg, gif, webp = fixture_image_blocks(all_formats=True)
             for block in result["content"]:
@@ -1192,7 +1201,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             assert len(received) == 1
             expected_token = rotated_token
             startup_event("oauth_credential_rotated", model_posts=len(received), refresh_count=len(refresh_calls))
-        if recover_pending or tool_receipt_images or empty_tool_receipt:
+        if recover_pending or tool_receipt_images or exact_tool_receipts:
             marker = ("--name=" + headers["x-session-id"]).encode()
             original, = [int(path.parent.name) for path in Path("/proc").glob("[0-9]*/cmdline")
                          if fixture_command_has(path, marker)]
@@ -1537,7 +1546,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                     "old_model_posts": 2, "new_model_posts": 1,
                     "new_attempt": new_attempt}
         verify_model(received, policy=tool_policy or "append", old_content=old_result, current_text_blocks=current_text_blocks,
-                     exact_receipts=result["content"] if empty_tool_receipt else ())
+                     exact_receipts=result["content"] if exact_tool_receipts else ())
         captures = verify_captures(manage, received, account_token, additional_secrets=(
             (refresh_token, rotated_token, rotated_refresh) if oauth_rotation else ()
         ))
@@ -1576,7 +1585,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                                         if block["type"] == "image"],
                                             "content_sha256": sha256(encoded(old_result)).hexdigest(),
                                             "changed_order_http": changed_history_images}
-        elif not (tool_receipt_images or history_empty_tool_result or empty_tool_receipt):
+        elif not (tool_receipt_images or history_empty_tool_result or exact_tool_receipts):
             proof["old_tool_calls"] = 0
         if history_empty_tool_result:
             observed = [find_blocks(model, "tool_use_id", PAST_ID) for _, model, _ in received]
@@ -1586,7 +1595,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                                   "observed_results": observed,
                                                   "changed_shape_http": changed_empty_history,
                                                   "changed_shape_request_id": empty_history_request_id}
-        if tool_receipt_images or empty_tool_receipt:
+        if tool_receipt_images or exact_tool_receipts:
             assert final["stop_reason"] == "end_turn"
             assert binding_file.read_bytes() == original_binding, binding_file
             history_after_receipt = original_file.read_bytes()
@@ -1605,13 +1614,14 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                               "original_history_bytes_equal": history_after_receipt == original_history,
                               "original_history_added_record_types": [row["type"] for row in appended],
                               "stop_reason": final["stop_reason"]}
-        if empty_tool_receipt:
+        if exact_tool_receipts:
             observed = [(row["role"], block) for row in received[-1][1]["messages"] for block in blocks(row)
                         if block.get("type") == "tool_result" and block["tool_use_id"] in expected_ids]
-            proof["empty_tool_receipt"] = {**recovery_proof, "input_shape": empty_tool_receipt,
-                                           "submitted_results": result["content"], "observed_results": observed,
-                                           "initial_http": initial_status,
-                                           "receipt_http": status, "initial_process_lost": recover_pending}
+            proof_key = "empty_tool_receipt" if empty_tool_receipt else "tool_receipt_text_blocks"
+            proof[proof_key] = {**recovery_proof, "input_shape": empty_tool_receipt or tool_receipt_text_blocks,
+                                "submitted_results": result["content"], "observed_results": observed,
+                                "initial_http": initial_status, "receipt_http": status,
+                                "initial_process_lost": recover_pending}
         if tool_receipt_images:
             actual = {}
             for block in result["content"]:
@@ -1698,7 +1708,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 proof.update(nested_history_cache_markers=[find_blocks(model, "tool_use_id", PAST_ID)
                                                            for _, model, _ in received],
                              changed_nested_history_cache_status=changed_nested_cache)
-        if parallel_tools and not (tool_receipt_images or empty_tool_receipt):
+        if parallel_tools and not (tool_receipt_images or exact_tool_receipts):
             first, second = (document for _, document, _ in received)
             assert TOOL["input_schema"] != PARALLEL_SECOND_TOOL["input_schema"]
             for native in (first, second):
@@ -4101,6 +4111,8 @@ def main():
                                   help="核对本轮实际回执的空值、错误标志及继续提示")
     current_receipts.add_argument("--tool-receipt-images", nargs="?", const="explicit-success",
                         choices=("explicit-success", "implicit-success"))
+    current_receipts.add_argument("--tool-receipt-text-blocks", choices=("implicit-success", "explicit-success", "error"),
+                                  help="逐块核对本轮工具回执的重复文本、换行、错误标志及继续提示")
     parser.add_argument("--explicit-custom-tool-type", action="store_true")
     system_roles = parser.add_mutually_exclusive_group()
     system_roles.add_argument("--message-system-roles", dest="message_system_roles", action="store_const", const="observe")
@@ -4208,6 +4220,7 @@ def main():
                      or args.model_connection_contract is not None or args.external_signed_history_contract
                      or args.history_tool_images is not None or args.tool_receipt_images is not None
                      or args.history_empty_tool_result is not None or args.empty_tool_receipt is not None
+                     or args.tool_receipt_text_blocks is not None
                      or args.explicit_custom_tool_type
                      or args.recovery_readiness_rejection
                      or args.structured_output_contract or bool(args.forced_tool_choice_contract) or args.no_tool_choice_contract
@@ -4244,6 +4257,7 @@ def main():
                        history_empty_tool_result=args.history_empty_tool_result,
                        empty_tool_receipt=args.empty_tool_receipt,
                        tool_receipt_images=args.tool_receipt_images,
+                       tool_receipt_text_blocks=args.tool_receipt_text_blocks,
                        explicit_custom_tool_type=args.explicit_custom_tool_type,
                        previous=previous,
                        failure_boundaries=args.failure_boundaries, current_text_blocks=args.current_text_blocks,

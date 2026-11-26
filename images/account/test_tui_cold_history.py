@@ -474,6 +474,29 @@ class ColdHistoryTests(TestCase):
         result["content"][1]["cache_control"]["ttl"] = "unsupported"
         self.assertIsNone(ColdHistory.from_request(body))
 
+    def test_resumed_tool_result_text_blocks_require_exact_model_content(self):
+        """发送前拒绝改写结果正文、分块或错误标志。@return 无。"""
+        text = {"type": "text", "text": "重复段"}
+        middle = {"type": "text", "text": "中段\n保留换行"}
+        result = {"type": "tool_result", "tool_use_id": "toolu_new", "is_error": False,
+                  "content": [text, middle, text]}
+        continuation = [*self.body["messages"],
+                        {"role": "assistant", "content": [
+                            {"type": "tool_use", "id": "toolu_new", "name": "LookupNote", "input": {}}]},
+                        {"role": "user", "content": [result]}]
+        resumed = ColdHistory.from_request(self.body).resume_receipts(continuation)
+        modeled = {"messages": deepcopy(resumed.history)}
+        self.assertEqual(modeled["messages"][-1]["content"], [result])
+        self.assertTrue(resumed.matches_history_tool_text_blocks(modeled))
+        incoming = modeled["messages"][-1]["content"][0]
+        incoming["content"] = [text, middle]
+        self.assertFalse(resumed.matches_history_tool_text_blocks(modeled))
+        incoming["content"] = [middle, text, text]
+        self.assertFalse(resumed.matches_history_tool_text_blocks(modeled))
+        incoming["content"] = [text, middle, text]
+        incoming.pop("is_error")
+        self.assertFalse(resumed.matches_history_tool_text_blocks(modeled))
+
     def test_completed_empty_results_keep_content_shape_when_resumed(self):
         """核对空结果的三种入站形状、旧归属及回执冻结。@return 无。"""
         for fields in ({}, {"content": []}, {"content": ""}, {"is_error": True}):

@@ -136,6 +136,14 @@ def tool_result_is_empty(block):
     return block.get("content", "") in ("", [])
 
 
+def tool_result_has_plain_text_blocks(block):
+    """识别非空纯文本数组。@param block 工具结果。@return 是否全部为非空纯文本块。"""
+    content = block.get("content")
+    return isinstance(content, list) and bool(content) and all(
+        isinstance(nested, dict) and _plain_text(nested) for nested in content
+    )
+
+
 def _historical_image_results(rows):
     return [(row["role"], block) for row in rows for block in _blocks(row)
             if block.get("type") == "tool_result" and tool_result_has_images(block)]
@@ -511,6 +519,12 @@ class ColdHistory:
         """核对历史及纳入恢复记录的空结果。@param native CLI 实际正文。@return 原结果块是否保留。"""
         expected = [(row["role"], block) for row in self.history for block in _blocks(row)
                     if block.get("type") == "tool_result" and tool_result_is_empty(block)]
+        return _matches_history_results(native, expected)
+
+    def matches_history_tool_text_blocks(self, native):
+        """核对原有纯文本结果数组。@param native CLI 实际正文。@return 原结果角色、字段及分块是否保留。"""
+        expected = [(row["role"], block) for row in self.history for block in _blocks(row)
+                    if block.get("type") == "tool_result" and tool_result_has_plain_text_blocks(block)]
         return _matches_history_results(native, expected)
 
     def matches_history_cache_markers(self, native):
