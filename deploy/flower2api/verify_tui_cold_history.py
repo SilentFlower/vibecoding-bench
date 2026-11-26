@@ -59,6 +59,9 @@ CHANGED_REPLY = "新问题的答案只来自已确认历史。"
 AFTER_RESTART = "RESTART：从已确认的旧问答开启另一轮。"
 DROP_REPLY = "FAILURE：模型收到正文后关闭响应连接。"
 REJECT_MODEL_REQUEST = "FAILURE：模型收到正文后返回合成拒绝。"
+QUOTA_QUESTIONS = {"allowed": "合成用量允许对照。", "rejected": "合成模型限流对照。"}
+QUOTA_RETRY_SECONDS = 29
+QUOTA_REJECTION = {"type": "error", "error": {"type": "rate_limit_error", "message": "隔离模型的合成限流"}}
 SLOW_MODEL_DELAY = 4.25
 SYSTEM = ["RULE1：你是便签助手。", "RULE2：请只使用已声明的工具。"]
 PAST_ID = "toolu_past_fixture"
@@ -107,14 +110,16 @@ SUGGESTION_REPLY = "summarize the synthetic note next"
 FORCED_CHOICES = {"any": {"type": "any"}, "named": {"type": "tool", "name": SECOND_TOOL["name"]}}
 
 
-def response_json(handler, payload, *, status=200):
+def response_json(handler, payload, *, status=200, headers=None):
     """写入合成 JSON 响应。@param handler 当前连接。@param payload 响应对象。
-    @param status 该隔离服务的实际状态。@return 无。
+    @param status 该隔离服务的实际状态。@param headers 可选的原模型响应头。@return 无。
     """
     raw = json.dumps(payload).encode()
     handler.send_response(status)
     handler.send_header("Content-Type", "application/json")
     handler.send_header("Content-Length", str(len(raw)))
+    for name, value in (headers or {}).items():
+        handler.send_header(name, value)
     handler.end_headers()
     handler.wfile.write(raw)
 
@@ -308,7 +313,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            structured_output=False, forced_tool_choice=None, no_tool_choice=False, disable_parallel_tool_use=False,
            auxiliary_mode=None,
            auxiliary_kind="title", auxiliary_sample=None, agent_progress=None, stock_client=False,
-           cancel_and_change_question=False, oauth_rotation=False):
+           cancel_and_change_question=False, oauth_rotation=False, provider_quota=None):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -325,6 +330,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param stock_client 是否通过真实外部 CLI 验证完整 V2 输入与工具回执。
     @param cancel_and_change_question 是否在首轮工具参数未完成时取消并从确认历史改问。
     @param oauth_rotation 是否在原轮等待工具期间通过正式管理入口轮换账号凭据。
+    @param provider_quota 可选的公开 SSE 或 JSON 供应商限流和被动额度对照。
     @param current_text_blocks 是否验证本轮文本块顺序及边界归属。
     @param signed_tool_history 是否核对隔离模型原工具轮的签名块。
     @param signed_tool_response 可选，模拟空思考正文或缺少助手模型的隔离响应。
@@ -380,7 +386,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         directory.mkdir(mode=0o700, parents=True, exist_ok=True)
         os.chown(directory, 1001, 1001)
     inspect_model_body = (cache_markers or message_system_roles or thinking_display_model or structured_output
-                          or forced_tool_choice or no_tool_choice or disable_parallel_tool_use)
+                          or forced_tool_choice or no_tool_choice or disable_parallel_tool_use or provider_quota)
     if inspect_model_body and v1_runtime is None:
         MODEL_BODY_TRACE.touch(mode=0o600, exist_ok=False)
         os.chown(MODEL_BODY_TRACE, 1001, 1001)
@@ -388,6 +394,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     config = Path("/run/v3/sender.json")
     copy2(temporary / "ca.der", config.with_name("verification-ca.der"))
     received, callbacks, proxy_targets = [], [], []
+    quota_reads = []
+    quota_reset = time_ns() // 1_000_000_000
+    quota_windows = {"5h": quota_reset + 3600, "7d": quota_reset + 6 * 86400, "7d_oi": quota_reset + 5 * 86400}
     auxiliary_received = []
     auxiliary_provider_sessions = []
     suggestion = auxiliary_kind == "suggestion"
@@ -408,6 +417,12 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         """以生产主机名的临时证书接收原生请求，返回固定工具或文本。"""
 
         protocol_version = "HTTP/1.1"
+
+        def do_GET(self):
+            """记录隔离模型上意外的主动额度查询。@return 无。"""
+            if provider_quota:
+                quota_reads.append(self.path)
+            self.send_error(501)
 
         def do_POST(self):
             """验证合成凭据并返回同一轮 SSE。@return 无。"""
@@ -455,6 +470,20 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 startup_event("model_received", peer_port=self.client_address[1], model_posts=len(received),
                               **{f"{auxiliary_kind}_posts": len(auxiliary_received)},
                               model_body_sha256=model_digest)
+            quota = {}
+            if provider_quota:
+                user_text = [b.get("text") for row in body["messages"] if row["role"] == "user" for b in blocks(row)]
+                rejected = QUOTA_QUESTIONS["rejected"] in user_text
+                windows = {"5h": (1.0, "rejected"), "7d": (0.75, "allowed_warning")} if rejected else {
+                    "5h": (0.25, "allowed"), "7d": (0.5, "allowed"), "7d_oi": (0.125, "allowed"),
+                }
+                for window, (utilization, state) in windows.items():
+                    header_prefix = f"anthropic-ratelimit-unified-{window}-"
+                    quota.update({header_prefix + "utilization": str(utilization), header_prefix + "status": state,
+                                  header_prefix + "reset": str(quota_windows[window])})
+                if rejected:
+                    response_json(self, QUOTA_REJECTION, status=429, headers={**quota, "Retry-After": str(QUOTA_RETRY_SECONDS)})
+                    return
             if v1_runtime is not None or message_system_roles or adaptive_thinking_model:
                 model_betas.append(self.headers.get("anthropic-beta", ""))
             if failure_boundaries and any(block.get("text") == DROP_REPLY
@@ -539,6 +568,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Content-Length", str(len(prefix) + len(middle) + len(wire)))
+            for name, value in quota.items():
+                self.send_header(name, value)
             self.end_headers()
             if prefix:
                 self.wfile.write(prefix)
@@ -781,6 +812,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             account = manage("GET", f"accounts/{identifier}")
             return verify_message_system_roles(manage, token, account, received, model_betas,
                                                fixed=message_system_roles == "ordinary-contract")
+        if provider_quota:
+            proof = verify_provider_quota(manage, token, identifier, received, quota_windows, sender_state_after_failure,
+                                          stream=provider_quota == "sse")
+            assert quota_reads == []
+            return {**proof, "active_quota_queries": len(quota_reads)}
         if structured_output:
             return verify_structured_output(manage, token, identifier, received)
         if no_tool_choice:
@@ -1661,12 +1697,13 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
 
 
 def checked_messages(manage, token, body, headers, received, phase, *, expected_status=200, trace_startup=False,
-                     sender_status=None):
+                     sender_status=None, observe_headers=None):
     """在断言前保留本轮公开响应与诊断归属。
     @param manage 管理入口。@param token 合成凭据。@param body 公开输入。@param headers 原入口头。
     @param received 隔离模型收件。@param phase 夹具阶段。@param expected_status 预期 HTTP 状态，空值保留实测状态。
     @param trace_startup 是否记录公开请求时间及失败后线程栈。
     @param sender_status 可选，只在已保留失败和请求诊断后读取隔离发送器状态。
+    @param observe_headers 可选，读取该调用方实际收到的公开头。
     @return 实际状态、响应字节和公开请求 ID。
     """
     started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
@@ -1685,6 +1722,8 @@ def checked_messages(manage, token, body, headers, received, phase, *, expected_
             startup_event("public_response_headers", phase=phase, session_id=session_id,
                           request_id=evidence["request_id"], http_status=response.status,
                           model_posts_during=len(received) - before)
+        if observe_headers is not None:
+            observe_headers(response.headers)
 
     def report(failed_at, **details):
         failed_ns = monotonic_ns() if trace_startup else None
@@ -2483,6 +2522,74 @@ def verify_no_tool_choice(manage, token, identifier, received):
             cases[phase] = proof
     assert not any(path.is_file() for path in Path("/flows/api").rglob("*"))
     return {"cases": cases, "model_posts": len(received), "wire_final": "unavailable"}
+
+
+def verify_provider_quota(manage, token, identifier, received, quota_windows, sender_status, *, stream):
+    """核对真实模型的 429 与账户被动额度。
+    @param manage 管理入口。@param token 调用方。@param identifier 合成账号。
+    @param received 模型实收。@param quota_windows 合成窗口重置秒。
+    @param sender_status 失败后读取发送器。@param stream 是否以 SSE 请求。@return 脱敏证据。
+    """
+    windows = {"five_hour": "5h", "seven_day": "7d", "seven_day_fable": "7d_oi"}
+    expected = {"allowed": {"five_hour": 25, "seven_day": 50, "seven_day_fable": 12.5},
+                "rejected": {"five_hour": 100, "seven_day": 75, "seven_day_fable": 12.5}}
+    cases = {}
+
+    def observed_usage(values):
+        view = manage("GET", f"accounts/{identifier}")
+        usage = view["usage_data"]
+        if any(usage.get(name, {}).get("utilization") != value for name, value in values.items()):
+            return None
+        return {name: usage[name] for name in values}
+
+    for phase, question in QUOTA_QUESTIONS.items():
+        request_body = {"model": MODEL, "max_tokens": 128, "messages": [{"role": "user", "content": question}],
+                        "stream": stream, "system": SYSTEM[0]}
+        headers = {"User-Agent": "flower2api-passive-quota-fixture/1", "x-session-id": str(uuid4())}
+        public_headers = {}
+
+        def observe(response):
+            public_headers["retry_after"] = response.get("Retry-After")
+            public_headers["content_type"] = response.get_content_type()
+
+        before = len(received)
+        allowed = phase == "allowed"
+        status, raw, request_id = checked_messages(
+            manage, token, request_body, headers, received, "quota_" + phase, expected_status=200 if allowed else 429,
+            trace_startup=True, sender_status=sender_status, observe_headers=observe,
+        )
+        if allowed and stream:
+            frames = [json.loads(line[5:]) for line in raw.splitlines() if line.startswith(b"data:")]
+            assert frames[-1]["type"] == "message_stop"
+            assert "".join(event["delta"]["text"] for event in frames if event["type"] == "content_block_delta") == FINAL
+        elif allowed:
+            assert json.loads(raw)["content"] == [{"type": "text", "text": FINAL}], raw
+        else:
+            assert json.loads(raw) == QUOTA_REJECTION, raw
+        assert public_headers["retry_after"] == (None if allowed else str(QUOTA_RETRY_SECONDS)), public_headers
+        assert public_headers["content_type"] == ("text/event-stream" if allowed and stream else "application/json")
+        reservation, record, claims = cache_marker_claims(manage, request_id)
+        ((digest, model, _),), (claim,) = received[before:], claims
+        detail = manage("GET", "request-diagnostics/" + request_id)
+        (attempt,) = detail["attempts"]
+        confirmed = detail["request"]["context"]["tui_confirmed_model_responses"]
+        assert record["attempt_count"] == confirmed == 1 and attempt["attempt_id"] == reservation, detail
+        assert attempt["status_code"] == status, attempt
+        assert attempt["outcome"] == ("success" if allowed else "upstream_rejected"), attempt
+        assert attempt.get("error_stage") == (None if allowed else "upstream_headers"), attempt
+        assert claim["from_interactive_cli"] and claim["uses_native_history"] and claim["cli_sha256"] == claim["sha256"] == digest
+        assert sum(b.get("text") == question for row in model["messages"] if row["role"] == "user" for b in blocks(row)) == 1
+        usage = wait_for(lambda: observed_usage(expected[phase]))
+        assert all(int(datetime.fromisoformat(window["resets_at"]).timestamp()) == quota_windows[windows[name]]
+                   for name, window in usage.items()), usage
+        cases[phase] = {"status": status, "request_id": request_id, "reservation_id": reservation,
+                        "model_posts": 1, "attempt_count": record["attempt_count"], "confirmed_model_responses": confirmed,
+                        "provider_path": "interactive_cli", "model_body_sha256": digest, "cli_body_sha256": claim["cli_sha256"],
+                        "input_body_sha256": sha256(encoded(request_body)).hexdigest(),
+                        "attempt_outcome": attempt["outcome"], "attempt_error_stage": attempt.get("error_stage"),
+                        "passive_usage": usage, **public_headers}
+    assert len(received) == 2 and not any(path.is_file() for path in Path("/flows/api").rglob("*"))
+    return {"cases": cases, "stream": stream, "model_posts": len(received), "wire_final": "unavailable"}
 
 
 def verify_disable_parallel_tool_use(manage, token, identifier, received, sender_status):
@@ -3572,6 +3679,7 @@ def main():
     scenario.add_argument("--tool-policy", choices=("replace", "user_reminder"))
     scenario.add_argument("--recover-pending-tool", action="store_true")
     scenario.add_argument("--oauth-rotation", choices=("live", "restart"))
+    scenario.add_argument("--provider-quota", choices=("sse", "json"))
     scenario.add_argument("--initial-idle-model-connection", action="store_true")
     scenario.add_argument("--output-effort", action="store_true")
     scenario.add_argument("--structured-output-contract", action="store_true")
@@ -3637,7 +3745,7 @@ def main():
     trace_startup = (args.initial_idle_model_connection or args.trace_initial_startup or cache_markers
                      or args.recovery_readiness_rejection
                      or args.structured_output_contract or bool(args.forced_tool_choice_contract) or args.no_tool_choice_contract
-                     or args.disable_parallel_tool_use_contract or bool(args.oauth_rotation)
+                     or args.disable_parallel_tool_use_contract or bool(args.oauth_rotation or args.provider_quota)
                      or bool(auxiliary_mode or args.agent_progress)
                      or bool(args.thinking_display_contract)
                      or (bool(args.message_system_roles) and args.v1_runtime is None))
@@ -3658,7 +3766,7 @@ def main():
                        system_policy=args.system_policy, toggle_pending_policy=args.toggle_pending_policy,
                        stock_client=args.stock_client,
                        tool_policy=args.tool_policy, recover_pending=args.recover_pending_tool or args.oauth_rotation == "restart",
-                       oauth_rotation=bool(args.oauth_rotation),
+                       oauth_rotation=bool(args.oauth_rotation), provider_quota=args.provider_quota,
                        output_effort=args.output_effort, history_png=args.history_png,
                        history_images=args.history_images, history_tool_blocks=args.history_tool_blocks,
                        previous=previous,

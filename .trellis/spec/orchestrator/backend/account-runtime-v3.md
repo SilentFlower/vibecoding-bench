@@ -2583,6 +2583,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 活跃工具组的签名属于发送器实收的助手块。回传时核对原签名和工具参数。受支持的原生根轮按工具 ID 登记实际 `message_start.message.model`，与当前回执修订一起保存，覆盖缺省 `thinking`、显式 `adaptive/updates` 和 `adaptive/summarized`。冷恢复仅将该事实写入对应的已验签助手行，普通外部历史仍使用 `role/content`。固定 CLI 2.1.293 依此保留原签名，模型提交前核对签名块和工具 ID 的原序。带签名回执的来源数据缺失或旧存量未登记助手模型时，冷恢复在准备阶段返回 `422/unsupported_parameter`，原会话文件保留，回执零尝试和零新增投递。无签名旧回执沿原布局恢复。
 - CLI 回环模型请求沿原账号 sender 授权路径送到固定供应商。该次请求交付 CLI 实际生成的 JSON 实体。调试快照的正文摘要取自这一实体，`wire_final.status` 为 `unavailable`。
 - 原工具组等待期间，受信管理入口 `POST /admin/accounts/{id}/oauth-credentials/resolve` 可用 `force_refresh: true` 验证原账号刷新通道。合法回执保留原工具归属和原轮输入，实际模型续轮按同一账号已落库的新 AT 重新解析。原进程内续轮和原进程丢失后的磁盘恢复均适用完整 OAuth 文件协议。模型请求调试快照保留正文摘要与会话归属，凭据值须脱敏。
+- 受管模型的 HTTP 429 在公开 Messages 保留状态、错误正文和有效 `Retry-After`。诊断以同一预留记录一次确认的模型响应及 `upstream_rejected / upstream_headers`。受管模型的 200 和真实 429 都可从完整响应额度头被动更新原账号对应窗口，比例换算为百分比，缺省窗口保留已记录值。账本和工作区的本地拒绝各沿原阶段记录。
 - 账户、会话、模型、替代的调用方参数或连接归属变更均沿原预留和回执门槛处理。冷导入只协商当前支持的普通输入形状。其他形状继续沿该发行既有入口合同。
 
 ### 4. Validation & Error Matrix
@@ -2655,6 +2656,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `verify_tui_cold_history.py --cancel-and-change-question` 在公开首轮交付工具 ID 和部分参数时断开读者，隔离模型继续保留尾段。确认原请求终态为取消后，沿同一公开会话从客户端确认的历史改问。新轮走交互 CLI，已取消问题和工具不会进入模型正文，原绑定和会话档案按原字节保留。迟交被取消的工具回执返回 400、零尝试。两轮各一次模型实收。
 - `verify_tui_cold_history.py --parallel-new-tools` 从公开入口核对同一模型响应的两个不同 Schema 的工具。客户端执行返回的调用并按原 ID 逆序回传。模型实收恢复调用顺序，成功文本逐字保留，失败保留 `is_error` 和原文本及原生 token 提醒。缺少结果、用重复 ID 代替缺项、齐全后追加重复项均返回 400，模型零新增收件。随后合法组完成一次。
 - `verify_tui_cold_history.py --oauth-rotation live|restart` 将固定 OAuth 和 Messages 目标映射到同一隔离 HTTPS 接收端。公开首轮收到工具后经真实管理入口强制刷新，旧 RT 使用一次，刷新回包的两项凭据与账号返回的已落库值相符。模型回环收件只报告凭据代次，首轮与原样回执分别使用旧 AT、新 AT。核对两个请求及尝试、CLI 正文及模型实收摘要、原调用 ID、回执隔离和两次模型投递。重启用例保留原档。两份调试快照检查刷新前后的 AT、RT 均已脱敏。
+- `verify_tui_cold_history.py --provider-quota sse|json` 从公开入口分别发一次成功请求和一次真实模型 429 请求。核对公开响应、有效 `Retry-After`、预留与单次尝试、CLI 正文及隔离模型实收摘要。管理详情读回 5 小时、7 天及 Fable 周额度，429 省略的 Fable 周额度保留原值。隔离上游主动额度查询计数为零。
 - `verify_tui_cold_history.py --auto-tool-choice [bare|explicit-false]` 核对原字段形状、完整工具声明与实际模型正文省略 `tool_choice`。省略选项值时沿用 `explicit-false`。分别与 `--parallel-new-tools`、`--recover-pending-tool` 组合，核对双工具正常续轮与单组丢进程恢复各投递两次。四种改写均拒绝，随后原样回执成功。`--auto-tool-direct-text` 以 bare auto 带两项工具声明验证一次模型投递、零工具执行及公开文本 `end_turn`。
 - `verify_tui_cold_history.py --disable-parallel-tool-use-contract` 使用相同的两项客户端工具，在三种账号动作下分别提交 `auto` 加显式 `true` 或 `false`。核对策略更新、详情和列表的现有可用性字段，按公开 ID 和预留核对入站 SHA-256、CLI 认领、模型实收、工具 schema 及实际策略落点。三种 `false` 均由交互 CLI 投递一次，实际模型正文省略 `tool_choice`。追加的 `true` 直接答复以 `end_turn` 结束，单工具往返保留原字段、调用 ID 和两项工具声明，重复回执为 400 且模型零新增。替换、用户提醒的 `true` 均为 422 且零尝试、零投递。独立 `verify_tui_tool_choice_input.py` 以受支持的 `--append-system-prompt` 核对串行指令只出现在提示词中。
 - `verify_tui_cold_history.py --split-history-tools` 核对分行的两对旧工具及结果、原顺序和单次新工具执行。
