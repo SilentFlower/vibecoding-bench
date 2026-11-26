@@ -3,6 +3,7 @@
 import argparse
 from base64 import b64encode
 from contextlib import ExitStack, closing, suppress
+from copy import deepcopy
 from datetime import datetime, timezone
 from faulthandler import dump_traceback
 from fcntl import LOCK_EX, flock
@@ -505,6 +506,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         old_result = "已完成的旧工具结果。"
         if history_tool_blocks:
             old_result = [{"type": "text", "text": text} for text in ("已完成的旧工具结果。", "保持第二段结果。")]
+        if history_cache_markers:
+            text = {"type": "text", "text": "已确认的重复旧工具结果。"}
+            old_result = [text, {**text, "cache_control": {"type": "ephemeral", "ttl": "5m"}}]
         messages[3:3] = [
             {"role": "assistant", "content": [{"type": "tool_use", "name": "OldNote", "id": PAST_ID, "input": ARGS}]},
             {"role": "user", "content": [{"type": "tool_result", "tool_use_id": PAST_ID, "content": old_result}]},
@@ -650,6 +654,13 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             changed = {**follow, "messages": [changed_prefix, *follow["messages"][1:]]}
             changed_cache, _, _ = checked_messages(
                 manage, token, changed, headers, received, "changed_history_cache", expected_status=422,
+            )
+            assert len(received) == 1
+            changed_nested = deepcopy(follow)
+            ((_, old_tool_result),) = find_blocks(changed_nested, "tool_use_id", PAST_ID)
+            old_tool_result["content"][1].pop("cache_control")
+            changed_nested_cache, _, _ = checked_messages(
+                manage, token, changed_nested, headers, received, "changed_nested_history_cache", expected_status=422,
             )
             assert len(received) == 1
         if signed_tool_history:
@@ -837,6 +848,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                         for i, ((role, _), row) in enumerate(zip(HISTORY[:2], messages[:2], strict=True))]
             assert observed == [expected, expected], observed
             proof.update(history_cache_markers=observed, changed_history_cache_status=changed_cache)
+            proof.update(nested_history_cache_markers=[find_blocks(model, "tool_use_id", PAST_ID)
+                                                       for _, model, _ in received],
+                         changed_nested_history_cache_status=changed_nested_cache)
         if parallel_tools:
             first, second = (document for _, document, _ in received)
             for native in (first, second):
@@ -1450,14 +1464,20 @@ def verify_cache_markers(manage, token, account_id, headers, received):
             ((digest, model, _),) = received[before:]
             (claim,) = own_claims
             assert claim["sha256"] == digest, (name, evidence, claim)
-            from_cli = name == "unmarked" or name in ("history", "history_replace", "history_user_reminder")
+            from_cli = name in ("unmarked", "history", "history_replace", "history_user_reminder", "nested_result")
             assert claim["from_interactive_cli"] is from_cli, (name, claim)
             assert model.get("tools", []) == body.get("tools", []), name
             if from_cli:
                 user_texts = [b.get("text") for message in model["messages"] if message["role"] == "user"
                               for b in blocks(message)]
                 assert user_texts.count(question["text"]) == user_texts.count(tail["text"]) == 1
-                if expected is not None:
+                if name == "nested_result":
+                    assert observed_cache_breakpoints(model) == []
+                    assert find_blocks(model, "id", PAST_ID) == [("assistant", historical_tool)]
+                    observed = find_blocks(model, "tool_use_id", PAST_ID)
+                    assert observed == [("user", historical_result)], observed
+                    evidence["nested_result"] = observed
+                elif expected is not None:
                     markers = observed_cache_breakpoints(model)
                     assert markers == [(i, 0, row["role"], row["content"][0])
                                        for i, row in enumerate(expected[:2])], (name, markers)

@@ -393,6 +393,16 @@ class ColdHistoryTests(TestCase):
             row = json.loads(path.read_bytes().splitlines()[2])
             self.assertEqual(row["message"], {"role": "user", "content": [result]})
         result["content"][1]["cache_control"] = {"type": "ephemeral"}
+        plan = ColdHistory.from_request(body)
+        self.assertTrue(plan.has_history_cache_markers())
+        self.assertTrue(plan.matches_history_cache_markers(body))
+        moved = deepcopy(body)
+        moved["messages"][2]["content"][0]["content"].reverse()
+        self.assertFalse(plan.matches_history_cache_markers(moved))
+        replayed = deepcopy(body)
+        replayed["messages"][2]["content"][0]["tool_use_id"] = "toolu_other"
+        self.assertFalse(plan.matches_history_cache_markers(replayed))
+        result["content"][1]["cache_control"]["ttl"] = "unsupported"
         self.assertIsNone(ColdHistory.from_request(body))
 
     def test_split_assistant_and_user_rows_preserve_the_closed_tool_group(self):

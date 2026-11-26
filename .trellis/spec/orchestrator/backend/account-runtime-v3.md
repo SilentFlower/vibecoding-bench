@@ -2557,7 +2557,8 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 普通 Messages 的已确认历史文本可保留 `ephemeral` 缓存标记、本来缺省的 TTL 与 `1h`、`5m`。原生路径承接当前轮纯文本及至多四个按先长后短排序的历史断点。该会话关闭 CLI 自动断点，派发前逐条对照角色、消息和块位置及标记内容。标记不符返回 422，零投递。根轮历史标记随工具组冻结，从续轮或丢进程恢复改写标记均拒绝。
 - 已确认的用户历史与本轮用户消息可保留内嵌 Base64 PNG、JPEG、GIF 和 WebP。历史恢复按原角色和内容块顺序交给 CLI，用户提醒可附在同一条消息。URL 图像沿既有输入合同。
 - 本轮图片暂存于当前私有 HOME 的 `tmp` 子目录。隔离启动器仅保留属于该 HOME 的 `O_PATH` 目录描述符。CLI 逐张使用原生 PTY 粘贴，Mod 依据公开图文顺序使用实际粘贴的图片块。主请求核对原图字节、图文边界和生成的进程内来源别名。该别名只标识进程内文件描述符和服务端生成的附件名。固定 CLI 在粘贴时会处理超出 2000 像素长边或 512000 字节的图像，此范围之外在启动前沿既有入口合同。
-- 已闭合的旧工具结果可保留非空有序 `text` 块数组和原工具 ID。带扩展字段的结果块沿现有输入合同，先前完成的工具保持已完成。
+- 已闭合的旧工具结果可保留非空有序 `text` 块数组和原工具 ID。其余扩展字段沿现有输入合同，先前完成的工具保持已完成。
+- 已闭合工具结果内的文本块也可带历史 `ephemeral` 标记。它与历史直接文本共用四个断点预算和 TTL 顺序。发送前按原调用 ID、角色及工具结果内的块位置核对；只处理已确认前缀，活跃工具的新结果继续使用原回执合同。
 - 旧工具调用和回执可以拆在相邻同角色历史里。原生导入按角色合并相邻行，保持块内容和先后顺序，整组调用必须在下一助理轮前闭合。原公开历史仍作为回执归属的比较依据。
 - V2 管理端可选择 `append`、`replace`、`user_reminder`。已核验发送器通过私有预留传递非默认动作。替换以启动文件承载系统正文，省略保留默认正文，显式空串或空数组仅保留身份和计费块。提醒保留默认系统正文，附到首条不含工具回执的用户消息。纯新轮的提醒随原问题提交。完整 CC 原生请求沿原输入合同。已登记等待工具的进程沿用其启动动作。
 - 普通原生输入的 `output_config.effort` 支持 `low`、`medium`、`high`、`max`，由 2.1.293 的 `--effort` 组装。模型出站前核对实际字段。等待和冷恢复沿用根轮冻结的强度。交互 `--json-schema` 的组件探针未生成 `output_config.format`，此字段沿现有输入合同处理。
@@ -2610,7 +2611,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `verify_tui_cold_history.py --history-png` 核对追加、用户提醒两种动作下的原角色、历史图像字节和单次当前问题。
 - `verify_tui_cold_history.py --history-images` 在同一旧用户消息中核对 PNG、JPEG、GIF、WebP 的顺序和原始数据。
 - `verify_tui_cold_history.py --current-images` 核对本轮四种内嵌图像、前后文本与边界内纯图片请求的实际模型正文。交换图片顺序的回执返回 422。追加动作下单独核对超过像素、字节边界的原入口。与 `--recover-pending-tool` 一起核对冷恢复仍保留原图文、回执 ID 和原档案。隔离程序的目录描述符用例覆盖当前 HOME 读取及外部 HOME 拒绝。
-- `verify_tui_cold_history.py --history-tool-blocks` 核对已闭合的两个文本结果块、顺序及原 ID，并完成一次新工具回执。
+- `verify_tui_cold_history.py --history-tool-blocks` 核对已闭合的两个文本结果块、顺序及原 ID，并完成一次新工具回执。`--history-cache-markers` 还核对重复的工具结果文本上单个嵌套断点的准确位置，以及在线续轮、丢进程恢复和篡改拒绝。
 - `verify_tui_cold_history.py --parallel-new-tools` 从公开入口核对同一模型响应的两个工具。按调用 ID 解析参数增量并逆序回传成功和失败结果。缺少结果和重复 ID 均拒绝，合法回传沿原工具组完成。
 - `verify_tui_cold_history.py --auto-tool-choice --parallel-new-tools` 核对显式自动选择下的并行工具和改写拒绝。与 `--recover-pending-tool` 组合时核对原选择在丢进程后的续轮仍受保护。
 - `verify_tui_cold_history.py --split-history-tools` 核对分行的两对旧工具及结果、原顺序和单次新工具执行。

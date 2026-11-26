@@ -117,8 +117,19 @@ def _inline_image(block, *, for_paste=False):
 
 def _text_result_blocks(content):
     return isinstance(content, list) and bool(content) and all(
-        isinstance(block, dict) and _plain_text(block) for block in content
+        isinstance(block, dict) and _history_text(block) for block in content
     )
+
+
+def _marked_blocks(content):
+    for index, block in enumerate(content):
+        if "cache_control" in block:
+            yield index, None, None, block
+        nested = block.get("content")
+        if block.get("type") == "tool_result" and isinstance(nested, list):
+            for offset, inner in enumerate(nested):
+                if isinstance(inner, dict) and "cache_control" in inner:
+                    yield index, offset, block.get("tool_use_id"), inner
 
 
 def _automatic_tools(choice):
@@ -200,7 +211,7 @@ class ColdHistory:
         content = _blocks(current)
         if not content or not all(_plain_text(block) or _inline_image(block, for_paste=True) for block in content):
             return None
-        cache_blocks = [block for row in history for block in _blocks(row) if "cache_control" in block]
+        cache_blocks = [block for row in history for _, _, _, block in _marked_blocks(_blocks(row))]
         if cache_blocks:
             # 原生路径仅承接已验证的历史文本。保留默认 TTL，并限制断点数量和前缀的时长顺序。
             if len(cache_blocks) > 4 or not all(_plain_text(b) for b in content):
@@ -339,23 +350,27 @@ class ColdHistory:
 
     def has_history_cache_markers(self):
         """检查已确认的历史是否带显式缓存标记。@return 是否需关闭 CLI 自动断点。"""
-        return any("cache_control" in block for row in self.history for block in _blocks(row))
+        return any(marker for row in self.history for marker in _marked_blocks(_blocks(row)))
 
     def matches_history_cache_markers(self, native):
         """核对原生出站的历史断点。@param native CLI 实际生成的请求。@return 原位置与标记是否完整保留。"""
         if not self.has_history_cache_markers():
             return True
 
+        history = self._grouped_history()
+
         def positions(rows):
-            return [(index, role, offset, block) for index, (role, content) in enumerate(rows)
-                    for offset, block in enumerate(content) if "cache_control" in block]
+            return [(index, role, offset, inner, tool_id, block) for index, (role, content) in enumerate(rows)
+                    for offset, inner, tool_id, block in _marked_blocks(content)
+                    # 新工具回传中的嵌套字段有自己的回执合同。这里只冻结已确认前缀内的嵌套断点。
+                    if inner is None or (index < len(history) and offset < len(history[index][1]))]
 
         # 自动断点关闭后只允许已确认的历史标记。按消息和块位置匹配可区分重复文本。
         return ("cache_control" not in native
                 and not any("cache_control" in block for field in ("system", "tools")
                             for block in native.get(field, []) if isinstance(block, dict))
                 and positions((row["role"], _blocks(row)) for row in native["messages"])
-                == positions(self._grouped_history()))
+                == positions(history))
 
     def import_session(self, config, work, native_id, *, replay_resources: ExitStack | None = None):
         """在已绑定的工作区选择新会话或发布已完成的外部历史。
