@@ -5,7 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from tui_workspace_launch import HistoryReplay, _key, _project_history_dir, launch_workspace_cli, publish_workspace_history
 
@@ -56,7 +56,7 @@ class BoundLaunchTests(TestCase):
         )
         self.history.parent.mkdir(parents=True)
 
-    def _start(self, *, resume=False, who=None, launch=None, prepare_history=None):
+    def _start(self, *, resume=False, who=None, launch=None, prepare_history=None, recover_incomplete_history=False):
         command = {
             "action": "send",
             "reservation_id": self.who["reservation_id"],
@@ -73,6 +73,7 @@ class BoundLaunchTests(TestCase):
             terminal_fd=0,
             storage=self.root,
             prepare_history=prepare_history,
+            recover_incomplete_history=recover_incomplete_history,
         )
 
     def test_wrong_subject_session_and_workspace_never_reach_spawn(self):
@@ -162,6 +163,42 @@ class BoundLaunchTests(TestCase):
             self.history.symlink_to(self.record)
             with self.assertRaises(OSError):
                 self._start(resume=None)
+            self.assertEqual(spawn.call_count, 2)
+
+    def test_legacy_receipt_reopens_without_consuming_metadata_only_archive(self):
+        """仅经核对的旧回执可跳过未写主轮的原档。@return 无。"""
+        snapshot = b'{"type":"permission-mode","permissionMode":"dontAsk"}\n'
+        self.history.write_bytes(snapshot)
+        self.history.chmod(0o600)
+        binding = self.record.read_bytes()
+        with patch("tui_workspace_launch.Popen") as spawn:
+            with self.assertRaisesRegex(ValueError, "缺少原生主轮"):
+                self._start(resume=None)
+            with self.assertRaisesRegex(ValueError, "缺少原生主轮"):
+                self._start(resume=True, recover_incomplete_history=True)
+            with self.assertRaisesRegex(ValueError, "缺少原生主轮"):
+                self._start(resume=None, prepare_history=lambda *_: self.native, recover_incomplete_history=True)
+            spawn.assert_not_called()
+
+            self._start(resume=None, recover_incomplete_history=True)
+            option, session = spawn.call_args.args[0][-2:]
+            self.assertEqual((option, UUID(session).version), ("--session-id", 4))
+            self.assertNotEqual(session, self.native)
+            self.assertEqual(self.history.read_bytes(), snapshot)
+            self.assertEqual(self.record.read_bytes(), binding)
+
+            row = {"type": "assistant", "cwd": str(self.cwd), "sessionId": self.native}
+            self.history.write_text(json.dumps(row))
+            self._start(resume=None, recover_incomplete_history=True)
+            self.assertEqual(spawn.call_args.args[0][-2:], ["--resume", str(self.history)])
+            for invalid in (b"{", json.dumps({**row, "cwd": "/other"}).encode()):
+                self.history.write_bytes(invalid)
+                with self.assertRaises(ValueError):
+                    self._start(resume=None, recover_incomplete_history=True)
+            self.history.write_bytes(snapshot)
+            self.history.chmod(0o644)
+            with self.assertRaisesRegex(ValueError, "归属或权限"):
+                self._start(resume=None, recover_incomplete_history=True)
             self.assertEqual(spawn.call_count, 2)
 
     def test_import_returns_bound_session_for_standard_restart(self):

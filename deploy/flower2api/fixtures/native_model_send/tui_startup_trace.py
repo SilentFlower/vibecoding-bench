@@ -78,6 +78,11 @@ def main():
                           function=location.name, line=location.lineno)
             raise
         startup_event("cli_spawned", reservation_id=ident)
+        if options.get("recover_incomplete_history"):
+            mode, session = process.args[-2:]
+            startup_event("cli_legacy_recovery_started", reservation_id=ident, cli_pid=process.pid,
+                          mode=mode, native_session_id=Path(session).stem,
+                          bound_native_session_id=command["workspace"]["native_session_id"])
         return process
 
     def trace_callback(actor, path, data):

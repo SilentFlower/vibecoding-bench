@@ -505,8 +505,14 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
 
         def restart(process, phase):
             wait_for(lambda: sender_state().get("idle"))
+            if trace_startup:
+                startup_event("sender_stop_requested", phase=phase, sender_pid=process.pid)
             stop(process)
+            if trace_startup:
+                startup_event("sender_exited", phase=phase, sender_pid=process.pid, returncode=process.returncode)
             restarted = start_sender()
+            if trace_startup:
+                startup_event("sender_started", phase=phase, sender_pid=restarted.pid)
             try:
                 ready_sender(restarted, phase, require_idle=True)
             except AssertionError as error:
@@ -575,12 +581,29 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 marker = ("--name=" + headers["x-session-id"]).encode()
                 (pid,) = [int(path.parent.name) for path in Path("/proc").glob("[0-9]*/cmdline")
                           if fixture_command_has(path, marker)]
+                archive = binding_file = None
+                if forced_tool_choice == "restart-metadata-only":
+                    (binding_file,) = Path("/native/tui-workspaces").glob("*.json")
+                    native_id = json.loads(binding_file.read_bytes())["native_session_id"]
+                    projects = Path("/native/tui-sessions") / native_id / "home/.claude/projects"
+                    archive = wait_for(lambda: next(projects.glob("*/" + native_id + ".jsonl"), None))
+                startup_event("forced_receipt_cli_sigkill", session_id=headers["x-session-id"], cli_pid=pid)
                 os.kill(pid, SIGKILL)
                 source = restart(source, "forced_tool_receipt")
                 assert not Path(f"/proc/{pid}").exists()
+                startup_event("forced_receipt_cli_exit_observed", session_id=headers["x-session-id"], cli_pid=pid)
+                if archive is not None:
+                    # 保留原 CLI 写出的元数据记录，模拟回执已登记而主轮未落盘的退出边界。
+                    snapshot = b"".join(line for line in archive.read_bytes().splitlines(keepends=True)
+                                        if json.loads(line)["type"] not in ("user", "assistant"))
+                    archive.write_bytes(snapshot)
+                    startup_event("forced_receipt_metadata_only", session_id=headers["x-session-id"],
+                                  native_session_id=native_id, archive_sha256=sha256(snapshot).hexdigest())
+                    return archive, snapshot, binding_file, binding_file.read_bytes()
 
             return verify_forced_tool_choice(manage, token, identifier, received, sender_state_after_failure,
-                                             restart_forced if forced_tool_choice == "restart" else None)
+                                             restart_forced if forced_tool_choice != "live" else None,
+                                             metadata_only=forced_tool_choice == "restart-metadata-only")
         if cache_capability:
             return verify_cache_capabilities(manage, token, identifier, headers, received, cache_capability)
         if history_cache_markers:
@@ -1750,10 +1773,11 @@ def fixture_forced_tool_sse(body):
     return message_sse({"type": "text", "text": FINAL}, "end_turn", "msg_forced_final")
 
 
-def verify_forced_tool_choice(manage, token, identifier, received, sender_status, restart):
+def verify_forced_tool_choice(manage, token, identifier, received, sender_status, restart, *, metadata_only):
     """从公开入口核对强制选择、原工具回执和 CLI 正文。
     @param manage 管理入口。@param token 合成令牌。@param identifier 账号 ID。
     @param received 模型实收。@param sender_status 失败后查询发送器。@param restart 可选的发送器重启。
+    @param metadata_only 是否仅验证原档缺主轮的受控对照。
     @return 按请求关联的证据。
     """
     cases = {}
@@ -1761,12 +1785,16 @@ def verify_forced_tool_choice(manage, token, identifier, received, sender_status
 
     def post(body, phase, expected_status):
         before = len(received)
+        ingress_digest = sha256(encoded(body)).hexdigest()
+        startup_event("forced_tool_ingress", phase=phase, session_id=headers["x-session-id"],
+                      ingress_body_sha256=ingress_digest)
         status, raw, request_id = checked_messages(manage, token, body, headers, received, phase,
                                                    expected_status=expected_status, trace_startup=True,
                                                    sender_status=sender_status)
         reservation, record, claims = cache_marker_claims(manage, request_id)
         proof = {"status": status, "request_id": request_id, "reservation_id": reservation,
-                 "attempt_count": record["attempt_count"], "model_posts": len(received) - before}
+                 "attempt_count": record["attempt_count"], "model_posts": len(received) - before,
+                 "ingress_body_sha256": ingress_digest}
         if status != 200:
             assert proof["attempt_count"] == proof["model_posts"] == 0 and not claims, (phase, proof)
             proof.update(error_code=json.loads(raw)["error"]["code"], diagnostics_stage=record.get("error_stage"))
@@ -1788,10 +1816,11 @@ def verify_forced_tool_choice(manage, token, identifier, received, sender_status
         return raw, proof
 
     policies = ("append",) if restart else ("append", "replace", "user_reminder")
+    choices = {"named": FORCED_CHOICES["named"]} if metadata_only else FORCED_CHOICES
     for policy in policies:
         account = manage("PUT", f"accounts/{identifier}", {"client_system_prompt_policy": policy})
         assert account["client_system_prompt_policy"] == policy
-        for label, choice in FORCED_CHOICES.items():
+        for label, choice in choices.items():
             phase = policy + "_" + label
             headers = {"x-session-id": str(uuid4()), "User-Agent": "flower2api-forced-tool-fixture/1"}
             messages = [{"role": "user", "content": "查询合成便签。"}]
@@ -1807,10 +1836,19 @@ def verify_forced_tool_choice(manage, token, identifier, received, sender_status
             first_name = TOOL["name"] if label == "any" else second_name
             follow = body
             tool_proofs = [first]
+            preserved = None
             for tool_id, name, args in ((NEW_ID, first_name, ARGS), (SECOND_ID, second_name, SECOND_ARGS)):
                 if tool_id == SECOND_ID:
                     raw, step = post(follow, phase + "_receipt_forced", 200)
                     tool_proofs.append(step)
+                    if preserved:
+                        marker = ("--name=" + headers["x-session-id"]).encode()
+                        (path,) = [path for path in Path("/proc").glob("[0-9]*/cmdline")
+                                   if fixture_command_has(path, marker)]
+                        args_wire = path.read_bytes().split(b"\0")
+                        new_id = args_wire[args_wire.index(b"--session-id") + 1].decode()
+                        assert UUID(new_id).version == 4 and new_id != preserved[0].stem
+                        step["recovered_native_session_id"] = new_id
                 tool_reply = json.loads(raw)
                 expected = {"type": "tool_use", "id": tool_id, "name": name, "input": args}
                 assert tool_reply["stop_reason"] == "tool_use" and tool_reply["content"] == [expected], (phase, tool_reply)
@@ -1820,13 +1858,19 @@ def verify_forced_tool_choice(manage, token, identifier, received, sender_status
                             {"role": "user", "content": [receipt]}]
                 follow = {**body, "messages": messages}
                 if tool_id == NEW_ID and restart:
-                    restart(headers)
+                    preserved = restart(headers)
             final_request = {**follow, "tool_choice": {"type": "auto"}}
             raw, final = post(final_request, phase + "_receipt_auto", 200)
             reply = json.loads(raw)
             assert reply["stop_reason"] == "end_turn" and reply["content"] == [{"type": "text", "text": FINAL}], raw
             final.update(client_text=reply["content"][0]["text"], client_stop_reason=reply["stop_reason"])
             cases[phase] = {"initial": first, "forced_receipt": tool_proofs[-1], "auto_receipt": final, "client_tool_calls": 2}
+            if preserved:
+                archive, snapshot, binding_file, binding_snapshot = preserved
+                assert archive.read_bytes() == snapshot and binding_file.read_bytes() == binding_snapshot
+                cases[phase]["original_archive"] = {"native_session_id": archive.stem,
+                                                   "sha256": sha256(snapshot).hexdigest(),
+                                                   "metadata_rows": len(snapshot.splitlines())}
     assert not any(path.is_file() for path in Path("/flows/api").rglob("*"))
     return {"wire_final": "unavailable", "restarted": restart is not None, "cases": cases, "model_posts": len(received)}
 
@@ -2577,7 +2621,7 @@ def main():
     scenario.add_argument("--initial-idle-model-connection", action="store_true")
     scenario.add_argument("--output-effort", action="store_true")
     scenario.add_argument("--structured-output-contract", action="store_true")
-    scenario.add_argument("--forced-tool-choice-contract", choices=("live", "restart"))
+    scenario.add_argument("--forced-tool-choice-contract", choices=("live", "restart", "restart-metadata-only"))
     scenario.add_argument("--thinking-display-contract", choices=tuple(THINKING_DISPLAY_DEFAULTS))
     scenario.add_argument("--history-png", action="store_true")
     scenario.add_argument("--history-images", action="store_true")

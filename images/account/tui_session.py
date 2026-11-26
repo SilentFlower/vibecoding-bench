@@ -473,6 +473,8 @@ class _Actor:
                             if (media := self._stage_current_images(home, history_resources)) is not None:
                                 launch_options["media_fd"] = media
                         resume = bool(launch_plan.history)
+                    elif self.receipt_revision is not None:
+                        launch_options["recover_incomplete_history"] = True
                     master, slave = os.openpty()
                     self.master = master
                     # 纯图文提交先显示附件标记。让当前编号留在固定 CLI 的提示行可视范围内。

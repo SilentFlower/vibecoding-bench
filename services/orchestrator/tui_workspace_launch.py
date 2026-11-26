@@ -17,6 +17,10 @@ from uuid import UUID, uuid4
 from runtime_files import atomic_text, directory_fd, private_directory
 
 
+class _MissingMainHistory(ValueError):
+    """已核验的原生档案暂时只有非主轮记录。"""
+
+
 @dataclass(frozen=True)
 class HistoryReplay:
     """同一分叉用于本次启动的确认前缀，文件生命周期由调用者管理。
@@ -71,7 +75,7 @@ def _main_history(stream, work: Path, native_id: str) -> Iterator[dict]:
             main = True
             yield row
     if not main:
-        raise ValueError("V2 恢复历史缺少原生主轮")
+        raise _MissingMainHistory("V2 恢复历史缺少原生主轮")
 
 
 def _resume_path(stack: ExitStack, config: Path, work: Path, native_id: str, required: bool,
@@ -160,6 +164,7 @@ def launch_workspace_cli(
     inherited_fds: tuple[int, ...] = (),
     initialize_profile: Callable[[Path], None] | None = None,
     prepare_history: Callable[[Path, Path, str], str | HistoryReplay] | None = None,
+    recover_incomplete_history: bool = False,
 ) -> Popen:
     """在该账号发送器绑定的目录启动交互 CLI，继承事件源已分配的 PTY。
 
@@ -176,6 +181,7 @@ def launch_workspace_cli(
     @param inherited_fds 受信启动器额外传入的同会话描述符。
     @param initialize_profile 可选，新会话由受信控制端为已核验目录初始化独立配置。
     @param prepare_history 可选，在已核验工作区选会话及临时确认前缀。恢复要求合法历史，纯新轮要求所选 UUID 尚无历史。
+    @param recover_incomplete_history 仅已核对的旧工具回执可在原档缺少主轮时另开 CLI。
     @return 由事件源负责监督与回收的官方进程。
     """
     if (
@@ -231,7 +237,13 @@ def launch_workspace_cli(
         session_args = ["--session-id", native_id]
         history = None
         if resume is not False or prepare_history is not None:
-            history = _resume_path(stack, config_dir, work, native_id, required=resume is True)
+            try:
+                history = _resume_path(stack, config_dir, work, native_id, required=resume is True)
+            except _MissingMainHistory:
+                if not recover_incomplete_history or prepare_history is not None or resume is not None:
+                    raise
+                # 旧回执的正文已由账本核对。写主轮前退出的原档不参与恢复，另开会话保留原档和绑定。
+                session_args = ["--session-id", str(uuid4())]
         if history is not None:
             if resume is False:
                 raise ValueError("V2 新会话 UUID 已有历史记录")
