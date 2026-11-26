@@ -21,22 +21,26 @@ export function register(on) {
   })
   on('prompt.submit', async ($, e, next) => {
     // 终端只输入发送器产生的固定标记。客户文本到达这里时已经越过终端命令解析。
-    const { prompt, guard, blocks } = await post($, 'prompt', { marker: e.text })
-    if (blocks) pendingBlocks = { marker: prompt, blocks }
+    const { prompt, guard, blocks, media } = await post($, 'prompt', { marker: e.text })
+    if (blocks) pendingBlocks = { marker: prompt, blocks, media }
     return next({ ...e, text: prompt, context: [...(e.context ?? []), guard] })
   }).catch(() => ({ drop: '交互请求归属已失效' }))
 
   on('session.append', { door: 'prompt' }, ($, e, next) => {
     if (!pendingBlocks || e.agentId) return next(e)
     const { content } = e.message
-    const { marker, blocks } = pendingBlocks
+    const { marker, blocks, media } = pendingBlocks
     const index = content.findIndex(block => block.type === 'text' && block.text === marker)
     if (index < 0) return next(e)
-    // 文本块在 CLI 保存用户行前替换同会话标记。CLI 随后自行组装请求和缓存标记。
+    // 图像取自 CLI 实际粘贴的块。仅按公开输入顺序放回对应位置，仍由 CLI 保存和组装。
     pendingBlocks = null
-    return next({ ...e, message: { ...e.message,
-      content: [...content.slice(0, index), ...blocks, ...content.slice(index + 1)],
-    } })
+    const images = media ? content.filter(block => block.type === 'image') : []
+    let imageIndex = 0
+    const submitted = blocks.map(block => media && block.type === 'image' ? images[imageIndex++] : block)
+    if (imageIndex !== images.length || submitted.includes(undefined)) throw new Error('本轮图像未完整粘贴')
+    const replaced = content.flatMap((block, slot) =>
+      slot === index ? submitted : media && block.type === 'image' ? [] : [block])
+    return next({ ...e, message: { ...e.message, content: replaced } })
   })
 
   on('turn.step', async function* ($, e, next) {

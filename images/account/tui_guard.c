@@ -123,6 +123,23 @@ static void retain_loopback_channel(int channel, unsigned short port) {
         fail("发布 TUI 回环连接通道");
 }
 
+static int private_media_directory(int descriptor, const char *home) {
+    struct stat info;
+    int flags = fcntl(descriptor, F_GETFL);
+    if (flags < 0 || !(flags & O_PATH) || fstat(descriptor, &info)
+        || !S_ISDIR(info.st_mode) || info.st_uid != geteuid() || (info.st_mode & 0777) != 0700)
+        return 0;
+    /* 暂存目录已经在原 HOME 权限内。保留 O_PATH 只为让 CLI 用当前进程的别名读取图像。 */
+    char alias[64], target[PATH_MAX], parent[PATH_MAX];
+    snprintf(alias, sizeof(alias), "/proc/self/fd/%d", descriptor);
+    int prefix = snprintf(parent, sizeof(parent), "%s/tmp/", home);
+    ssize_t length = readlink(alias, target, sizeof(target) - 1);
+    if (prefix < 0 || prefix >= (int)sizeof(parent) || length <= prefix || length >= (ssize_t)sizeof(target) - 1)
+        return 0;
+    target[length] = '\0';
+    return !memcmp(target, parent, (size_t)prefix) && !strchr(target + prefix, '/');
+}
+
 static void private_process(int abi2, int oauth) {
     scmp_filter_ctx filter = seccomp_init(SCMP_ACT_ALLOW);
     if (!filter) fail("创建 TUI 进程限制");
@@ -181,6 +198,16 @@ int main(int argc, char **argv) {
         argv += 3;
         argc -= 3;
     }
+    int media = -1;
+    if (argc >= 5 && !strncmp(argv[1], "--media-fd=", 11)) {
+        char *end;
+        unsigned long parsed = strtoul(argv[1] + 11, &end, 10);
+        if (*end || parsed < 3 || parsed > INT_MAX || !private_media_directory((int)parsed, argv[2]))
+            return 125;
+        media = (int)parsed;
+        argv += 1;
+        argc -= 1;
+    }
     const int oauth = oauth_probe || port != 0;
     if (!probe && (argc < 4 || argv[1][0] != '/' || argv[2][0] != '/' || argv[3][0] != '/'))
         return 125;
@@ -222,6 +249,7 @@ int main(int argc, char **argv) {
     /* 原版程序用已核验的 FD 执行，exec 成功时一并关闭它和工作目录描述符。 */
     if (close_range(3, ~0U, CLOSE_RANGE_CLOEXEC)) fail("关闭 TUI 继承描述符");
     if (port) retain_loopback_channel(channel, port);
+    if (media >= 0 && fcntl(media, F_SETFD, 0) < 0) fail("保留本轮图像目录");
     if (syscall(SYS_landlock_restrict_self, rules, 0)) fail("启用 TUI 文件隔离");
     private_process(abi2, oauth);
     execv(argv[3], argv + 3);

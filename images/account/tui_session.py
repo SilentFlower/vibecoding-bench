@@ -1,5 +1,6 @@
 """把同一 sender 内的官方交互会话绑定到一次次受权的客户端工具往返。"""
 
+from base64 import b64decode
 from collections import Counter, deque
 from contextlib import ExitStack, closing, suppress
 from dataclasses import dataclass, field
@@ -18,6 +19,7 @@ import select
 import shutil
 import struct
 from subprocess import TimeoutExpired
+from tempfile import TemporaryDirectory
 import termios
 import time
 from threading import Condition, Event, Thread
@@ -307,6 +309,7 @@ class _Actor:
         self.prompt = prompt
         self.prompt_hash = sha256(prompt.encode()).digest()
         self.marker = "Flower session " + uuid4().hex
+        self.media_paths: tuple[str, ...] = ()
         self.bearer = secrets.token_urlsafe(32)
         self.model_bearer = secrets.token_urlsafe(32)
         self.model_path = "/model/" + self.model_bearer if driver.managed_oauth else ""
@@ -363,6 +366,26 @@ class _Actor:
             self.worker = None
             self.abort()
             raise
+
+    def _stage_current_images(self, home, resources):
+        sources = [block["source"] for block in self.cold_history.current_blocks if block["type"] == "image"]
+        if not sources:
+            return None
+        # 原生文件粘贴会附带来源。使用本进程内的目录别名，模型不会收到账号私有目录路径。
+        folder = Path(resources.enter_context(TemporaryDirectory(prefix="images-", dir=home / "tmp")))
+        descriptor = os.open(folder, os.O_PATH | os.O_DIRECTORY)
+        resources.callback(os.close, descriptor)
+        aliases = []
+        for index, source in enumerate(sources, 1):
+            name = f"attachment-{index}.{source['media_type'].split('/')[1]}"
+            with os.fdopen(os.open(folder / name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as stream:
+                stream.write(b64decode(source["data"], validate=True))
+            aliases.append(f"/proc/self/fd/{descriptor}/{name}")
+        self.media_paths = tuple(aliases)
+        return descriptor
+
+    def _terminal_marker(self):
+        return "".join(f"[Image #{index}] " for index in range(1, len(self.media_paths) + 1)) + self.marker
 
     def _monitor(self, command):
         master, slave = None, None
@@ -444,11 +467,15 @@ class _Actor:
                             launch_options["prepare_history"] = partial(
                                 launch_plan.import_session, replay_resources=history_resources,
                             )
+                            if (media := self._stage_current_images(home, history_resources)) is not None:
+                                launch_options["media_fd"] = media
                         resume = bool(launch_plan.history)
                     master, slave = os.openpty()
                     self.master = master
+                    # 纯图文提交先显示附件标记。让当前编号留在固定 CLI 的提示行可视范围内。
+                    columns = min(0xffff, max(100, len(self._terminal_marker()) + 4))
                     fcntl.ioctl(
-                        slave, termios.TIOCSWINSZ, struct.pack("HHHH", 32, 100, 0, 0)
+                        slave, termios.TIOCSWINSZ, struct.pack("HHHH", 32, columns, 0, 0)
                     )
                     if self.dead.is_set():
                         raise RuntimeError("原预留已经取消")
@@ -483,6 +510,7 @@ class _Actor:
                     callback.start()
                     try:
                         seen, tail, submitted = False, b"", False
+                        media_index, waiting_for_image = 0, b""
                         while not self.dead.is_set() and self.process.poll() is None:
                             with self.changed:
                                 if self.claim and self.claim.disconnected and self.claim.disconnected.is_set():
@@ -497,16 +525,30 @@ class _Actor:
                                 data = os.read(master, 65536)
                                 if not data:
                                     break
-                                seen |= "❯".encode() in tail + data
-                                tail = data[-4:]
+                                screen = tail + data
+                                seen |= "❯".encode() in screen
+                                if waiting_for_image and waiting_for_image in screen:
+                                    waiting_for_image = b""
+                                tail = screen[-max(4, len(waiting_for_image)):]
                             if (
                                 seen
                                 and self.ready.is_set()
                                 and (not wait_for_mcp or self.mcp_ready.is_set())
                                 and not submitted
                                 and not self.dead.is_set()
+                                and not waiting_for_image
                             ):
-                                # 成员内容经 prompt.submit 传送；控制字符和斜杠始终不会写进 PTY。
+                                if media_index:
+                                    os.write(master, b" ")
+                                if media_index < len(self.media_paths):
+                                    path = self.media_paths[media_index].encode()
+                                    os.write(master, b"\x1b[200~" + path + b"\x1b[201~")
+                                    media_index += 1
+                                    # CLI 用光标定位显示标记中的空格。等实际渲染出编号再贴下一张。
+                                    waiting_for_image = f"#{media_index}]".encode()
+                                    tail = b""
+                                    continue
+                                # 客户正文交给 Mod。PTY 只接收服务端生成的标记和附件别名。
                                 os.write(master, self.marker.encode())
                                 if not self.dead.wait(0.18):
                                     os.write(master, b"\r")
@@ -547,12 +589,16 @@ class _Actor:
             elif (
                 path == "/prompt"
                 and self.prompt is not None
-                and data.get("marker") == self.marker
+                and data.get("marker") == self._terminal_marker()
             ):
                 prompt, self.prompt = self.prompt, None
                 if self.cold_history is not None and self.cold_history.current_blocks and self.recovery_history is None:
-                    return {"prompt": self.marker, "guard": self.guard_text,
-                            "blocks": self.cold_history.submitted_blocks()}
+                    blocks = self.cold_history.submitted_blocks()
+                    if self.media_paths:
+                        # 内容块中的图像由实际 PTY 粘贴提供。回调只描述它们在图文中的位置。
+                        blocks = [{"type": "image"} if block["type"] == "image" else block for block in blocks]
+                    return {"prompt": data["marker"], "guard": self.guard_text, "blocks": blocks,
+                            "media": bool(self.media_paths)}
                 return {"prompt": prompt, "guard": self.guard_text}
             elif path == "/results":
                 return self._tool_results(data)
@@ -699,6 +745,27 @@ class _Actor:
         self.frame_batch = batch
         self.changed.notify_all()
 
+    def _matches_current_blocks(self, content):
+        if not isinstance(content, list):
+            return False
+        expected = self.cold_history.submitted_blocks()
+        if not self.media_paths:
+            actual = [block.get("text") if isinstance(block, dict) and block.get("type") == "text" else None
+                      for block in content[-len(expected):]]
+            return actual == [block["text"] for block in expected]
+        sources = [{"type": "text", "text": f"[Image: source: {path}]"} for path in self.media_paths]
+        tail = content[-(len(expected) + len(sources)):]
+        if any(not isinstance(block, dict) for block in tail):
+            return False
+        normalized = [{key: value for key, value in block.items() if key != "cache_control"} for block in tail]
+        actual = normalized[:len(expected)]
+        if normalized[len(expected):] != sources:
+            return False
+        # 固定 CLI 会在追加来源说明前为最后一个文本块补一个换行。
+        if expected[-1]["type"] == "text" and actual[-1] == {**expected[-1], "text": expected[-1]["text"] + "\n"}:
+            actual[-1] = expected[-1]
+        return actual == expected
+
     def _main_request(self, body, handle):
         if (
             not isinstance(body, dict)
@@ -743,15 +810,9 @@ class _Actor:
         content = rows[last_user].get("content")
         line = "prompt.submit hook additional context: " + self.guard_text
         multiple = self.cold_history is not None and self.cold_history.current_blocks and self.recovery_history is None
-        if multiple:
-            # Mod 失效时 CLI 可能保留标记。只有按原顺序出现全部文本块才能认领本轮。
-            if not isinstance(content, list):
-                return False
-            expected = [block["text"] for block in self.cold_history.submitted_blocks()]
-            actual = [block.get("text") if isinstance(block, dict) and block.get("type") == "text" else None
-                      for block in content[-len(expected):]]
-            if actual != expected:
-                return False
+        # Mod 失效时 CLI 可能保留标记。只有按顺序保留原图文和已知附件来源才能认领本轮。
+        if multiple and not self._matches_current_blocks(content):
+            return False
         if isinstance(content, list):
             marker = "<system-reminder>\n" + line + "\n</system-reminder>"
             guard_count = sum(

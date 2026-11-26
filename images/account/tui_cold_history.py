@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from itertools import chain, islice, zip_longest
 from pathlib import Path
 import re
+from struct import unpack_from
 from tempfile import TemporaryDirectory
 from uuid import uuid4
 
@@ -26,6 +27,9 @@ _IMAGE_HEADERS = {
     "image/gif": (b"GIF87a", b"GIF89a"),
     "image/webp": (b"RIFF",),
 }
+# 固定 CLI 的文件粘贴超出像素或字节边界会重采样或重编码。已有历史不经过粘贴。
+_MAX_PASTE_IMAGE_EDGE = 2000
+_MAX_PASTE_IMAGE_BYTES = 512_000
 
 
 def _blocks(row):
@@ -38,7 +42,47 @@ def _plain_text(block):
             and isinstance(block["text"], str) and bool(block["text"]))
 
 
-def _inline_image(block):
+def _jpeg_dimensions(data):
+    offset = 2
+    while offset + 4 <= len(data) and data[offset] == 0xff:
+        marker = data[offset + 1]
+        if marker == 0xff:
+            offset += 1
+            continue
+        if marker in (0xd9, 0xda):
+            break
+        size, = unpack_from(">H", data, offset + 2)
+        if size < 2 or offset + 2 + size > len(data):
+            break
+        # 只从开始帧读取尺寸。应用数据里的相同字节可能属于 EXIF 或其他元数据。
+        if 0xc0 <= marker <= 0xcf and marker not in (0xc4, 0xc8, 0xcc) and size >= 8:
+            height, width = unpack_from(">HH", data, offset + 5)
+            return width, height
+        offset += 2 + size
+    return None
+
+
+def _image_dimensions(media_type, data):
+    if media_type == "image/png" and len(data) >= 24 and data[12:16] == b"IHDR":
+        return unpack_from(">II", data, 16)
+    if media_type == "image/gif" and len(data) >= 10:
+        return unpack_from("<HH", data, 6)
+    if media_type == "image/jpeg":
+        return _jpeg_dimensions(data)
+    if media_type == "image/webp":
+        chunk = data[12:16]
+        if chunk == b"VP8X" and len(data) >= 30:
+            return int.from_bytes(data[24:27], "little") + 1, int.from_bytes(data[27:30], "little") + 1
+        if chunk == b"VP8L" and len(data) >= 25 and data[20] == 0x2f:
+            packed, = unpack_from("<I", data, 21)
+            return (packed & 0x3fff) + 1, ((packed >> 14) & 0x3fff) + 1
+        if chunk == b"VP8 " and len(data) >= 30 and data[23:26] == b"\x9d\x01\x2a":
+            width, height = unpack_from("<HH", data, 26)
+            return width & 0x3fff, height & 0x3fff
+    return None
+
+
+def _inline_image(block, *, for_paste=False):
     if block.keys() != {"type", "source"} or block["type"] != "image":
         return False
     source = block["source"]
@@ -52,7 +96,14 @@ def _inline_image(block):
     except ValueError:
         return False
     media_type = source["media_type"]
-    return decoded.startswith(_IMAGE_HEADERS[media_type]) and (media_type != "image/webp" or decoded[8:12] == b"WEBP")
+    if not decoded.startswith(_IMAGE_HEADERS[media_type]) or (media_type == "image/webp" and decoded[8:12] != b"WEBP"):
+        return False
+    if not for_paste:
+        return True
+    if len(decoded) > _MAX_PASTE_IMAGE_BYTES:
+        return False
+    dimensions = _image_dimensions(media_type, decoded)
+    return dimensions is not None and all(0 < side <= _MAX_PASTE_IMAGE_EDGE for side in dimensions)
 
 
 def _text_result_blocks(content):
@@ -95,7 +146,7 @@ def _closed_history(rows, *, result_types=(str,)):
 
 @dataclass(frozen=True)
 class ColdHistory:
-    """记录已确认的普通输入、当前文本以及该会话的 MCP 工具映射。"""
+    """记录已确认的普通输入、当前内容以及该会话的 MCP 工具映射。"""
 
     history: list
     model: str
@@ -106,11 +157,11 @@ class ColdHistory:
     thinking: dict | None
     system_policy: str
     effort: str | None = None
-    current_blocks: tuple[str, ...] = ()
+    current_blocks: tuple[dict, ...] = ()
 
     @classmethod
     def from_request(cls, body, system_policy="append"):
-        """识别普通文本首轮及受支持的闭合历史。
+        """识别普通文本、内嵌图像及受支持的闭合历史。
         @param body 已校验的请求。@param system_policy 本轮冻结的账号系统指令动作。
         @return 原生输入计划或空。
         """
@@ -130,7 +181,7 @@ class ColdHistory:
                 or not _closed_history(history)):
             return None
         content = _blocks(current)
-        if not content or not all(_plain_text(block) for block in content):
+        if not content or not all(_plain_text(block) or _inline_image(block, for_paste=True) for block in content):
             return None
         declared = body.get("tools", [])
         for tool in declared:
@@ -147,9 +198,9 @@ class ColdHistory:
         if system_policy != "replace":
             system = system or ""
         tools = {MCP_PREFIX + tool["name"]: tool for tool in declared}
-        return cls(history, body["model"], content[0]["text"], system, tools, body["max_tokens"],
+        return cls(history, body["model"], content[0].get("text", ""), system, tools, body["max_tokens"],
                    body.get("thinking"), system_policy, output.get("effort"),
-                   tuple(block["text"] for block in content) if len(content) > 1 else ())
+                   tuple(content) if len(content) > 1 or content[0]["type"] == "image" else ())
 
     def system_argument(self):
         """选择原生 CLI 提示词文件选项。@return 参数和文件正文，或缺省值。"""
@@ -166,13 +217,13 @@ class ColdHistory:
         return self.prompt
 
     def submitted_blocks(self):
-        """取得原生用户行的有序文本块。@return 本轮文本，以及适用的用户提醒。"""
+        """取得原生用户行的有序内容块。@return 本轮图文，以及适用的用户提醒。"""
         if not self.current_blocks:
             return [{"type": "text", "text": self.submitted_prompt()}]
-        text = self.current_blocks
+        blocks = list(self.current_blocks)
         if self._reminder_index() == len(self.history):
-            text = (*text, self._reminder())
-        return [{"type": "text", "text": part} for part in text]
+            blocks.append({"type": "text", "text": self._reminder()})
+        return blocks
 
     def _scope(self):
         scope = (self.model, self.system_policy, self.system, self.tools, self.max_tokens, self.thinking)
@@ -181,10 +232,14 @@ class ColdHistory:
 
     def receipt_boundary(self):
         """冻结必须随原工具回执复用的根轮输入。@return 不含客户原文的边界。"""
+        current = self.current_blocks or self.prompt
+        if self.current_blocks and all(block["type"] == "text" for block in self.current_blocks):
+            # 已签发的纯文本多块回执仍沿用原摘要。
+            current = tuple(block["text"] for block in self.current_blocks)
         return {
             "prompt_index": len(self.history) + 1,
             "system_policy": self.system_policy,
-            "digest": digest([self._scope(), self.history, self.current_blocks or self.prompt]),
+            "digest": digest([self._scope(), self.history, current]),
         }
 
     def resume_receipts(self, messages):

@@ -499,6 +499,7 @@ def launch_session(
     model_endpoint: tuple[str, str] | None = None,
     oauth_file: bool = False,
     prepare_history=None,
+    media_fd: int | None = None,
 ) -> Popen:
     """用账号内核限定工作区后，在真实 PTY 上运行固定版本。
 
@@ -513,6 +514,7 @@ def launch_session(
     @param model_endpoint 会话回环端点与本次使用的账号凭据或开发口令。
     @param oauth_file 是否启用独占账号刷新与完整文件。
     @param prepare_history 可选，同一会话的外部历史导入函数。
+    @param media_fd 可选，本会话私有图像暂存目录的 O_PATH 描述符。
     @return 直属交互进程，退出由账号执行器回收。
     """
     home, mod = session_paths(command)
@@ -541,9 +543,11 @@ def launch_session(
         auth = {"ANTHROPIC_AUTH_TOKEN": bearer}
     with (_open_program() as (_, fd),
           _loopback_channel(target.port if oauth_file else None) as (network_guard, network_fds)):
+        media_guard = [f"--media-fd={media_fd}"] if media_fd is not None else []
+        media_fds = (media_fd,) if media_fd is not None else ()
         return launch_workspace_cli(
             reservation, command, program=GUARD,
-            arguments=[*network_guard, str(home), str(mod), f"/proc/self/fd/{fd}", *arguments],
+            arguments=[*network_guard, *media_guard, str(home), str(mod), f"/proc/self/fd/{fd}", *arguments],
             config_dir=config_dir, environment={
                 **{k: environment[k] for k in ("CLAUDE_CODE_MAX_OUTPUT_TOKENS", "MAX_THINKING_TOKENS")
                    if k in environment},
@@ -551,7 +555,7 @@ def launch_session(
                 "SHELL": "/bin/bash", "LANG": "C.UTF-8", "TERM": "xterm-256color",
                 "ANTHROPIC_BASE_URL": url, **auth,
             }, resume=resume, terminal_fd=terminal_fd, storage=STORAGE, program_fd=fd,
-            inherited_fds=network_fds,
+            inherited_fds=(*network_fds, *media_fds),
             initialize_profile=lambda work: _initialize_local_profile(config_dir, work),
             prepare_history=prepare_history,
         )

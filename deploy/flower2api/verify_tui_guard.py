@@ -182,6 +182,31 @@ class GuardTests(TestCase):
         """在当前真实内核核验就绪、保存与会话隔离。@return 无。"""
         self._verify_sessions(self.native)
 
+    def test_media_directory_belongs_to_current_home(self):
+        """核对当前 HOME 的进程内图像别名和外部目录拒绝。@return 无。"""
+        with ExitStack() as stack:
+            directories = []
+            for home in (self.first, self.second):
+                directory = home / "tmp" / "images-fixture"
+                directory.mkdir(mode=0o700, parents=True)
+                (directory / "image.png").write_bytes(home.name.encode())
+                descriptor = os.open(directory, os.O_PATH | os.O_DIRECTORY)
+                stack.callback(os.close, descriptor)
+                directories.append(descriptor)
+            program = stack.enter_context(SESSION_PROGRAM.open("rb"))
+            play = (
+                "from pathlib import Path; import sys; "
+                "assert Path('/proc/self/fd/' + sys.argv[1], 'image.png').read_bytes() == b'first'"
+            )
+            for descriptor, status in zip(directories, (0, 125), strict=True):
+                with self.subTest(status=status):
+                    child = subprocess.run(
+                        [self.native, f"--media-fd={descriptor}", self.first, self.mod,
+                         f"/proc/self/fd/{program.fileno()}", "-I", "-S", "-B", "-c", play, str(descriptor)],
+                        cwd=self.work, capture_output=True, pass_fds=(descriptor, program.fileno()), timeout=5,
+                    )
+                    self.assertEqual(child.returncode, status, child.stderr)
+
     def test_abi2_selection(self):
         """选择兼容分支，在当前内核执行其规则并保存会话。@return 无。"""
         self._verify_sessions(self.probe, {**os.environ, "TUI_GUARD_TEST_ABI": "2"})

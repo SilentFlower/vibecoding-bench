@@ -1,6 +1,7 @@
 """用真实网关、账号事件源与 2.1.293 CLI 验收公开 Messages 冷导入。"""
 
 import argparse
+from base64 import b64encode
 from contextlib import ExitStack, closing
 from hashlib import sha256
 from http.client import HTTPConnection
@@ -8,12 +9,14 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
 from pathlib import Path
+from re import fullmatch
 from secrets import token_hex
 from shutil import copy2, copytree
 from signal import SIGKILL
 from socket import SHUT_RDWR, create_connection, if_nameindex
 from sqlite3 import connect
 import ssl
+from struct import pack
 from subprocess import PIPE, Popen, run
 from sys import executable
 from tempfile import TemporaryDirectory
@@ -21,6 +24,7 @@ from threading import Event
 from time import sleep, time_ns
 from urllib.parse import parse_qs, urlsplit
 from uuid import uuid4
+from zlib import compress, crc32
 
 from fixtures.native_model_send.fixture_tunnel import _relay
 from verify_tui_concurrency import frame
@@ -157,7 +161,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            toggle_pending_policy=False, tool_policy=None, recover_pending=False, output_effort=False,
            history_png=False, history_images=False, history_tool_blocks=False, previous=None, failure_boundaries=False,
            current_text_blocks=False, signed_tool_history=False, split_history_tools=False, v1_runtime=None,
-           parallel_tools=False, reconnect_tool_stream=False):
+           parallel_tools=False, reconnect_tool_stream=False, current_images=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -177,6 +181,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param v1_runtime 固定 V1 制品，提供时仅验证 V1 内核的公开能力。
     @param parallel_tools 是否验证同一步多个新工具的回执。
     @param reconnect_tool_stream 是否在真实续轮流中断开再接回。
+    @param current_images 是否用本轮原生图文替换纯文本问题。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -451,6 +456,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 {"type": "tool_result", "tool_use_id": PAST_SECOND_ID, "content": "第二个已完成的旧工具结果。"}]})
         current = ([{"type": "text", "text": part} for part in (QUESTION, QUESTION_TAIL)]
                    if current_text_blocks else QUESTION)
+        if current_images:
+            current = [{"type": "text", "text": QUESTION}, *fixture_image_blocks(all_formats=True),
+                       {"type": "text", "text": QUESTION_TAIL}]
         messages.append({"role": "user", "content": current})
         # 历史中的旧工具结果和当前问题之间保留完成边界，CLI 启动后只提交当前问题。
         declared = [TOOL, SECOND_TOOL] if parallel_tools else [TOOL]
@@ -554,6 +562,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             changed = {**follow, "messages": [*messages[:-1], merged, *follow["messages"][-2:]]}
             changed_blocks, response = call(18090, "POST", "/v1/messages", token, changed, headers)
             assert changed_blocks == 422 and len(received) == 1, (changed_blocks, response, len(received))
+        if current_images:
+            changed_image = {**messages[-1], "content": [current[0], current[2], current[1], *current[3:]]}
+            changed = {**follow, "messages": [*messages[:-1], changed_image, *follow["messages"][-2:]]}
+            changed_media, response = call(18090, "POST", "/v1/messages", token, changed, headers)
+            assert changed_media == 422 and len(received) == 1, (changed_media, response, len(received))
         if signed_tool_history:
             tampered = {**SIGNED_THINKING, "signature": "Y2hhbmdlZA=="}
             changed = {**follow, "messages": [*messages, {"role": "assistant", "content": [tampered, *offered[1:]]}, result]}
@@ -659,6 +672,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             proof["closed_historical_tools"] = 2
         if current_text_blocks:
             proof.update(current_text_blocks=2, changed_current_blocks_status=changed_blocks)
+        if current_images:
+            for index, (_, native, _) in enumerate(received):
+                verify_current_image_row(native, current, require_alias=index == 0)
+            proof.update(current_images=[block["source"]["media_type"] for block in current if block["type"] == "image"],
+                         changed_current_images_status=changed_media)
         if signed_tool_history:
             hydrated = find_blocks(received[1][1], "type", "thinking")
             assert hydrated == [("assistant", SIGNED_THINKING)], (
@@ -681,6 +699,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                               "changed_effort_http": changed_effort, "frozen_effort": "medium",
                                               "old_session_id": original_id, "recovered_session_id": restored_id,
                                               "original_history_preserved": True}
+        if current_images and not recover_pending and not restart_history:
+            proof["image_only"] = verify_image_only_requests(
+                manage, token, account_token, headers, received,
+                check_existing=not toggle_pending_policy and tool_policy in (None, "append"),
+            )
         if restart_history:
             wait_for(lambda: sender_state().get("idle"))
             (binding_file,) = Path("/native/tui-workspaces").glob("*.json")
@@ -1059,12 +1082,8 @@ def verify_output_effort(manage, token, account_token, headers, received):
     return {"output_effort": outcomes, "model_posts": len(received)}
 
 
-def verify_history_images(manage, token, account_token, account_id, headers, received, *, all_formats):
-    """核对历史用户图像与新问题的真实出站。
-    @param manage 管理接口。@param token 公共令牌。@param account_token 合成账号凭据。
-    @param account_id 当前账号。@param headers 固定公开会话。@param received 模型实收。
-    @param all_formats 是否同时校验 JPEG、GIF、WebP。@return 测试摘要。
-    """
+def fixture_image_blocks(*, all_formats):
+    """构造内嵌图像块。@param all_formats 是否加入 JPEG、GIF、WebP。@return 合成图像块。"""
     images = {"image/png": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j4uoAAAAASUVORK5CYII="}
     if all_formats:
         images.update({
@@ -1074,8 +1093,84 @@ def verify_history_images(manage, token, account_token, account_id, headers, rec
             "image/gif": "R0lGODdhAgACAIEAAKCgoAAAAAAAAAAAACwAAAAAAgACAAAIBgABCAQQEAA7",
             "image/webp": "UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoCAAIAAUAmJaQAA3AA/u2oAAA=",
         })
-    image_blocks = [{"type": "image", "source": {"type": "base64", "media_type": media_type, "data": data}}
-                    for media_type, data in images.items()]
+    return [{"type": "image", "source": {"type": "base64", "media_type": media_type, "data": data}}
+            for media_type, data in images.items()]
+
+
+def verify_image_only_requests(manage, token, account_token, headers, received, *, check_existing):
+    """核对原生粘贴边界及超界请求的原入口。
+    @param manage 管理入口。@param token 合成调用方。@param account_token 合成模型凭据。
+    @param headers 公开请求头。@param received TLS 实收。
+    @param check_existing 默认账号动作下核对超界兼容。@return 各独立请求的证据。
+    """
+    def chunk(kind, data):
+        return pack(">I", len(data)) + kind + data + pack(">I", crc32(data, crc32(kind)))
+
+    def make_png(width, size=None):
+        # 构造合法的一行灰度 PNG，区别像素边界和文件大小边界。
+        png = (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", pack(">IIBBBBB", width, 1, 8, 0, 0, 0, 0))
+               + chunk(b"IDAT", compress(b"\x00" * (width + 1))) + chunk(b"IEND", b""))
+        if size is not None:
+            metadata = b"Probe\x00" + b"x" * (size - len(png) - 18)
+            png = png[:-12] + chunk(b"tEXt", metadata) + png[-12:]
+            assert len(png) == size
+        return [{"type": "image", "source": {
+            "type": "base64", "media_type": "image/png", "data": b64encode(png).decode("ascii"),
+        }}]
+
+    cases = [("native_width_2000", make_png(2000), True), ("native_bytes_512000", make_png(2, 512_000), True)]
+    if check_existing:
+        cases.extend([
+            ("native_24_images", fixture_image_blocks(all_formats=True) * 6, True),
+            ("existing_width_2001", make_png(2001), False),
+            ("existing_bytes_512001", make_png(2, 512_001), False),
+        ])
+    result = {}
+    for name, content, native in cases:
+        body = {"model": MODEL, "max_tokens": 128, "stream": False,
+                "messages": [{"role": "user", "content": content}]}
+        before = len(received)
+        status, raw = call(18090, "POST", "/v1/messages", token, body, {**headers, "x-session-id": str(uuid4())})
+        assert status == 200 and len(received) == before + 1, (name, status, raw, len(received))
+        assert json.loads(raw)["content"] == [{"type": "text", "text": FINAL}]
+        if native:
+            verify_current_image_row(received[-1][1], content, require_alias=True)
+            (attempt,) = verify_captures(manage, received[-1:], account_token)
+            result[name] = {"model_posts": 1, "attempt": attempt}
+        else:
+            # 只在默认账号动作核对超界兼容，保留原入口实收的图像和消息。
+            assert received[-1][1]["messages"] == body["messages"]
+            result[name] = {"model_posts": 1, "body_sha256": received[-1][0]}
+    return result
+
+
+def verify_current_image_row(native, expected, *, require_alias):
+    """核对实收图文在同一条用户消息内。@param native 模型正文。
+    @param expected 原始图文块。@param require_alias 是否从本轮粘贴。@return 无。
+    """
+    row, = [row for row in native["messages"] if any(block["type"] == "image" for block in blocks(row))]
+    assert row["role"] == "user"
+    observed = [{key: value for key, value in block.items() if key != "cache_control"} for block in blocks(row)]
+    images = [block for block in expected if block["type"] == "image"]
+    assert [block for block in observed if block["type"] == "image"] == images
+    if expected[-1]["type"] == "text":
+        native_end = {**expected[-1], "text": expected[-1]["text"] + "\n"}
+        observed = [expected[-1] if block == native_end else block for block in observed]
+    assert sum(observed[index:index + len(expected)] == expected for index in range(len(observed))) == 1
+    sources = [block["text"] for block in observed if block.get("text", "").startswith("[Image: source:")]
+    assert all(fullmatch(r"\[Image: source: /proc/self/fd/[0-9]+/attachment-[0-9]+\.(png|jpeg|gif|webp)\]", path)
+               for path in sources)
+    if require_alias:
+        assert len(sources) == len(images)
+
+
+def verify_history_images(manage, token, account_token, account_id, headers, received, *, all_formats):
+    """核对历史用户图像与新问题的真实出站。
+    @param manage 管理接口。@param token 公共令牌。@param account_token 合成账号凭据。
+    @param account_id 当前账号。@param headers 固定公开会话。@param received 模型实收。
+    @param all_formats 是否同时校验 JPEG、GIF、WebP。@return 测试摘要。
+    """
+    image_blocks = fixture_image_blocks(all_formats=all_formats)
     history = [{"role": "user", "content": [{"type": "text", "text": HISTORY[0][1]}, *image_blocks]},
                {"role": "assistant", "content": HISTORY[1][1]}]
     cases = []
@@ -1101,7 +1196,7 @@ def verify_history_images(manage, token, account_token, account_id, headers, rec
         assert case["body_sha256"] == capture["ingress_body_sha256"]
         case.update(capture)
     return {"history_images" if all_formats else "history_png": cases,
-            "formats": list(images), "model_posts": len(received)}
+            "formats": [block["source"]["media_type"] for block in image_blocks], "model_posts": len(received)}
 
 
 def fixture_command_has(path, argument):
@@ -1199,6 +1294,7 @@ def main():
     parser.add_argument("--sender", type=Path, required=True)
     parser.add_argument("--shared-state", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--current-text-blocks", action="store_true")
+    parser.add_argument("--current-images", action="store_true")
     parser.add_argument("--signed-tool-history", action="store_true")
     scenario = parser.add_mutually_exclusive_group()
     scenario.add_argument("--restart-history", action="store_true")
@@ -1243,7 +1339,7 @@ def main():
                        failure_boundaries=args.failure_boundaries, current_text_blocks=args.current_text_blocks,
                        signed_tool_history=args.signed_tool_history, split_history_tools=args.split_history_tools,
                        v1_runtime=args.v1_runtime, parallel_tools=args.parallel_new_tools,
-                       reconnect_tool_stream=args.reconnect_tool_stream)
+                       reconnect_tool_stream=args.reconnect_tool_stream, current_images=args.current_images)
         print(json.dumps(proof, ensure_ascii=False))
 
 

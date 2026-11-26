@@ -13,6 +13,7 @@ from unittest import TestCase
 from uuid import uuid4
 
 from tui_cold_history import IMPORT_BOUNDARY, ColdHistory
+from tui_reconnect import digest
 from tui_workspace_launch import HistoryReplay, _key, _project_history_dir, _resume_path, launch_workspace_cli
 
 
@@ -390,6 +391,7 @@ class ColdHistoryTests(TestCase):
         body["messages"][-1]["content"] = current
         plan = ColdHistory.from_request(body)
         self.assertEqual(plan.submitted_blocks(), current)
+        self.assertEqual(plan.receipt_boundary()["digest"], digest([plan._scope(), plan.history, ("本轮", "输入")]))
         self.assertNotEqual(plan.receipt_boundary(), ColdHistory.from_request(self.body).receipt_boundary())
 
     def test_replace_distinguishes_omitted_and_empty_system(self):
@@ -446,14 +448,17 @@ class ColdHistoryTests(TestCase):
         for output in ({"effort": "unknown"}, {"format": {"type": "json_schema", "schema": {}}}):
             self.assertIsNone(ColdHistory.from_request({**self.body, "output_config": output}))
 
-    def test_only_matching_inline_image_enters_native_history(self):
-        """闭合用户记录的内嵌图像须匹配声明格式。@return 无。"""
+    def test_only_matching_inline_image_enters_native_input(self):
+        """历史和本轮的内嵌图像须匹配声明格式。@return 无。"""
         picture = {"type": "image", "source": {"type": "base64", "media_type": "image/png",
                   "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j4uoAAAAASUVORK5CYII="}}
         raw = deepcopy(self.body)
         raw["messages"][0]["content"] = [{"type": "text", "text": "历史图像"}, picture]
         self.assertEqual(ColdHistory.from_request(raw).history[0]["content"][-1], picture)
-        self.assertIsNone(ColdHistory.from_request({**raw, "messages": raw["messages"][:1]}))
+        current = {**raw, "messages": raw["messages"][:1]}
+        self.assertEqual(ColdHistory.from_request(current).submitted_blocks(), raw["messages"][0]["content"])
+        image_only = {**raw, "messages": [{"role": "user", "content": [picture]}]}
+        self.assertEqual(ColdHistory.from_request(image_only).submitted_blocks(), [picture])
         for source in ({"type": "url", "url": "https://example.invalid/picture.png"},
                        {**picture["source"], "data": "invalid base64"},
                        {**picture["source"], "media_type": "image/jpeg"},
@@ -462,3 +467,4 @@ class ColdHistoryTests(TestCase):
             with self.subTest(source=source):
                 raw["messages"][0]["content"][-1] = {"type": "image", "source": source}
                 self.assertIsNone(ColdHistory.from_request(raw))
+                self.assertIsNone(ColdHistory.from_request(current))
