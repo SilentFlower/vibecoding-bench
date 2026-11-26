@@ -214,7 +214,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param history_cache_markers 是否冻结历史标记并验证工具往返。
     @param history_cache_ttl 工具往返启用的平台历史断点时长。
     @param cache_capability 对照生产入口或 CLI 提示词和工具的缓存标记能力。
-    @param message_system_roles 是否对照普通请求及原生形状的消息级系统角色。
+    @param message_system_roles 消息级系统角色对照或普通 API 固定回归模式。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -456,7 +456,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             assert account["request_backend"] == "native293" and account["client_system_prompt_policy"] == "replace"
             token = manage("POST", "tokens", {"name": "v1-policy-owner", "allowed_accounts": str(identifier)})["token"]
             if message_system_roles:
-                return verify_message_system_roles(manage, token, account, received, v1_betas)
+                return verify_message_system_roles(manage, token, account, received, v1_betas,
+                                                   fixed=message_system_roles == "ordinary-contract")
             return verify_v1_prompt_policy(token, received, v1_betas)
         assert account["tui_v2_available"]
         manage("PUT", f"accounts/{identifier}", {"request_backend": "tui_v2",
@@ -467,7 +468,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         messages = [{"role": role, "content": text} for role, text in HISTORY]
         if message_system_roles:
             account = manage("GET", f"accounts/{identifier}")
-            return verify_message_system_roles(manage, token, account, received, v1_betas)
+            return verify_message_system_roles(manage, token, account, received, v1_betas,
+                                               fixed=message_system_roles == "ordinary-contract")
         if cache_capability:
             return verify_cache_capabilities(manage, token, identifier, headers, received, cache_capability)
         if history_cache_markers:
@@ -1263,9 +1265,10 @@ def stage_history_branch(config, work, native_id, body):
     return output.stdout.decode().strip()
 
 
-def verify_message_system_roles(manage, token, account, received, model_betas):
+def verify_message_system_roles(manage, token, account, received, model_betas, *, fixed=False):
     """对照公开来源、消息级角色与出站归属。@param manage 管理入口。@param token 合成令牌。
-    @param account 选定账号。@param received 模型实收。@param model_betas 模型头实收。@return 逐例证据。
+    @param account 选定账号。@param received 模型实收。@param model_betas 模型头实收。
+    @param fixed 是否按普通 API 已验收状态和实收断言。@return 逐例证据。
     """
     backend = account["request_backend"]
     assert backend in ("native293", "tui_v2")
@@ -1304,6 +1307,26 @@ def verify_message_system_roles(manage, token, account, received, model_betas):
                      for source in ("api", "ua_only", "cc_with_billing", "cc_without_billing"))
         cases.append(("replace_cc_alias_without_billing", "cc_without_billing_alias", "replace", model_ok, "system", True))
 
+    rejections = {
+        "api_denied_model": (400, "system_role_model_not_allowed"),
+        "user_control_fields": (422, "unsupported_parameter"),
+        "assistant_control_fields": (422, "unsupported_parameter"),
+        "bad_clear_at": (400, "invalid_parameter"),
+    }
+    if fixed:
+        cases = [case for case in cases if case[1] == "api"]
+        policies = ("replace",)
+        if backend == "tui_v2":
+            assert can_set_policy
+            policies = ("append", "replace", "user_reminder")
+            for policy in policies[1:]:
+                rejections[policy + "_api"] = (422, "unsupported_parameter")
+                rejections["minimal_system_" + policy] = (422, "unsupported_parameter")
+                rejections["minimal_system_after_user_" + policy] = (422, "unsupported_parameter")
+        cases.extend((variant + "_" + policy, "api", policy, model_ok, variant, False)
+                     for policy in policies
+                     for variant in ("minimal_root_only", "minimal_system", "minimal_system_after_user"))
+
     proof = {}
     active_policy = default_policy
     for label, origin, policy, model, variant, with_betas in cases:
@@ -1323,7 +1346,16 @@ def verify_message_system_roles(manage, token, account, received, model_betas):
                             "x-claude-code-session-id": session})
         messages = deepcopy(rows)
         system = [root]
-        if variant == "root_only":
+        if variant.startswith("minimal_"):
+            system = [{"type": "text", "text": root["text"]}]
+            messages = [*messages[:2], messages[-1]]
+            if variant != "minimal_root_only":
+                # 保留监督窗口的原位置，另测供应商文档支持的 user 与 assistant 之间。
+                position = 1 if variant == "minimal_system_after_user" else 2
+                messages.insert(position, {"role": "system", "content": [
+                    {"type": "text", "text": rows[2]["content"][0]["text"]},
+                ]})
+        elif variant == "root_only":
             messages = [row for row in messages if row["role"] != "system"]
             system = [dict(type="text", text=root["text"])]
         elif variant.endswith("_fields"):
@@ -1343,8 +1375,10 @@ def verify_message_system_roles(manage, token, account, received, model_betas):
 
         before = len(received)
         before_claims = len(MODEL_BODY_TRACE.read_text().splitlines()) if backend == "tui_v2" else 0
+        expected_status, expected_code = rejections.get(label, (200, None)) if fixed else (None, None)
         status, raw, request_id = checked_messages(
-            manage, token, body, headers, received, label, expected_status=None, trace_startup=backend == "tui_v2",
+            manage, token, body, headers, received, label, expected_status=expected_status,
+            trace_startup=backend == "tui_v2",
         )
         result = {"request_id": request_id}
         query = "request-diagnostics?" + urlencode({"correlation_id": request_id})
@@ -1385,11 +1419,20 @@ def verify_message_system_roles(manage, token, account, received, model_betas):
                           model_metadata_present=bool(metadata),
                           model_fixture_device_retained=model_identity.get("device_id") == "1" * 64,
                           messages_preserved=model_body["messages"] == messages)
-            if variant == "system":
-                assert model_body["messages"] == messages and result["model_root_system"] == [root], (label, result)
+            if variant in ("system", "minimal_system", "minimal_system_after_user"):
+                assert model_body["messages"] == messages and result["model_root_system"] == system, (label, result)
         else:
             assert len(received) == before and not claims, (label, result)
             result["error_code"] = json.loads(raw)["error"].get("code")
+        if fixed:
+            posts = int(expected_status == 200)
+            assert (result.get("error_code"), result["model_posts"], result["attempt_count"]) == (
+                expected_code, posts, posts,
+            ), (label, result)
+            if variant in ("root_only", "minimal_root_only"):
+                assert result["provider_path"] == ("interactive_cli" if backend == "tui_v2" else "native293"), (
+                    label, result,
+                )
         proof[label] = result
     assert not any(path.is_file() for path in Path("/flows/api").rglob("*"))
     return {"backend": backend, "cases": proof, "model_posts": len(received), "wire_final": "unavailable"}
@@ -2022,7 +2065,10 @@ def main():
     parser.add_argument("--current-images", action="store_true")
     parser.add_argument("--history-cache-markers", action="store_true")
     parser.add_argument("--history-cache-ttl", choices=("5m", "1h"))
-    parser.add_argument("--message-system-roles", action="store_true")
+    system_roles = parser.add_mutually_exclusive_group()
+    system_roles.add_argument("--message-system-roles", dest="message_system_roles", action="store_const", const="observe")
+    system_roles.add_argument("--ordinary-message-system-contract", dest="message_system_roles", action="store_const",
+                              const="ordinary-contract")
     parser.add_argument("--auto-tool-choice", action="store_true")
     parser.add_argument("--signed-tool-history", action="store_true")
     parser.add_argument("--trace-initial-startup", action="store_true", help="记录源码 V2 夹具的启动阶段")
