@@ -521,6 +521,21 @@ class ColdHistoryTests(TestCase):
         for output in ({"effort": "unknown"}, {"format": {"type": "json_schema", "schema": {}}}):
             self.assertIsNone(ColdHistory.from_request({**self.body, "output_config": output}))
 
+    def test_explicit_adaptive_updates_is_frozen(self):
+        """已验证的自适应思考配置随根轮冻结。@return 无。"""
+        thinking = {"type": "adaptive", "display": "updates"}
+        for model in ("claude-sonnet-4-6", "claude-opus-5-5"):
+            with self.subTest(model=model):
+                body = {**self.body, "model": model, "thinking": thinking}
+                plan = ColdHistory.from_request(body)
+                boundary = plan.receipt_boundary()
+                self.assertEqual(plan.thinking, thinking)
+                self.assertEqual(ColdHistory.from_receipt_boundary(body, boundary), plan)
+                for changed in ({"type": "adaptive"}, {**thinking, "display": "omitted"},
+                                {**thinking, "display": "summarized"}, {"type": "disabled"}):
+                    self.assertIsNone(ColdHistory.from_receipt_boundary({**body, "thinking": changed}, boundary))
+        self.assertIsNone(ColdHistory.from_request({**self.body, "model": "claude-haiku-4-5", "thinking": thinking}))
+
     def test_explicit_auto_tool_choice_preserves_parallel_permission(self):
         """自动选择进入原生合同并随原工具组冻结。@return 无。"""
         choice = {"type": "auto", "disable_parallel_tool_use": False}

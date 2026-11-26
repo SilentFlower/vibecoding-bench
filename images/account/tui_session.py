@@ -931,6 +931,10 @@ class _Actor:
                     self.agent_offer.messages.clear()
                     self.agent_messages.clear()
                 if self.cold_history is not None:
+                    thinking = self.cold_history.thinking
+                    if thinking is not None and thinking["type"] == "adaptive" and native.get("thinking") != thinking:
+                        raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
+                            "code": "unsupported_parameter", "message": "CLI 未保留请求的自适应思考显示模式"}}))
                     if self.cold_history.effort is not None:
                         output = native.get("output_config")
                         if not isinstance(output, dict) or output.get("effort") != self.cold_history.effort:
@@ -1562,7 +1566,8 @@ class SessionDriver:
             actor_key = (*actor_key, "agent-summary")
         offered, returned = split_reply(messages)
         policy = reservation.get("body_policy")
-        native_cache_policy = not policy or not policy["sub2api"]
+        # disabled 经平台改写后也会呈现 adaptive/updates，仍须与客户端显式指定区分。
+        native_body_policy = not policy or not (policy["sub2api"] or policy["adaptive"])
         native_cache_ttl = policy["ttl"] if policy else "off"
         deadline = reservation["deadline_unix_ms"] / 1000
 
@@ -1647,7 +1652,7 @@ class SessionDriver:
                             {**body, "messages": messages[:prompt_index]}, actor.cold_history.system_policy,
                             cache_ttl=actor.cold_history.cache_ttl,
                         )
-                        if not native_cache_policy or plan != actor.cold_history or not tool_results_only:
+                        if not native_body_policy or plan != actor.cold_history or not tool_results_only:
                             raise InputRejection("unsupported_parameter")
                     actor.claim = handle
                     return handle
@@ -1656,7 +1661,7 @@ class SessionDriver:
         system_policy = reservation.get("client_system_prompt_policy", "append")
         is_native = native_input(body, reservation.get("input_format"))
         native_history_allowed = (self.managed_oauth and reservation.get("native_cold_history") is True
-                                  and native_cache_policy and agent_hint is None and not is_native)
+                                  and native_body_policy and agent_hint is None and not is_native)
         if native_checkpoint is not None:
             if not native_history_allowed or not tool_results_only:
                 raise InputRejection("unsupported_parameter")

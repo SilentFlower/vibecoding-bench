@@ -200,8 +200,12 @@ class ColdHistory:
             return None
         if type(body.get("max_tokens")) is not int or body["max_tokens"] <= 0:
             return None
-        if body.get("thinking") not in (None, {"type": "disabled"}):
-            return None
+        thinking = body.get("thinking")
+        if thinking not in (None, {"type": "disabled"}):
+            # 固定 CLI 在这两个模型上原样生成显式 updates。其他显示模式仍使用现有合同。
+            if (body["model"] not in ("claude-sonnet-4-6", "claude-opus-5-5")
+                    or thinking != {"type": "adaptive", "display": "updates"}):
+                return None
         output = body.get("output_config", {})
         if not isinstance(output, dict) or output and (
                 output.keys() != {"effort"} or output["effort"] not in ("low", "medium", "high", "max")):
@@ -243,7 +247,7 @@ class ColdHistory:
             system = system or ""
         tools = {MCP_PREFIX + tool["name"]: tool for tool in declared}
         return cls(history, body["model"], content[0].get("text", ""), system, tools, body["max_tokens"],
-                   body.get("thinking"), system_policy, output.get("effort"),
+                   thinking, system_policy, output.get("effort"),
                    tuple(content) if len(content) > 1 or content[0]["type"] == "image" else (), choice, cache_ttl)
 
     def system_argument(self):

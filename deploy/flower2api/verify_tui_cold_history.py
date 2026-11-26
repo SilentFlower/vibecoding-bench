@@ -57,6 +57,8 @@ NEW_ID = "toolu_cold_fixture"
 SECOND_ID = "toolu_second_cold_fixture"
 RECONNECT_ID = "toolu_reconnect_cold_fixture"
 SIGNED_THINKING = {"type": "thinking", "thinking": "隔离模型的合成思考段。", "signature": "c2lnbmF0dXJlLWZpeHR1cmU="}
+ADAPTIVE_THINKING = {"type": "adaptive", "display": "updates"}
+THINKING_UPDATES_BETA = "thinking-display-updates-2026-08-18"
 V1_RUNTIME_SHA256 = "017ec892b9dfbf08bf4cb2e5bf59048cb41a0ecfc21b1ad518751a23a911b9b7"
 TOOL = {"name": "Lookup-Note", "description": "读取合成便签", "input_schema": {
     "type": "object", "required": ["key", "options"], "additionalProperties": False,
@@ -180,6 +182,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            history_png=False, history_images=False, history_tool_blocks=False, previous=None, failure_boundaries=False,
            current_text_blocks=False, signed_tool_history=False, split_history_tools=False, v1_runtime=None,
            parallel_tools=False, reconnect_tool_stream=False, current_images=False, auto_tool_choice=False,
+           adaptive_thinking_model=None,
            recovery_ledger_contention=False, recovery_ledger_deadline=False, recovery_workspace_rejection=False,
            recovery_slow_model=False, initial_idle_model_connection=False, trace_startup=False, cache_markers=False,
            history_cache_markers=False, history_cache_ttl=None, cache_capability=None, message_system_roles=False):
@@ -204,6 +207,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param reconnect_tool_stream 是否在真实续轮流中断开再接回。
     @param current_images 是否用本轮原生图文替换纯文本问题。
     @param auto_tool_choice 是否核对显式自动选择和并行工具。
+    @param adaptive_thinking_model 可选，核对显式 adaptive/updates 的固定模型。
     @param recovery_ledger_contention 是否在提交原回执时短暂占用账号账本锁。
     @param recovery_ledger_deadline 是否持续持锁直至回执触发准入截止，然后重交。
     @param recovery_workspace_rejection 是否核对工作区绑定拒绝及原回执再次认领。
@@ -238,7 +242,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     copy2(temporary / "ca.der", config.with_name("verification-ca.der"))
     received, callbacks, proxy_targets = [], [], []
     slow_tool_arrivals = []
-    v1_betas = []
+    model_betas = []
     lookups = []
     deny_proxy = False
     denied_tunnels = []
@@ -266,8 +270,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             if trace_startup:
                 startup_event("model_received", peer_port=self.client_address[1], model_posts=len(received),
                               model_body_sha256=model_digest)
-            if v1_runtime is not None or message_system_roles:
-                v1_betas.append(self.headers.get("anthropic-beta", ""))
+            if v1_runtime is not None or message_system_roles or adaptive_thinking_model:
+                model_betas.append(self.headers.get("anthropic-beta", ""))
             if failure_boundaries and any(block.get("text") == DROP_REPLY
                                           for row in body["messages"] for block in blocks(row)):
                 self.close_connection = True
@@ -459,6 +463,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
 
         manage("PUT", "settings", {"allowed_user_agents": "",
                                    "request_diagnostics_log_mode": "info" if inspect_model_body else "debug"})
+        if adaptive_thinking_model:
+            manage("PUT", "settings", {"rewrite_disabled_thinking_enabled": "true",
+                                       "rewrite_disabled_thinking_models": adaptive_thinking_model})
         if history_cache_ttl:
             manage("PUT", "settings", {"message_cache_control_rewrite": "off",
                                        "cache_control_ttl_rewrite": history_cache_ttl})
@@ -477,9 +484,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             assert account["request_backend"] == "native293" and account["client_system_prompt_policy"] == "replace"
             token = manage("POST", "tokens", {"name": "v1-policy-owner", "allowed_accounts": str(identifier)})["token"]
             if message_system_roles:
-                return verify_message_system_roles(manage, token, account, received, v1_betas,
+                return verify_message_system_roles(manage, token, account, received, model_betas,
                                                    fixed=message_system_roles == "ordinary-contract")
-            return verify_v1_prompt_policy(token, received, v1_betas)
+            return verify_v1_prompt_policy(token, received, model_betas)
         assert account["tui_v2_available"]
         manage("PUT", f"accounts/{identifier}", {"request_backend": "tui_v2",
                "request_backend_revision": account["request_backend_revision"]})
@@ -489,7 +496,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         messages = [{"role": role, "content": text} for role, text in HISTORY]
         if message_system_roles:
             account = manage("GET", f"accounts/{identifier}")
-            return verify_message_system_roles(manage, token, account, received, v1_betas,
+            return verify_message_system_roles(manage, token, account, received, model_betas,
                                                fixed=message_system_roles == "ordinary-contract")
         if cache_capability:
             return verify_cache_capabilities(manage, token, identifier, headers, received, cache_capability)
@@ -577,6 +584,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 "tools": declared, "system": [{"type": "text", "text": part} for part in SYSTEM]}
         if auto_tool_choice:
             body["tool_choice"] = {"type": "auto", "disable_parallel_tool_use": False}
+        if adaptive_thinking_model:
+            body.update(model=adaptive_thinking_model, thinking=ADAPTIVE_THINKING)
+            headers["anthropic-beta"] = THINKING_UPDATES_BETA
         if recover_pending:
             body["output_config"] = {"effort": "medium"}
         with ExitStack() as initial_connections:
@@ -699,6 +709,16 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             changed = {**follow, "tool_choice": {"type": "none"}}
             changed_choice, response = call(18090, "POST", "/v1/messages", token, changed, headers)
             assert changed_choice == 422 and len(received) == 1, (changed_choice, response, len(received))
+        if adaptive_thinking_model:
+            changed_thinking = {}
+            for label, thinking in (("omitted", {"type": "adaptive", "display": "omitted"}),
+                                    ("disabled_with_platform_rewrite", {"type": "disabled"})):
+                changed_status, raw, _ = checked_messages(
+                    manage, token, {**follow, "thinking": thinking}, headers, received,
+                    "changed_thinking_" + label, expected_status=422,
+                )
+                assert json.loads(raw)["error"]["code"] == "unsupported_parameter" and len(received) == 1, raw
+                changed_thinking[label] = changed_status
         if history_cache_markers:
             first, = messages[0]["content"]
             changed_prefix = {**messages[0], "content": [{**first, "cache_control": {"type": "ephemeral", "ttl": "5m"}}]}
@@ -948,6 +968,13 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             observed = [native.get("tool_choice") for _, native, _ in received]
             assert all(choice in (None, {"type": "auto"}, body["tool_choice"]) for choice in observed)
             proof.update(auto_tool_choice=observed, changed_tool_choice_status=changed_choice)
+        if adaptive_thinking_model:
+            actual_thinking = [native.get("thinking") for _, native, _ in received]
+            assert actual_thinking == [ADAPTIVE_THINKING] * 2, actual_thinking
+            assert all(native["model"] == adaptive_thinking_model for _, native, _ in received)
+            assert len(model_betas) == 2 and all(THINKING_UPDATES_BETA in beta.split(",") for beta in model_betas), model_betas
+            proof.update(thinking_model=adaptive_thinking_model, thinking=actual_thinking,
+                         changed_thinking_status=changed_thinking)
         if signed_tool_history:
             hydrated = find_blocks(received[1][1], "type", "thinking")
             assert hydrated == [("assistant", SIGNED_THINKING)], (
@@ -2109,6 +2136,7 @@ def main():
     system_roles.add_argument("--ordinary-message-system-contract", dest="message_system_roles", action="store_const",
                               const="ordinary-contract")
     parser.add_argument("--auto-tool-choice", action="store_true")
+    parser.add_argument("--adaptive-thinking-model", choices=(MODEL, "claude-opus-5-5"))
     parser.add_argument("--signed-tool-history", action="store_true")
     parser.add_argument("--trace-initial-startup", action="store_true", help="记录源码 V2 夹具的启动阶段")
     fault = parser.add_mutually_exclusive_group()
@@ -2177,6 +2205,7 @@ def main():
                        v1_runtime=args.v1_runtime, parallel_tools=args.parallel_new_tools,
                        reconnect_tool_stream=args.reconnect_tool_stream, current_images=args.current_images,
                        auto_tool_choice=args.auto_tool_choice,
+                       adaptive_thinking_model=args.adaptive_thinking_model,
                        recovery_ledger_contention=args.recovery_ledger_contention,
                        recovery_ledger_deadline=args.recovery_ledger_deadline,
                        recovery_workspace_rejection=args.recovery_workspace_rejection,

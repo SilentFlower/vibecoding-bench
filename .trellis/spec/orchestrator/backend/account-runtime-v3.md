@@ -2563,6 +2563,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 旧工具调用和回执可以拆在相邻同角色历史里。原生导入按角色合并相邻行，保持块内容和先后顺序，整组调用必须在下一助理轮前闭合。原公开历史仍作为回执归属的比较依据。
 - V2 管理端可选择 `append`、`replace`、`user_reminder`。已核验发送器通过私有预留传递非默认动作。替换以启动文件承载系统正文，省略保留默认正文，显式空串或空数组仅保留身份和计费块。提醒保留默认系统正文，附到首条不含工具回执的用户消息。纯新轮的提醒随原问题提交。完整 CC 原生请求沿原输入合同。已登记等待工具的进程沿用其启动动作。
 - 普通原生输入的 `output_config.effort` 支持 `low`、`medium`、`high`、`max`，由 2.1.293 的 `--effort` 组装。模型出站前核对实际字段。等待和冷恢复沿用根轮冻结的强度。交互 `--json-schema` 的组件探针未生成 `output_config.format`，此字段沿现有输入合同处理。
+- 固定 2.1.293 对 `claude-sonnet-4-6` 和 `claude-opus-5-5` 原生支持客户端显式 `thinking={"type":"adaptive","display":"updates"}`。真实 CLI 正文在模型投递前须与原设置一致。回执从根轮冻结配置，改成 `omitted` 或改成平台会自动重写的 `disabled` 均返回 `422/unsupported_parameter`。其他显示形状及平台自动重写沿既有合同。用 `--adaptive-thinking-model` 指定上述模型，分别独立运行及搭配 `--recover-pending-tool`，核对两次模型实收的 thinking 对象和 `thinking-display-updates-2026-08-18` 功能头。
 - 工具声明由会话私有 HTTP MCP 返回。有工具的轮次等待 `tools/list` 应答写出后才提交 PTY 提示。公开调用块恢复原名，ID 与参数增量仍对应原模型事件。工具结果通过原进程的回执账本交付，接收方、历史、原调用和本轮生效设置均需匹配。
 - 声明客户端工具时接受显式 `tool_choice.type=auto`，`disable_parallel_tool_use` 可省略或显式为 false。固定 CLI 的默认自动选择与并行许可符合这一合同。事件源在模型派发前核对实际工具和选择语义，显式原参数随工具回执冻结。
 - 普通工具名中的连字符与下划线分别保留。固定 CLI 2.1.293 仅增加会话 MCP 前缀，嵌套 Schema 与参数沿原描述交付。重启后工具回执仍核对原名、ID 和完整参数。
