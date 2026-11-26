@@ -161,7 +161,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            toggle_pending_policy=False, tool_policy=None, recover_pending=False, output_effort=False,
            history_png=False, history_images=False, history_tool_blocks=False, previous=None, failure_boundaries=False,
            current_text_blocks=False, signed_tool_history=False, split_history_tools=False, v1_runtime=None,
-           parallel_tools=False, reconnect_tool_stream=False, current_images=False):
+           parallel_tools=False, reconnect_tool_stream=False, current_images=False, auto_tool_choice=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -182,6 +182,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param parallel_tools 是否验证同一步多个新工具的回执。
     @param reconnect_tool_stream 是否在真实续轮流中断开再接回。
     @param current_images 是否用本轮原生图文替换纯文本问题。
+    @param auto_tool_choice 是否核对显式自动选择和并行工具。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -466,6 +467,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         registered_tools = encoded(expected_ids).decode()
         body = {"model": MODEL, "max_tokens": 128, "stream": True, "messages": messages,
                 "tools": declared, "system": [{"type": "text", "text": part} for part in SYSTEM]}
+        if auto_tool_choice:
+            body["tool_choice"] = {"type": "auto", "disable_parallel_tool_use": False}
         if recover_pending:
             body["output_config"] = {"effort": "medium"}
         status, raw = call(18090, "POST", "/v1/messages", token, body, headers)
@@ -567,6 +570,10 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             changed = {**follow, "messages": [*messages[:-1], changed_image, *follow["messages"][-2:]]}
             changed_media, response = call(18090, "POST", "/v1/messages", token, changed, headers)
             assert changed_media == 422 and len(received) == 1, (changed_media, response, len(received))
+        if auto_tool_choice:
+            changed = {**follow, "tool_choice": {"type": "none"}}
+            changed_choice, response = call(18090, "POST", "/v1/messages", token, changed, headers)
+            assert changed_choice == 422 and len(received) == 1, (changed_choice, response, len(received))
         if signed_tool_history:
             tampered = {**SIGNED_THINKING, "signature": "Y2hhbmdlZA=="}
             changed = {**follow, "messages": [*messages, {"role": "assistant", "content": [tampered, *offered[1:]]}, result]}
@@ -677,6 +684,10 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 verify_current_image_row(native, current, require_alias=index == 0)
             proof.update(current_images=[block["source"]["media_type"] for block in current if block["type"] == "image"],
                          changed_current_images_status=changed_media)
+        if auto_tool_choice:
+            observed = [native.get("tool_choice") for _, native, _ in received]
+            assert all(choice in (None, {"type": "auto"}, body["tool_choice"]) for choice in observed)
+            proof.update(auto_tool_choice=observed, changed_tool_choice_status=changed_choice)
         if signed_tool_history:
             hydrated = find_blocks(received[1][1], "type", "thinking")
             assert hydrated == [("assistant", SIGNED_THINKING)], (
@@ -1295,6 +1306,7 @@ def main():
     parser.add_argument("--shared-state", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--current-text-blocks", action="store_true")
     parser.add_argument("--current-images", action="store_true")
+    parser.add_argument("--auto-tool-choice", action="store_true")
     parser.add_argument("--signed-tool-history", action="store_true")
     scenario = parser.add_mutually_exclusive_group()
     scenario.add_argument("--restart-history", action="store_true")
@@ -1339,7 +1351,8 @@ def main():
                        failure_boundaries=args.failure_boundaries, current_text_blocks=args.current_text_blocks,
                        signed_tool_history=args.signed_tool_history, split_history_tools=args.split_history_tools,
                        v1_runtime=args.v1_runtime, parallel_tools=args.parallel_new_tools,
-                       reconnect_tool_stream=args.reconnect_tool_stream, current_images=args.current_images)
+                       reconnect_tool_stream=args.reconnect_tool_stream, current_images=args.current_images,
+                       auto_tool_choice=args.auto_tool_choice)
         print(json.dumps(proof, ensure_ascii=False))
 
 

@@ -2561,6 +2561,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - V2 管理端可选择 `append`、`replace`、`user_reminder`。已核验发送器通过私有预留传递非默认动作。替换以启动文件承载系统正文，省略保留默认正文，显式空串或空数组仅保留身份和计费块。提醒保留默认系统正文，附到首条不含工具回执的用户消息。纯新轮的提醒随原问题提交。完整 CC 原生请求沿原输入合同。已登记等待工具的进程沿用其启动动作。
 - 普通原生输入的 `output_config.effort` 支持 `low`、`medium`、`high`、`max`，由 2.1.293 的 `--effort` 组装。模型出站前核对实际字段。等待和冷恢复沿用根轮冻结的强度。交互 `--json-schema` 的组件探针未生成 `output_config.format`，此字段沿现有输入合同处理。
 - 工具声明由会话私有 HTTP MCP 返回。有工具的轮次等待 `tools/list` 应答写出后才提交 PTY 提示。公开调用块恢复原名，ID 与参数增量仍对应原模型事件。工具结果通过原进程的回执账本交付，接收方、历史、原调用和本轮生效设置均需匹配。
+- 声明客户端工具时接受显式 `tool_choice.type=auto`，`disable_parallel_tool_use` 可省略或显式为 false。固定 CLI 的默认自动选择与并行许可符合这一合同。事件源在模型派发前核对实际工具和选择语义，显式原参数随工具回执冻结。
 - 普通工具名中的连字符与下划线分别保留。固定 CLI 2.1.293 仅增加会话 MCP 前缀，嵌套 Schema 与参数沿原描述交付。重启后工具回执仍核对原名、ID 和完整参数。
 - 原生等待进程丢失时，私有回执按同一修订核对根轮策略及正文摘要。新原生会话导入客户端已核对的工具结果，保留原 JSONL。由受管 PTY 使用 CLI 的继续提示启动模型步骤，原问题和已完成工具保持在历史中。旧工具回执仍以原表布局读取。
 - 活跃工具组的签名属于发送器实收的助手块。回传时核对原签名和工具参数。固定 CLI 2.1.293 对这组已闭合签名工具历史的冷恢复会在继续提示后裁掉签名。此形状准备阶段返回 422，保留原会话文件，模型零新增投递。
@@ -2600,6 +2601,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `verify_tui_cold_history.py --current-images` 核对本轮四种内嵌图像、前后文本与边界内纯图片请求的实际模型正文。交换图片顺序的回执返回 422。追加动作下单独核对超过像素、字节边界的原入口。与 `--recover-pending-tool` 一起核对冷恢复仍保留原图文、回执 ID 和原档案。隔离程序的目录描述符用例覆盖当前 HOME 读取及外部 HOME 拒绝。
 - `verify_tui_cold_history.py --history-tool-blocks` 核对已闭合的两个文本结果块、顺序及原 ID，并完成一次新工具回执。
 - `verify_tui_cold_history.py --parallel-new-tools` 从公开入口核对同一模型响应的两个工具。按调用 ID 解析参数增量并逆序回传成功和失败结果。缺少结果和重复 ID 均拒绝，合法回传沿原工具组完成。
+- `verify_tui_cold_history.py --auto-tool-choice --parallel-new-tools` 核对显式自动选择下的并行工具和改写拒绝。与 `--recover-pending-tool` 组合时核对原选择在丢进程后的续轮仍受保护。
 - `verify_tui_cold_history.py --split-history-tools` 核对分行的两对旧工具及结果、原顺序和单次新工具执行。
 - `verify_tui_cold_history.py --current-text-blocks` 核对本轮两个独立文本块的模型实收，合并边界的回执返回 422。与 `--recover-pending-tool` 组合时，另核对重启后原始文本块、记录和工具结果仍被保留。
 - `verify_tui_cold_history.py --signed-tool-history` 由隔离模型发出真实 SSE 签名事件，验证同一活跃工具轮的原块实收和改签名拒绝。与 `--recover-pending-tool` 组合时，核对当前固定版的冷恢复拒绝和零新增投递。

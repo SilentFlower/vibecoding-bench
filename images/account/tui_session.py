@@ -927,11 +927,15 @@ class _Actor:
                 if handle.kind == "new" and self.agent_offer is not None:
                     self.agent_offer.messages.clear()
                     self.agent_messages.clear()
-                if self.cold_history is not None and self.cold_history.effort is not None:
-                    output = native.get("output_config")
-                    if not isinstance(output, dict) or output.get("effort") != self.cold_history.effort:
+                if self.cold_history is not None:
+                    if self.cold_history.effort is not None:
+                        output = native.get("output_config")
+                        if not isinstance(output, dict) or output.get("effort") != self.cold_history.effort:
+                            raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
+                                "code": "unsupported_parameter", "message": "CLI 当前模型未生成请求的推理强度"}}))
+                    if not self.cold_history.matches_tool_choice(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
-                            "code": "unsupported_parameter", "message": "CLI 当前模型未生成请求的推理强度"}}))
+                            "code": "unsupported_parameter", "message": "CLI 未保留请求的自动工具选择"}}))
                 if handle.kind == "recovered" and not self.driver.checkpoints.submit(
                     self.identity, self.receipt_revision, handle.request_digest, True
                 ):

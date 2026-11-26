@@ -448,6 +448,21 @@ class ColdHistoryTests(TestCase):
         for output in ({"effort": "unknown"}, {"format": {"type": "json_schema", "schema": {}}}):
             self.assertIsNone(ColdHistory.from_request({**self.body, "output_config": output}))
 
+    def test_explicit_auto_tool_choice_preserves_parallel_permission(self):
+        """自动选择进入原生合同并随原工具组冻结。@return 无。"""
+        choice = {"type": "auto", "disable_parallel_tool_use": False}
+        plan = ColdHistory.from_request({**self.body, "tool_choice": choice})
+        native = {"tools": list(plan.tools.values())}
+        self.assertTrue(plan.matches_tool_choice(native))
+        self.assertTrue(plan.matches_tool_choice({**native, "tool_choice": choice}))
+        self.assertFalse(plan.matches_tool_choice({"tools": []}))
+        self.assertNotEqual(plan.receipt_boundary(), ColdHistory.from_request(self.body).receipt_boundary())
+        for other in ({"type": "none"}, {"type": "tool", "name": "LookupNote"},
+                      {**choice, "disable_parallel_tool_use": True}, {**choice, "disable_parallel_tool_use": 0}):
+            with self.subTest(other=other):
+                self.assertFalse(plan.matches_tool_choice({**native, "tool_choice": other}))
+                self.assertIsNone(ColdHistory.from_request({**self.body, "tool_choice": other}))
+
     def test_only_matching_inline_image_enters_native_input(self):
         """历史和本轮的内嵌图像须匹配声明格式。@return 无。"""
         picture = {"type": "image", "source": {"type": "base64", "media_type": "image/png",

@@ -112,6 +112,12 @@ def _text_result_blocks(content):
     )
 
 
+def _automatic_tools(choice):
+    return (isinstance(choice, dict) and choice.get("type") == "auto"
+            and choice.keys() <= {"type", "disable_parallel_tool_use"}
+            and choice.get("disable_parallel_tool_use", False) is False)
+
+
 def _closed_history(rows, *, result_types=(str,)):
     pending, seen, results = set(), set(), set()
     for index, row in enumerate(rows):
@@ -158,6 +164,7 @@ class ColdHistory:
     system_policy: str
     effort: str | None = None
     current_blocks: tuple[dict, ...] = ()
+    tool_choice: dict | None = None
 
     @classmethod
     def from_request(cls, body, system_policy="append"):
@@ -165,7 +172,8 @@ class ColdHistory:
         @param body 已校验的请求。@param system_policy 本轮冻结的账号系统指令动作。
         @return 原生输入计划或空。
         """
-        if body.keys() - {"model", "max_tokens", "thinking", "system", "messages", "tools", "stream", "output_config"}:
+        if body.keys() - {"model", "max_tokens", "thinking", "system", "messages", "tools", "stream", "output_config",
+                          "tool_choice"}:
             return None
         if type(body.get("max_tokens")) is not int or body["max_tokens"] <= 0:
             return None
@@ -184,6 +192,9 @@ class ColdHistory:
         if not content or not all(_plain_text(block) or _inline_image(block, for_paste=True) for block in content):
             return None
         declared = body.get("tools", [])
+        choice = body.get("tool_choice")
+        if "tool_choice" in body and (not declared or not _automatic_tools(choice)):
+            return None
         for tool in declared:
             if (tool.keys() - {"name", "input_schema", "description"}
                     or not re.fullmatch(r"[A-Za-z0-9_-]+", tool["name"])
@@ -200,7 +211,7 @@ class ColdHistory:
         tools = {MCP_PREFIX + tool["name"]: tool for tool in declared}
         return cls(history, body["model"], content[0].get("text", ""), system, tools, body["max_tokens"],
                    body.get("thinking"), system_policy, output.get("effort"),
-                   tuple(content) if len(content) > 1 or content[0]["type"] == "image" else ())
+                   tuple(content) if len(content) > 1 or content[0]["type"] == "image" else (), choice)
 
     def system_argument(self):
         """选择原生 CLI 提示词文件选项。@return 参数和文件正文，或缺省值。"""
@@ -228,7 +239,17 @@ class ColdHistory:
     def _scope(self):
         scope = (self.model, self.system_policy, self.system, self.tools, self.max_tokens, self.thinking)
         # 缺省沿用既有工作区和等待回执的摘要。
-        return scope if self.effort is None else (*scope, self.effort)
+        if self.effort is not None:
+            scope = (*scope, self.effort)
+        return scope if self.tool_choice is None else (*scope, self.tool_choice)
+
+    def matches_tool_choice(self, native):
+        """核对显式自动工具选择及并行许可。@param native CLI 已生成的请求。@return 是否维持原选择。"""
+        # 有工具声明时，Messages 省略 tool_choice 表示 auto 并允许并行调用。
+        if self.tool_choice is None:
+            return True
+        tools = native.get("tools")
+        return isinstance(tools, list) and bool(tools) and _automatic_tools(native.get("tool_choice", {"type": "auto"}))
 
     def receipt_boundary(self):
         """冻结必须随原工具回执复用的根轮输入。@return 不含客户原文的边界。"""
