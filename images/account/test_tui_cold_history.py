@@ -4,14 +4,16 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
 from copy import deepcopy
 import json
+from os import close, openpty
 from pathlib import Path
+from sys import executable
 from tempfile import TemporaryDirectory
 from threading import Barrier
 from unittest import TestCase
 from uuid import uuid4
 
 from tui_cold_history import IMPORT_BOUNDARY, ColdHistory
-from tui_workspace_launch import _resume_path
+from tui_workspace_launch import _key, _project_history_dir, _resume_path, launch_workspace_cli
 
 
 class ColdHistoryTests(TestCase):
@@ -62,6 +64,85 @@ class ColdHistoryTests(TestCase):
                     content = [{"type": "text", "text": content}]
                 expected.append({"role": row["role"], "content": content})
             self.assertEqual([row["message"] for row in rows], expected)
+
+    def test_same_binding_reopens_through_real_pty_launcher(self):
+        """以独立 PTY 子进程核对重复导入、显式恢复、自动恢复及分叉启动。@return 无。"""
+        scope = (3, "测试环境", 8)
+        account, environment, principal = scope
+        session, native_id = "测试会话", str(uuid4())
+        key = _key((scope, session))
+        plan = ColdHistory.from_request(self.body)
+        with TemporaryDirectory() as directory:
+            storage = Path(directory)
+            base = storage / "tui-workspaces"
+            base.mkdir(mode=0o700)
+            work = base / _key((scope, "session", session))
+            work.mkdir(mode=0o700)
+            binding = base / (key + ".json")
+            binding.write_text(json.dumps({"session_key": key, "client_path": None, "native_session_id": native_id}))
+            binding.chmod(0o600)
+            config = storage / "config"
+            config.mkdir(mode=0o700)
+            project = _project_history_dir(config, work)
+            history = project / (native_id + ".jsonl")
+            workspace = {"version": 1, "work_dir": str(work), "binding_file": str(binding), "native_session_id": native_id}
+            # 终端子进程只记录真实启动参数，保留历史在 CLI 提交当前问题前的状态。
+            probe = (
+                "import json, os, sys\n"
+                "from pathlib import Path\n"
+                "assert os.isatty(0)\n"
+                "Path(sys.argv[1]).write_text(json.dumps([os.getcwd(), *sys.argv[2:]]))\n"
+            )
+
+            def start(prepare=None, *, resume=None):
+                reservation_id = str(uuid4())
+                reservation = {"account_id": account, "environment_id": environment, "principal_id": principal,
+                               "session_id": session, "reservation_id": reservation_id}
+                command = {"action": "send", "reservation_id": reservation_id, "workspace": workspace}
+                output = storage / reservation_id
+                master, slave = openpty()
+                try:
+                    child = launch_workspace_cli(
+                        reservation, command, program=Path(executable), arguments=["-I", "-c", probe, str(output)],
+                        config_dir=config, environment={}, resume=resume, terminal_fd=slave, storage=storage,
+                        prepare_history=prepare,
+                    )
+                    try:
+                        self.assertEqual(child.wait(timeout=5), 0)
+                    finally:
+                        if child.poll() is None:
+                            child.kill()
+                            child.wait()
+                finally:
+                    close(slave)
+                    close(master)
+                cwd, *argv = json.loads(output.read_text())
+                self.assertEqual(cwd, str(work))
+                return argv
+
+            expected = ["--resume", str(history)]
+            self.assertEqual(start(plan.import_session), expected)
+            snapshot = history.read_bytes()
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                retries = [pool.submit(start, plan.import_session) for _ in range(4)]
+                self.assertEqual([retry.result() for retry in retries], [expected] * 4)
+            self.assertEqual(start(resume=True), expected)
+            self.assertEqual(start(), expected)
+            self.assertEqual(list(project.iterdir()), [history])
+
+            changed = deepcopy(self.body)
+            changed["messages"][0]["content"] = "不同的确认边界"
+            fork_plan = ColdHistory.from_request(changed)
+            flag, path = start(fork_plan.import_session)
+            self.assertEqual(flag, "--resume")
+            fork = Path(path)
+            self.assertNotEqual(fork, history)
+            fork_snapshot = fork.read_bytes()
+            self.assertEqual(start(fork_plan.import_session), [flag, path])
+            self.assertEqual(start(), expected)
+            self.assertEqual(set(project.iterdir()), {history, fork})
+            self.assertEqual(history.read_bytes(), snapshot)
+            self.assertEqual(fork.read_bytes(), fork_snapshot)
 
     def test_reuses_previous_import_format_without_rewriting(self):
         """旧版文件沿原条件读回，新模型请求另建只含历史事实的分支。@return 无。"""
