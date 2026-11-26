@@ -1148,10 +1148,15 @@ class _Actor:
                 return
 
 
-def _receipt_request(body, reservation):
+def _receipt_request(body, reservation, *, cache_ttl=None):
     # 只绑定实际支持的生成参数和返回表示，连接 ID 与预留期限可随重试变化。
-    return digest([body, dict(reservation.get("model_headers") or {}),
-                   reservation.get("body_policy"), reservation.get("input_format")])
+    policy = reservation.get("body_policy")
+    if cache_ttl is not None and cache_ttl != (policy["ttl"] if policy else "off"):
+        # 原生续轮沿根轮的 TTL。网关省略默认策略，摘要也要沿用这种旧表示。
+        policy = {**(policy or {"sub2api": False, "adaptive": False}), "ttl": cache_ttl}
+        if cache_ttl == "off" and not policy["sub2api"] and not policy["adaptive"]:
+            policy = None
+    return digest([body, dict(reservation.get("model_headers") or {}), policy, reservation.get("input_format")])
 
 
 class _Reserved:
@@ -1578,12 +1583,19 @@ class SessionDriver:
                 for row in messages[offered + 1:]
             )
             request = _receipt_request(body, reservation)
+            active_request, active_ttl = request, native_cache_ttl
             with self.lock:
                 while (actor := self.sessions.get(actor_key)) is not None:
                     with actor.changed:
+                        root = actor.cold_history
+                        frozen_ttl = root.cache_ttl if root is not None else native_cache_ttl
+                        if frozen_ttl != active_ttl:
+                            active_ttl = frozen_ttl
+                            active_request = (request if active_ttl == native_cache_ttl
+                                              else _receipt_request(body, reservation, cache_ttl=active_ttl))
                         prior = actor.claim
                         retiring = actor.dead.is_set() or (prior is not None and prior.sent
-                                                           and prior.request_digest == request)
+                                                           and prior.request_digest == active_request)
                     if not retiring:
                         break
                     # 原网关退出时，发送器可能正在释放同一请求。只等待该步骤的监护线程。
@@ -1596,7 +1608,7 @@ class SessionDriver:
                     branch, previous, expected, prior_request, revision, native_checkpoint = checkpoint
                     answers = tool_receipts(messages, previous, expected,
                                             input_format=reservation.get("input_format"), checkpoint=True)
-                    if prior_request is not None and prior_request != request:
+                    if native_checkpoint is None and prior_request is not None and prior_request != request:
                         raise ValueError("已提交的工具结果或模型参数与重试不符")
             if actor is not None:
                 with actor.changed:
@@ -1626,14 +1638,14 @@ class SessionDriver:
                         stream,
                         frozen,
                         reservation,
-                        request,
+                        active_request,
                     )
                     if actor.cold_history is not None:
                         prompt_index = len(actor.cold_history.history) + 1
                         # 继续使用原进程的生效设置，校验通过后才把回执交给等待工具。
                         plan = ColdHistory.from_request(
                             {**body, "messages": messages[:prompt_index]}, actor.cold_history.system_policy,
-                            cache_ttl=native_cache_ttl,
+                            cache_ttl=actor.cold_history.cache_ttl,
                         )
                         if not native_cache_policy or plan != actor.cold_history or not tool_results_only:
                             raise InputRejection("unsupported_parameter")
@@ -1648,12 +1660,12 @@ class SessionDriver:
         if native_checkpoint is not None:
             if not native_history_allowed or not tool_results_only:
                 raise InputRejection("unsupported_parameter")
-            cold = ColdHistory.from_request(
-                {**body, "messages": messages[:native_checkpoint["prompt_index"]]}, native_checkpoint["system_policy"],
-                cache_ttl=native_cache_ttl,
-            )
-            if cold is None or cold.receipt_boundary() != native_checkpoint:
+            cold = ColdHistory.from_receipt_boundary(body, native_checkpoint)
+            if cold is None:
                 raise InputRejection("unsupported_parameter")
+            request = _receipt_request(body, reservation, cache_ttl=cold.cache_ttl)
+            if prior_request is not None and prior_request != request:
+                raise ValueError("已提交的工具结果或模型参数与重试不符")
             recovery_history = cold.resume_receipts(messages)
             if recovery_history is None:
                 raise InputRejection("unsupported_parameter")

@@ -615,6 +615,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                       (registered_tools, "!" + registered_tools)).fetchall()
             # 公开拒绝完成时，正确回执已经可以重新认领，查询不等待后台归还。
             assert stored == [(registered_tools,)], stored
+        if history_cache_ttl:
+            manage("PUT", "settings", {"cache_control_ttl_rewrite": "off"})
+            assert manage("GET", "settings")["cache_control_ttl_rewrite"] == "off"
         if recover_pending:
             marker = ("--name=" + headers["x-session-id"]).encode()
             original, = [int(path.parent.name) for path in Path("/proc").glob("[0-9]*/cmdline")
@@ -660,15 +663,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 manage, token, changed, headers, received, "changed_history_cache", expected_status=422,
             )
             assert len(received) == 1
-            if history_cache_ttl:
-                try:
-                    manage("PUT", "settings", {"cache_control_ttl_rewrite": "off"})
-                    changed_ttl_policy, _, _ = checked_messages(
-                        manage, token, follow, headers, received, "changed_history_ttl_policy", expected_status=422,
-                    )
-                finally:
-                    manage("PUT", "settings", {"cache_control_ttl_rewrite": history_cache_ttl})
-            else:
+            if not history_cache_ttl:
                 changed_nested = deepcopy(follow)
                 ((_, old_tool_result),) = find_blocks(changed_nested, "tool_use_id", PAST_ID)
                 old_tool_result["content"][1].pop("cache_control")
@@ -857,15 +852,16 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             proof["historical_tool_result_blocks"] = len(old_result)
         if history_cache_markers:
             observed = [observed_cache_breakpoints(model) for _, model, _ in received]
-            expected = [(i, 0, role, row["content"][0])
-                        for i, ((role, _), row) in enumerate(zip(HISTORY[:2], messages[:2], strict=True))]
+            original_markers = [(i, 0, row["role"], row["content"][0]) for i, row in enumerate(messages[:2])]
+            expected = original_markers
             if history_cache_ttl:
                 expected = [(i, offset, role, {**block, "cache_control": {"type": "ephemeral", "ttl": history_cache_ttl}})
                             for i, offset, role, block in expected]
             assert observed == [expected, expected], observed
             proof.update(history_cache_markers=observed, changed_history_cache_status=changed_cache)
             if history_cache_ttl:
-                proof.update(history_cache_ttl=history_cache_ttl, changed_history_ttl_policy_status=changed_ttl_policy)
+                proof.update(history_cache_ttl=history_cache_ttl, active_platform_ttl="off",
+                             receipt_after_policy_change_status=status)
             else:
                 proof.update(nested_history_cache_markers=[find_blocks(model, "tool_use_id", PAST_ID)
                                                            for _, model, _ in received],
@@ -1024,6 +1020,19 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                 "preserved_bytes": [len(data) for data in snapshots.values()],
                                 "additional_model_posts": 2,
                                 "attempts": verify_captures(manage, received[-2:], account_token)}
+        if history_cache_ttl:
+            # 同一公开会话确认同一前缀后开启新轮，只有新轮应用管理端的 off。
+            fresh = {**body, "stream": False, "messages": [*messages[:-1], {"role": "user", "content": AFTER_RESTART}]}
+            fresh_status, reply, fresh_request = checked_messages(
+                manage, token, fresh, headers, received, "new_round_after_ttl_change", trace_startup=trace_startup,
+            )
+            assert json.loads(reply)["content"] == [{"type": "text", "text": FINAL}] and len(received) == 3
+            markers = observed_cache_breakpoints(received[-1][1])
+            assert markers == original_markers, markers
+            (capture,) = verify_captures(manage, received[-1:], account_token)
+            assert capture["request_id"] == fresh_request and (not recover_pending or original_file.read_bytes() == original_history)
+            proof["new_round_after_ttl_change"] = {"http_status": fresh_status, "same_session": True,
+                                                    "model_posts": 1, "markers": markers, "attempt": capture}
         return proof
 
 

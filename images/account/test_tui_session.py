@@ -18,7 +18,7 @@ from unittest.mock import Mock, patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/orchestrator"))
 from tui_capacity import TuiCapacity
 from tui_reconnect import ReceiptCheckpoints
-from tui_session import SessionDriver, _install_mod
+from tui_session import SessionDriver, _install_mod, _receipt_request
 from tui_messages import (
     ModelResponseError,
     SubagentAmbiguousError,
@@ -36,6 +36,17 @@ from tui_messages import (
 
 class SessionTests(unittest.TestCase):
     """固定版结构化事件和账号内原生进程预留的回归。"""
+
+    def test_receipt_digest_uses_the_frozen_ttl_and_preserves_old_default(self):
+        """原生重交只沿根轮归一 TTL，兼容旧存储的摘要。@return 无。"""
+        body = self._body()
+        default = self._identity("frozen-ttl")
+        forced = {**default, "body_policy": {"sub2api": False, "ttl": "5m", "adaptive": False}}
+        self.assertEqual(_receipt_request(body, default, cache_ttl="5m"), _receipt_request(body, forced))
+        self.assertEqual(_receipt_request(body, forced, cache_ttl="off"), _receipt_request(body, default))
+        self.assertNotEqual(_receipt_request(body, forced), _receipt_request(body, default))
+        changed = {**forced, "body_policy": {**forced["body_policy"], "adaptive": True}}
+        self.assertNotEqual(_receipt_request(body, changed, cache_ttl="off"), _receipt_request(body, default))
 
     def test_protocol_headers_use_current_sdk_and_reject_unsupported_beta(self):
         """普通 API 校验同轮原生能力，协议值按准入结果覆盖默认值。@return 无。"""

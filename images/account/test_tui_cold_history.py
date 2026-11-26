@@ -391,6 +391,11 @@ class ColdHistoryTests(TestCase):
         self.assertNotEqual(plan.receipt_boundary(), ColdHistory.from_request(body).receipt_boundary())
         self.assertNotEqual(plan.receipt_boundary(), ColdHistory.from_request(forced, cache_ttl="5m").receipt_boundary())
         self.assertIsNone(ColdHistory.from_request(self.body, cache_ttl="5m"))
+        for ttl in ("off", "5m", "1h"):
+            signed = ColdHistory.from_request(body, cache_ttl=ttl)
+            boundary = signed.receipt_boundary()
+            self.assertEqual(ColdHistory.from_receipt_boundary(body, boundary), signed)
+            self.assertIsNone(ColdHistory.from_receipt_boundary(forced, boundary))
 
         with TemporaryDirectory() as directory, ExitStack() as stack:
             config, work, native_id = Path(directory), Path("/native/workspace"), str(uuid4())

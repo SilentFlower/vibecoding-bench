@@ -298,6 +298,17 @@ class ColdHistory:
             "digest": digest([self._scope(), self.history, current]),
         }
 
+    @classmethod
+    def from_receipt_boundary(cls, body, boundary):
+        """从持久摘要恢复已冻结的根轮。@param body 回执原始输入。@param boundary 原生根轮边界。@return 已匹配计划或空。"""
+        root = {**body, "messages": body["messages"][:boundary["prompt_index"]]}
+        # TTL 已参与旧摘要。按私有协议的三个取值核对原始输入，持久格式继续兼容已有回执。
+        for ttl in ("off", "5m", "1h"):
+            plan = cls.from_request(root, boundary["system_policy"], cache_ttl=ttl)
+            if plan is not None and plan.receipt_boundary() == boundary:
+                return plan
+        return None
+
     def resume_receipts(self, messages):
         """将已认领的原生工具组纳入恢复历史。
         @param messages 已核对原历史、调用和回执的完整公开消息。@return 本次原生恢复计划。
