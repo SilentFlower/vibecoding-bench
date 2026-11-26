@@ -101,6 +101,7 @@ pub(super) const TUI_WORKSPACE_BIND: &str = "tui_workspace_bind";
 pub(super) const TUI_JSON_PROJECTION_V1: &str = "gateway-json-v1";
 pub(super) const TUI_SSE_PROJECTION_HEADER: &str = "x-v3-tui-sse-projection";
 pub(super) const TUI_SSE_PROJECTION_V1: &str = "gateway-sse-v1";
+const TUI_LEDGER_REPLY_WINDOW: Duration = Duration::from_millis(250);
 
 /// 限制私有 V2 帧的 Bearer 令牌格式。@param token 账号凭据。@return 是否可安全编码。
 pub(super) fn valid_tui_account_token(token: &str) -> bool {
@@ -1474,6 +1475,7 @@ pub(super) struct TuiReservation {
     client: Client,
     binding: TransportBinding,
     identity_header: String,
+    admission_deadline: Instant,
     pub(super) attempt_id: String,
     pub(super) capture_state: Option<&'static str>,
     pub(super) wire_capture: bool,
@@ -1586,15 +1588,15 @@ impl TuiReservation {
         mut self,
         ttfb_timeout: Duration,
     ) -> Result<reqwest::Response, AppError> {
-        self.submit_with_account_credentials(ttfb_timeout, None)
+        self.submit_with_account_credentials(Instant::now() + ttfb_timeout, None)
             .await
     }
 
     /// 提交原预留，按原来源协商的凭据协议发放本轮凭据。
-    /// @param ttfb_timeout 回包头期限。@param credentials 敏感私有凭据头。@return 原 sender 响应。
+    /// @param ttfb_deadline 回包头截止。@param credentials 敏感私有凭据头。@return 原 sender 响应。
     pub(super) async fn submit_with_account_credentials(
         &mut self,
-        ttfb_timeout: Duration,
+        ttfb_deadline: Instant,
         credentials: Option<HeaderValue>,
     ) -> Result<reqwest::Response, AppError> {
         if self.managed_oauth != credentials.is_some() {
@@ -1632,10 +1634,29 @@ impl TuiReservation {
         } else {
             request.body(reqwest::Body::wrap_stream(empty::<Result<Bytes, IoError>>()))
         };
-        let response = timeout(ttfb_timeout, request.send())
+        // 等账本锁与网关准入共用截止。仅给明确的发送前拒绝留出私有回包时间。
+        let reply_deadline = if self.continuation && ttfb_deadline == self.admission_deadline {
+            ttfb_deadline + TUI_LEDGER_REPLY_WINDOW
+        } else {
+            ttfb_deadline
+        };
+        let response = timeout_at(reply_deadline, request.send())
             .await
             .map_err(|_| unknown())?
             .map_err(|_| unknown())?;
+        // 定时器与响应可能同时就绪，须按实际观察时间核对迟到的私有回包。
+        let observed = Instant::now();
+        if observed >= reply_deadline
+            || (observed >= ttfb_deadline
+                && (response.status() != StatusCode::TOO_MANY_REQUESTS
+                    || !tui_projection_marker(
+                        response.headers(),
+                        TUI_ERROR_SOURCE,
+                        TUI_SUBMISSION_LEDGER,
+                    )))
+        {
+            return Err(unknown());
+        }
         self.repair_pending = self.signature_repair
             && response.status() == StatusCode::BAD_REQUEST
             && tui_projection_marker(response.headers(), TUI_SIGNATURE_REPAIR, "pending");
@@ -2060,6 +2081,7 @@ pub(super) async fn prepare_tui(
         client,
         binding,
         identity_header,
+        admission_deadline: deadline,
         attempt_id,
         agent_header_used: agent_hint.is_some(),
         capture_state: None,
@@ -4561,7 +4583,7 @@ mod tests {
     async fn tui_reservation_sends_once_and_only_cancels_before_submission() {
         use axum::body::to_bytes;
         use futures_util::stream::once;
-        use tokio::sync::{Notify, mpsc};
+        use tokio::sync::{Notify, mpsc, oneshot};
         use tokio::time::sleep_until;
 
         let (observations, mut events) = mpsc::unbounded_channel();
@@ -4580,11 +4602,13 @@ mod tests {
         let (sends, mut sent) = mpsc::unbounded_channel();
         let release_body = Arc::new(Notify::new());
         let sender_barrier = release_body.clone();
+        let (late_replies, mut late_reply) = mpsc::unbounded_channel();
         let app = app.route(
             "/internal/tui-v2/send",
             post(move |headers: HeaderMap| {
                 let sends = sends.clone();
                 let sender_barrier = sender_barrier.clone();
+                let late_replies = late_replies.clone();
                 async move {
                     assert!(tui_delegates_json(&headers));
                     let reservation = headers["x-v3-tui-reservation"].to_str().unwrap().to_owned();
@@ -4606,6 +4630,27 @@ mod tests {
                     }
                     if reservation == "unknown" {
                         tokio::time::sleep(Duration::from_secs(1)).await;
+                    }
+                    if reservation.starts_with("late-") {
+                        let (release, ready) = oneshot::channel();
+                        late_replies.send(release).unwrap();
+                        let _ = ready.await;
+                        if reservation == "late-model" {
+                            return StatusCode::OK.into_response();
+                        }
+                        let stage = if reservation == "late-provider" {
+                            "local_provider_http"
+                        } else {
+                            TUI_SUBMISSION_LEDGER
+                        };
+                        let mut response = (
+                            StatusCode::TOO_MANY_REQUESTS,
+                            [(TUI_ERROR_SOURCE, stage), (RETRY_AFTER.as_str(), "1")],
+                        ).into_response();
+                        if reservation == "late-duplicate-ledger" {
+                            response.headers_mut().append(TUI_ERROR_SOURCE, HeaderValue::from_static(stage));
+                        }
+                        return response;
                     }
                     if reservation == "delegated429" {
                         return (
@@ -4657,6 +4702,7 @@ mod tests {
                 release_id: "synthetic".into(),
             },
             identity_header: id.into(),
+            admission_deadline: Instant::now() + Duration::from_secs(5),
             attempt_id: id.into(),
             agent_header_used: false,
             capture_state: None,
@@ -4687,7 +4733,7 @@ mod tests {
         let mut legacy_relay = reservation("legacy-relay");
         legacy_relay.signature_repair = true;
         let first = legacy_relay
-            .submit_with_account_credentials(Duration::from_secs(2), None)
+            .submit_with_account_credentials(Instant::now() + Duration::from_secs(2), None)
             .await
             .unwrap();
         assert_eq!(first.status(), StatusCode::BAD_REQUEST);
@@ -4768,11 +4814,56 @@ mod tests {
         );
         assert_eq!(body["usage"]["cache_read_input_tokens"], 4210);
         assert_eq!(sent.recv().await.unwrap(), "delegated");
-        let failed = reservation("unknown")
-            .submit(Duration::from_millis(500))
+        for (id, shared, continuation, expected_rejection) in [
+            ("late-ledger", true, true, true),
+            ("late-provider", true, true, false),
+            ("late-model", true, true, false),
+            ("late-duplicate-ledger", true, true, false),
+            ("late-ledger", false, true, false),
+            ("late-ledger", true, false, false),
+        ] {
+            let mut prepared = reservation(id);
+            prepared.continuation = continuation;
+            let deadline = Instant::now() + Duration::from_millis(150);
+            if shared {
+                prepared.admission_deadline = deadline;
+            }
+            let (result, ()) = tokio::join!(
+                prepared.submit_with_account_credentials(deadline, None),
+                async {
+                    assert_eq!(sent.recv().await.unwrap(), id);
+                    let release = late_reply.recv().await.unwrap();
+                    sleep_until(deadline + Duration::from_millis(25)).await;
+                    let _ = release.send(());
+                }
+            );
+            if expected_rejection {
+                let response = result.unwrap();
+                assert_eq!(
+                    tui_failure_stage(response.headers(), &[TUI_SUBMISSION_LEDGER]),
+                    Some(TUI_SUBMISSION_LEDGER)
+                );
+                let public = tui_public_response(response, None).await.unwrap();
+                assert_eq!(public.status(), StatusCode::TOO_MANY_REQUESTS);
+                assert_eq!(public.headers()[RETRY_AFTER], "1");
+                assert!(!public.headers().contains_key(TUI_ERROR_SOURCE));
+            } else {
+                assert!(
+                    matches!(result, Err(AppError::BadGateway(_))),
+                    "{id} 共用截止={shared} 原工具回执={continuation}"
+                );
+            }
+        }
+        let mut unknown = reservation("unknown");
+        let deadline = Instant::now() + Duration::from_millis(500);
+        unknown.continuation = true;
+        unknown.admission_deadline = deadline;
+        let failed = unknown
+            .submit_with_account_credentials(deadline, None)
             .await;
         assert!(matches!(failed, Err(AppError::BadGateway(_))));
         assert_eq!(sent.recv().await.unwrap(), "unknown");
+        drop(unknown);
         assert!(
             timeout(Duration::from_millis(100), events.recv())
                 .await

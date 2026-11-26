@@ -2597,6 +2597,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `verify_tui_cold_history.py --recover-pending-tool` 结束唯一等待中的真实 CLI 并重启其账号发送器。修改账号动作和客户端指令后，原回执仅继续其冻结策略，恢复模型步骤的正文来自真实 CLI。
 - 公开首轮和原工具回执的意外状态或断连先写出 HTTP 状态、请求 ID、夹具阶段与隔离模型收件，再在网关退出前读取对应请求的诊断阶段及所属尝试。无响应头时只列同一合成会话和本次时间窗口内的候选。失败证据输出到 stderr，原失败仍使验收退出。
 - 发送器在向本机事件源发出 `send` 之前同步写入提交账本。账本终态写入沿原预留的单调截止等待文件锁。发送前账本拒绝的私有回包标为 `tui_submission_ledger`，网关记录同名诊断阶段并归还原工具回执。将 `--recovery-ledger-contention` 与 `--recover-pending-tool` 同用，核对持锁两秒后合法回执完成、模型总收件两次、原归档保留。
+- 原工具回执的私有发送首包等待与准入共用截止时，网关在原截止后最多再观察 250 毫秒，只接纳同一已鉴权请求中带单值 `tui_submission_ledger` 标记的 429。提交截止和原预留保持不变。缺少明确拒绝时仍按提交状态未知处理。将 `--recovery-ledger-deadline` 与 `--recover-pending-tool` 同用，核对 3 秒预算持锁到回包的 429、账本阶段、零次模型尝试以及释锁后原回执单次续轮。
 - 网关在根诊断的 `context.tui_reservation_id` 关联 sender 预留。已鉴权私有响应的固定阶段区分准备阶段的账本读取、源绑定及准备交换，以及提交阶段的预留认领、账本终态和工作区绑定。阶段标记限于单值白名单。工作区绑定在 Unix `send` 之前明确拒绝时归还原回执。将 `--recovery-workspace-rejection` 与 `--recover-pending-tool` 同用，核对 `tui_workspace_bind`、零 attempt、原回执可重新认领以及恢复绑定后仅向模型投递一次续轮。
 - 首次创建工作区绑定仍在锁内原子发布。续轮只读已发布的绑定及工作目录，读取时核对原主体、会话键、UUID 和私有权限。测试在持有提交账本锁时读回既有绑定，同时核对跨主体拒绝及原文件字节。
 - 就绪和准备的无锁账本读取若碰到原子替换后已脱离目录的旧文件描述符，沿原调用截止重新打开当前路径。属主、0600、唯一链接及账号环境仍须匹配。写入终态继续在锁内重读。就绪探测按 `tui_readiness_config`、`tui_readiness_ledger`、`tui_readiness_source` 区分配置、账本和本机源失败，准备账本失败仍标记 `tui_prepare_ledger`。

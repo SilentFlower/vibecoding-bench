@@ -2988,8 +2988,10 @@ impl GatewayService {
                         prepared.continuation,
                     )
                     .await?;
-                let ttfb_timeout = request.remaining()?.min(UPSTREAM_TTFB_TIMEOUT);
-                let repair_deadline = TokioInstant::now() + ttfb_timeout;
+                request.check_deadline()?;
+                let ttfb_deadline = request
+                    .deadline()
+                    .min(TokioInstant::now() + UPSTREAM_TTFB_TIMEOUT);
                 let started = std::time::Instant::now();
                 let usage_started_at = Utc::now();
                 let delivery = if let (Some(writer), Some(turn)) = (&reconnect, &mut turn) {
@@ -3024,7 +3026,7 @@ impl GatewayService {
                     trace.commit_native(started);
                 }
                 let response = prepared
-                    .submit_with_account_credentials(ttfb_timeout, credentials)
+                    .submit_with_account_credentials(ttfb_deadline, credentials)
                     .await
                     .inspect_err(|_| {
                         diagnostics::error_stage("tui_send_http");
@@ -3107,7 +3109,7 @@ impl GatewayService {
                         .await
                         .map_err(|_| AppError::BadGateway("V2 签名拒绝响应无效".into()))?;
                     response = Response::from_parts(parts, Body::from(rejection));
-                    let admission = timeout_at(repair_deadline, async {
+                    let admission = timeout_at(ttfb_deadline, async {
                         let permit = request.admit(&account).await?;
                         let configuration = route
                             .allow_submit(
@@ -3127,7 +3129,7 @@ impl GatewayService {
                     .await;
                     if let Ok(Ok(Some((permit, configuration)))) = admission
                         && let Some(remaining) =
-                            repair_deadline.checked_duration_since(TokioInstant::now())
+                            ttfb_deadline.checked_duration_since(TokioInstant::now())
                         && !remaining.is_zero()
                     {
                         let retry_id = Uuid::new_v4();

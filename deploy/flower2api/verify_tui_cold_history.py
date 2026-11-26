@@ -164,7 +164,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            history_png=False, history_images=False, history_tool_blocks=False, previous=None, failure_boundaries=False,
            current_text_blocks=False, signed_tool_history=False, split_history_tools=False, v1_runtime=None,
            parallel_tools=False, reconnect_tool_stream=False, current_images=False, auto_tool_choice=False,
-           recovery_ledger_contention=False, recovery_workspace_rejection=False):
+           recovery_ledger_contention=False, recovery_ledger_deadline=False, recovery_workspace_rejection=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -187,6 +187,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param current_images 是否用本轮原生图文替换纯文本问题。
     @param auto_tool_choice 是否核对显式自动选择和并行工具。
     @param recovery_ledger_contention 是否在提交原回执时短暂占用账号账本锁。
+    @param recovery_ledger_deadline 是否持续持锁直至回执触发准入截止，然后重交。
     @param recovery_workspace_rejection 是否核对工作区绑定拒绝及原回执再次认领。
     @return 脱敏证据。
     """
@@ -599,6 +600,35 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             release_lock = Timer(2, lock.close)
             stack.callback(release_lock.cancel)
             release_lock.start()
+        if recovery_ledger_deadline:
+            budget_key = "v3_admission_wait_seconds"
+            previous_budget = manage("GET", "settings")[budget_key]
+            manage("PUT", "settings", {budget_key: "3"})
+            try:
+                with Path("/native/tui-v2-submissions.lock").open("rb") as deadline_lock:
+                    flock(deadline_lock, LOCK_EX)
+                    started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+                    started = monotonic()
+                    expired_status, _, expired_request = checked_messages(
+                        manage, token, follow, headers, received, "recovered_receipt_ledger_deadline", expected_status=429,
+                    )
+                    elapsed_ms = round((monotonic() - started) * 1000)
+                    posts_before_retry = len(received)
+                    assert expired_request and posts_before_retry == 1
+                    evidence = report_request_diagnostics(
+                        manage, "recovered_receipt_ledger_deadline", expired_request, headers["x-session-id"], started_at,
+                    )
+                    expired, = evidence["requests"]
+                    assert expired["status_code"] == 429 and expired["error_stage"] == "tui_submission_ledger", expired
+                    assert expired["attempt_count"] == 0 and expired["attempts"] == [], expired
+                    expired_reservation = expired["diagnostic_context"]["tui_reservation_id"]
+                    assert str(UUID(expired_reservation)) == expired_reservation
+                    with closing(connect(temporary / "gateway.db")) as database:
+                        tools = database.execute("SELECT tools FROM tui_native_turns WHERE tools IN (?, ?)",
+                                                 (registered_tools, "!" + registered_tools)).fetchall()
+                        assert tools == [(registered_tools,)], tools
+            finally:
+                manage("PUT", "settings", {budget_key: previous_budget})
         if recovery_workspace_rejection:
             original_binding = binding_file.read_bytes()
             mismatched = {**json.loads(original_binding), "session_key": "0" * 64}
@@ -756,6 +786,14 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             if recovery_ledger_contention:
                 assert lock.closed
                 proof["recovered_pending_tool"]["ledger_lock_delay_seconds"] = 2
+            if recovery_ledger_deadline:
+                assert expired_request != continuation_request_id
+                proof["recovered_pending_tool"]["ledger_deadline"] = {
+                    "http_status": expired_status, "error_stage": expired["error_stage"],
+                    "attempt_count": expired["attempt_count"], "request_id": expired_request,
+                    "reservation_id": expired_reservation, "elapsed_ms": elapsed_ms,
+                    "model_posts_before_retry": posts_before_retry, "receipt_reopened": True,
+                }
             if recovery_workspace_rejection:
                 assert rejected_request != continuation_request_id
                 proof["recovered_pending_tool"]["workspace_rejection"] = {
@@ -1456,6 +1494,7 @@ def main():
     parser.add_argument("--signed-tool-history", action="store_true")
     fault = parser.add_mutually_exclusive_group()
     fault.add_argument("--recovery-ledger-contention", action="store_true")
+    fault.add_argument("--recovery-ledger-deadline", action="store_true")
     fault.add_argument("--recovery-workspace-rejection", action="store_true")
     scenario = parser.add_mutually_exclusive_group()
     scenario.add_argument("--restart-history", action="store_true")
@@ -1477,7 +1516,7 @@ def main():
     scenario.add_argument("--failure-boundaries", action="store_true")
     scenario.add_argument("--v1-runtime", type=Path)
     args = parser.parse_args()
-    if (args.recovery_ledger_contention or args.recovery_workspace_rejection) and (
+    if (args.recovery_ledger_contention or args.recovery_ledger_deadline or args.recovery_workspace_rejection) and (
         not args.recover_pending_tool or args.signed_tool_history
     ):
         parser.error("恢复故障注入需要可提交的 --recover-pending-tool 原回执")
@@ -1507,6 +1546,7 @@ def main():
                        reconnect_tool_stream=args.reconnect_tool_stream, current_images=args.current_images,
                        auto_tool_choice=args.auto_tool_choice,
                        recovery_ledger_contention=args.recovery_ledger_contention,
+                       recovery_ledger_deadline=args.recovery_ledger_deadline,
                        recovery_workspace_rejection=args.recovery_workspace_rejection)
         print(json.dumps(proof, ensure_ascii=False))
 
