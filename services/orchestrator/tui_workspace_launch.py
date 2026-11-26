@@ -151,12 +151,17 @@ def publish_workspace_history(
                         observation.history_published = True
                 return candidate
             with stream:
-                if matches(_main_history(stream, work, candidate)):
-                    return candidate
-                if replay is not None and candidate != native_id:
-                    stream.seek(0)
-                    if prefix := replay(_main_history(stream, work, candidate), candidate):
-                        return HistoryReplay(candidate, prefix)
+                try:
+                    if matches(_main_history(stream, work, candidate)):
+                        return candidate
+                    if replay is not None and candidate != native_id:
+                        stream.seek(0)
+                        if prefix := replay(_main_history(stream, work, candidate), candidate):
+                            return HistoryReplay(candidate, prefix)
+                except _MissingMainHistory:
+                    if render is None:
+                        raise
+                    # 完整确认历史可在独立分叉导入。占用原 UUID 的元数据档案继续保留。
             if render is None:
                 return str(uuid4())
             # 分叉按登记会话和确认边界定位。一份记录已推进时，保留它并继续查找同一边界的后续记录。

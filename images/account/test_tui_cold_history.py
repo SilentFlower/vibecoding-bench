@@ -236,6 +236,40 @@ class ColdHistoryTests(TestCase):
             self.assertEqual(set(original.parent.iterdir()), {original, forked})
             self.assertEqual(forked.read_bytes(), fork_bytes)
 
+    def test_import_forks_around_metadata_only_binding(self):
+        """完整确认历史可避开只有元数据的绑定档案，重复导入复用分叉。@return 无。"""
+        plan = ColdHistory.from_request(self.body)
+        fresh = ColdHistory.from_request({**self.body, "messages": self.body["messages"][-1:]})
+        work = Path("/native/workspace")
+        session = str(uuid4())
+        with TemporaryDirectory() as directory, ExitStack() as stack:
+            config = Path(directory)
+            project = _project_history_dir(config, work)
+            project.parent.mkdir(mode=0o700)
+            project.mkdir(mode=0o700)
+            original = project / (session + ".jsonl")
+            snapshot = b'{"type":"permission-mode","permissionMode":"dontAsk"}\n'
+            original.write_bytes(snapshot)
+            original.chmod(0o600)
+
+            with self.assertRaisesRegex(ValueError, "缺少原生主轮"):
+                fresh.import_session(config, work, session)
+            self.assertEqual(list(project.iterdir()), [original])
+            branch = plan.import_session(config, work, session)
+            self.assertNotEqual(branch, session)
+            self.assertEqual(plan.import_session(config, work, session), branch)
+            fork = _resume_path(stack, config, work, branch, required=True)
+            self.assertEqual(set(project.iterdir()), {original, fork})
+            self.assertEqual(original.read_bytes(), snapshot)
+
+            original.write_bytes(b"{\n")
+            with self.assertRaises(json.JSONDecodeError):
+                plan.import_session(config, work, session)
+            original.write_text(json.dumps({"type": "assistant", "cwd": "/other", "sessionId": session}) + "\n")
+            with self.assertRaisesRegex(ValueError, "与当前会话工作区不匹配"):
+                plan.import_session(config, work, session)
+            self.assertEqual(set(project.iterdir()), {original, fork})
+
     def test_advanced_fork_keeps_its_bytes_and_reuses_unadvanced_revision(self):
         """已推进的分叉保持原记录，重复确认边界复用同一未推进修订。@return 无。"""
         base = ColdHistory.from_request(self.body)

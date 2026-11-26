@@ -749,34 +749,48 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         if no_tool_choice:
             return verify_no_tool_choice(manage, token, identifier, received)
         if forced_tool_choice:
+            def bound_forced_archive():
+                (binding_file,) = Path("/native/tui-workspaces").glob("*.json")
+                native_id = json.loads(binding_file.read_bytes())["native_session_id"]
+                projects = Path("/native/tui-sessions") / native_id / "home/.claude/projects"
+                archive = wait_for(lambda: next(projects.glob("*/" + native_id + ".jsonl"), None))
+                return archive, binding_file
+
+            def retain_forced_metadata(archive, binding_file, phase, session_id):
+                snapshot = b"".join(line for line in archive.read_bytes().splitlines(keepends=True)
+                                    if json.loads(line)["type"] not in ("user", "assistant"))
+                archive.write_bytes(snapshot)
+                startup_event(phase, session_id=session_id, native_session_id=archive.stem,
+                              archive_sha256=sha256(snapshot).hexdigest())
+                return archive, snapshot, binding_file, binding_file.read_bytes()
+
+            def stage_closed_archive(headers):
+                # 先等待旧工具轮完整交付并释放工作区，再构造下一新轮缺主链的边界。
+                wait_for(lambda: sender_state().get("idle"))
+                preserved = retain_forced_metadata(*bound_forced_archive(), "forced_closed_metadata_only",
+                                                   headers["x-session-id"])
+                assert preserved[1], preserved[0]
+                return preserved
+
             def restart_forced(headers):
                 nonlocal source
                 marker = ("--name=" + headers["x-session-id"]).encode()
                 (pid,) = [int(path.parent.name) for path in Path("/proc").glob("[0-9]*/cmdline")
                           if fixture_command_has(path, marker)]
-                archive = binding_file = None
-                if forced_tool_choice == "restart-metadata-only":
-                    (binding_file,) = Path("/native/tui-workspaces").glob("*.json")
-                    native_id = json.loads(binding_file.read_bytes())["native_session_id"]
-                    projects = Path("/native/tui-sessions") / native_id / "home/.claude/projects"
-                    archive = wait_for(lambda: next(projects.glob("*/" + native_id + ".jsonl"), None))
+                metadata_archive = bound_forced_archive() if forced_tool_choice == "restart-metadata-only" else None
                 startup_event("forced_receipt_cli_sigkill", session_id=headers["x-session-id"], cli_pid=pid)
                 os.kill(pid, SIGKILL)
                 source = restart(source, "forced_tool_receipt")
                 assert not Path(f"/proc/{pid}").exists()
                 startup_event("forced_receipt_cli_exit_observed", session_id=headers["x-session-id"], cli_pid=pid)
-                if archive is not None:
-                    # 保留原 CLI 写出的元数据记录，模拟回执已登记而主轮未落盘的退出边界。
-                    snapshot = b"".join(line for line in archive.read_bytes().splitlines(keepends=True)
-                                        if json.loads(line)["type"] not in ("user", "assistant"))
-                    archive.write_bytes(snapshot)
-                    startup_event("forced_receipt_metadata_only", session_id=headers["x-session-id"],
-                                  native_session_id=native_id, archive_sha256=sha256(snapshot).hexdigest())
-                    return archive, snapshot, binding_file, binding_file.read_bytes()
+                if metadata_archive is not None:
+                    return retain_forced_metadata(*metadata_archive, "forced_receipt_metadata_only", headers["x-session-id"])
 
+            closed_archive = stage_closed_archive if forced_tool_choice == "restart-closed-metadata-only" else None
             return verify_forced_tool_choice(manage, token, identifier, received, sender_state_after_failure,
                                              restart_forced if forced_tool_choice != "live" else None,
-                                             metadata_only=forced_tool_choice == "restart-metadata-only")
+                                             metadata_only=forced_tool_choice == "restart-metadata-only",
+                                             stage_closed_archive=closed_archive)
         if cache_capability:
             return verify_cache_capabilities(manage, token, identifier, headers, received, cache_capability)
         if history_cache_markers and history_cache_scope != "nested":
@@ -2426,11 +2440,13 @@ def fixture_forced_tool_sse(body):
     return message_sse({"type": "text", "text": FINAL}, "end_turn", "msg_forced_final")
 
 
-def verify_forced_tool_choice(manage, token, identifier, received, sender_status, restart, *, metadata_only):
+def verify_forced_tool_choice(manage, token, identifier, received, sender_status, restart, *, metadata_only,
+                              stage_closed_archive=None):
     """从公开入口核对强制选择、原工具回执和 CLI 正文。
     @param manage 管理入口。@param token 合成令牌。@param identifier 账号 ID。
     @param received 模型实收。@param sender_status 失败后查询发送器。@param restart 可选的发送器重启。
-    @param metadata_only 是否仅验证原档缺主轮的受控对照。
+    @param metadata_only 是否仅验证在途回执遇到原档缺主轮的受控对照。
+    @param stage_closed_archive 可选，按公开会话请求头在完整答复交付后保留原档的元数据并返回快照。
     @return 按请求关联的证据。
     """
     cases = {}
@@ -2461,8 +2477,12 @@ def verify_forced_tool_choice(manage, token, identifier, received, sender_status
             question = body["messages"][-1]["content"]
             assert sum(block.get("text") == question for row in model["messages"] if row["role"] == "user"
                        for block in blocks(row)) == 1, (phase, model)
+            assert sum(block.get("text") == FINAL for row in model["messages"] if row["role"] == "assistant"
+                       for block in blocks(row)) == 1, (phase, model)
             proof.update(provider_path="interactive_cli", model_body_sha256=digest, cli_body_sha256=claim["cli_sha256"],
                          attempt_id=attempt["attempt_id"], new_question_count=1,
+                         native_session_id=json.loads(model["metadata"]["user_id"])["session_id"],
+                         session_origin=attempt["context"]["tui_session_origin"],
                          model_tools=verify_automatic_model_tools(model, tools))
         else:
             assert not claim["from_interactive_cli"] and not claim["uses_native_history"], (phase, claim)
@@ -2481,7 +2501,7 @@ def verify_forced_tool_choice(manage, token, identifier, received, sender_status
         return raw, proof
 
     policies = ("append",) if restart else ("append", "replace", "user_reminder")
-    choices = {"named": FORCED_CHOICES["named"]} if metadata_only else FORCED_CHOICES
+    choices = {"named": FORCED_CHOICES["named"]} if metadata_only or stage_closed_archive else FORCED_CHOICES
     for policy in policies:
         account = manage("PUT", f"accounts/{identifier}", {"client_system_prompt_policy": policy})
         assert account["client_system_prompt_policy"] == policy
@@ -2532,12 +2552,19 @@ def verify_forced_tool_choice(manage, token, identifier, received, sender_status
             cases[phase] = {"initial": first, "forced_receipt": tool_proofs[-1], "auto_receipt": final, "client_tool_calls": 2}
             if not metadata_only:
                 # 旧发送器交付完整答复后，原生新轮可从客户端确认的完整历史开始。
+                if stage_closed_archive:
+                    preserved = stage_closed_archive(headers)
                 question = {"role": "user", "content": "工具轮完成后，请回答独立的合成问题 " + phase}
                 history = [*messages, {"role": "assistant", "content": reply["content"]}]
                 fresh = {**final_request, "messages": [*history, question]}
                 raw, next_question = post(fresh, phase + "_next_auto_question", 200, new_auto=True)
                 reply = json.loads(raw)
                 assert reply["stop_reason"] == "end_turn" and reply["content"] == [{"type": "text", "text": FINAL}], raw
+                if stage_closed_archive:
+                    archive = preserved[0]
+                    branch_id = next_question["native_session_id"]
+                    assert branch_id != archive.stem and next_question["session_origin"] == "external_import"
+                    assert archive.with_name(branch_id + ".jsonl").is_file()
                 cases[phase]["next_auto_question"] = next_question
             if preserved:
                 archive, snapshot, binding_file, binding_snapshot = preserved
@@ -3384,7 +3411,8 @@ def main():
     scenario.add_argument("--initial-idle-model-connection", action="store_true")
     scenario.add_argument("--output-effort", action="store_true")
     scenario.add_argument("--structured-output-contract", action="store_true")
-    scenario.add_argument("--forced-tool-choice-contract", choices=("live", "restart", "restart-metadata-only"))
+    scenario.add_argument("--forced-tool-choice-contract",
+                          choices=("live", "restart", "restart-metadata-only", "restart-closed-metadata-only"))
     scenario.add_argument("--no-tool-choice-contract", action="store_true")
     scenario.add_argument("--auto-tool-direct-text", action="store_true",
                           help="带两项工具声明的 auto 请求直接返回文本")

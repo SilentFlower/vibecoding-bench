@@ -2552,6 +2552,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 普通 Messages 的已闭合文本与工具历史、当前文本问题和支持的客户端工具声明共用当前账号作用域。工作区归属核验后，事件源原子发布固定 2.1.293 格式的私有会话记录。CLI 恢复该历史并提交当前问题。顶层追加指令保持输入顺序。
 - 冷导入使用发送器已登记的 `native_session_id`。新导入记录的 `message` 只包含 `role` 和 `content`，原工具调用 ID 和结果仍保留在内容块中。首条 JSONL 记录的外层 `flower2apiImportBoundary` 保存规范化历史和本轮生效设置的摘要。同一工作区的完整主链、消息及摘要匹配时，保留文件和 UUID。旧格式沿原模型及主链匹配条件读回，保留原文件字节。
 - 已有合法主链超出本轮确认边界，或历史、已记录的生效设置发生分歧时，按登记会话、确认历史及生效设置查找同一私有工作区的匹配分支。发布使用目录锁与原子不覆盖操作。恢复与导入回调返回的 UUID 均经 `_resume_path` 核对目标文件身份、权限、cwd 和原生 UUID。回调为纯新轮选中的 UUID 须尚无历史。
+- 同一公开会话带完整确认历史开始独立新轮时，无主链的候选文件可按同一确认边界跳过并在私有工作区另选分支。原档和原绑定保留。相同确认边界可复用尚未推进的导入分支。JSONL 损坏或主链的 UUID、cwd 不符时仍拒绝该次导入。直接恢复及无确认历史的入口沿用各自的缺主链校验。
 - 分叉已结束且本轮问题与档案里的原问题一致时，客户可重发同一确认历史触发新投递。启动器核对原分叉及同 UUID 的私有临时 JSONL。临时文件只载入已确认前缀，由本次 CLI 追加并在进程回收后清除。原分叉档案保留原字节。输入问题改变或已有分叉仍未完成时沿后续修订查找。
 - 普通 Messages 在原公开会话中提交分叉的确认历史。启动器的显式恢复与自动恢复均可根据同一导入计划定位该分叉。单独按已登记 UUID 恢复时，选择原绑定的历史。普通历史分叉共享原会话的绑定文件与私有配置目录。
 - 普通单文本首轮和已闭合的纯文本历史也使用该原生入口。无外部历史时由 CLI 自行创建会话记录。公开会话已有主链但本轮提交空前缀时，启动新的独立原生会话。普通顶层 `system` 省略、空串和空数组均保留原生默认工作正文。多个文本块按原顺序作为本轮追加指令。
@@ -2623,6 +2624,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `--structured-output-contract` 从普通公开入口对照三种账号动作的无 schema、仅 schema、schema 与 `effort=medium`，覆盖 SSE 和非流式 JSON。无 schema 的六例走交互 CLI。成功用例核对模型实收的 `output_config`、问题一次、工作指令落点和公开响应终态。隔离模型仅在收到完整 schema 时返回约定的 JSON 文本。用预留、尝试和实收摘要确认发送路径，拒绝用例核对零尝试和零投递。最终 TLS 写出未采集。
 - `--forced-tool-choice-contract live|restart` 从公开 Messages 对照 `any` 和指定第二个工具。隔离模型按实收字段决定调用，`any` 两次分别选择两个工具，指定工具两次使用同一名称及各自 ID。续轮提交原调用结果并保留强制选择，最后一个合法回执可在旧账号发送路径显式选用 `auto`，接收合成文本。其后在同一公开会话带已确认历史提交独立 `auto` 请求，核对 CLI 认领摘要等于模型实收、只投递一次、原两组工具调用和结果完整。`restart` 在第一个回执前结束原 CLI 并重启账号发送器。报告按预留对照 CLI 正文及实际模型请求的摘要、字段、工具名、参数与回执。`verify_tui_tool_choice_input.py <固定 CLI>` 在仅回环网络独立验证工具权限选项与模型请求。最终 TLS 写出未采集。
 - `--forced-tool-choice-contract restart-metadata-only` 在首轮工具回执登记后结束原 CLI，原档只保留实际 CLI 写出的非主轮记录。通过相同公开请求验证父版 `cli_launch` 失败与本版独立 CLI UUID 成功，核对原档和绑定字节、回执归属及实收投递。观测记录原进程退出、旧发送器退出和新发送器就绪、入站正文摘要、预留以及 CLI 实际启动模式。
+- `--forced-tool-choice-contract restart-closed-metadata-only` 在指定工具轮已收到 `end_turn` 后保留原档的实际 CLI 元数据。随后在同一公开会话提交完整确认历史及独立 `auto` 问题。核对公开 200、`external_import` 原生分支、新问题一次投递、完整答复与两组工具调用及结果、原档与绑定的字节。
 - `--no-tool-choice-contract` 从公开入口对照三种策略的缺省、显式 `none` 且 `tools` 省略、显式 `none` 且为空数组，以及 `none` 同带工具声明。按预留核对原生分支、模型实收工具及选择、工作指令角色和公开文本终态。最终 TLS 写出未采集。
 - `--thinking-display-contract <claude-sonnet-4-6|claude-opus-5-5>` 通过普通 Messages 对照省略整个 `thinking`、仅省略 `display`、显式 `omitted` 和 `summarized`。完全省略时三种账号动作均使用交互 CLI 生成 `adaptive/updates`，显式 `summarized` 也走交互 CLI。仅省略 `display` 或显式 `omitted` 时，追加策略经账号代发保留原对象，替换及用户提醒均返回 `422/unsupported_parameter`、零投递。隔离模型按文档模拟 Sonnet 4.6 缺省摘要及 Opus 5.5 缺省省略，SSE 检查摘要增量和签名顺序，JSON 检查等价内容块。显式 `omitted` 的合成回复保留空思考块和签名。核对原生分支、正文 SHA-256 及预留和尝试的关联。最终 TLS 写出未采集。
 - 将 `--thinking-cli-summaries on|off` 与 `--thinking-display-contract` 同用，探针只在启动固定 CLI 的 `--settings` 设置 `showThinkingSummaries`。公开请求省略整个 `thinking`。两个模型在 `on` 下原生生成 `adaptive/summarized`，在 `off` 下原生生成 `adaptive/updates`。两种状态的 SSE 和 JSON 均按隔离模型实际回复核对。`off` 产生的 `updates` 和显式 `omitted` 是不同的模型请求模式。
