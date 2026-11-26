@@ -107,8 +107,11 @@ def _model_head(handle, status, content_type):
     if attempt_id := getattr(handle, "repair_attempt_id", None):
         fields["repair_attempt_id"] = attempt_id
     # 只在收到模型帧后随成功响应发布正文归属。预留成功或选定候选正文不足以记录此事实。
-    if status == 200 and (body_source := getattr(handle, "body_source", None)):
-        fields["body_source"] = body_source
+    if status == 200:
+        if body_source := getattr(handle, "body_source", None):
+            fields["body_source"] = body_source
+        if session_origin := getattr(handle, "session_origin", None):
+            fields["session_origin"] = session_origin
     return fields
 
 

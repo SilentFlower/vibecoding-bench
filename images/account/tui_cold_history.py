@@ -15,7 +15,7 @@ from runtime_files import atomic_text
 from tui_cache_policy import model_body
 from tui_messages import encode
 from tui_reconnect import digest
-from tui_workspace_launch import publish_workspace_history
+from tui_workspace_launch import WorkspaceLaunchObservation, publish_workspace_history
 
 
 MCP_SERVER = "flower"
@@ -456,10 +456,14 @@ class ColdHistory:
                 and positions((row["role"], _blocks(row)) for row in native["messages"])
                 == positions(history))
 
-    def import_session(self, config, work, native_id, *, replay_resources: ExitStack | None = None):
+    def import_session(
+        self, config, work, native_id, *, replay_resources: ExitStack | None = None,
+        observation: WorkspaceLaunchObservation | None = None,
+    ):
         """在已绑定的工作区选择新会话或发布已完成的外部历史。
         @param config 私有配置。@param work 已核验工作目录。@param native_id 绑定的原生会话。
         @param replay_resources 可选，交互进程退出后清理本轮使用的临时确认前缀。
+        @param observation 可选，本轮使用外部输入发布历史时更新本机来源。
         @return 本次启动的原生会话 UUID，或 UUID 与本轮临时确认前缀。
         """
         history = self._grouped_history()
@@ -492,6 +496,7 @@ class ColdHistory:
             config, work, native_id, lambda rows: self._matches_history(rows, history, boundary),
             (lambda session_id: self._transcript(work, session_id, history, boundary)) if history else None,
             boundary=boundary, replay=replay if history and replay_resources is not None else None,
+            observation=observation,
         )
 
     def _matches_history(self, rows, history, boundary):

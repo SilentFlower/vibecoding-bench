@@ -50,6 +50,7 @@ from tui_messages import (
     valid_model_header_value,
     wire_events,
 )
+from tui_workspace_launch import WorkspaceLaunchObservation
 
 # 与网关的 BINDING_TTL_MS 一致，客户端确认工具时原进程和资源名额仍随会话保留。
 _RECEIPT_SECONDS = 60 * 60
@@ -327,6 +328,7 @@ class _Actor:
         self.failure = None
         self.master = None
         self.process = None
+        self.launch_observation = WorkspaceLaunchObservation()
         self.step = None
         self.frame_batch = []
         self.finished = False
@@ -471,6 +473,7 @@ class _Actor:
                         if self.recovery_history is None:
                             launch_options["prepare_history"] = partial(
                                 launch_plan.import_session, replay_resources=history_resources,
+                                observation=self.launch_observation,
                             )
                             if (media := self._stage_current_images(home, history_resources)) is not None:
                                 launch_options["media_fd"] = media
@@ -507,6 +510,7 @@ class _Actor:
                         terminal_fd=slave,
                         mod_dir=plugin,
                         model_endpoint=(endpoint + self.model_path, self.launch_token or self.model_bearer),
+                        observation=self.launch_observation,
                         **({"oauth_file": True} if self.oauth_file else {}),
                         **launch_options,
                     )
@@ -1221,6 +1225,13 @@ class _Reserved:
         self.body_source = None
         self.sent = self.completed = False
         self.request_digest = request_digest
+
+    @property
+    def session_origin(self) -> str | None:
+        """返回本次尝试对应的实际会话来源。@return 复用或启动来源。"""
+        if self.kind == "continuation":
+            return "live_process"
+        return self.actor.launch_observation.origin
 
     def send(self, command):
         """实际启动或恢复一个模型步骤。@param command 已核验工作区。@return 逐帧输出。"""

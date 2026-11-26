@@ -626,6 +626,7 @@ export interface DiagnosticContext {
   native_model_calls?: number | null
   tui_reservation_id?: string | null
   tui_body_source?: 'interactive_cli' | 'account_sender' | null
+  tui_session_origin?: 'new_session' | 'live_process' | 'disk_resume' | 'external_import' | null
   control_state?: string | null
   control_observed_at?: string | null
   control_error_code?: string | null

@@ -28,7 +28,8 @@ use crate::model::identity::device_profile;
 use crate::model::request_diagnostics::{
     AttemptDiagnostic, DiagnosticContext, DiagnosticParameters, DiagnosticSessions,
     DiagnosticTokens, ExecutionLocation, NativeRejection, NativeRequestObservation,
-    RequestDiagnostic, RequestLogMode, TuiBodySource, normalize_correlation_id, safe_model,
+    RequestDiagnostic, RequestLogMode, TuiBodySource, TuiSessionOrigin, normalize_correlation_id,
+    safe_model,
 };
 use crate::service::native_capture;
 use crate::service::request_session::RequestSession;
@@ -793,10 +794,19 @@ impl AttemptTrace {
         }
     }
 
-    /// 记录已绑定发送器确认的同轮正文归属。@param source 私有回执来源。@return 无。
-    pub(super) fn tui_body_source(&mut self, source: TuiBodySource) {
-        if let Some(record) = self.record.as_mut() {
-            record.context.get_or_insert_with(Default::default).tui_body_source = Some(source);
+    /// 记录已绑定发送器确认的同轮归属。
+    /// @param source 实际正文来源。@param origin 实际会话来源。@return 无。
+    pub(super) fn tui_sources(
+        &mut self,
+        source: Option<TuiBodySource>,
+        origin: Option<TuiSessionOrigin>,
+    ) {
+        if let Some(record) = self.record.as_mut()
+            && (source.is_some() || origin.is_some())
+        {
+            let context = record.context.get_or_insert_with(Default::default);
+            context.tui_body_source = source;
+            context.tui_session_origin = origin;
         }
     }
 

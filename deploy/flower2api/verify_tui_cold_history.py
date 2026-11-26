@@ -1110,6 +1110,10 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                     "new_attempt": new_attempt}
         verify_model(received, policy=tool_policy or "append", old_content=old_result, current_text_blocks=current_text_blocks)
         captures = verify_captures(manage, received, account_token)
+        if restart_history or recover_pending:
+            assert [attempt["diagnostic_session_origin"] for attempt in captures] == [
+                "external_import", "disk_resume" if recover_pending else "live_process",
+            ], captures
         for attempt, request_id, request_body, reply_id, model_id in zip(
             captures, (initial_request_id, continuation_request_id),
             (body, follow), (events[0]["message"]["id"], final["id"]),
@@ -1295,8 +1299,13 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             branch_ids = []
             snapshots = {history_file: original}
             followup_ids = []
+            branch_request_ids = []
             for post in (3, 4):
-                status, raw = call(18090, "POST", "/v1/messages", token, branch, headers)
+                status, raw, branch_request_id = checked_messages(
+                    manage, token, branch, headers, received, f"restart_history_{post}",
+                    trace_startup=trace_startup, sender_status=sender_state_after_failure,
+                )
+                branch_request_ids.append(branch_request_id)
                 assert status == 200 and len(received) == post, (status, raw, len(received))
                 assert json.loads(raw)["content"] == [{"type": "text", "text": FINAL}]
                 model_body = received[-1][1]
@@ -1317,7 +1326,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                     completed = path.read_bytes()
                     assert completed.startswith(staged_bytes) and len(completed) > len(staged_bytes)
                     snapshots[path] = completed
-                    restart(restarted)
+                    restart(restarted, "repeat_history")
                 else:
                     assert branch_id != native_id and path.is_file()
                 followup_ids.append(json.loads(raw)["id"])
@@ -1327,6 +1336,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             assert list(binding_file.parent.glob("*.json")) == [binding_file]
             assert binding_file.read_bytes() == binding_bytes
             assistant_fields = sorted(next(row for row in imported if row["role"] == "assistant"))
+            branch_attempts = verify_captures(manage, received[-2:], account_token)
+            assert [a["request_id"] for a in branch_attempts] == branch_request_ids, branch_attempts
+            assert [a["diagnostic_session_origin"] for a in branch_attempts] == ["disk_resume"] * 2, branch_attempts
             proof["restart"] = {"bound_session_id": native_id, "branch_session_ids": branch_ids,
                                 "staged_branch_session_id": staged_id,
                                 "binding_preserved": True,
@@ -1335,7 +1347,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                 "repeat_client_message_ids": followup_ids,
                                 "preserved_bytes": [len(data) for data in snapshots.values()],
                                 "additional_model_posts": 2,
-                                "attempts": verify_captures(manage, received[-2:], account_token)}
+                                "attempts": branch_attempts}
         if history_cache_ttl:
             # 同一公开会话确认同一前缀后开启新轮，只有新轮应用管理端的 off。
             fresh = {**body, "stream": False, "messages": [*messages[:-1], {"role": "user", "content": AFTER_RESTART}]}
@@ -1373,6 +1385,7 @@ def checked_messages(manage, token, body, headers, received, phase, *, expected_
     def observe(response):
         evidence.update(http_status=response.status, request_id=response.getheader("x-cc2api-request-id"))
         assert response.getheader("x-v3-tui-body-source") is None
+        assert response.getheader("x-v3-tui-session-origin") is None
         if trace_startup:
             startup_event("public_response_headers", phase=phase, session_id=session_id,
                           request_id=evidence["request_id"], http_status=response.status,
@@ -1448,7 +1461,7 @@ def report_request_diagnostics(manage, phase, request_id, session_id, started_at
             "control_state", "control_error_code", "control_recovery", "observed_control_http_status",
             "native_receive_ended", "native_source_terminal", "tui_reservation_id",
             "tool_continuation_mode", "tool_continuation_path", "tool_continuation_reason",
-            "tui_body_source",
+            "tui_body_source", "tui_session_origin",
         ) if context.get(key) is not None}
 
     try:
@@ -2177,6 +2190,8 @@ def verify_structured_output(manage, token, identifier, received):
                     from_cli = config is None
                     assert claim["uses_native_history"] is from_cli and claim["from_interactive_cli"] is from_cli, claim
                     body_source = attempt["context"]["tui_body_source"]
+                    session_origin = attempt["context"]["tui_session_origin"]
+                    assert session_origin == "new_session", (phase, attempt)
                     assert attempt["log_mode"] == "info" and body_source == (
                         "interactive_cli" if from_cli else "account_sender"
                     ), (phase, attempt)
@@ -2208,6 +2223,7 @@ def verify_structured_output(manage, token, identifier, received):
                     assert stop_reason == "end_turn" and text == (FINAL if from_cli else STRUCTURED_REPLY), phase
                     result.update(provider_path="interactive_cli" if from_cli else "account_sender",
                                   diagnostic_body_source=body_source,
+                                  diagnostic_session_origin=session_origin,
                                   attempt_id=reservation, model_body_sha256=digest, model_output_config=output,
                                   model_instruction_role="user" if reminder else "system",
                                   model_root_system_shape="string" if isinstance(root, str) else "blocks",
@@ -2873,7 +2889,8 @@ def verify_captures(manage, received, account_token):
                 captures[digest] = {"request_id": request_id, "attempt_id": attempt_id,
                                     "ingress_body_sha256": snap["ingress"]["original_body_sha256"],
                                     "cli_and_https_body_sha256": digest, "final_tls_capture": "unavailable",
-                                    "diagnostic_body_source": (attempt.get("context") or {}).get("tui_body_source")}
+                                    "diagnostic_body_source": (attempt.get("context") or {}).get("tui_body_source"),
+                                    "diagnostic_session_origin": (attempt.get("context") or {}).get("tui_session_origin")}
         return [captures[digest] for digest in expected] if captures.keys() == expected.keys() else None
 
     return wait_for(observe)

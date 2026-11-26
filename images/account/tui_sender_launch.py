@@ -26,7 +26,7 @@ from tui_messages import (
     BODY_LIMIT, MODEL_PROTOCOL_HEADERS, MODEL_VERSION_HEADERS, OAUTH_FILE_LIMIT,
     ModelResponseError, encode, passive_quota_headers, valid_model_header_value,
 )
-from tui_workspace_launch import launch_workspace_cli
+from tui_workspace_launch import WorkspaceLaunchObservation, launch_workspace_cli
 
 
 VERSION = "2.1.293"
@@ -501,6 +501,7 @@ def launch_session(
     prepare_history=None,
     media_fd: int | None = None,
     recover_incomplete_history: bool = False,
+    observation: WorkspaceLaunchObservation | None = None,
 ) -> Popen:
     """用账号内核限定工作区后，在真实 PTY 上运行固定版本。
 
@@ -517,6 +518,7 @@ def launch_session(
     @param prepare_history 可选，同一会话的外部历史导入函数。
     @param media_fd 可选，本会话私有图像暂存目录的 O_PATH 描述符。
     @param recover_incomplete_history 仅旧工具账本已核对原回执时，允许为缺少主轮的原档另开 CLI。
+    @param observation 可选，本轮实际启动的会话来源。
     @return 直属交互进程，退出由账号执行器回收。
     """
     home, mod = session_paths(command)
@@ -561,4 +563,5 @@ def launch_session(
             inherited_fds=(*network_fds, *media_fds),
             initialize_profile=lambda work: _initialize_local_profile(config_dir, work),
             prepare_history=prepare_history, recover_incomplete_history=recover_incomplete_history,
+            observation=observation,
         )

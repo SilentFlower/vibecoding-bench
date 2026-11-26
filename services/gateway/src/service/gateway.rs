@@ -33,7 +33,7 @@ use crate::model::api_token::ApiToken;
 use crate::model::identity::device_profile;
 use crate::model::request_diagnostics::{
     DiagnosticParameters, NATIVE_OBSERVATION_HEADER, NativeRequestObservation, RequestLogMode,
-    TuiBodySource,
+    TuiBodySource, TuiSessionOrigin,
 };
 use crate::model::request_usage::RequestUsage;
 use crate::service::access_policy::{
@@ -4449,6 +4449,11 @@ impl GatewayService {
             .get(runtime_transport::TUI_BODY_SOURCE)
             .and_then(|header| header.to_str().ok())
             .and_then(TuiBodySource::from_wire);
+        let session_origin = response
+            .headers()
+            .get(runtime_transport::TUI_SESSION_ORIGIN)
+            .and_then(|header| header.to_str().ok())
+            .and_then(TuiSessionOrigin::from_wire);
         let mut response =
             runtime_transport::tui_public_response(response, (!fixture).then_some(account.id))
                 .await
@@ -4470,9 +4475,7 @@ impl GatewayService {
                 if repaired {
                     attempt.tui_thinking_removed();
                 }
-                if let Some(source) = body_source {
-                    attempt.tui_body_source(source);
-                }
+                attempt.tui_sources(body_source, session_origin);
                 attempt.tui_capture(attempt_id, capture_state);
                 attempt.with_feedback(request.clone());
                 attempt.commit_native(started);

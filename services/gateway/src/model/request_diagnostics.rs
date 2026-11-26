@@ -351,6 +351,39 @@ impl TuiBodySource {
     }
 }
 
+/// 已取得同轮模型响应的 V2 会话启动或复用来源。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TuiSessionOrigin {
+    NewSession,
+    LiveProcess,
+    DiskResume,
+    ExternalImport,
+}
+
+impl TuiSessionOrigin {
+    /// 识别私有协议的已知会话来源。@param value 发送器回执值。@return 匹配的来源。
+    pub(crate) fn from_wire(value: &str) -> Option<Self> {
+        match value {
+            "new_session" => Some(Self::NewSession),
+            "live_process" => Some(Self::LiveProcess),
+            "disk_resume" => Some(Self::DiskResume),
+            "external_import" => Some(Self::ExternalImport),
+            _ => None,
+        }
+    }
+
+    /// 返回私有响应头所用的值。@return 对应的协议字符串。
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::NewSession => "new_session",
+            Self::LiveProcess => "live_process",
+            Self::DiskResume => "disk_resume",
+            Self::ExternalImport => "external_import",
+        }
+    }
+}
+
 /// 跨平台入口、执行身份及源事实；不保存正文、凭据或任意原生事件。
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
@@ -377,6 +410,9 @@ pub struct DiagnosticContext {
     /// 仅在同一 V2 尝试收到模型响应时记录的正文来源。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tui_body_source: Option<TuiBodySource>,
+    /// 同一次 V2 尝试实际使用的已确认会话来源。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tui_session_origin: Option<TuiSessionOrigin>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input_rejection_reason: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

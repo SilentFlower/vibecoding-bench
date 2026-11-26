@@ -7,7 +7,10 @@ from unittest import TestCase
 from unittest.mock import patch
 from uuid import UUID, uuid4
 
-from tui_workspace_launch import HistoryReplay, _key, _project_history_dir, launch_workspace_cli, publish_workspace_history
+from tui_workspace_launch import (
+    HistoryReplay, WorkspaceLaunchObservation, _key, _project_history_dir,
+    launch_workspace_cli, publish_workspace_history,
+)
 
 
 class BoundLaunchTests(TestCase):
@@ -56,7 +59,10 @@ class BoundLaunchTests(TestCase):
         )
         self.history.parent.mkdir(parents=True)
 
-    def _start(self, *, resume=False, who=None, launch=None, prepare_history=None, recover_incomplete_history=False):
+    def _start(
+        self, *, resume=False, who=None, launch=None, prepare_history=None,
+        recover_incomplete_history=False, observation=None,
+    ):
         command = {
             "action": "send",
             "reservation_id": self.who["reservation_id"],
@@ -74,6 +80,7 @@ class BoundLaunchTests(TestCase):
             storage=self.root,
             prepare_history=prepare_history,
             recover_incomplete_history=recover_incomplete_history,
+            observation=observation,
         )
 
     def test_wrong_subject_session_and_workspace_never_reach_spawn(self):
@@ -149,16 +156,22 @@ class BoundLaunchTests(TestCase):
     def test_auto_resume_only_when_the_bound_history_exists(self):
         """普通对话结束后重开时恢复原记录，损坏或跨项目的同名历史须报错。@return 无。"""
         with patch("tui_workspace_launch.Popen") as spawn:
-            self._start(resume=None)
+            first = WorkspaceLaunchObservation()
+            self._start(resume=None, observation=first)
+            self.assertEqual(first.origin, "new_session")
             self.assertEqual(spawn.call_args.args[0][-2:], ["--session-id", self.native])
             row = {"type": "assistant", "cwd": str(self.cwd), "sessionId": self.native}
             self.history.write_text(json.dumps(row))
             self.history.chmod(0o600)
-            self._start(resume=None)
+            reopened = WorkspaceLaunchObservation()
+            self._start(resume=None, observation=reopened)
+            self.assertEqual(reopened.origin, "disk_resume")
             self.assertEqual(spawn.call_args.args[0][-2:], ["--resume", str(self.history)])
             self.history.write_text(json.dumps({**row, "cwd": "/other"}))
+            rejected = WorkspaceLaunchObservation()
             with self.assertRaises(ValueError):
-                self._start(resume=None)
+                self._start(resume=None, observation=rejected)
+            self.assertIsNone(rejected.origin)
             self.history.unlink()
             self.history.symlink_to(self.record)
             with self.assertRaises(OSError):
@@ -211,16 +224,20 @@ class BoundLaunchTests(TestCase):
             self.assertEqual(native_id, self.native)
             return publish_workspace_history(config, work, native_id, lambda rows: bool(list(rows)), lambda sid: json.dumps(
                 {"type": "user", "cwd": str(work), "sessionId": sid, "message": {"role": "user", "content": "合成历史"}}
-            ) + "\n", boundary="fixture-boundary")
+            ) + "\n", boundary="fixture-boundary", observation=observation)
 
         with patch("tui_workspace_launch.Popen") as spawn:
-            self._start(prepare_history=prepare, resume=None)
+            observation = WorkspaceLaunchObservation()
+            self._start(prepare_history=prepare, resume=None, observation=observation)
+            self.assertEqual(observation.origin, "external_import")
             snapshot = self.history.read_bytes()
             self.assertEqual(spawn.call_args.args[0][-2:], ["--resume", str(self.history)])
             self.who = {**self.who, "reservation_id": str(uuid4())}
             self._start(resume=True)
             self.assertEqual(spawn.call_args.args[0][-2:], ["--resume", str(self.history)])
-            self._start(prepare_history=prepare, resume=None)
+            observation = WorkspaceLaunchObservation()
+            self._start(prepare_history=prepare, resume=None, observation=observation)
+            self.assertEqual(observation.origin, "disk_resume")
             self.assertEqual(spawn.call_args.args[0][-2:], ["--resume", str(self.history)])
             self._start(resume=None)
             self.assertEqual(spawn.call_args.args[0][-2:], ["--resume", str(self.history)])

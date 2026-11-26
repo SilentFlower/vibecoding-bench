@@ -14,7 +14,9 @@ from uuid import uuid4
 
 from tui_cold_history import IMPORT_BOUNDARY, ColdHistory
 from tui_reconnect import digest
-from tui_workspace_launch import HistoryReplay, _key, _project_history_dir, _resume_path, launch_workspace_cli
+from tui_workspace_launch import (
+    HistoryReplay, WorkspaceLaunchObservation, _key, _project_history_dir, _resume_path, launch_workspace_cli,
+)
 
 
 class ColdHistoryTests(TestCase):
@@ -203,18 +205,23 @@ class ColdHistoryTests(TestCase):
 
             def prepare(plan):
                 barrier.wait(timeout=5)
-                return plan.import_session(config, work, session)
+                observation = WorkspaceLaunchObservation()
+                selected = plan.import_session(config, work, session, observation=observation)
+                return selected, observation.history_published
 
             futures = [pool.submit(prepare, first) for _ in range(8)]
-            self.assertEqual([future.result() for future in futures], [session] * 8)
+            selected = [future.result() for future in futures]
+            self.assertCountEqual(selected, [(session, True)] + [(session, False)] * 7)
             original = _resume_path(stack, config, work, session, required=True)
             original_bytes = original.read_bytes()
             self.assertEqual(list(original.parent.iterdir()), [original])
             barrier = Barrier(8)
             original_retry = pool.submit(prepare, first)
             fork_attempts = [pool.submit(prepare, second) for _ in range(7)]
-            fork, = {future.result() for future in fork_attempts}
-            self.assertEqual(original_retry.result(), session)
+            selected = [future.result() for future in fork_attempts]
+            fork, = {session_id for session_id, _ in selected}
+            self.assertCountEqual(selected, [(fork, True)] + [(fork, False)] * 6)
+            self.assertEqual(original_retry.result(), (session, False))
             self.assertNotEqual(fork, session)
             self.assertEqual(original.read_bytes(), original_bytes)
             forked = _resume_path(stack, config, work, fork, required=True)
@@ -223,7 +230,7 @@ class ColdHistoryTests(TestCase):
                              "另一条已确认的上一轮输入")
             barrier = Barrier(8)
             futures = [pool.submit(prepare, second) for _ in range(8)]
-            self.assertEqual([future.result() for future in futures], [fork] * 8)
+            self.assertEqual([future.result() for future in futures], [(fork, False)] * 8)
             self.assertEqual(set(original.parent.iterdir()), {original, forked})
             self.assertEqual(forked.read_bytes(), fork_bytes)
 

@@ -31,6 +31,17 @@ class HistoryReplay:
     path: Path
 
 
+@dataclass
+class WorkspaceLaunchObservation:
+    """记录同一次工作区启动的本机事实。
+    @param history_published 本次已从外部输入发布已验证历史。
+    @param origin 子进程启动后确认的会话来源。
+    """
+
+    history_published: bool = False
+    origin: str | None = None
+
+
 def _key(fields) -> str:
     # 与发送器相同的有序 JSON 元组，显式编码避免不同身份字段拼接成相同字符串。
     data = json.dumps(fields, ensure_ascii=False, separators=(",", ":")).encode()
@@ -105,6 +116,7 @@ def publish_workspace_history(
     matches: Callable[[Iterator[dict]], bool],
     render: Callable[[str], str] | None,
     *, boundary: str, replay: Callable[[Iterator[dict], str], Path | None] | None = None,
+    observation: WorkspaceLaunchObservation | None = None,
 ) -> str | HistoryReplay:
     """按工作区绑定选择新会话或发布已核对的历史。
 
@@ -115,6 +127,7 @@ def publish_workspace_history(
     @param render 以选中的原生 UUID 组装完整 JSONL。纯新轮传 None，CLI 自行创建对话记录。
     @param boundary 规范化确认历史和生效设置的摘要。
     @param replay 可选，在已推进的同一分叉上为本次启动保存确认前缀。
+    @param observation 可选，同一 CLI 启动的外部历史发布记录。
     @return 本次会话 UUID，或带临时确认前缀的同一分叉。
     """
     if str(UUID(native_id)) != native_id or UUID(native_id).version != 4:
@@ -134,6 +147,8 @@ def publish_workspace_history(
             except FileNotFoundError:
                 if render is not None:
                     atomic_text(project / name, render(candidate), replace=False)
+                    if observation is not None:
+                        observation.history_published = True
                 return candidate
             with stream:
                 if matches(_main_history(stream, work, candidate)):
@@ -165,6 +180,7 @@ def launch_workspace_cli(
     initialize_profile: Callable[[Path], None] | None = None,
     prepare_history: Callable[[Path, Path, str], str | HistoryReplay] | None = None,
     recover_incomplete_history: bool = False,
+    observation: WorkspaceLaunchObservation | None = None,
 ) -> Popen:
     """在该账号发送器绑定的目录启动交互 CLI，继承事件源已分配的 PTY。
 
@@ -182,6 +198,7 @@ def launch_workspace_cli(
     @param initialize_profile 可选，新会话由受信控制端为已核验目录初始化独立配置。
     @param prepare_history 可选，在已核验工作区选会话及临时确认前缀。恢复要求合法历史，纯新轮要求所选 UUID 尚无历史。
     @param recover_incomplete_history 仅已核对的旧工具回执可在原档缺少主轮时另开 CLI。
+    @param observation 可选，写入实际启动所用的会话来源。
     @return 由事件源负责监督与回收的官方进程。
     """
     if (
@@ -257,7 +274,7 @@ def launch_workspace_cli(
             initialize_profile(work)
         # 真实 cwd 由已核验的目录描述符确定，Windows 和远程路径始终留在原始 Messages 正文中。
         descriptors = (cwd,) if program_fd is None else (cwd, program_fd)
-        return Popen(
+        process = Popen(
             ["/usr/bin/setsid", "--ctty", program, *arguments, *session_args],
             cwd=f"/proc/self/fd/{cwd}",
             pass_fds=(*descriptors, *inherited_fds),
@@ -266,3 +283,11 @@ def launch_workspace_cli(
             stderr=terminal_fd,
             env={**environment, "CLAUDE_CONFIG_DIR": str(config_dir)},
         )
+        if observation is not None:
+            if history is None:
+                observation.origin = "new_session"
+            elif observation.history_published:
+                observation.origin = "external_import"
+            else:
+                observation.origin = "disk_resume"
+        return process
