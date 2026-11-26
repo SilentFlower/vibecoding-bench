@@ -32,6 +32,11 @@ from zlib import compress, crc32
 
 from fixtures.native_model_send.agent_progress import model_reply as agent_progress_model_reply, verify_agent_progress
 from fixtures.native_model_send.fixture_tunnel import _relay
+from fixtures.native_model_send.stock_messages import (
+    POLICIES as STOCK_POLICIES,
+    model_reply as stock_model_reply,
+    verify_stock_client,
+)
 from fixtures.native_model_send.tui_startup_trace import MODEL_BODY_TRACE, THINKING_SUMMARIES_SETTING, startup_event
 from verify_tui_concurrency import frame
 from verify_tui_final_tls import call, encoded, serve, stop, wait_for
@@ -273,7 +278,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            history_cache_markers=False, history_cache_ttl=None, history_cache_scope=None,
            cache_capability=None, message_system_roles=False,
            structured_output=False, forced_tool_choice=None, no_tool_choice=False, auxiliary_mode=None,
-           auxiliary_kind="title", auxiliary_sample=None, agent_progress=None):
+           auxiliary_kind="title", auxiliary_sample=None, agent_progress=None, stock_client=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -287,6 +292,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param history_tool_blocks 是否核对已完成工具结果的原始文本块。
     @param previous 可选，旧发行源码、网关、发送器三个离线制品。
     @param failure_boundaries 是否分别在模型收件前后切断隔离连接。
+    @param stock_client 是否通过真实外部 CLI 验证完整 V2 输入与工具回执。
     @param current_text_blocks 是否验证本轮文本块顺序及边界归属。
     @param signed_tool_history 是否核对隔离模型原工具轮的签名块。
     @param signed_tool_response 可选，模拟空思考正文或缺少助手模型的隔离响应。
@@ -355,6 +361,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     deny_proxy = False
     denied_tunnels = []
     finish_stream = Event()
+    stock_homes = tuple(temporary / f"stock-{policy}" for policy in STOCK_POLICIES) if stock_client else ()
 
     class Receiver(QuietHandler):
         """以生产主机名的临时证书接收原生请求，返回固定工具或文本。"""
@@ -407,7 +414,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 sleep(SLOW_MODEL_DELAY)
             restart = any(b.get("text") == AFTER_RESTART for row in body["messages"] for b in blocks(row))
             prefix = b""
-            if agent_progress:
+            if stock_client:
+                wire = stock_model_reply(body, stock_homes, FINAL)
+            elif agent_progress:
                 wire = agent_progress_model_reply(len(received) - 1, body, agent_progress, fixture_tool_sse, message_sse, frame)
             elif is_auxiliary:
                 if auxiliary_mode == "tool-output":
@@ -623,7 +632,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             return json.loads(raw)
 
         manage("PUT", "settings", {"allowed_user_agents": "",
-                                   "request_diagnostics_log_mode": "info" if inspect_model_body or agent_progress else "debug"})
+                                   "request_diagnostics_log_mode": "info" if (
+                                       inspect_model_body or agent_progress or stock_client
+                                   ) else "debug"})
         if auxiliary_mode:
             manage("PUT", "settings", {
                 f"intercept_warmup_{auxiliary_kind}_enabled": "true" if auxiliary_mode == "mock" else "false",
@@ -662,6 +673,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                "request_backend_revision": account["request_backend_revision"]})
         token, foreign = (manage("POST", "tokens", {"name": name, "allowed_accounts": str(identifier)})["token"]
                           for name in ("cold-history-owner", "cold-history-foreign"))
+        if stock_client:
+            return verify_stock_client(manage, token, identifier, received, stock_homes, FINAL)
         if agent_progress:
             return verify_agent_progress(manage, token, foreign, received, temporary / "gateway.db", agent_progress,
                                          checked_messages, wait_for)
@@ -3055,6 +3068,7 @@ def main():
     scenario.add_argument("--interleaved-suggestion", choices=("forward", "mock", "pooled", "pool-unsupported", "tool-output"))
     parser.add_argument("--suggestion-request", type=Path, help="官方 CLI 隔离模型导出的建议请求")
     scenario.add_argument("--agent-progress", type=Path, help="官方父子轮与固定进度查询的隔离样本")
+    scenario.add_argument("--stock-client", action="store_true", help="用固定原版 CLI 验证公开 V2 的 Read 往返")
     scenario.add_argument("--thinking-display-contract", choices=tuple(THINKING_DISPLAY_DEFAULTS))
     scenario.add_argument("--history-png", action="store_true")
     scenario.add_argument("--history-images", action="store_true")
@@ -3070,6 +3084,8 @@ def main():
     args = parser.parse_args()
     if args.current_image_ending == "image" and not args.current_images:
         parser.error("--current-image-ending 需要同用 --current-images")
+    if args.stock_client and args.v1_runtime:
+        parser.error("--stock-client 使用 V2 账号")
     if bool(args.interleaved_title) != bool(args.title_request):
         parser.error("--interleaved-title 与 --title-request 需要一起使用")
     if bool(args.interleaved_suggestion) != bool(args.suggestion_request):
@@ -3117,6 +3133,7 @@ def main():
         proof = verify(args.gateway, args.sender, Path(directory),
                        restart_history=args.restart_history, text_input=args.text_input,
                        system_policy=args.system_policy, toggle_pending_policy=args.toggle_pending_policy,
+                       stock_client=args.stock_client,
                        tool_policy=args.tool_policy, recover_pending=args.recover_pending_tool,
                        output_effort=args.output_effort, history_png=args.history_png,
                        history_images=args.history_images, history_tool_blocks=args.history_tool_blocks,
