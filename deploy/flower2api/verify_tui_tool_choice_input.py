@@ -114,13 +114,14 @@ def verify(binary, folder):
             (declared_count,) = server.tool_lists[before_lists:]
             assert declared_count == 2 and body["model"] == MODEL, (label, body)
             native = {tool["name"]: tool for tool in body["tools"]}
-            assert native.keys() == expected and body.get("tool_choice") in (None, {"type": "auto"}), (label, body)
+            assert native.keys() == expected and "tool_choice" not in body, (label, body)
             source_tools = {first: TOOL, second: SECOND_TOOL}
             assert all(native[name]["input_schema"] == source_tools[name]["input_schema"] for name in expected)
             assert sum(QUESTION in b.get("text", "") for r in body["messages"] if r["role"] == "user"
                        for b in blocks(r)) == 1
             results[label] = {**record, "cli_flags": flags, "declared_count": declared_count,
                               "model_tools": sorted(native), "model_tool_choice": body.get("tool_choice"),
+                              "model_tool_choice_present": "tool_choice" in body,
                               "completed_direct_reply": True}
         assert not server.tool_calls, server.tool_calls
     with binary.open("rb") as program:

@@ -2423,7 +2423,7 @@ def verify_forced_tool_choice(manage, token, identifier, received, sender_status
     cases = {}
     tools = [TOOL, SECOND_TOOL]
 
-    def post(body, phase, expected_status):
+    def post(body, phase, expected_status, *, new_auto=False):
         before = len(received)
         ingress_digest = sha256(encoded(body)).hexdigest()
         startup_event("forced_tool_ingress", phase=phase, session_id=headers["x-session-id"],
@@ -2441,18 +2441,30 @@ def verify_forced_tool_choice(manage, token, identifier, received, sender_status
             return raw, proof
         ((digest, model, _),), (claim,) = received[before:], claims
         assert proof["attempt_count"] == proof["model_posts"] == 1 and claim["sha256"] == digest, (phase, proof)
-        assert not claim["from_interactive_cli"] and not claim["uses_native_history"], (phase, claim)
-        assert claim["cli_sha256"] and claim["cli_sha256"] != digest, (phase, claim)
-        assert claim["cli_tool_choice"] in (None, {"type": "auto"}), (phase, claim)
-        assert model["tool_choice"] == body["tool_choice"] and model["tools"] == tools, (phase, model)
-        assert model["thinking"] == body["thinking"], (phase, model)
+        if new_auto:
+            assert claim["from_interactive_cli"] and claim["uses_native_history"] and claim["cli_sha256"] == digest, claim
+            (attempt,) = manage("GET", "request-diagnostics/" + request_id)["attempts"]
+            assert attempt["context"]["tui_body_source"] == "interactive_cli", attempt
+            question = body["messages"][-1]["content"]
+            assert sum(block.get("text") == question for row in model["messages"] if row["role"] == "user"
+                       for block in blocks(row)) == 1, (phase, model)
+            proof.update(provider_path="interactive_cli", model_body_sha256=digest, cli_body_sha256=claim["cli_sha256"],
+                         attempt_id=attempt["attempt_id"], new_question_count=1,
+                         model_tools=verify_automatic_model_tools(model, tools))
+        else:
+            assert not claim["from_interactive_cli"] and not claim["uses_native_history"], (phase, claim)
+            assert claim["cli_sha256"] and claim["cli_sha256"] != digest, (phase, claim)
+            assert claim["cli_tool_choice"] is None, (phase, claim)
+            assert model["tool_choice"] == body["tool_choice"] and model["tools"] == tools, (phase, model)
+            assert model["thinking"] == body["thinking"], (phase, model)
+            proof.update(provider_path="account_sender", model_body_sha256=digest, model_tool_choice=model["tool_choice"],
+                         model_tools=[tool["name"] for tool in model["tools"]],
+                         cli_body_sha256=claim["cli_sha256"], cli_tool_choice=claim["cli_tool_choice"],
+                         cli_tool_names=claim["cli_tool_names"])
         result = [(r["role"], b) for r in body["messages"] for b in blocks(r) if b["type"] in ("tool_use", "tool_result")]
         observed = [(r["role"], b) for r in model["messages"] for b in blocks(r) if b["type"] in ("tool_use", "tool_result")]
         assert observed == result, (phase, observed)
-        proof.update(provider_path="account_sender", model_body_sha256=digest, model_tool_choice=model["tool_choice"],
-                     model_tools=[tool["name"] for tool in model["tools"]], tool_history=observed,
-                     cli_body_sha256=claim["cli_sha256"], cli_tool_choice=claim["cli_tool_choice"],
-                     cli_tool_names=claim["cli_tool_names"])
+        proof["tool_history"] = observed
         return raw, proof
 
     policies = ("append",) if restart else ("append", "replace", "user_reminder")
@@ -2505,6 +2517,15 @@ def verify_forced_tool_choice(manage, token, identifier, received, sender_status
             assert reply["stop_reason"] == "end_turn" and reply["content"] == [{"type": "text", "text": FINAL}], raw
             final.update(client_text=reply["content"][0]["text"], client_stop_reason=reply["stop_reason"])
             cases[phase] = {"initial": first, "forced_receipt": tool_proofs[-1], "auto_receipt": final, "client_tool_calls": 2}
+            if not metadata_only:
+                # 旧发送器交付完整答复后，原生新轮可从客户端确认的完整历史开始。
+                question = {"role": "user", "content": "工具轮完成后，请回答独立的合成问题 " + phase}
+                history = [*messages, {"role": "assistant", "content": reply["content"]}]
+                fresh = {**final_request, "messages": [*history, question]}
+                raw, next_question = post(fresh, phase + "_next_auto_question", 200, new_auto=True)
+                reply = json.loads(raw)
+                assert reply["stop_reason"] == "end_turn" and reply["content"] == [{"type": "text", "text": FINAL}], raw
+                cases[phase]["next_auto_question"] = next_question
             if preserved:
                 archive, snapshot, binding_file, binding_snapshot = preserved
                 assert archive.read_bytes() == snapshot and binding_file.read_bytes() == binding_snapshot
