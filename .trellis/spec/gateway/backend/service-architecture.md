@@ -167,6 +167,7 @@ src/tlsfp/
 - `deploy/flower2api/verify_tui_cold_history.py --mixed-release` 用两个版本的真实网关、发送器和事件源验收。隔离编排夹具持续暴露受信旧本机绑定；公开入口核对新轮拒绝、旧轮回执的归属和单次收口，并在新代次核对原生正文及定向采集。
 - `deploy/flower2api/verify_tui_mixed_images.py` 使用两批配对的 `verification-control`、`verification-account` 镜像及固定 CLI 安装卷。四个角色容器共享仅回环网络。实际网关、发送器及事件源来自各自镜像。验收证据记录四个实际镜像 ID 和源码修订。
 - `deploy/flower2api/verify_tui_cold_history.py --failure-boundaries` 在真实 V2 新轮的账号代理握手和隔离模型收件后分别断开连接。核对模型投递次数分别为零和一。后续独立新轮成功一次，采集正文对应真实 CLI。
+- `deploy/flower2api/verify_tui_cold_history.py --reconnect-tool-stream` 在隔离模型发送工具续轮首段后断开公开 SSE。六秒后接回仍在生成的响应，再次断开后读取已保存的原响应。核对相同消息和工具 ID、两次重读零模型投递、新工具回执收口及旧回执拒绝。
 - SQLite 与 PostgreSQL 迁移测试覆盖历史记录、同一 RT 重复发送保护和同 RT 刷新成功后的状态清理。
 
 ## Scenario: 原生持续预热、实时就绪与请求进程诊断
