@@ -73,7 +73,7 @@ def install_source():
 
 def verify(gateway, sender, temporary, *, restart_history=False, text_input=False, system_policy=False,
            toggle_pending_policy=False, tool_policy=None, recover_pending=False, output_effort=False,
-           history_png=False):
+           history_png=False, history_tool_blocks=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -83,6 +83,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param recover_pending 是否结束等待进程并在发送器重启后恢复真实工具回执。
     @param output_effort 是否核对 CLI 实际生成的推理强度和 Token 上限。
     @param history_png 是否核对用户历史里的内嵌 PNG。
+    @param history_tool_blocks 是否核对已完成工具结果的原始文本块。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -253,9 +254,12 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         if tool_policy:
             assert manage("PUT", f"accounts/{identifier}", {"client_system_prompt_policy": tool_policy})[
                 "client_system_prompt_policy"] == tool_policy
+        old_result = "已完成的旧工具结果。"
+        if history_tool_blocks:
+            old_result = [{"type": "text", "text": text} for text in ("已完成的旧工具结果。", "保持第二段结果。")]
         messages[3:3] = [
             {"role": "assistant", "content": [{"type": "tool_use", "name": "OldNote", "id": PAST_ID, "input": ARGS}]},
-            {"role": "user", "content": [{"type": "tool_result", "tool_use_id": PAST_ID, "content": "已完成的旧工具结果。"}]},
+            {"role": "user", "content": [{"type": "tool_result", "tool_use_id": PAST_ID, "content": old_result}]},
         ]
         messages.append({"role": "user", "content": QUESTION})
         # 历史中的旧工具结果和当前问题之间保留完成边界，CLI 启动后只提交当前问题。
@@ -323,7 +327,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         duplicate, _ = call(18090, "POST", "/v1/messages", token, follow, headers)
         assert duplicate == 400 and len(received) == 2, (duplicate, len(received))
         assert callbacks == [NEW_ID]
-        verify_model(received, policy=tool_policy or "append")
+        verify_model(received, policy=tool_policy or "append", old_content=old_result)
         captures = verify_captures(manage, received, account_token)
         for attempt, request_body, reply_id, model_id in zip(
             captures, (body, follow), (events[0]["message"]["id"], final["id"]),
@@ -338,6 +342,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                  "changed_tool_arguments_status": wrong_arguments,
                  "duplicate_receipt_status": duplicate, "tls_versions": [tls for _, _, tls in received],
                  "proxy_connections": len(proxy_targets), "attempts": captures}
+        if history_tool_blocks:
+            proof["historical_tool_result_blocks"] = len(old_result)
         if toggle_pending_policy:
             proof["pending_policy"] = "append"
         if tool_policy:
@@ -595,9 +601,9 @@ def find_blocks(body, key, identifier):
     return [(row["role"], b) for row in body["messages"] for b in blocks(row) if b.get(key) == identifier]
 
 
-def verify_model(received, *, policy):
+def verify_model(received, *, policy, old_content):
     """检验历史、系统提示、原生动态 MCP 和续轮。@param received HTTPS 实收。
-    @param policy 原工具轮的有效动作。@return 无。
+    @param policy 原工具轮的有效动作。@param old_content 已确认的旧工具结果。@return 无。
     """
     (_, first, _), (_, second, _) = received
     for body in (first, second):
@@ -622,7 +628,7 @@ def verify_model(received, *, policy):
         (old,) = find_blocks(body, "id", PAST_ID)
         (old_result,) = find_blocks(body, "tool_use_id", PAST_ID)
         assert old == ("assistant", {"type": "tool_use", "id": PAST_ID, "name": "OldNote", "input": ARGS})
-        assert old_result[0] == "user" and old_result[1]["content"] == "已完成的旧工具结果。"
+        assert old_result[0] == "user" and old_result[1]["content"] == old_content
         (tool,) = [t for t in body["tools"] if t.get("description") == TOOL["description"]]
         assert tool["name"] == "mcp__flower__LookupNote" and tool["input_schema"] == TOOL["input_schema"]
     assert not find_blocks(first, "id", NEW_ID) and not find_blocks(first, "tool_use_id", NEW_ID)
@@ -677,6 +683,7 @@ def main():
     scenario.add_argument("--recover-pending-tool", action="store_true")
     scenario.add_argument("--output-effort", action="store_true")
     scenario.add_argument("--history-png", action="store_true")
+    scenario.add_argument("--history-tool-blocks", action="store_true")
     args = parser.parse_args()
     if (not Path("/.dockerenv").exists() or {name for _, name in if_nameindex()} != {"lo"}
             or Path("/run/v3/sender.json").exists() or any(Path("/native").glob("*"))):
@@ -687,7 +694,8 @@ def main():
                        restart_history=args.restart_history, text_input=args.text_input,
                        system_policy=args.system_policy, toggle_pending_policy=args.toggle_pending_policy,
                        tool_policy=args.tool_policy, recover_pending=args.recover_pending_tool,
-                       output_effort=args.output_effort, history_png=args.history_png)
+                       output_effort=args.output_effort, history_png=args.history_png,
+                       history_tool_blocks=args.history_tool_blocks)
         print(json.dumps(proof, ensure_ascii=False))
 
 

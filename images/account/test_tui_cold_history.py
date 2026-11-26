@@ -339,6 +339,24 @@ class ColdHistoryTests(TestCase):
         cached["system"][0]["cache_control"] = {"type": "ephemeral"}
         self.assertIsNone(ColdHistory.from_request(cached))
 
+    def test_preserves_completed_tool_result_text_blocks(self):
+        """导入旧工具结果的文本块顺序及配对，扩展块沿原入口合同。@return 无。"""
+        body = deepcopy(self.body)
+        result = body["messages"][2]["content"][0]
+        result["content"] = [
+            {"type": "text", "text": "旧工具结果第一段"},
+            {"type": "text", "text": "旧工具结果第二段"},
+        ]
+        work, session = Path("/native/workspace"), str(uuid4())
+        with TemporaryDirectory() as directory, ExitStack() as stack:
+            config = Path(directory)
+            self.assertEqual(ColdHistory.from_request(body).import_session(config, work, session), session)
+            path = _resume_path(stack, config, work, session, required=True)
+            row = json.loads(path.read_bytes().splitlines()[2])
+            self.assertEqual(row["message"], {"role": "user", "content": [result]})
+        result["content"][1]["cache_control"] = {"type": "ephemeral"}
+        self.assertIsNone(ColdHistory.from_request(body))
+
     def test_replace_distinguishes_omitted_and_empty_system(self):
         """省略保留工作正文，显式空值使用空的原生替换文件。@return 无。"""
         body = deepcopy(self.body)

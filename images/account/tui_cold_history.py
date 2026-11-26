@@ -46,6 +46,12 @@ def _inline_png(block):
         return False
 
 
+def _text_result_blocks(content):
+    return isinstance(content, list) and bool(content) and all(
+        isinstance(block, dict) and _plain_text(block) for block in content
+    )
+
+
 def _closed_history(rows, *, result_types=(str,)):
     pending, seen = set(), set()
     for row in rows:
@@ -64,7 +70,8 @@ def _closed_history(rows, *, result_types=(str,)):
                     and block.keys() <= {"type", "tool_use_id", "content", "is_error"}
                     and isinstance(block.get("tool_use_id"), str)
                     and block["tool_use_id"] not in results
-                    and isinstance(block.get("content"), result_types)
+                    and (isinstance(block.get("content"), result_types)
+                         or _text_result_blocks(block.get("content")))
                     and type(block.get("is_error", False)) is bool):
                 results.add(block["tool_use_id"])
             else:
