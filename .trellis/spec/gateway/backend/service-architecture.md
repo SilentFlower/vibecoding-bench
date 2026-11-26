@@ -46,6 +46,7 @@ src/tlsfp/
 ### 3. Contracts
 
 - 创建、编辑、列表、OAuth 默认与表单重置同步后端值。切换进入现有排空门禁；非 V3 同样检查本地活动。状态快捷操作单独保存该字段，避免用旧 Account 快照覆盖凭据。
+- 当前生效内核为 `native293` 时，管理视图回报只读 `client_system_prompt_policy: "replace"`，与 V2 保存值各自独立。账号页显示默认替换动作。普通 Messages 省略 `system` 时保留 CLI 工作正文，非空业务文本按顺序替换，显式空串或空数组清空工作正文。CLI 身份和计费块仍由运行时组装。
 - 普通准入、账号选择、凭据解析及加权许可仍由 Gateway 所有。原生分支在 Rust 正文/头部/CCH 重写前接管精确 Messages；保留逻辑 JSON 与 HeaderMap 多值，头值在私有信封中按 Latin-1 字节串传递。
 - 账号 Fast/1M 权限先明确拒绝越权申请；允许时保持原始输入交给二进制。当前 bearer 和受控身份进入工作进程，RT 留在既有凭据所有者。原生池的 Linux x64、身份、封存、预算及回收规则由 [V3 原生 sender](../../orchestrator/backend/account-runtime-v3.md#scenario-v3-原生-sender-共享映像池与资源预算)所有。
 - 每个原生作业最多一次模型提交；签名修复仅在完整收到明确的 `invalid_request_error` 签名 400 后，同账号、冻结版本追加一次 thinking 降级作业。复用 legacy 既有 thinking 转 text、移除 redacted_thinking 及根 thinking 和依赖清理策略；工具历史保持。两次准备与发送共享首次冻结的剩余预算，已耗尽则返回首次 400。普通 400、传输失败及状态不明保持原响应路径；明确 429 由 Gateway 共用分类决定透传、有限退避或换号。legacy 的两阶段 signature 等既有重试沿原路径。调度 submitted 记录每次实际内部 POST，各作业有独立 UUID，收到可信上游观察后各自记录诊断尝试。
@@ -104,6 +105,7 @@ src/tlsfp/
 ### 6. Tests Required
 
 - `account_backend_defaults_validate_and_obey_busy_gate`、`historical_backend_migration_and_account_updates_are_independent`：默认/非法值/忙门禁/两账号和回退。
+- `native293_reports_its_fixed_client_system_prompt_policy` 核对创建、详情、列表、普通编辑及拒绝策略写入。`services/runtime/tests/native/native.test.ts` 的普通 Messages 样本在隔离模型实收核对省略、单文本、显式空和多段提示词。
 - `native_backend_preserves_account_feature_authorization_without_rewriting`：Fast/1M 权限拒绝且正文保持；前端 `npm run build` 及创建/编辑/reset 链路核对。
 - `runtime_transport_test` 覆盖私有 POST 鉴权早于正文、原绑定拒绝、过滤上游保留头和实际状态字节保真。`native_execution_logs_error_event_eof_and_deadline` 核对首响应等待与输入管道阻塞分别受原期限约束，并验证输入超时按提交状态未知处理。
 - `tests/native_signature_fixture.py`经真实Gateway及回环sender覆盖280/293首次400→2xx、续轮单发、同一实际会话跨账号/版本/模型复用、正文与头部会话关联、不同/缺失实际会话独立判断、失败不学习、独立诊断尝试、普通400/业务透传429/提交未知保持单发和预算耗尽；`native_signature_repair`单测覆盖完整思考前缀、不同会话及变更历史隔离、跨模型复用、新建实例重新学习、7天过期及4096项上限。

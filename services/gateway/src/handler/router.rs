@@ -696,6 +696,8 @@ fn account_api_value(account: &Account) -> Value {
             ClientSystemPromptPolicy::Independent
         };
         value["client_system_prompt_policy"] = json!(policy);
+    } else if account.is_claude_code() {
+        crate::service::tui_backend::append_v1_system_prompt(&mut value, &account.request_backend);
     }
     value
 }
@@ -1630,7 +1632,7 @@ async fn update_account(
             .ok_or_else(|| AppError::BadRequest("当前账号的客户端系统提示词动作无效".into()))?;
         let mut view = json!({});
         crate::service::tui_backend::append_view(&state.account_svc, &existing, &mut view).await?;
-        if view.get("client_system_prompt_policy").is_none() {
+        if view["request_backend"] != crate::service::tui_backend::TUI_V2 {
             return Err(AppError::BadRequest(
                 "当前账号内核未提供可保存的提示词动作".into(),
             ));
@@ -1895,7 +1897,7 @@ async fn update_account(
                 {
                     state.account_svc.request_native_wake(id);
                 }
-                let mut result = json!(existing);
+                let mut result = account_api_value(&existing);
                 if system_prompt_changed {
                     crate::service::tui_backend::append_view(
                         &state.account_svc,
@@ -1985,7 +1987,7 @@ async fn update_account(
     {
         state.account_svc.request_native_wake(id);
     }
-    let mut result = json!(existing);
+    let mut result = account_api_value(&existing);
     if system_prompt_changed {
         crate::service::tui_backend::append_view(&state.account_svc, &existing, &mut result)
             .await?;
@@ -3442,7 +3444,7 @@ mod tests {
         normalize_oauth_credential_validity_seconds, validate_model_id_list,
     };
     use crate::config::{AdminConfig, Config, DatabaseConfig, ServerConfig};
-    use crate::model::account::{Account, CanonicalEnvData, CanonicalPromptEnvData};
+    use crate::model::account::{Account, CanonicalEnvData, CanonicalPromptEnvData, TuiSystemPromptPolicy};
     use crate::service::account::{AccountSelectionContext, AccountService};
     use crate::service::gateway::GatewayService;
     use crate::service::oauth::TokenTester;
@@ -4435,6 +4437,54 @@ mod tests {
             json!({"email":"cc-policy@example.invalid","setup_token":"synthetic","client_system_prompt_policy":"user_reminder"}),
         ).await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    /// V1 的固定动作随生效内核回报，暂未交付的动作不会写入 V2 的保存值。@return 无。
+    #[tokio::test]
+    async fn native293_reports_its_fixed_client_system_prompt_policy() {
+        let (app, _, _, _, service) = test_router_with_scheduling(true).await;
+        let (status, created) = account_admin_json(
+            &app,
+            Method::POST,
+            "/admin/accounts",
+            json!({"email":"native-v1@example.invalid","setup_token":"synthetic","request_backend":"native293"}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED);
+        assert_eq!(created["client_system_prompt_policy"], "replace");
+        let id = created["id"].as_i64().unwrap();
+        let path = format!("/admin/accounts/{id}");
+        for action in ["append", "replace", "user_reminder"] {
+            let (status, _) = account_admin_json(
+                &app,
+                Method::PUT,
+                &path,
+                json!({"client_system_prompt_policy":action}),
+            )
+            .await;
+            assert_eq!(status, StatusCode::BAD_REQUEST);
+        }
+        let (status, saved) = account_admin_json(
+            &app,
+            Method::PUT,
+            &path,
+            json!({"name":"已编辑的 V1"}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(saved["client_system_prompt_policy"], "replace");
+        let (status, detail) = account_admin_json(&app, Method::GET, &path, Value::Null).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(detail["client_system_prompt_policy"], "replace");
+        assert_eq!(detail["name"], "已编辑的 V1");
+        let (status, list) =
+            account_admin_json(&app, Method::GET, "/admin/accounts", Value::Null).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(list["data"][0]["client_system_prompt_policy"], "replace");
+        assert_eq!(
+            service.get_account(id).await.unwrap().tui_system_prompt_policy,
+            TuiSystemPromptPolicy::Append
+        );
     }
 
     /// 已验证字段映射必须与精确版本绑定，旧请求观察继续兼容。

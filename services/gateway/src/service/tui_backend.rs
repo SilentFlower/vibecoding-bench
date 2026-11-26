@@ -9,7 +9,7 @@ use tokio::time::{MissedTickBehavior, interval};
 use tracing::{debug, warn};
 
 use crate::error::AppError;
-use crate::model::account::Account;
+use crate::model::account::{Account, TuiSystemPromptPolicy};
 use crate::service::account::{AccountQueue, AccountService};
 use crate::service::runtime_bridge::{account_config_permit, account_route_config_permit};
 use crate::service::runtime_transport::{
@@ -324,6 +324,15 @@ fn view(
     value
 }
 
+/// 回报 V1 已验证的固定动作。@param value 账号管理视图。@param backend 当前生效的转发方式。@return 无。
+pub(crate) fn append_v1_system_prompt(value: &mut Value, backend: &str) {
+    if backend == "native293" {
+        value["client_system_prompt_policy"] = json!(TuiSystemPromptPolicy::Replace);
+    } else if let Some(fields) = value.as_object_mut() {
+        fields.remove("client_system_prompt_policy");
+    }
+}
+
 fn attach_status(
     value: &mut Value,
     account: &Account,
@@ -343,6 +352,8 @@ fn attach_status(
         value["tui_system_prompt_policy_available"] = json!(runtime.is_some_and(|status| {
             status.system_prompt_policy && tui_same_binding(&state.binding, &status.key)
         }));
+    } else {
+        append_v1_system_prompt(value, &state.active);
     }
     if !state.target.is_empty() {
         value["request_backend_wait_reason"] = json!(if runtime

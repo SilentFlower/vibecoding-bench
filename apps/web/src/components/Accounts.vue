@@ -1686,7 +1686,12 @@ async function copyText(text: string) {
               </NoticeStrip>
             </div>
             <ProxyPicker v-model="proxyChoice" :current-label="editingProxyLabel" /></section>
-          <section v-if="!isAgyForm && editing?.tui_system_prompt_policy_available && form.request_backend === 'tui_v2'" class="account-form-section">
+          <section v-if="!isAgyForm && form.request_backend === 'native293'" class="account-form-section">
+            <h3>客户端系统提示词</h3>
+            <p>用客户端指令替换默认工作正文（默认）</p>
+            <p class="form-help">普通 Messages 请求省略指令时保留默认工作正文。显式空值清空工作正文，保留 Claude Code 身份和计费。</p>
+          </section>
+          <section v-else-if="!isAgyForm && editing?.tui_system_prompt_policy_available && form.request_backend === 'tui_v2'" class="account-form-section">
             <ChoiceSelect v-model="form.client_system_prompt_policy" label="客户端系统提示词" :options="[
               {value:'append',label:'追加到原生系统提示词（默认）'},
               {value:'replace',label:'用客户端指令替换默认工作正文'},
