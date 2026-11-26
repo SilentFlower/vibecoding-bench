@@ -207,6 +207,37 @@ class SessionTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     restarted.prepare(child, raw)
 
+    def test_restore_native_receipt_reconstructs_original_root_policy_and_tool_names(self):
+        """恢复只接受同一根轮配置，保留本轮回执内容及原生工具名。@return 无。"""
+        identity = {**self._identity("external-native"), "native_cold_history": True}
+        tool = {"name": "LookupNote", "input_schema": {"type": "object"}}
+        body = {**self._body(), "system": "原轮指令", "tools": [tool]}
+        group = [{"type": "tool_use", "id": "tool_native", "name": tool["name"], "input": {}}]
+        returned = json.loads(self._returning(body, group, "tool_native"))
+        text_result = [{"type": "text", "text": "合成回执"}]
+        returned["messages"][-1]["content"][0]["content"] = text_result
+        with TemporaryDirectory() as root, closing(self._driver()) as first:
+            first.managed_oauth = True
+            first.checkpoints = ReceiptCheckpoints(root)
+            with closing(first.prepare(identity, encode(body))) as initial:
+                plan = initial.actor.cold_history
+                self.assertIsNotNone(plan)
+                self._offered(initial, *group)
+            first.close()
+            continuation = {**identity, "continuation_only": True, "client_system_prompt_policy": "user_reminder"}
+            with closing(self._driver()) as restarted:
+                restarted.managed_oauth = True
+                restarted.checkpoints = ReceiptCheckpoints(root)
+                with self.assertRaisesRegex(ValueError, "unsupported_parameter"):
+                    restarted.prepare(continuation, encode({**returned, "system": "替换已冻结的指令"}))
+                with closing(restarted.prepare(continuation, encode(returned))) as handle:
+                    self.assertEqual(handle.kind, "recovered")
+                    self.assertEqual(handle.actor.cold_history, plan)
+                    recovered = handle.actor.recovery_history
+                    self.assertEqual(recovered.history[-2]["content"][0]["name"], "mcp__flower__LookupNote")
+                    self.assertEqual(recovered.history[-1]["content"][0]["content"], text_result)
+                    self.assertEqual(recovered.system_argument(), ("--append-system-prompt-file", "原轮指令"))
+
     def test_new_tool_immediately_revokes_old_recovery(self):
         """新指令首帧可能已经到达客户端，拒绝重新生成上一份回执。@return 无。"""
         body, identity = self._body(), self._identity("tool-start")

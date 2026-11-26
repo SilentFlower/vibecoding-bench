@@ -332,6 +332,7 @@ class _Actor:
         self.port = None
         self.worker = None
         self.cold_history = None
+        self.recovery_history = None
 
     def model_authorization(self):
         """读取当前模型回环的账号授权。@return 当前回合 AT 或原会话口令。"""
@@ -429,8 +430,9 @@ class _Actor:
                                 },
                             }}}))
                             opts.extend(["--mcp-config", str(mcp)])
-                        launch_options["prepare_history"] = plan.import_session
-                        resume = bool(plan.history)
+                        launch_plan = self.recovery_history or plan
+                        launch_options["prepare_history"] = launch_plan.import_session
+                        resume = bool(launch_plan.history)
                     master, slave = os.openpty()
                     self.master = master
                     fcntl.ioctl(
@@ -660,6 +662,7 @@ class _Actor:
             self.receipt_revision = self.driver.checkpoints.offer(
                 self.identity, self.reservation["session_id"], self.history,
                 [receipt_snapshot(b) for b in self.expected], _RECEIPT_SECONDS,
+                native=self.cold_history.receipt_boundary() if self.cold_history is not None else None,
             )
             self.wait_until = time.monotonic() + _RECEIPT_SECONDS
             for offer in self.agent_offers.values():
@@ -702,6 +705,14 @@ class _Actor:
                 and set(ids) == self.delivered == set(handle.answers)
                 and len(ids) == len(self.delivered)
             )
+        if self.recovery_history is not None:
+            # 恢复会话可能在已闭合的结果后生成额外助理边界。核对完整历史中的原调用 ID 后再查本轮标记。
+            expected_ids = set(handle.answers)
+            ids = [block.get("tool_use_id") for row in rows if isinstance(row.get("content"), list)
+                   for block in row["content"] if block.get("type") == "tool_result"
+                   and block.get("tool_use_id") in expected_ids]
+            if set(ids) != expected_ids or len(ids) != len(expected_ids):
+                return False
         # 2.1.293 在新轮或恢复后都只用最近用户输入及紧随的系统行认领本次许可。
         last_user = next(
             (
@@ -1454,9 +1465,15 @@ class SessionDriver:
             return result
 
         checkpoint = None
+        native_checkpoint = None
         if not summary and (returned or reservation["continuation_only"]):
             if not returned:
                 raise ValueError("缺少原轮工具结果")
+            tool_results_only = all(
+                row["role"] == "user" and isinstance(row["content"], list) and row["content"]
+                and all(block["type"] == "tool_result" for block in row["content"])
+                for row in messages[offered + 1:]
+            )
             request = _receipt_request(body, reservation)
             with self.lock:
                 while (actor := self.sessions.get(actor_key)) is not None:
@@ -1473,7 +1490,7 @@ class SessionDriver:
                     checkpoint = self.checkpoints.find(actor_key)
                     if checkpoint is None:
                         raise InputRejection("unrecoverable_tool")
-                    branch, previous, expected, prior_request, revision = checkpoint
+                    branch, previous, expected, prior_request, revision, native_checkpoint = checkpoint
                     answers = tool_receipts(messages, previous, expected,
                                             input_format=reservation.get("input_format"), checkpoint=True)
                     if prior_request is not None and prior_request != request:
@@ -1514,25 +1531,33 @@ class SessionDriver:
                         plan = ColdHistory.from_request(
                             {**body, "messages": messages[:prompt_index]}, actor.cold_history.system_policy,
                         )
-                        if not native_cache_policy or plan != actor.cold_history or any(
-                            row["role"] != "user" or not isinstance(row["content"], list)
-                            or not row["content"] or any(block["type"] != "tool_result" for block in row["content"])
-                            for row in messages[offered + 1:]
-                        ):
+                        if not native_cache_policy or plan != actor.cold_history or not tool_results_only:
                             raise InputRejection("unsupported_parameter")
                     actor.claim = handle
                     return handle
 
-        cold = None
+        cold = recovery_history = None
         system_policy = reservation.get("client_system_prompt_policy", "append")
         is_native = native_input(body, reservation.get("input_format"))
-        if (self.managed_oauth and reservation.get("native_cold_history") is True
-                and native_cache_policy and agent_hint is None and checkpoint is None
-                and not is_native):
+        native_history_allowed = (self.managed_oauth and reservation.get("native_cold_history") is True
+                                  and native_cache_policy and agent_hint is None and not is_native)
+        if native_checkpoint is not None:
+            if not native_history_allowed or not tool_results_only:
+                raise InputRejection("unsupported_parameter")
+            cold = ColdHistory.from_request(
+                {**body, "messages": messages[:native_checkpoint["prompt_index"]]}, native_checkpoint["system_policy"],
+            )
+            if cold is None or cold.receipt_boundary() != native_checkpoint:
+                raise InputRejection("unsupported_parameter")
+            recovery_history = cold.resume_receipts(messages)
+            if recovery_history is None:
+                raise InputRejection("unsupported_parameter")
+        elif native_history_allowed and checkpoint is None:
             cold = ColdHistory.from_request(body, system_policy)
-        if cold is None and system_policy != "append" and not is_native:
+        if cold is None and system_policy != "append" and not is_native and checkpoint is None:
             raise InputRejection("unsupported_parameter")
-        prompt = cold.submitted_prompt() if cold is not None else prompt_text(messages)
+        launch_plan = recovery_history or cold
+        prompt = launch_plan.submitted_prompt() if launch_plan is not None else prompt_text(messages)
         with self.lock:
             if agent_hint is not None and not summary and (
                 actor_key in self.sessions
@@ -1629,6 +1654,7 @@ class SessionDriver:
                             offer,
                         )
                         actor.cold_history = cold
+                        actor.recovery_history = recovery_history
                         if checkpoint is not None:
                             actor.receipt_revision = revision
                         if offer is not None:

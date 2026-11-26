@@ -1,19 +1,19 @@
 """固定 2.1.293 交互 CLI 的普通 Messages 历史导入与受管 MCP 描述。"""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
-from hashlib import sha256
 from itertools import zip_longest
-import json
 import re
 from uuid import uuid4
 
 from tui_messages import encode
+from tui_reconnect import digest
 from tui_workspace_launch import publish_workspace_history
 
 
 MCP_SERVER = "flower"
 MCP_PREFIX = f"mcp__{MCP_SERVER}__"
+RESUME_PROMPT = "Continue from where you left off."
 
 
 def _blocks(row):
@@ -26,7 +26,7 @@ def _plain_text(block):
             and isinstance(block["text"], str) and bool(block["text"]))
 
 
-def _closed_history(rows):
+def _closed_history(rows, *, result_types=(str,)):
     pending, seen = set(), set()
     for row in rows:
         results = set()
@@ -44,7 +44,7 @@ def _closed_history(rows):
                     and block.keys() <= {"type", "tool_use_id", "content", "is_error"}
                     and isinstance(block.get("tool_use_id"), str)
                     and block["tool_use_id"] not in results
-                    and isinstance(block.get("content"), str)
+                    and isinstance(block.get("content"), result_types)
                     and type(block.get("is_error", False)) is bool):
                 results.add(block["tool_use_id"])
             else:
@@ -122,6 +122,49 @@ class ColdHistory:
             return f"{self.prompt}\n\n{self._reminder()}"
         return self.prompt
 
+    def _scope(self):
+        return (self.model, self.system_policy, self.system, self.tools, self.max_tokens, self.thinking)
+
+    def receipt_boundary(self):
+        """冻结必须随原工具回执复用的根轮输入。@return 不含客户原文的边界。"""
+        return {
+            "prompt_index": len(self.history) + 1,
+            "system_policy": self.system_policy,
+            "digest": digest([self._scope(), self.history, self.prompt]),
+        }
+
+    def resume_receipts(self, messages):
+        """将已认领的原生工具组纳入恢复历史。
+        @param messages 已核对原历史、调用和回执的完整公开消息。@return 本次原生恢复计划。
+        """
+        history = []
+        for index, row in enumerate(messages):
+            role = row["role"]
+            if role not in ("user", "assistant"):
+                return None
+            content = _blocks(row)
+            if role == "assistant" and index > len(self.history):
+                renamed = []
+                for block in content:
+                    if block["type"] == "tool_use":
+                        name = MCP_PREFIX + block["name"]
+                        if name not in self.tools:
+                            return None
+                        block = {**block, "name": name}
+                    renamed.append(block)
+                content = renamed
+            if role == "user":
+                content = [{**block, "content": block.get("content", "")} if block["type"] == "tool_result"
+                           else block for block in content]
+            if history and history[-1]["role"] == role:
+                history[-1]["content"] += content
+            else:
+                history.append({"role": role, "content": list(content)})
+        if not _closed_history(history, result_types=(str, list)):
+            return None
+        # 交互 CLI 从闭合的工具结果开始读取。新模型步骤仍由受管 PTY 标记认领。
+        return replace(self, history=history, prompt=RESUME_PROMPT)
+
     def _reminder(self):
         return f"<system-reminder>\n{self.system}\n</system-reminder>"
 
@@ -146,10 +189,7 @@ class ColdHistory:
                 blocks = [*blocks, {"type": "text", "text": self._reminder()}]
             history.append((row["role"], blocks))
 
-        boundary = sha256(json.dumps(
-            (self.model, self.system_policy, self.system, self.tools, self.max_tokens, self.thinking, history),
-            ensure_ascii=False, separators=(",", ":"), sort_keys=True, allow_nan=False,
-        ).encode()).hexdigest()
+        boundary = digest((*self._scope(), history))
         return publish_workspace_history(
             config, work, native_id, lambda rows: self._matches_history(rows, history),
             (lambda session_id: self._transcript(work, session_id, history)) if history else None,

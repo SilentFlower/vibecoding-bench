@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 from secrets import token_hex
 from shutil import copy2, copytree
+from signal import SIGKILL
 from socket import create_connection, if_nameindex
 from sqlite3 import connect
 import ssl
@@ -70,13 +71,14 @@ def install_source():
 
 
 def verify(gateway, sender, temporary, *, restart_history=False, text_input=False, system_policy=False,
-           toggle_pending_policy=False, tool_policy=None):
+           toggle_pending_policy=False, tool_policy=None, recover_pending=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
     @param system_policy 是否按账号验证原生正文的三种动作。
     @param toggle_pending_policy 是否在客户端工具等待时更改账号动作。
     @param tool_policy 工具往返前显式设置的 V2 动作。
+    @param recover_pending 是否结束等待进程并在发送器重启后恢复真实工具回执。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -190,6 +192,16 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         def sender_state():
             return json.loads(call(8091, "GET", "/internal/status", secret)[1]).get("tui_v2", {})
 
+        def restart(process):
+            wait_for(lambda: sender_state().get("idle"))
+            stop(process)
+            restarted = start_sender()
+            try:
+                wait_for(lambda: sender_state().get("ready") and sender_state().get("idle"))
+            except AssertionError as error:
+                raise AssertionError(("账号发送器重启后未就绪", restarted.poll(), sender_state())) from error
+            return restarted
+
         wait_for(lambda: sender_state().get("ready"))
 
         def manage(method, path, body=None):
@@ -270,6 +282,22 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                       (json.dumps([NEW_ID]), "!" + json.dumps([NEW_ID]))).fetchall()
             # 公开拒绝完成时，正确回执已经可以重新认领，查询不等待后台归还。
             assert stored == [(json.dumps([NEW_ID]),)], stored
+        if recover_pending:
+            marker = ("--name=" + headers["x-session-id"]).encode()
+            original, = [int(path.parent.name) for path in Path("/proc").glob("[0-9]*/cmdline")
+                         if fixture_command_has(path, marker)]
+            os.kill(original, SIGKILL)
+            source = restart(source)
+            assert not Path(f"/proc/{original}").exists()
+            (binding_file,) = Path("/native/tui-workspaces").glob("*.json")
+            original_id = json.loads(binding_file.read_text())["native_session_id"]
+            projects = Path("/native/tui-sessions") / original_id / "home/.claude/projects"
+            (original_file,) = projects.glob("*/" + original_id + ".jsonl")
+            original_history = original_file.read_bytes()
+            manage("PUT", f"accounts/{identifier}", {"client_system_prompt_policy": "user_reminder"})
+            modified_system = {**follow, "system": "更改已经冻结的指令"}
+            changed_policy, response = call(18090, "POST", "/v1/messages", token, modified_system, headers)
+            assert changed_policy == 422 and len(received) == 1, (changed_policy, response, len(received))
         status, raw = call(18090, "POST", "/v1/messages", token, follow, headers)
         if status != 200:
             trace = [{key: row.get(key) for key in ("status_code", "outcome", "error_stage", "attempt_count")}
@@ -299,6 +327,16 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             proof["pending_policy"] = "append"
         if tool_policy:
             proof["tool_policy"] = tool_policy
+        if recover_pending:
+            assert original_file.read_bytes() == original_history
+            _, native_recovery, _ = received[-1]
+            restored_id = json.loads(native_recovery["metadata"]["user_id"])["session_id"]
+            assert restored_id != original_id and (original_file.parent / (restored_id + ".jsonl")).is_file()
+            restored_text = [(row["role"], block.get("text")) for row in native_recovery["messages"] for block in blocks(row)]
+            assert restored_text.count(("user", "Continue from where you left off.")) == 1
+            proof["recovered_pending_tool"] = {"changed_system_http": changed_policy, "frozen_policy": "append",
+                                              "old_session_id": original_id, "recovered_session_id": restored_id,
+                                              "original_history_preserved": True}
         if restart_history:
             wait_for(lambda: sender_state().get("idle"))
             (binding_file,) = Path("/native/tui-workspaces").glob("*.json")
@@ -308,16 +346,6 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             projects = Path("/native/tui-sessions") / native_id / "home/.claude/projects"
             (history_file,) = projects.glob("*/" + native_id + ".jsonl")
             original = history_file.read_bytes()
-            def restart(process):
-                wait_for(lambda: sender_state().get("idle"))
-                stop(process)
-                restarted = start_sender()
-                try:
-                    wait_for(lambda: sender_state().get("ready") and sender_state().get("idle"))
-                except AssertionError as error:
-                    raise AssertionError(("账号发送器重启后未就绪", restarted.poll(), sender_state())) from error
-                return restarted
-
             restarted = restart(source)
             divergent = "H1：分叉历史中的项目名是水杉。"
             branch = {**body, "stream": False,
@@ -425,6 +453,14 @@ def blocks(row):
     return row["content"] if isinstance(row["content"], list) else [{"type": "text", "text": row["content"]}]
 
 
+def fixture_command_has(path, argument):
+    """仅比较隔离夹具的进程标记。@param path 进程参数。@param argument 合成会话标记。@return 是否匹配。"""
+    try:
+        return argument in path.read_bytes().split(b"\0")
+    except (FileNotFoundError, PermissionError, ProcessLookupError):
+        return False
+
+
 def find_blocks(body, key, identifier):
     """按真实模型输入中的公开 ID 核对旧工具及续轮。@param body 模型正文。@param key ID 字段。
     @param identifier 合成调用 ID。@return 含所属角色的匹配块。
@@ -511,6 +547,7 @@ def main():
     scenario.add_argument("--system-policy", action="store_true")
     scenario.add_argument("--toggle-pending-policy", action="store_true")
     scenario.add_argument("--tool-policy", choices=("replace", "user_reminder"))
+    scenario.add_argument("--recover-pending-tool", action="store_true")
     args = parser.parse_args()
     if (not Path("/.dockerenv").exists() or {name for _, name in if_nameindex()} != {"lo"}
             or Path("/run/v3/sender.json").exists() or any(Path("/native").glob("*"))):
@@ -520,7 +557,7 @@ def main():
         proof = verify(args.gateway, args.sender, Path(directory),
                        restart_history=args.restart_history, text_input=args.text_input,
                        system_policy=args.system_policy, toggle_pending_policy=args.toggle_pending_policy,
-                       tool_policy=args.tool_policy)
+                       tool_policy=args.tool_policy, recover_pending=args.recover_pending_tool)
         print(json.dumps(proof, ensure_ascii=False))
 
 
