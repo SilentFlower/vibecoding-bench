@@ -110,6 +110,7 @@ function actionLabel(value: string): string {
 function label(value: string): string {
   if (value === 'tui_provider_request') {
     if (submissionFormat.value === 'request_to_account_sender') return '提交给账号发送器';
+    if (submissionFormat.value === 'request_to_interactive_cli') return '交给交互 CLI';
     if (submissionFormat.value === 'http_request_written_to_loopback_provider') return '提交给本地提供方';
     return '模型请求提交';
   }

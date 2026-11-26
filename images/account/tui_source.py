@@ -179,6 +179,9 @@ class AccountSource:
     def _exchange_bound(self, reader, writer, connection, proof, hello, driver, epoch):
         action = hello["action"]
         ready = driver.ready()
+        managed_oauth = getattr(driver, "managed_oauth", False)
+        # 调试采集与签名恢复由现有账号发送器实施。使用原生投递时须按其实际能力协商。
+        sender_features = not (managed_oauth and getattr(driver, "native_dispatch", None) is not None)
         state = {
             **proof,
             "ready": ready,
@@ -187,12 +190,14 @@ class AccountSource:
             "model_header_policy_protocol": 1,
             "body_policy_protocol": 1,
             "input_policy_protocol": 1,
-            "capture_http_protocol": 1,
             "agent_scope_protocol": 1,
             "agent_summary_protocol": 1,
             "upstream_session_protocol": 1,
-            "signature_repair_protocol": 1,
         }
+        if sender_features:
+            state.update(capture_http_protocol=1, signature_repair_protocol=1)
+        elif getattr(driver, "cli_handoff_capture", False):
+            state["capture_cli_submission_protocol"] = 1
         receipt = hello.get("receipt") if action == "status" else None
         inspect = getattr(driver, "receipt_idle", None)
         if ready and inspect is not None and isinstance(receipt, dict):
@@ -202,7 +207,6 @@ class AccountSource:
                 state["receipt_idle"] = inspect((
                     proof["account_id"], proof["environment_id"], proof["generation"], principal, session,
                 ))
-        managed_oauth = getattr(driver, "managed_oauth", False)
         if managed_oauth:
             state["managed_oauth_protocol"] = 1
         file_available = managed_oauth and getattr(driver, "oauth_file_available", False)
@@ -334,6 +338,13 @@ class AccountSource:
                 return
             if "oauth_file" in command:
                 return
+            if not sender_features and ("signature_repair" in command or command.get("capture_http") is True):
+                return
+            if "capture_cli_submission" in command and (
+                command["capture_cli_submission"] is not True or "capture_cli_submission_protocol" not in state
+                or "capture_http" in command or "capture_assembly" in command
+            ):
+                return
             token = command.get("account_token")
             size = command.pop("oauth_file_len", None)
             if oauth_file:
@@ -358,7 +369,7 @@ class AccountSource:
                 handle.signature_exchange = lambda raw, error=None: self._signature_exchange(
                     reader, writer, connection, handle, send_deadline, epoch, raw, error
                 )
-            capturing = command.get("capture_http") is True
+            capturing = command.get("capture_http") is True or command.get("capture_cli_submission") is True
             if capturing:
                 handle.capture = []
             try:
@@ -574,8 +585,8 @@ def listen(path, source, sender_pid):
         os.close(directory)
 
 
-def main():
-    """在受管账号内启动内置事件源。@return 无。"""
+def main(driver_factory=None):
+    """在受管账号内启动内置事件源。@param driver_factory 镜像内部选定的会话驱动工厂。@return 无。"""
     # 解释器以 -I 运行，只在安装目录加载随镜像交付的会话驱动。
     from tui_session import SessionDriver
     from tui_sender_launch import purge_oauth_files
@@ -585,7 +596,7 @@ def main():
         raise SystemExit(0)
 
     signal.signal(signal.SIGTERM, stop)
-    with closing(AccountSource(Path(sys.argv[1]), SessionDriver)) as source:
+    with closing(AccountSource(Path(sys.argv[1]), driver_factory or SessionDriver)) as source:
         with listen(SOCKET, source, os.getppid()) as server:
             purge_oauth_files()
             # sender 意外退出时也收回原会话；Linux 会将孤儿重挂给其他父进程。

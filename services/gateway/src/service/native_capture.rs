@@ -613,13 +613,17 @@ fn snapshot_parts(
         let format = payload["submission_format"]
             .as_str()
             .unwrap_or("http_request_to_local_provider");
-        let managed = format == "request_to_account_sender";
+        let wire_note = match format {
+            "request_to_interactive_cli" => "已记录交给交互 CLI 的正文与协议选项。CLI 最终 TLS 写出的有序请求头与字节尚未采集。",
+            "request_to_account_sender" => "已记录交给账号发送器的请求。当前发送器未采集最终 TLS 写出。",
+            _ => "已记录回环 HTTP 请求。独立提供方的对外 TLS 写出尚未观测。",
+        };
         value["stages"] = json!([
             {"stage":"ingress","source":"gateway_http_ingress","representation":"http_logical_bytes","status":ingress_status},
             {"stage":"tui_provider_request","source":"tui_sender_http","representation":format,
                 "status":if truncated || headers_truncated {"truncated"} else {"complete"}},
             {"stage":"wire_final","source":"unavailable","representation":"unavailable","status":"unavailable",
-                "note":if managed {"已记录交给账号发送器的请求。当前发送器未采集最终 TLS 写出。"} else {"已记录回环 HTTP 请求。独立提供方的对外 TLS 写出尚未观测。"}}
+                "note":wire_note}
         ]);
     }
     if let Some(policy) = value.get("cache_policy") {

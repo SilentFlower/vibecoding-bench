@@ -21,6 +21,7 @@ from time import sleep, time
 from urllib.parse import urlsplit
 from uuid import uuid4
 
+from fixtures.file_activity import monitor_read, read_counts
 from verify_tui_concurrency import CLEAN_ENV, MIB, ROOT, frame, record, wait_for, write_json
 
 sys.path.insert(0, str(ROOT / 'images' / 'account'))
@@ -843,37 +844,6 @@ def final_text(result):
     assert status==200 and events[-1]['type']=='message_stop'
     assert any(e['type']=='message_delta' and e['delta']['stop_reason']=='end_turn' for e in events)
     return ''.join(event['delta']['text'] for event in events if event['type']=='content_block_delta')
-
-
-def monitor_read(stack, path):
-    """准备独立 Linux inotify 文件读取计数。@param stack 生命周期。@param path 私有夹具。@return 文件描述符。"""
-    from ctypes import CDLL, get_errno
-    import os
-
-    libc = CDLL('libc.so.6', use_errno=True)
-    descriptor = libc.inotify_init1(os.O_CLOEXEC | os.O_NONBLOCK)
-    if descriptor < 0:
-        raise OSError(get_errno(),'inotify_init1')
-    stack.callback(os.close,descriptor)
-    if libc.inotify_add_watch(descriptor, os.fsencode(path), 0x20 | 0x01 | 0x10) < 0:
-        raise OSError(get_errno(),'inotify_add_watch')
-    return descriptor
-
-
-def read_counts(descriptor):
-    """读取单个夹具的内核打开、读、关闭记录。@param descriptor 监控。@return 事件掩码。"""
-    import os
-    from struct import unpack_from
-
-    if not select([descriptor],[],[],2)[0]:
-        return []
-    raw = os.read(descriptor,65536)
-    result, offset = [], 0
-    while offset < len(raw):
-        _, mask, _, length = unpack_from('iIII',raw,offset)
-        result.append(mask)
-        offset += 16 + length
-    return result
 
 
 def check_replay(fixture, replay):

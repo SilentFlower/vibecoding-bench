@@ -186,6 +186,23 @@ def _install_mod(source, private_dir):
         shutil.copytree(source / component, private_dir / component, dirs_exist_ok=True)
 
 
+@dataclass(frozen=True)
+class _ModelSubmission:
+    """一次已认领的模型步骤。正文、账号凭据和头仅在账号服务内持有。"""
+
+    step: WireStep
+    handle: "_Reserved"
+    body: bytes = field(repr=False)
+    headers: dict = field(repr=False)
+    account_token: str | None = field(repr=False)
+
+    def record_cli_handoff(self):
+        """原生适配器确认交付后，向本次调试采集交回实际正文与协议选项。@return 无。"""
+        capture = getattr(self.handle, "capture", None)
+        if capture is not None:
+            capture.append((list(self.headers.items()), self.body))
+
+
 class _StaleReceipt(ValueError):
     """迟到或重复的私有查询，只结束本次查询。"""
 
@@ -363,8 +380,8 @@ class _Actor:
                         }
                     }
                     opts = [
-                        "--name",
-                        "Flower2API V2",
+                        # 同一预留会话的显示名稳定。传成单个参数，兼容以连字符开头的合法会话 ID。
+                        f"--name={self.reservation['session_id']}",
                         "--model",
                         self.settings["model"],
                         "--strict-mcp-config",
@@ -734,9 +751,9 @@ class _Actor:
                 actual.pop("anthropic-beta", None)
         return actual
 
-    def serve_model(self, http, native):
-        """一轮原生模型 POST 开启一次冻结的本机请求。@param http 当前 TUI 的模型连接。
-        @param native 原生 CLI 请求，仅用于核对已开放的主步骤。@return 无。
+    def _claim_model(self, sdk_headers, native):
+        """在当前预留中认领一次模型提交。@param sdk_headers 该 CLI 的本轮头。
+        @param native 内层 CLI 用于配对的请求。@return 完成策略及会话映射的输入，未匹配时为空。
         """
         with self.driver.lock, self.changed:
             step, handle = self.step, self.claim
@@ -748,7 +765,7 @@ class _Actor:
                 or step.claimed
                 or (self.oauth_file and (
                     not handle.account_token or not hmac.compare_digest(
-                        http.headers.get("Authorization", ""), "Bearer " + handle.account_token
+                        sdk_headers.get("Authorization", ""), "Bearer " + handle.account_token
                     )
                 ))
                 or not self._main_request(native, handle)
@@ -769,7 +786,7 @@ class _Actor:
                     raise SubagentBindingError("子代理的原工具已拒绝或取消")
                 headers = handle.model_headers
                 if handle.model_header_policy:
-                    headers = self._protocol_headers(http.headers, handle)
+                    headers = self._protocol_headers(sdk_headers, handle)
                 if handle.kind == "new" and self.agent_offer is not None:
                     self.agent_offer.messages.clear()
                     self.agent_messages.clear()
@@ -787,11 +804,10 @@ class _Actor:
                 self.receipt_key = secrets.token_bytes(32)
                 self.changed.notify_all()
         if not pending:
-            http.send_error(409, "No pending model step")
-            return
+            return None
         # 旧进程仍校验启动 AT。文件模式的令牌已经与原生步骤绑定。
         if handle.api_context is not None:
-            offered = {v.strip() for v in http.headers.get("anthropic-beta", "").split(",")}
+            offered = {v.strip() for v in sdk_headers.get("anthropic-beta", "").split(",")}
             thinking = handle.thinking if handle.thinking is not None else native.get("thinking", {})
             clears = any(edit["type"] == "clear_thinking_20251015" for edit in handle.api_context.get("edits", []))
             if CONTEXT_BETA not in offered or (clears and thinking.get("type") not in ("enabled", "adaptive")):
@@ -806,12 +822,29 @@ class _Actor:
         raw, headers = provider_session(
             raw, headers, self.identity[4], handle.upstream_session_id,
         )
+        return _ModelSubmission(step, handle, raw, headers, account_token)
+
+    def serve_model(self, http, native):
+        """交付同一次已认领的模型响应。@param http 当前 TUI 连接。
+        @param native 内层 CLI 请求。@return 无。
+        """
+        submission = self._claim_model(http.headers, native)
+        if submission is None:
+            http.send_error(409, "No pending model step")
+            return
+        if self.driver.managed_oauth and submission.account_token is None:
+            raise ModelResponseError(503, b"")
+        if self.driver.native_dispatch is not None and self.driver.managed_oauth:
+            # 只有镜像的受信入口能安装原生投递器；两条路径使用同一份一次认领结果。
+            self.driver.native_dispatch(self, http, submission)
+            return
+        step, handle = submission.step, submission.handle
+        raw, headers = submission.body, submission.headers
+        account_token = submission.account_token
         options = {"headers": headers}
         if getattr(handle, "capture", None) is not None:
             options["capture"] = handle.capture
         if self.driver.managed_oauth:
-            if account_token is None:
-                raise ModelResponseError(503, b"")
             # CLI 原生请求的授权头只认证回环连接，实际模型发送取当前认领的账号 AT。
             options["headers"] = {
                 **headers,
@@ -876,35 +909,43 @@ class _Actor:
             http.send_header("Connection", "close")
             http.end_headers()
             http.close_connection = True
-            tail = bytearray()
-            for wire, event in wire_events(upstream):
-                with self.changed:
-                    if self.dead.is_set():
-                        raise RuntimeError("模型轮已取消")
-                    if event and event.get("type") == "error":
-                        # 上游已建立 SSE 时保留其原始 error 记录，不能伪造正常 message_stop。
-                        self._publish([wire])
-                        self.finished = True
-                        self.expected = None
-                        self.changed.notify_all()
-                        http.wfile.write(wire)
-                        http.wfile.flush()
-                        return
-                self._observe(step, event)
-                with self.changed:
-                    if step.stopped:
-                        if len(tail) + len(wire) > BODY_LIMIT:
-                            raise ValueError("模型终态后的数据超限")
-                        tail.extend(wire)
-                    else:
-                        self._publish([wire])
+            for wire in self._model_events(step, upstream):
                 http.wfile.write(wire)
                 http.wfile.flush()
+
+    def _model_events(self, step, upstream):
+        """按外层读取进度观察同一模型流，确认终态后唤醒会话。
+        @param step 已认领的模型步骤。@param upstream 原始 SSE 字节流。@return 供内层 CLI 消费的原帧。
+        """
+        tail = bytearray()
+        for wire, event in wire_events(upstream):
+            terminal_error = event is not None and event.get("type") == "error"
             with self.changed:
-                if not step.stopped or not tail:
-                    raise ValueError("模型事件在终态之前结束")
-                step.final = [bytes(tail)]
-                self.changed.notify_all()
+                if self.dead.is_set():
+                    raise RuntimeError("模型轮已取消")
+                if terminal_error:
+                    # 上游已建立 SSE 时保留其原始 error 记录，不能伪造正常 message_stop。
+                    self._publish([wire])
+                    self.finished = True
+                    self.expected = None
+                    self.changed.notify_all()
+            if terminal_error:
+                yield wire
+                return
+            self._observe(step, event)
+            with self.changed:
+                if step.stopped:
+                    if len(tail) + len(wire) > BODY_LIMIT:
+                        raise ValueError("模型终态后的数据超限")
+                    tail.extend(wire)
+                else:
+                    self._publish([wire])
+            yield wire
+        with self.changed:
+            if not step.stopped or not tail:
+                raise ValueError("模型事件在终态之前结束")
+            step.final = [bytes(tail)]
+            self.changed.notify_all()
 
     def events(self, handle, command):
         """本轮原生事件的迭代器。@param handle 认领。@param command 发送指令。@return SSE 分帧。"""
@@ -1053,14 +1094,17 @@ class _Reserved:
 class SessionDriver:
     """绑定当前账号的真实 TUI 会话。@param config 受信预留配置。@param launcher 原版账号启动器。"""
 
-    def __init__(self, config, launcher=None, capacity=None):
-        """创建该账号的进程表。@param config 源配置。@param launcher 注入的受信启动器。@return 无。"""
+    def __init__(self, config, launcher=None, capacity=None, *, native_dispatch=None):
+        """创建该账号的进程表。@param config 源配置。@param launcher 受信启动器。
+        @param capacity 账号容量。@param native_dispatch 镜像提供的原生模型投递回调。@return 无。
+        """
         if launcher is None:
             import tui_sender_launch as launcher
         self.launcher = launcher
         self.checkpoints = ReceiptCheckpoints(getattr(launcher, "STORAGE", None))
         self.managed_oauth = getattr(launcher, "managed_oauth_enabled", lambda: False)()
         self.oauth_file_available = getattr(launcher, "file_oauth_enabled", lambda: False)()
+        self.native_dispatch = native_dispatch
         # 编排每个 HTTP 并发配置两个预留。等待新 TUI 的队列必须留下至少一个传输名额还工具。
         limit = max(1, config["max_reservations"] // 2)
         self.summary_only_headroom = False

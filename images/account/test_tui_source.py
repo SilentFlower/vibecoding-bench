@@ -150,6 +150,28 @@ class SourceTests(unittest.TestCase):
                 self.assertFalse(reply["idle"])
                 self.assertIs(reply["receipt_idle"], expected)
 
+    def test_native_dispatch_only_advertises_implemented_protocols(self):
+        """原生候选只声明当前可用能力，旧投递继续原协商。@return 无。"""
+        self.driver.managed_oauth = True
+        self.driver.oauth_file_available = True
+        for dispatch in (None, object()):
+            self.driver.native_dispatch = dispatch
+            self.driver.cli_handoff_capture = True
+            with self.subTest(native=dispatch is not None), self._connect("status") as (_, stream):
+                state = json.loads(stream.readline())
+                self.assertEqual(state["oauth_file_protocol"], 1)
+                self.assertEqual(state.get("capture_cli_submission_protocol"), 1 if dispatch is not None else None)
+                for name in ("capture_http_protocol", "signature_repair_protocol"):
+                    self.assertEqual(state.get(name), 1 if dispatch is None else None)
+        for fields in ({"capture_http": True}, {"signature_repair": False},
+                       {"capture_cli_submission": True, "capture_assembly": True}):
+            with self.subTest(fields=fields), self._connect() as (proof, stream):
+                command = self._prepare(proof, stream, b"{}")
+                self.assertEqual(json.loads(stream.readline())["kind"], "new")
+                self._write(stream, {**command, **fields, "account_token": "test-at"})
+                self.assertEqual(stream.readline(), b"")
+                self.assertEqual(self.driver.submitted, 0)
+
     def test_binding_before_body_and_real_readiness(self):
         """绑定或父进程不符时关闭，真实驱动未就绪时返回相应状态。@return 无。"""
         with self._connect(account_id=2) as (_, stream):

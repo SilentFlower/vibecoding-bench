@@ -79,6 +79,7 @@ pub(super) const TUI_V2_STATUS_PROTOCOL: u8 = 1;
 pub(super) const TUI_GATEWAY_ID_HEADER: &str = "x-v3-tui-message-id-mode";
 pub(super) const TUI_CAPTURE: &str = "x-v3-tui-http-capture";
 pub(super) const TUI_FINAL_CAPTURE: &str = "x-v3-tui-final-capture";
+pub(super) const TUI_CLI_SUBMISSION: &str = "x-v3-tui-cli-submission";
 pub(super) const TUI_UPSTREAM_SESSION: &str = "x-v3-tui-upstream-session";
 pub(super) const TUI_MANAGED_OAUTH: &str = "x-v3-tui-managed-oauth";
 pub(super) const TUI_MODEL_HEADER_POLICY: &str = "x-v3-tui-model-header-policy";
@@ -2021,7 +2022,8 @@ pub(super) async fn prepare_tui(
     }
     let observe = super::diagnostics::current_log_mode() == RequestLogMode::Debug;
     if observe {
-        prepare = prepare.header(TUI_CAPTURE, "1").header(TUI_FINAL_CAPTURE, "1");
+        prepare = prepare.header(TUI_CAPTURE, "1").header(TUI_FINAL_CAPTURE, "1")
+            .header(TUI_CLI_SUBMISSION, "1");
     }
     let apply_policy = input.body_policy != TuiBodyPolicy::default();
     if apply_policy {

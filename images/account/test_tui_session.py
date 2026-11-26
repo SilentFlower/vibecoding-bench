@@ -60,6 +60,42 @@ class SessionTests(unittest.TestCase):
             self.assertFalse(actor.step.claimed)
             driver.launcher.local_model_response.assert_not_called()
 
+    def test_native_dispatch_uses_one_authorized_frozen_submission(self):
+        """并发的同轮种子只能认领一次，错误账号授权及过期凭据保留原语义。@return 无。"""
+        raw = encode(self._body())
+        with closing(self._driver()) as driver, closing(driver.prepare(self._identity("native-send"), raw)) as handle:
+            driver.managed_oauth = True
+            driver.native_dispatch = Mock()
+            actor = handle.actor
+            actor.oauth_file = True
+            actor.step = SimpleNamespace(native=("turn", 1), native_model="chosen", claimed=False)
+            handle.account_token = "synthetic-local-token"
+            handle.expires_at = int(time.time() * 1000) + 5000
+            request = {**self._body(), "messages": [{"role": "user", "content": [
+                {"type": "text", "text": "<system-reminder>\nprompt.submit hook additional context: "
+                 + actor.guard_text + "\n</system-reminder>"}]}]}
+            wrong = Mock(headers={"Authorization": "Bearer different"})
+            actor.serve_model(wrong, request)
+            wrong.send_error.assert_called_once_with(409, "No pending model step")
+            self.assertFalse(actor.step.claimed)
+            failed = Mock(headers={"Authorization": "Bearer " + handle.account_token})
+            expires_at, handle.expires_at = handle.expires_at, 1
+            with self.assertRaises(ModelResponseError) as expired:
+                actor.serve_model(failed, request)
+            self.assertEqual(expired.exception.status, 503)
+            handle.expires_at = expires_at
+            driver.native_dispatch.assert_not_called()
+            peers = [Mock(headers=failed.headers) for _ in range(2)]
+            with ThreadPoolExecutor(2) as pool:
+                list(pool.map(lambda peer: actor.serve_model(peer, request), peers))
+            driver.native_dispatch.assert_called_once()
+            self.assertEqual(sum(peer.send_error.call_count for peer in peers), 1)
+            submission = driver.native_dispatch.call_args.args[2]
+            self.assertIs(submission.step, actor.step)
+            self.assertEqual(submission.body, raw)
+            self.assertNotIn(handle.account_token, repr(submission))
+            self.assertIsNone(handle.raw)
+
     def test_non_stream_accept_uses_sdk_for_upstream_sse(self):
         """公开非流式请求向模型取流时使用同轮 SDK 的 Accept。@return 无。"""
         for explicit in (False, None):

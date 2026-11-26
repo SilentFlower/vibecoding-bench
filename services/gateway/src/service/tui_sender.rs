@@ -39,7 +39,7 @@ use crate::service::runtime_transport::{
     tui_input_rejection, tui_model_headers, tui_projection_marker, valid_tui_account_token,
 };
 use crate::service::runtime_transport::{
-    TUI_CAPTURE, TUI_ERROR_SOURCE, TUI_FINAL_CAPTURE, TUI_MODEL_ACCEPT_OMITTED,
+    TUI_CAPTURE, TUI_CLI_SUBMISSION, TUI_ERROR_SOURCE, TUI_FINAL_CAPTURE, TUI_MODEL_ACCEPT_OMITTED,
     TUI_MODEL_HEADER_POLICY, TUI_REPAIR_ATTEMPT, TUI_SIGNATURE_REPAIR, TuiReceiptProbe,
 };
 use crate::service::session_policy_block;
@@ -149,6 +149,7 @@ enum Phase {
         managed_oauth: bool,
         oauth_file: bool,
         signature_repair: Option<bool>,
+        cli_submission: bool,
     },
     Submitted,
     RepairPending(oneshot::Sender<RepairPermit>),
@@ -202,6 +203,7 @@ struct SourceOptions {
     managed: bool,
     oauth_file: bool,
     wire: bool,
+    cli_submission: bool,
     captured: bool,
 }
 
@@ -425,6 +427,7 @@ struct VerifiedSource {
     model_headers: bool,
     model_header_policy: bool,
     capture_http: bool,
+    cli_submission: bool,
     body_policy: bool,
     input_policy: bool,
     agent_scope: bool,
@@ -457,6 +460,7 @@ async fn verify_source(
         idle,
         receipt_idle: reply["receipt_idle"].as_bool(),
         capture_http: reply["capture_http_protocol"].as_u64() == Some(1),
+        cli_submission: reply["capture_cli_submission_protocol"].as_u64() == Some(1),
         model_headers: reply["model_headers_protocol"].as_u64() == Some(1),
         model_header_policy: reply["model_header_policy_protocol"].as_u64() == Some(1),
         body_policy: reply["body_policy_protocol"].as_u64() == Some(1),
@@ -676,6 +680,7 @@ impl TuiSender {
                 model_headers,
                 model_header_policy,
                 capture_http,
+                cli_submission,
                 body_policy,
                 input_policy,
                 agent_scope,
@@ -688,6 +693,9 @@ impl TuiSender {
             } = verify_source(&self.path, binding, "bind", None)
                 .await
                 .map_err(|_| unavailable())?;
+            // 双方明确支持原生交付表示才采集。旧控制端继续使用其认识的来源。
+            let cli_submission = cli_submission && managed_oauth && capture_requested
+                && tui_projection_marker(request.headers(), TUI_CLI_SUBMISSION, "1");
             if identity.agent_summary && !agent_summary {
                 return Err(unavailable());
             }
@@ -839,6 +847,7 @@ impl TuiSender {
                 kind,
                 workspace,
                 capture_http,
+                cli_submission,
                 input_policy,
                 model_header_policy,
                 session_mapping,
@@ -856,6 +865,7 @@ impl TuiSender {
             kind,
             workspace,
             capture_http,
+            cli_submission,
             input_policy,
             model_header_policy,
             session_mapping,
@@ -884,6 +894,7 @@ impl TuiSender {
             managed_oauth,
             oauth_file,
             signature_repair,
+            cli_submission,
         };
         slot.armed = false;
         let mut response = (StatusCode::NO_CONTENT, [(HANDOFF_HEADER, kind)]).into_response();
@@ -917,8 +928,8 @@ impl TuiSender {
                 .headers_mut()
                 .insert(TUI_SIGNATURE_REPAIR, HeaderValue::from_static("1"));
         }
-        if capture_requested && capture_http {
-            if wire_protocol {
+        if capture_requested && (capture_http || cli_submission) {
+            if wire_protocol && !cli_submission {
                 response
                     .headers_mut()
                     .insert(TUI_FINAL_CAPTURE, HeaderValue::from_static("1"));
@@ -948,6 +959,7 @@ impl TuiSender {
             BufReader<UnixStream>,
             Option<workspace::Candidate>,
             Option<bool>,
+            bool,
         ),
         AppError,
     > {
@@ -979,6 +991,7 @@ impl TuiSender {
             connection,
             workspace,
             signature_repair,
+            cli_submission,
             ..
         } = std::mem::replace(&mut record.phase, Phase::Submitted)
         else {
@@ -994,6 +1007,7 @@ impl TuiSender {
             connection,
             workspace,
             signature_repair,
+            cli_submission,
         ))
     }
 
@@ -1037,7 +1051,7 @@ impl TuiSender {
             })
             .transpose()?;
         let oauth_file = oauth_file_payload(headers)?;
-        let (slot, mut connection, workspace, signature_repair) = self.claim(
+        let (slot, mut connection, workspace, signature_repair, cli_submission) = self.claim(
             binding,
             &identity,
             upstream_session.is_some(),
@@ -1085,7 +1099,7 @@ impl TuiSender {
                 .is_some()
                 .then(|| (dir.clone(), input.clone(), *account))
         });
-        let wire_protocol = tui_projection_marker(headers, TUI_FINAL_CAPTURE, "1");
+        let wire_protocol = !cli_submission && tui_projection_marker(headers, TUI_FINAL_CAPTURE, "1");
         let wire_captured = if managed_oauth && wire_protocol {
             capture
                 .take()
@@ -1103,7 +1117,7 @@ impl TuiSender {
             command["capture_assembly"] = json!(true);
         }
         if capture.is_some() {
-            command["capture_http"] = json!(true);
+            command[if cli_submission { "capture_cli_submission" } else { "capture_http" }] = json!(true);
         }
         if let Some(known) = signature_repair {
             command["signature_repair"] = json!(known);
@@ -1113,6 +1127,7 @@ impl TuiSender {
             managed: managed_oauth,
             oauth_file: oauth_file.is_some(),
             wire: wire_protocol,
+            cli_submission,
             captured: capture.is_some() || wire_captured,
         };
         if let Some(candidate) = workspace {
@@ -1575,7 +1590,9 @@ fn save_provider_capture(
     let (directory, input, account, attempt, permit) = capture;
     tokio::task::spawn_blocking(move || {
         let _permit = permit;
-        let format = if options.managed {
+        let format = if options.cli_submission {
+            "request_to_interactive_cli"
+        } else if options.managed {
             "request_to_account_sender"
         } else {
             "http_request_written_to_loopback_provider"
@@ -1588,7 +1605,7 @@ fn save_provider_capture(
                 pairs,
                 raw,
                 format,
-                !options.wire,
+                !options.wire && !options.cli_submission,
                 None,
             )
             .is_err()

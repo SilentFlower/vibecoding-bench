@@ -164,7 +164,7 @@ def _read(directory: int, account_id: int, attempt_id: str, now_ms: int) -> tupl
                 or set(by_name) != {'ingress', 'tui_provider_request', 'wire_final'}
                 or provider.get('source') != 'tui_sender_http'
                 or provider.get('representation') not in {'http_request_to_local_provider',
-                    'request_to_account_sender', 'http_request_written_to_loopback_provider'}
+                    'request_to_account_sender', 'http_request_written_to_loopback_provider', 'request_to_interactive_cli'}
                 or provider.get('status') not in {'complete', 'truncated'}):
             raise ValueError('V2 回环采集来源或 TLS 阶段无效')
         if 'submission_format' in provider and (provider['representation'] != 'http_request_to_local_provider'

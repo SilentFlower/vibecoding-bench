@@ -35,7 +35,7 @@ class NativeCaptureTests(unittest.TestCase):
                                 'representation':'unavailable'}]}
             path = folder / (attempt + '.json')
             for representation in ('http_request_to_local_provider', 'request_to_account_sender',
-                                   'http_request_written_to_loopback_provider'):
+                                   'http_request_written_to_loopback_provider', 'request_to_interactive_cli'):
                 stage['representation'] = representation
                 path.write_text(json.dumps(item))
                 self.assertEqual(read_capture(root, 3, attempt), item)
