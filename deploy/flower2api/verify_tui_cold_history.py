@@ -166,7 +166,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            current_text_blocks=False, signed_tool_history=False, split_history_tools=False, v1_runtime=None,
            parallel_tools=False, reconnect_tool_stream=False, current_images=False, auto_tool_choice=False,
            recovery_ledger_contention=False, recovery_ledger_deadline=False, recovery_workspace_rejection=False,
-           recovery_slow_model=False):
+           recovery_slow_model=False, initial_idle_model_connection=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -192,6 +192,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param recovery_ledger_deadline 是否持续持锁直至回执触发准入截止，然后重交。
     @param recovery_workspace_rejection 是否核对工作区绑定拒绝及原回执再次认领。
     @param recovery_slow_model 是否验证隔离模型收件后的公开超时和诊断归属。
+    @param initial_idle_model_connection 是否先占用一个未握手的模型 TCP 连接。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -311,7 +312,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         receiver = ThreadingHTTPServer(("127.0.0.1", 0), Receiver)
         tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         tls.load_cert_chain(temporary / "leaf.pem", temporary / "leaf.key")
-        receiver.socket = tls.wrap_socket(receiver.socket, server_side=True)
+        # 握手由已接收连接的工作线程完成，空闲 TCP 不会占住监听线程。
+        receiver.socket = tls.wrap_socket(receiver.socket, server_side=True, do_handshake_on_connect=False)
         serve(stack, receiver)
         stack.callback(finish_stream.set)
         proxy = serve(stack, ThreadingHTTPServer(("127.0.0.1", 0), Proxy))
@@ -484,7 +486,12 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             body["tool_choice"] = {"type": "auto", "disable_parallel_tool_use": False}
         if recover_pending:
             body["output_config"] = {"effort": "medium"}
-        _, raw, initial_request_id = checked_messages(manage, token, body, headers, received, "initial")
+        with ExitStack() as initial_connections:
+            if initial_idle_model_connection:
+                initial_connections.enter_context(create_connection(("127.0.0.1", receiver.server_port), timeout=5))
+            initial_status, raw, initial_request_id = checked_messages(manage, token, body, headers, received, "initial")
+            if initial_idle_model_connection:
+                assert len(received) == 1
         events = [json.loads(line[5:]) for line in raw.splitlines() if line.startswith(b"data:")]
         assert events[-1]["type"] == "message_stop", events
         offered = []
@@ -765,6 +772,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                  "changed_tool_arguments_status": wrong_arguments,
                  "duplicate_receipt_status": duplicate, "tls_versions": [tls for _, _, tls in received],
                  "proxy_connections": len(proxy_targets), "attempts": captures}
+        if initial_idle_model_connection:
+            proof["initial_idle_model_connection"] = {"http_status": initial_status, "model_posts": 1}
         if history_tool_blocks:
             proof["historical_tool_result_blocks"] = len(old_result)
         if parallel_tools:
@@ -1549,6 +1558,7 @@ def main():
     scenario.add_argument("--toggle-pending-policy", action="store_true")
     scenario.add_argument("--tool-policy", choices=("replace", "user_reminder"))
     scenario.add_argument("--recover-pending-tool", action="store_true")
+    scenario.add_argument("--initial-idle-model-connection", action="store_true")
     scenario.add_argument("--output-effort", action="store_true")
     scenario.add_argument("--history-png", action="store_true")
     scenario.add_argument("--history-images", action="store_true")
@@ -1595,7 +1605,8 @@ def main():
                        recovery_ledger_contention=args.recovery_ledger_contention,
                        recovery_ledger_deadline=args.recovery_ledger_deadline,
                        recovery_workspace_rejection=args.recovery_workspace_rejection,
-                       recovery_slow_model=args.recovery_slow_model)
+                       recovery_slow_model=args.recovery_slow_model,
+                       initial_idle_model_connection=args.initial_idle_model_connection)
         print(json.dumps(proof, ensure_ascii=False))
 
 
