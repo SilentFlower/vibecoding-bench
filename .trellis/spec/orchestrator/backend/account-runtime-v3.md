@@ -2572,6 +2572,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 普通原生工具轮的当前成功图文回执单独走已核验的磁盘恢复入口。固定 2.1.293 的活跃工具续轮会丢弃图像。原进程仍活跃时，先核对完整工具组、原历史、原生计划与持久回执修订，再回收原进程并从同一修订恢复。已丢进程时沿相同恢复入口。两个入口均核对实际 CLI 出站的原调用 ID、块顺序、内容和结果标志，消费一次恢复许可，只提交一次续轮。原进程回收期间仍可能补写自身尚未落盘的记录。
 - 图文工具结果块保留原内容。使用磁盘恢复的续轮还会在模型的 `user` 输入中收到一个单独的 `Continue from where you left off.` 文本块，因此整个用户输入会增加该块。父版热续轮的同一对照为零次。隔离对照中的连续两次图文回执共三次模型请求，分别收到 0／1／1 次，继续提示在实收正文中逐次核对。
 - 原生在途 `is_error:true` 图文回执在准备阶段返回 422。原回执修订仍可接收保真的结果，原进程若仍活跃则继续等待。已归属旧账号发送器的工具轮沿现有路径，将原错误标志和图文发给模型。
+- 客户端收到错误图文的 422 后，可用同一工具 ID 明确提交纯文本错误结果并保留 `is_error:true`。活跃进程和磁盘恢复均按原回执归属继续，模型侧收到该错误文本和标志。
 - 已闭合工具结果内的文本块也可带历史 `ephemeral` 标记。它与历史直接文本共用四个断点预算和 TTL 顺序。发送前按原调用 ID、角色及工具结果内的块位置核对；只处理已确认前缀，活跃工具的新结果继续使用原回执合同。
 - 旧工具调用和回执可以拆在相邻同角色历史里。原生导入按角色合并相邻行，保持块内容和先后顺序，整组调用必须在下一助理轮前闭合。原公开历史仍作为回执归属的比较依据。
 - V2 管理端可选择 `append`、`replace`、`user_reminder`。已核验发送器通过私有预留传递非默认动作。替换以启动文件承载系统正文，省略保留默认正文，显式空串或空数组仅保留身份和计费块。提醒保留默认系统正文，附到首条不含工具回执的用户消息。纯新轮的提醒随原问题提交。完整 CC 原生请求沿原输入合同。已登记等待工具的进程沿用其启动动作。
@@ -2579,6 +2580,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 普通 Messages 的 `output_config.format.type=json_schema` 仍是退役兼容缺口。固定 2.1.293 的 `--json-schema` 交互 PTY 探针在禁用和启用默认工具时均未生成 `output_config.format`。`--print` 正对照经 `StructuredOutput` 工具发送 schema，模型正文仍无该字段。[Claude Code CLI 参数](https://code.claude.com/docs/en/cli-reference) · [Messages JSON 输出](https://platform.claude.com/docs/en/build-with-claude/structured-outputs)
 - 固定 2.1.293 对 `claude-sonnet-4-6` 和 `claude-opus-5-5` 原生支持显式 `adaptive/updates` 和 `adaptive/summarized`。后者在原生计划确定后以 CLI `--settings` 启用 `showThinkingSummaries`，恢复沿同一根轮配置。投递前核对 CLI 真实生成的 `thinking` 对象。回执改动 `display`、省略显式值、或改成平台会自动重写的 `disabled` 时返回 `422/unsupported_parameter`。新请求的缺省 `display`、显式 `omitted` 和平台自动重写沿既有合同。用 `--adaptive-thinking-model` 指定模型，搭配 `--adaptive-thinking-display summarized` 验证摘要，省略显示选项验证 `updates` 及其功能头。两种模式均可搭配 `--recover-pending-tool`。
 - 工具声明由会话私有 HTTP MCP 返回。有工具的轮次等待 `tools/list` 应答写出后才提交 PTY 提示。公开调用块恢复原名，ID 与参数增量仍对应原模型事件。工具结果通过原进程的回执账本交付，接收方、历史、原调用和本轮生效设置均需匹配。
+- 普通客户端自定义工具允许 `type` 省略或显式为 `custom`。两种声明通过同一受管 MCP 入口提供名称、说明和输入 schema。固定 CLI 的模型实收省略可选的 `type`。原生回执的根轮边界保留客户端声明形状，显式值改为省略时返回 422、零新增投递。其他工具类型沿既有输入合同。[Anthropic SDK ToolParam](https://github.com/anthropics/anthropic-sdk-python/blob/main/src/anthropic/types/tool_param.py)
 - 声明客户端工具时接受显式 `tool_choice.type=auto`，`disable_parallel_tool_use` 可省略或显式为 false。固定 CLI 2.1.293 的这两种输入保留工具声明，实际模型正文均省略 `tool_choice`。自动选择允许模型直接返回文本，公开 SSE 的 `stop_reason` 为 `end_turn`。等待工具时冻结客户端原字段形状。在线及丢进程后的回执把省略和 false 互换，或改为 `none`、禁止并行、指定工具，均返回 422 且模型零新增收件。原样回执仍可完成。
 - 普通首轮的 `tool_choice={"type":"auto","disable_parallel_tool_use":true}` 允许模型直接回答，工具响应最多含一个调用。固定 2.1.293 的 `--append-system-prompt` 可把串行指令交给模型，实际正文仍省略 `tool_choice`，并保留两项 MCP 工具。追加策略沿下表保留原请求的禁并行字段，合法工具续轮按原归属继续。V2 管理 API 在绑定就绪时回报 `tui_v2_available` 和 `tui_system_prompt_policy_available`，账号列表、详情及策略更新均显示所选动作。两个字段分别描述 V2 可用性和系统提示词动作能力。禁并行的实际支持范围由公开 Messages 合同确认。[Messages 禁并行](https://platform.claude.com/docs/en/agents-and-tools/tool-use/parallel-tool-use#disable-parallel-tool-use) · [CLI 参数](https://code.claude.com/docs/en/cli-reference)
 - 普通 Messages 的 `tool_choice={"type":"none"}` 在 `tools` 省略或为空数组时使用交互 CLI。派发前要求 CLI 正文的 `tools` 为空或省略，`tool_choice` 保持显式 `none` 或省略并应用无工具默认值。存在工具声明时仍按既有策略处理并保留完整列表。[Messages 工具选择](https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools)
@@ -2662,6 +2664,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 独立图像补测使用可完整解码的透明 PNG、带 EXIF 的渐进 JPEG、双帧 GIF、双帧 WebP 及重复图块。核对原 MIME、Base64、顺序和上述原始数组差异。像素和字节边界的 18 例包含三种动作的 2000 像素、512000 字节正例，以及 2001 像素、512001 字节在有无顶层 `system` 时的路由和投递。正例各投递一次。超界 `append` 四例各投递一次，保留原 `messages`。另外八例均为 `422/unsupported_parameter`、零投递。
 - `verify_tui_cold_history.py --history-tool-blocks` 核对已闭合的两个文本结果块、顺序及原 ID，并完成一次新工具回执。`--history-cache-markers` 还核对重复的工具结果文本上单个嵌套断点的准确位置，以及在线续轮、丢进程恢复和篡改拒绝。
 - `verify_tui_cold_history.py --history-tool-images` 核对嵌套图文的四种内嵌格式、重复 PNG、多行文字及原工具 ID。包括三种账号动作、显式成功及 `implicit-success`、在线续轮及丢进程恢复。交换原历史图像顺序的工具回执返回 422，合法回执仍由交互 CLI 投递。可与已确认的直接、嵌套缓存标记组合。
+- `verify_tui_cold_history.py --explicit-custom-tool-type` 核对显式自定义工具的公开调用及模型实收声明。三种账号动作、正常续轮、双工具和丢进程恢复均核对名称、说明和 schema。回执移除已提交的显式字段返回 422，合法原样回执仍可完成。
 - `verify_tui_cold_history.py --tool-receipt-images` 核对本轮实际回执的四种内嵌格式、文字、重复项及原工具 ID。三种账号动作覆盖原 CLI 活跃时的恢复路径，`implicit-success` 与 `--recover-pending-tool` 对照显式成功和原进程丢失。错误图文返回 422 后，合法回执仍成功，重复及异主体／异会话结果均被拒绝。可以用 `--parallel-new-tools` 核对两个工具的逆序图文回执。
 - 图文回执摘要的 `standard_continue_count_by_model_post` 按模型实收顺序统计 `user` 角色中完整相等的标准继续文本块。首轮及一次图文恢复的公开夹具断言 0／1，同时独立核对原工具结果块。
 - `--current-images --history-cache-markers` 核对同轮图文与直接、嵌套历史断点。首轮和合法回执各由交互 CLI 投递一次，保留图文业务块及断点位置，附件来源没有 CLI 自动断点。改写历史标记或交换图片顺序返回 422。与 `--recover-pending-tool` 同用时核对原图文行和断点同时恢复。

@@ -268,7 +268,8 @@ class ColdHistory:
         if "tool_choice" in body and not (_automatic_tools(choice) if declared else choice == {"type": "none"}):
             return None
         for tool in declared:
-            if (tool.keys() - {"name", "input_schema", "description"}
+            if (tool.keys() - {"type", "name", "input_schema", "description"}
+                    or tool.get("type", "custom") != "custom"
                     or not re.fullmatch(r"[A-Za-z0-9_-]+", tool["name"])
                     or not isinstance(tool.get("description", ""), str)
                     or "input_schema" not in tool):

@@ -634,6 +634,20 @@ class ColdHistoryTests(TestCase):
         self.assertEqual(list(plan.tools), ["mcp__flower__LookupNote", "mcp__flower__Lookup-Note", "mcp__flower__Lookup_Note"])
         self.assertIn("error", plan.mcp({**request, "method": "tools/call"}))
 
+    def test_explicit_custom_tool_type_keeps_original_receipt_boundary(self):
+        """核对显式 custom 和默认声明的 MCP 契约，以及显式形状冻结。@return 无。"""
+        tool, = self.body["tools"]
+        body = {**self.body, "tools": [{**tool, "type": "custom"}]}
+        explicit = ColdHistory.from_request(body)
+        implicit = ColdHistory.from_request(self.body)
+        request = {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
+        self.assertEqual(explicit.mcp(request), implicit.mcp(request))
+        boundary = explicit.receipt_boundary()
+        self.assertEqual(ColdHistory.from_receipt_boundary(body, boundary), explicit)
+        self.assertIsNone(ColdHistory.from_receipt_boundary(self.body, boundary))
+        for kind in (None, "text_editor_20250728"):
+            self.assertIsNone(ColdHistory.from_request({**body, "tools": [{**tool, "type": kind}]}))
+
     def test_output_effort_matches_the_frozen_root_scope(self):
         """只有原生交互 CLI 已支持的强度进入原生计划。@return 无。"""
         expected = ColdHistory.from_request({**self.body, "output_config": {"effort": "low"}})

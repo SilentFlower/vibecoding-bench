@@ -322,7 +322,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            auxiliary_kind="title", auxiliary_sample=None, agent_progress=None, stock_client=False,
            cancel_and_change_question=False, oauth_rotation=False, provider_quota=None, slow_tool_stream=False,
            model_connection_contract=None, external_signed_history=False, history_tool_images=None,
-           tool_receipt_images=None):
+           tool_receipt_images=None, explicit_custom_tool_type=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -336,6 +336,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param history_tool_blocks 是否核对已完成工具结果的原始文本块。
     @param history_tool_images 核对已闭合工具结果的图文块，可显式声明成功或省略错误标志。
     @param tool_receipt_images 核对本轮实际工具调用的图文回执及拒绝边界。
+    @param explicit_custom_tool_type 是否通过显式 custom 的客户端声明进行原生工具往返。
     @param previous 可选，旧发行源码、网关、发送器三个离线制品。
     @param failure_boundaries 是否分别在模型收件前后切断隔离连接。
     @param stock_client 是否通过真实外部 CLI 验证完整 V2 输入与工具回执。
@@ -1014,6 +1015,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         messages.append({"role": "user", "content": current})
         # 历史中的旧工具结果和当前问题之间保留完成边界，CLI 启动后只提交当前问题。
         declared = [TOOL, PARALLEL_SECOND_TOOL] if parallel_tools or auto_tool_direct_text else [TOOL]
+        if explicit_custom_tool_type:
+            declared = [{**tool, "type": "custom"} for tool in declared]
         expected_ids = [NEW_ID, SECOND_ID] if parallel_tools else [NEW_ID]
         registered_tools = encoded(expected_ids).decode()
         body = {"model": MODEL, "max_tokens": 128, "stream": True, "messages": messages,
@@ -1247,6 +1250,15 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 )
                 assert len(received) == 1, (label, raw, len(received))
                 changed_choices[label] = rejected
+        if explicit_custom_tool_type:
+            changed_tools = deepcopy(declared)
+            changed_tools[0].pop("type")
+            changed_custom_type, _, changed_custom_request = checked_messages(
+                manage, token, {**follow, "tools": changed_tools}, headers, received, "omitted_custom_tool_type",
+                expected_status=422, trace_startup=trace_startup, sender_status=sender_state_after_failure,
+            )
+            assert len(received) == 1
+            assert not manage("GET", "request-diagnostics/" + changed_custom_request)["attempts"]
         if adaptive_thinking_model:
             changed_thinking = {}
             changes = {"omitted": {"type": "adaptive", "display": "omitted"},
@@ -1580,6 +1592,16 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                      "attempt_id": attempt["attempt_id"], "session_origin": session_origin})
             proof["model_connection_contract"] = {"mode": model_connection_contract,
                                                   "client_hellos": model_client_hellos, "model_posts": observations}
+        if explicit_custom_tool_type:
+            tool_definitions = []
+            for _, native, _ in received:
+                verify_automatic_model_tools(native, declared)
+                assert all(tool.get("type", "custom") == "custom" for tool in native["tools"])
+                tool_definitions.append(native["tools"])
+            assert all(attempt["diagnostic_body_source"] == "interactive_cli" for attempt in captures)
+            proof["explicit_custom_tool_type"] = {"input_tools": declared, "model_tools_by_post": tool_definitions,
+                                                 "omitted_type_receipt_http": changed_custom_type,
+                                                 "omitted_type_receipt_request_id": changed_custom_request}
         if oauth_rotation:
             assert refresh_calls == [True]
             assert [row["credential"] for row in credential_observations] == ["initial", "rotated"]
@@ -4015,6 +4037,7 @@ def main():
                         choices=("explicit-success", "implicit-success"))
     parser.add_argument("--tool-receipt-images", nargs="?", const="explicit-success",
                         choices=("explicit-success", "implicit-success"))
+    parser.add_argument("--explicit-custom-tool-type", action="store_true")
     system_roles = parser.add_mutually_exclusive_group()
     system_roles.add_argument("--message-system-roles", dest="message_system_roles", action="store_const", const="observe")
     system_roles.add_argument("--ordinary-message-system-contract", dest="message_system_roles", action="store_const",
@@ -4118,6 +4141,7 @@ def main():
     trace_startup = (args.initial_idle_model_connection or args.trace_initial_startup or args.trace_recovery_resend or cache_markers
                      or args.model_connection_contract is not None or args.external_signed_history_contract
                      or args.history_tool_images is not None or args.tool_receipt_images is not None
+                     or args.explicit_custom_tool_type
                      or args.recovery_readiness_rejection
                      or args.structured_output_contract or bool(args.forced_tool_choice_contract) or args.no_tool_choice_contract
                      or args.disable_parallel_tool_use_contract or bool(args.oauth_rotation or args.provider_quota)
@@ -4151,6 +4175,7 @@ def main():
                        history_images=args.history_images, history_tool_blocks=args.history_tool_blocks,
                        history_tool_images=args.history_tool_images,
                        tool_receipt_images=args.tool_receipt_images,
+                       explicit_custom_tool_type=args.explicit_custom_tool_type,
                        previous=previous,
                        failure_boundaries=args.failure_boundaries, current_text_blocks=args.current_text_blocks,
                        signed_tool_history=args.signed_tool_history, signed_tool_response=args.signed_tool_response,
