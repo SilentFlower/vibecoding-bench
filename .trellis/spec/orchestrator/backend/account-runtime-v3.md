@@ -2567,6 +2567,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 固定 2.1.293 对 `claude-sonnet-4-6` 和 `claude-opus-5-5` 原生支持显式 `adaptive/updates` 和 `adaptive/summarized`。后者在原生计划确定后以 CLI `--settings` 启用 `showThinkingSummaries`，恢复沿同一根轮配置。投递前核对 CLI 真实生成的 `thinking` 对象。回执改动 `display`、省略显式值、或改成平台会自动重写的 `disabled` 时返回 `422/unsupported_parameter`。新请求的缺省 `display`、显式 `omitted` 和平台自动重写沿既有合同。用 `--adaptive-thinking-model` 指定模型，搭配 `--adaptive-thinking-display summarized` 验证摘要，省略显示选项验证 `updates` 及其功能头。两种模式均可搭配 `--recover-pending-tool`。
 - 工具声明由会话私有 HTTP MCP 返回。有工具的轮次等待 `tools/list` 应答写出后才提交 PTY 提示。公开调用块恢复原名，ID 与参数增量仍对应原模型事件。工具结果通过原进程的回执账本交付，接收方、历史、原调用和本轮生效设置均需匹配。
 - 声明客户端工具时接受显式 `tool_choice.type=auto`，`disable_parallel_tool_use` 可省略或显式为 false。固定 CLI 的默认自动选择与并行许可符合这一合同。事件源在模型派发前核对实际工具和选择语义，显式原参数随工具回执冻结。
+- 普通 Messages 的 `tool_choice={"type":"none"}` 在 `tools` 省略或为空数组时使用交互 CLI。派发前要求 CLI 正文的 `tools` 为空或省略，`tool_choice` 保持显式 `none` 或省略并应用无工具默认值。存在工具声明时仍按既有策略处理并保留完整列表。[Messages 工具选择](https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools)
 - `tool_choice.type=any` 要求模型调用已声明的任一工具，`type=tool` 要求指定名称。两者在固定 2.1.293 交互入口仍是退役缺口。在两个合成 MCP 工具的权限对照中，`--allowedTools` 保留二者，`--disallowedTools` 排除另一工具。三种对照的 CLI 正文都省略 `tool_choice`，且能收口为直接文本。工具权限和会话可见性只决定可用工具，强制选择需保留 Messages 的字段语义。[CLI 工具选项](https://code.claude.com/docs/en/cli-reference) · [Messages 工具选择](https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools)
 - 普通工具名中的连字符与下划线分别保留。固定 CLI 2.1.293 仅增加会话 MCP 前缀，嵌套 Schema 与参数沿原描述交付。重启后工具回执仍核对原名、ID 和完整参数。
 - 原生等待进程丢失时，私有回执按同一修订核对根轮策略及正文摘要。新原生会话导入客户端已核对的工具结果，保留原 JSONL。由受管 PTY 使用 CLI 的继续提示启动模型步骤，原问题和已完成工具保持在历史中。旧工具回执仍以原表布局读取。
@@ -2589,6 +2590,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 | 文件归属错误或包含其他工作区的主链 | 拒绝恢复，保留原文件 |
 | 普通 API 携带 `output_config.format.type=json_schema`，单独使用或同带 `effort=medium` | `append` 经旧账号发送器透传，实收一次。`replace` 和 `user_reminder` 返回 `422/unsupported_parameter`，零尝试、零投递 |
 | Sonnet 4.6 普通 API 声明两个客户端工具、关闭思考并要求 `tool_choice.type=any` 或指定 `type=tool` | `append` 经旧账号发送器保留工具表与精确选择。`replace` 和 `user_reminder` 返回 `422/unsupported_parameter`，零尝试、零投递 |
+| 普通 API 声明工具且指定 `tool_choice.type=none` | `append` 经旧账号发送器保留选择和声明。`replace` 和 `user_reminder` 返回 `422/unsupported_parameter`，零尝试、零投递 |
 | 仅开启该路径的调试采集 | 保存 CLI 实际实体证据，最终 TLS 写出未采集 |
 
 ### 5. Scenarios and Examples
@@ -2610,6 +2612,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `--structured-output-contract` 从普通公开入口对照三种账号动作的无 schema、仅 schema、schema 与 `effort=medium`，覆盖 SSE 和非流式 JSON。无 schema 的六例走交互 CLI。成功用例核对模型实收的 `output_config`、问题一次、工作指令落点和公开响应终态。隔离模型仅在收到完整 schema 时返回约定的 JSON 文本。用预留、尝试和实收摘要确认发送路径，拒绝用例核对零尝试和零投递。最终 TLS 写出未采集。
 - `--forced-tool-choice-contract live|restart` 从公开 Messages 对照 `any` 和指定第二个工具。隔离模型按实收字段决定调用，`any` 两次分别选择两个工具，指定工具两次使用同一名称及各自 ID。续轮提交原调用结果并保留强制选择，最后一个合法回执可在旧账号发送路径显式选用 `auto`，接收合成文本。`restart` 在第一个回执前结束原 CLI 并重启账号发送器。报告按预留对照 CLI 正文及实际模型请求的摘要、字段、工具名、参数与回执。`verify_tui_tool_choice_input.py <固定 CLI>` 在仅回环网络独立验证工具权限选项与模型请求。最终 TLS 写出未采集。
 - `--forced-tool-choice-contract restart-metadata-only` 在首轮工具回执登记后结束原 CLI，原档只保留实际 CLI 写出的非主轮记录。通过相同公开请求验证父版 `cli_launch` 失败与本版独立 CLI UUID 成功，核对原档和绑定字节、回执归属及实收投递。观测记录原进程退出、旧发送器退出和新发送器就绪、入站正文摘要、预留以及 CLI 实际启动模式。
+- `--no-tool-choice-contract` 从公开入口对照三种策略的缺省、显式 `none` 且 `tools` 省略、显式 `none` 且为空数组，以及 `none` 同带工具声明。按预留核对原生分支、模型实收工具及选择、工作指令角色和公开文本终态。最终 TLS 写出未采集。
 - `--thinking-display-contract <claude-sonnet-4-6|claude-opus-5-5>` 通过普通 Messages 对照省略整个 `thinking`、仅省略 `display`、显式 `omitted` 和 `summarized`。完全省略时三种账号动作均使用交互 CLI 生成 `adaptive/updates`，显式 `summarized` 也走交互 CLI。仅省略 `display` 或显式 `omitted` 时，追加策略经账号代发保留原对象，替换及用户提醒均返回 `422/unsupported_parameter`、零投递。隔离模型按文档模拟 Sonnet 4.6 缺省摘要及 Opus 5.5 缺省省略，SSE 检查摘要增量和签名顺序，JSON 检查等价内容块。显式 `omitted` 的合成回复保留空思考块和签名。核对原生分支、正文 SHA-256 及预留和尝试的关联。最终 TLS 写出未采集。
 - 将 `--thinking-cli-summaries on|off` 与 `--thinking-display-contract` 同用，探针只在启动固定 CLI 的 `--settings` 设置 `showThinkingSummaries`。公开请求省略整个 `thinking`。两个模型在 `on` 下原生生成 `adaptive/summarized`，在 `off` 下原生生成 `adaptive/updates`。两种状态的 SSE 和 JSON 均按隔离模型实际回复核对。`off` 产生的 `updates` 和显式 `omitted` 是不同的模型请求模式。
 - `verify_tui_system_session_input.py <固定 CLI>` 在仅回环容器内以真实交互 2.1.293 和 Opus 5.5 核对 `hookSpecificOutput.additionalContext`。`UserPromptSubmit` 的正文由 CLI 加上来源前缀，放在该轮 user 之后、该轮 assistant 之前的 `system` 行。档案保存 `hook_additional_context` 附件，热续轮和从原档案 `--resume` 都保留该位置和一次内容。恢复时新执行的 `SessionStart` 钩子生成带来源前缀的当前轮 `system`，排在重开后新 user 之后。此组件实验记录直接由 CLI 发出的模型正文和原档案前缀，外部 Messages 原始文本块及指定历史位置仍需独立满足公开输入合同。当前公开追加策略对中途 `system` 的成功形状依赖旧账号代发，保留退役阻塞。

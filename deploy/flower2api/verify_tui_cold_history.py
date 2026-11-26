@@ -231,7 +231,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            recovery_ledger_contention=False, recovery_ledger_deadline=False, recovery_workspace_rejection=False,
            recovery_slow_model=False, initial_idle_model_connection=False, trace_startup=False, cache_markers=False,
            history_cache_markers=False, history_cache_ttl=None, cache_capability=None, message_system_roles=False,
-           structured_output=False, forced_tool_choice=None):
+           structured_output=False, forced_tool_choice=None, no_tool_choice=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -271,6 +271,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param message_system_roles 消息级系统角色对照或普通 API 固定回归模式。
     @param structured_output 是否核对普通 API 的结构化输出和实际发送路径。
     @param forced_tool_choice 核对强制工具选择及同进程或重启回执。
+    @param no_tool_choice 是否核对无工具时的显式 none 和保留声明的兼容路径。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -286,7 +287,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         directory.mkdir(mode=0o700, parents=True, exist_ok=True)
         os.chown(directory, 1001, 1001)
     inspect_model_body = (cache_markers or message_system_roles or thinking_display_model or structured_output
-                          or forced_tool_choice)
+                          or forced_tool_choice or no_tool_choice)
     if inspect_model_body and v1_runtime is None:
         MODEL_BODY_TRACE.touch(mode=0o600, exist_ok=False)
         os.chown(MODEL_BODY_TRACE, 1001, 1001)
@@ -338,7 +339,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 sleep(SLOW_MODEL_DELAY)
             restart = any(b.get("text") == AFTER_RESTART for row in body["messages"] for b in blocks(row))
             prefix = b""
-            if forced_tool_choice:
+            if no_tool_choice:
+                wire = message_sse({"type": "text", "text": FINAL}, "end_turn", "msg_cold_reply")
+            elif forced_tool_choice:
                 wire = fixture_forced_tool_sse(body)
             elif not results and tool and not restart and v1_runtime is None:
                 content = {"type": "tool_use", "id": NEW_ID, "name": tool["name"], "input": ARGS}
@@ -575,6 +578,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                                fixed=message_system_roles == "ordinary-contract")
         if structured_output:
             return verify_structured_output(manage, token, identifier, received)
+        if no_tool_choice:
+            return verify_no_tool_choice(manage, token, identifier, received)
         if forced_tool_choice:
             def restart_forced(headers):
                 nonlocal source
@@ -1759,6 +1764,60 @@ def verify_thinking_display_contract(manage, token, identifier, received, model,
             "wire_final": "unavailable", "cases": proof, "model_posts": len(received)}
 
 
+def verify_no_tool_choice(manage, token, identifier, received):
+    """核对公开无工具要求和实际 CLI 正文。@param manage 管理入口。@param token 调用方。
+    @param identifier 合成账号 ID。@param received 模型实收。@return 按策略的证据。
+    """
+    none = {"type": "none"}
+    variants = {"default": {}, "no_tools": {"tool_choice": none},
+                "empty_tools": {"tools": [], "tool_choice": none},
+                "declared_tool": {"tools": [TOOL], "tool_choice": none}}
+    cases = {}
+    for policy in ("append", "replace", "user_reminder"):
+        account = manage("PUT", f"accounts/{identifier}", {"client_system_prompt_policy": policy})
+        assert account["client_system_prompt_policy"] == policy
+        for label, fields in variants.items():
+            phase = f"{policy}_{label}"
+            question = f"合成无工具请求 {phase}"
+            headers = {"User-Agent": "flower2api-no-tools-fixture/1", "x-session-id": str(uuid4())}
+            body = {"model": MODEL, "max_tokens": 128, "stream": False, "system": SYSTEM[0],
+                    "messages": [{"role": "user", "content": question}], **fields}
+            from_cli = label != "declared_tool"
+            expected_status = 200 if from_cli or policy == "append" else 422
+            before = len(received)
+            status, raw, request_id = checked_messages(manage, token, body, headers, received, phase,
+                                                       expected_status=expected_status, trace_startup=True)
+            reservation, record, claims = cache_marker_claims(manage, request_id)
+            proof = {"status": status, "request_id": request_id, "reservation_id": reservation,
+                     "attempt_count": record["attempt_count"], "model_posts": len(received) - before,
+                     "input_tools": fields.get("tools"), "input_tool_choice": fields.get("tool_choice")}
+            if status == 422:
+                assert not (claims or proof["attempt_count"] or proof["model_posts"]), (phase, proof)
+                proof["error_code"] = json.loads(raw)["error"]["code"]
+                assert proof["error_code"] == "unsupported_parameter", (phase, raw)
+            else:
+                ((digest, model, _),), (claim,) = received[before:], claims
+                assert proof["attempt_count"] == 1 and claim["sha256"] == digest, (phase, proof, claim)
+                assert claim["uses_native_history"] is from_cli and claim["from_interactive_cli"] is from_cli, claim
+                assert model.get("tools", []) == fields.get("tools", []), (phase, model)
+                assert model.get("tool_choice", none if from_cli else None) == none, (phase, model)
+                user_texts = [b.get("text", "") for row in model["messages"] if row["role"] == "user" for b in blocks(row)]
+                system = model["system"]
+                system_texts = [system] if isinstance(system, str) else [b["text"] for b in system]
+                assert sum(text.count(question) for text in user_texts) == 1, (phase, user_texts)
+                reminder = policy == "user_reminder"
+                assert sum(text.count(SYSTEM[0]) for text in user_texts) == int(reminder), (phase, user_texts)
+                assert sum(text.count(SYSTEM[0]) for text in system_texts) == int(not reminder), (phase, system_texts)
+                reply = json.loads(raw)
+                assert reply["stop_reason"] == "end_turn" and reply["content"] == [{"type": "text", "text": FINAL}], raw
+                proof.update(provider_path="interactive_cli" if from_cli else "account_sender", model_body_sha256=digest,
+                             model_tools=model.get("tools"), model_tool_choice=model.get("tool_choice"),
+                             client_stop_reason=reply["stop_reason"])
+            cases[phase] = proof
+    assert not any(path.is_file() for path in Path("/flows/api").rglob("*"))
+    return {"cases": cases, "model_posts": len(received), "wire_final": "unavailable"}
+
+
 def fixture_forced_tool_sse(body):
     """按实收工具选择返回合成 tool_use。@param body 模型实收。@return 原始 SSE。"""
     choice = body.get("tool_choice", {})
@@ -2622,6 +2681,7 @@ def main():
     scenario.add_argument("--output-effort", action="store_true")
     scenario.add_argument("--structured-output-contract", action="store_true")
     scenario.add_argument("--forced-tool-choice-contract", choices=("live", "restart", "restart-metadata-only"))
+    scenario.add_argument("--no-tool-choice-contract", action="store_true")
     scenario.add_argument("--thinking-display-contract", choices=tuple(THINKING_DISPLAY_DEFAULTS))
     scenario.add_argument("--history-png", action="store_true")
     scenario.add_argument("--history-images", action="store_true")
@@ -2655,7 +2715,7 @@ def main():
     previous = args.mixed_release
     cache_markers = args.cache_markers or args.cache_marker_capabilities is not None
     trace_startup = (args.initial_idle_model_connection or args.trace_initial_startup or cache_markers
-                     or args.structured_output_contract or bool(args.forced_tool_choice_contract)
+                     or args.structured_output_contract or bool(args.forced_tool_choice_contract) or args.no_tool_choice_contract
                      or bool(args.thinking_display_contract)
                      or (bool(args.message_system_roles) and args.v1_runtime is None))
     if trace_startup and (previous or args.mixed_image_peers or args.v1_runtime):
@@ -2695,7 +2755,7 @@ def main():
                        cache_markers=cache_markers, history_cache_markers=args.history_cache_markers,
                        history_cache_ttl=args.history_cache_ttl, cache_capability=args.cache_marker_capabilities,
                        message_system_roles=args.message_system_roles, structured_output=args.structured_output_contract,
-                       forced_tool_choice=args.forced_tool_choice_contract)
+                       forced_tool_choice=args.forced_tool_choice_contract, no_tool_choice=args.no_tool_choice_contract)
         print(json.dumps(proof, ensure_ascii=False))
 
 

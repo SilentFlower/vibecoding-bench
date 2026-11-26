@@ -578,6 +578,22 @@ class ColdHistoryTests(TestCase):
                 self.assertFalse(plan.matches_tool_choice({**native, "tool_choice": other}))
                 self.assertIsNone(ColdHistory.from_request({**self.body, "tool_choice": other}))
 
+    def test_explicit_none_tool_choice_requires_empty_tools_at_both_boundaries(self):
+        """无工具的显式 none 只接受模型请求的等价表示。@return 无。"""
+        choice = {"type": "none"}
+        without_tools = {key: value for key, value in self.body.items() if key != "tools"}
+        for body in (without_tools, {**without_tools, "tools": []}):
+            plan = ColdHistory.from_request({**body, "tool_choice": choice})
+            self.assertEqual(plan.tools, {})
+            for native in ({}, {"tools": []}, {"tools": [], "tool_choice": choice}):
+                self.assertTrue(plan.matches_tool_choice(native))
+            for native in ({"tools": self.body["tools"]}, {"tools": None}, {"tool_choice": None},
+                           {"tools": [], "tool_choice": {"type": "auto"}}):
+                self.assertFalse(plan.matches_tool_choice(native))
+        for other in (None, {"type": "none", "name": "LookupNote"}, {"type": "auto"}):
+            self.assertIsNone(ColdHistory.from_request({**without_tools, "tool_choice": other}))
+        self.assertIsNone(ColdHistory.from_request({**self.body, "tool_choice": choice}))
+
     def test_only_matching_inline_image_enters_native_input(self):
         """历史和本轮的内嵌图像须匹配声明格式。@return 无。"""
         picture = {"type": "image", "source": {"type": "base64", "media_type": "image/png",

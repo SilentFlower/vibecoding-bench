@@ -242,7 +242,7 @@ class ColdHistory:
                 return None
         declared = body.get("tools", [])
         choice = body.get("tool_choice")
-        if "tool_choice" in body and (not declared or not _automatic_tools(choice)):
+        if "tool_choice" in body and not (_automatic_tools(choice) if declared else choice == {"type": "none"}):
             return None
         for tool in declared:
             if (tool.keys() - {"name", "input_schema", "description"}
@@ -297,10 +297,13 @@ class ColdHistory:
         return scope if self.cache_ttl == "off" else (*scope, self.cache_ttl)
 
     def matches_tool_choice(self, native):
-        """核对显式自动工具选择及并行许可。@param native CLI 已生成的请求。@return 是否维持原选择。"""
-        # 有工具声明时，Messages 省略 tool_choice 表示 auto 并允许并行调用。
+        """核对显式工具选择及并行许可。@param native CLI 已生成的请求。@return 是否维持原选择。"""
         if self.tool_choice is None:
             return True
+        if self.tool_choice == {"type": "none"}:
+            # Messages 无工具时缺省选择为 none，须一并核对 CLI 没有添加任何工具。
+            return native.get("tools", []) == [] and native.get("tool_choice", self.tool_choice) == self.tool_choice
+        # 有工具声明时，Messages 省略 tool_choice 表示 auto 并允许并行调用。
         tools = native.get("tools")
         return isinstance(tools, list) and bool(tools) and _automatic_tools(native.get("tool_choice", {"type": "auto"}))
 

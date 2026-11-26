@@ -953,7 +953,7 @@ class _Actor:
                                 "code": "unsupported_parameter", "message": "CLI 当前模型未生成请求的推理强度"}}))
                     if not self.cold_history.matches_tool_choice(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
-                            "code": "unsupported_parameter", "message": "CLI 未保留请求的自动工具选择"}}))
+                            "code": "unsupported_parameter", "message": "CLI 未保留请求的工具选择"}}))
                     if not self.cold_history.matches_history_cache_markers(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
                             "code": "unsupported_parameter", "message": "CLI 未保留历史缓存标记"}}))
