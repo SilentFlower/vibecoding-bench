@@ -180,8 +180,47 @@ class BoundLaunchTests(TestCase):
             self._start(prepare_history=prepare, resume=None)
             snapshot = self.history.read_bytes()
             self.assertEqual(spawn.call_args.args[0][-2:], ["--resume", str(self.history)])
-            self._start(prepare_history=prepare, resume=None)
+            self.who = {**self.who, "reservation_id": str(uuid4())}
             self._start(resume=True)
-            self.assertEqual(spawn.call_count, 3)
             self.assertEqual(spawn.call_args.args[0][-2:], ["--resume", str(self.history)])
+            self._start(prepare_history=prepare, resume=None)
+            self.assertEqual(spawn.call_args.args[0][-2:], ["--resume", str(self.history)])
+            self._start(resume=None)
+            self.assertEqual(spawn.call_args.args[0][-2:], ["--resume", str(self.history)])
+            self.assertEqual(spawn.call_count, 4)
+            self.assertEqual(list(self.history.parent.iterdir()), [self.history])
             self.assertEqual(self.history.read_bytes(), snapshot)
+
+    def test_prepared_session_checks_fork_history_before_launch(self):
+        """回调选中的分支执行与绑定历史一致的校验。@return 无。"""
+        fork_id = str(uuid4())
+        fork = self.history.with_name(fork_id + ".jsonl")
+        row = {"type": "user", "cwd": str(self.cwd), "sessionId": fork_id}
+
+        def prepare(config, work, native_id):
+            self.assertEqual((config, work, native_id), (self.config, self.cwd, self.native))
+            return fork_id
+
+        with patch("tui_workspace_launch.Popen") as spawn:
+            with self.assertRaises(FileNotFoundError):
+                self._start(prepare_history=prepare, resume=None)
+            for invalid in ({**row, "cwd": "/other"}, {**row, "sessionId": self.native}):
+                fork.write_text(json.dumps(invalid))
+                fork.chmod(0o600)
+                for resume in (None, False):
+                    with self.subTest(row=invalid, resume=resume), self.assertRaisesRegex(ValueError, "工作区不匹配"):
+                        self._start(prepare_history=prepare, resume=resume)
+            fork.write_text(json.dumps(row))
+            fork.chmod(0o644)
+            with self.assertRaisesRegex(ValueError, "归属或权限"):
+                self._start(prepare_history=prepare, resume=None)
+            fork.chmod(0o600)
+            with self.assertRaisesRegex(ValueError, "已有历史记录"):
+                self._start(prepare_history=prepare, resume=False)
+            spawn.assert_not_called()
+
+            self._start(prepare_history=prepare, resume=None)
+            self.assertEqual(spawn.call_args.args[0][-2:], ["--resume", str(fork)])
+            fork.unlink()
+            self._start(prepare_history=prepare, resume=False)
+            self.assertEqual(spawn.call_args.args[0][-2:], ["--session-id", fork_id])

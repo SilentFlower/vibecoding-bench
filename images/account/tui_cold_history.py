@@ -3,7 +3,7 @@
 from base64 import b64decode
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
-from itertools import zip_longest
+from itertools import chain, zip_longest
 import re
 from uuid import uuid4
 
@@ -15,6 +15,7 @@ from tui_workspace_launch import publish_workspace_history
 MCP_SERVER = "flower"
 MCP_PREFIX = f"mcp__{MCP_SERVER}__"
 RESUME_PROMPT = "Continue from where you left off."
+IMPORT_BOUNDARY = "flower2apiImportBoundary"
 
 
 def _blocks(row):
@@ -213,15 +214,18 @@ class ColdHistory:
 
         boundary = digest((*self._scope(), history))
         return publish_workspace_history(
-            config, work, native_id, lambda rows: self._matches_history(rows, history),
-            (lambda session_id: self._transcript(work, session_id, history)) if history else None,
+            config, work, native_id, lambda rows: self._matches_history(rows, history, boundary),
+            (lambda session_id: self._transcript(work, session_id, history, boundary)) if history else None,
             boundary=boundary,
         )
 
-    def _matches_history(self, rows, history):
-        matches = True
+    def _matches_history(self, rows, history, boundary):
+        first = next(rows)
+        # 旧导入文件只记录了当时使用的请求模型。按原条件读回，保留已存在的文件。
+        legacy = IMPORT_BOUNDARY not in first
+        matches = legacy or first[IMPORT_BOUNDARY] == boundary
         parent = None
-        for row, expected in zip_longest(rows, history):
+        for row, expected in zip_longest(chain((first,), rows), history):
             # 当前问题由新轮提交。已经追加过的真实原生对话只能作为独立分支的依据。
             if row is None or expected is None or row["type"] != expected[0]:
                 matches = False
@@ -229,28 +233,26 @@ class ColdHistory:
             message = row.get("message", {})
             if (row.get("parentUuid") != parent or not isinstance(row.get("uuid"), str)
                     or (message.get("role"), message.get("content")) != expected
-                    or row["type"] == "assistant" and message.get("model") != self.model):
+                    or legacy and row["type"] == "assistant" and message.get("model") != self.model):
                 matches = False
             parent = row.get("uuid")
         return matches
 
-    def _transcript(self, work, session_id, history):
+    def _transcript(self, work, session_id, history, boundary):
         timestamp = datetime.now(timezone.utc).isoformat()
         parent = None
         rows = []
         for role, content in history:
             uid = str(uuid4())
-            message = {"role": role, "content": content}
-            if role == "assistant":
-                message.update(id="msg_" + uuid4().hex, type="message", model=self.model,
-                               stop_reason="tool_use" if any(block["type"] == "tool_use" for block in content)
-                               else "end_turn", stop_sequence=None,
-                               usage={"input_tokens": 0, "output_tokens": 0})
-            rows.append(encode({
+            record = {
                 "parentUuid": parent, "uuid": uid, "sessionId": session_id, "cwd": str(work),
-                "type": role, "message": message, "isSidechain": False,
+                "type": role, "message": {"role": role, "content": content}, "isSidechain": False,
                 "userType": "external", "timestamp": timestamp,
-            }).decode())
+            }
+            if parent is None:
+                # 本轮设置的摘要属于导入记录，不是历史消息的模型或用量。
+                record[IMPORT_BOUNDARY] = boundary
+            rows.append(encode(record).decode())
             parent = uid
         return "\n".join(rows) + "\n"
 

@@ -10,7 +10,7 @@ from threading import Barrier
 from unittest import TestCase
 from uuid import uuid4
 
-from tui_cold_history import ColdHistory
+from tui_cold_history import IMPORT_BOUNDARY, ColdHistory
 from tui_workspace_launch import _resume_path
 
 
@@ -55,8 +55,53 @@ class ColdHistoryTests(TestCase):
             self.assertEqual([row["type"] for row in rows], ["user", "assistant", "user", "assistant"])
             self.assertEqual([row["parentUuid"] for row in rows], [None, *[row["uuid"] for row in rows[:-1]]])
             self.assertEqual({row["sessionId"] for row in rows}, {session})
-            self.assertEqual(rows[1]["message"]["content"], self.body["messages"][1]["content"])
-            self.assertEqual(rows[2]["message"]["content"], self.body["messages"][2]["content"])
+            expected = []
+            for row in self.body["messages"][:-1]:
+                content = row["content"]
+                if isinstance(content, str):
+                    content = [{"type": "text", "text": content}]
+                expected.append({"role": row["role"], "content": content})
+            self.assertEqual([row["message"] for row in rows], expected)
+
+    def test_reuses_previous_import_format_without_rewriting(self):
+        """旧版文件沿原条件读回，新模型请求另建只含历史事实的分支。@return 无。"""
+        plan = ColdHistory.from_request(self.body)
+        session = str(uuid4())
+        work = Path("/native/workspace")
+        with TemporaryDirectory() as directory, ExitStack() as stack:
+            config = Path(directory)
+            plan.import_session(config, work, session)
+            history = _resume_path(stack, config, work, session, required=True)
+            rows = [json.loads(line) for line in history.read_bytes().splitlines()]
+            rows[0].pop(IMPORT_BOUNDARY)
+            for row in rows:
+                if row["type"] == "assistant":
+                    row["message"].update(model=plan.model, id="msg_legacy", usage={"output_tokens": 0})
+            history.write_text("".join(json.dumps(row) + "\n" for row in rows))
+            old_bytes = history.read_bytes()
+            self.assertEqual(plan.import_session(config, work, session), session)
+            changed = ColdHistory.from_request({**self.body, "model": "another-model"})
+            branch = changed.import_session(config, work, session)
+            self.assertNotEqual(branch, session)
+            self.assertEqual(changed.import_session(config, work, session), branch)
+            self.assertEqual(history.read_bytes(), old_bytes)
+
+    def test_import_scope_changes_fork_without_overwriting_history(self):
+        """消息相同且本轮有效设置有变化时，分别复用两个已发布的记录。@return 无。"""
+        plan = ColdHistory.from_request(self.body)
+        changed = ColdHistory.from_request({**self.body, "max_tokens": 256})
+        session = str(uuid4())
+        work = Path("/native/workspace")
+        with TemporaryDirectory() as directory, ExitStack() as stack:
+            config = Path(directory)
+            self.assertEqual(plan.import_session(config, work, session), session)
+            history = _resume_path(stack, config, work, session, required=True)
+            snapshot = history.read_bytes()
+            fork = changed.import_session(config, work, session)
+            self.assertNotEqual(fork, session)
+            self.assertEqual(changed.import_session(config, work, session), fork)
+            self.assertEqual(plan.import_session(config, work, session), session)
+            self.assertEqual(history.read_bytes(), snapshot)
 
     def test_concurrent_imports_preserve_winning_history(self):
         """相同并发导入复用原文件，分歧历史保留原文件并使用独立会话。@return 无。"""
@@ -66,32 +111,33 @@ class ColdHistoryTests(TestCase):
         second = ColdHistory.from_request(changed)
         work = Path("/native/workspace")
         session = str(uuid4())
-        with TemporaryDirectory() as directory, ThreadPoolExecutor(max_workers=3) as pool, ExitStack() as stack:
+        with TemporaryDirectory() as directory, ThreadPoolExecutor(max_workers=8) as pool, ExitStack() as stack:
             config = Path(directory)
-            barrier = Barrier(3)
+            barrier = Barrier(8)
 
             def prepare(plan):
                 barrier.wait(timeout=5)
                 return plan.import_session(config, work, session)
 
-            futures = [pool.submit(prepare, plan) for plan in (first, first, first)]
-            self.assertEqual([future.result() for future in futures], [session] * 3)
+            futures = [pool.submit(prepare, first) for _ in range(8)]
+            self.assertEqual([future.result() for future in futures], [session] * 8)
             original = _resume_path(stack, config, work, session, required=True)
             original_bytes = original.read_bytes()
             self.assertEqual(list(original.parent.iterdir()), [original])
-            barrier = Barrier(2)
-            futures = [pool.submit(prepare, plan) for plan in (first, second)]
-            same, fork = (future.result() for future in futures)
-            self.assertEqual(same, session)
+            barrier = Barrier(8)
+            original_retry = pool.submit(prepare, first)
+            fork_attempts = [pool.submit(prepare, second) for _ in range(7)]
+            fork, = {future.result() for future in fork_attempts}
+            self.assertEqual(original_retry.result(), session)
             self.assertNotEqual(fork, session)
             self.assertEqual(original.read_bytes(), original_bytes)
             forked = _resume_path(stack, config, work, fork, required=True)
             fork_bytes = forked.read_bytes()
             self.assertEqual(json.loads(fork_bytes.splitlines()[0])["message"]["content"][0]["text"],
                              "另一条已确认的上一轮输入")
-            barrier = Barrier(3)
-            futures = [pool.submit(prepare, ColdHistory.from_request(deepcopy(changed))) for _ in range(3)]
-            self.assertEqual([future.result() for future in futures], [fork] * 3)
+            barrier = Barrier(8)
+            futures = [pool.submit(prepare, second) for _ in range(8)]
+            self.assertEqual([future.result() for future in futures], [fork] * 8)
             self.assertEqual(set(original.parent.iterdir()), {original, forked})
             self.assertEqual(forked.read_bytes(), fork_bytes)
 

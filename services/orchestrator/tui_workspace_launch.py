@@ -155,7 +155,7 @@ def launch_workspace_cli(
     @param program_fd 可选的已核验程序描述符，由同容器隔离入口在执行时关闭。
     @param inherited_fds 受信启动器额外传入的同会话描述符。
     @param initialize_profile 可选，新会话由受信控制端为已核验目录初始化独立配置。
-    @param prepare_history 可选，在已核验工作区确定本次会话 UUID。非纯新轮须已有可恢复历史。
+    @param prepare_history 可选，在已核验工作区确定本次会话 UUID。恢复要求合法历史，纯新轮要求所选 UUID 尚无历史。
     @return 由事件源负责监督与回收的官方进程。
     """
     if (
@@ -204,8 +204,12 @@ def launch_workspace_cli(
             if resume is None:
                 resume = True
         session_args = ["--session-id", native_id]
-        history = None if resume is False else _resume_path(stack, config_dir, work, native_id, required=resume is True)
+        history = None
+        if resume is not False or prepare_history is not None:
+            history = _resume_path(stack, config_dir, work, native_id, required=resume is True)
         if history is not None:
+            if resume is False:
+                raise ValueError("V2 新会话 UUID 已有历史记录")
             session_args = ["--resume", str(history)]
         if initialize_profile is not None:
             # 节点迁移只复制对话；首次在目标恢复时按同一私有 cwd 重建本机信任配置。

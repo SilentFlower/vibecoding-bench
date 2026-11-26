@@ -362,6 +362,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             projects = Path("/native/tui-sessions") / native_id / "home/.claude/projects"
             (history_file,) = projects.glob("*/" + native_id + ".jsonl")
             original = history_file.read_bytes()
+            imported = [json.loads(line)["message"] for line in original.splitlines()[:len(messages) - 1]]
+            assert imported == [{"role": row["role"], "content": blocks(row)} for row in messages[:-1]]
             restarted = restart(source)
             divergent = "H1：分叉历史中的项目名是水杉。"
             branch = {**body, "stream": False,
@@ -391,7 +393,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 snapshots[path] = path.read_bytes()
                 if post == 3:
                     restart(restarted)
+            assistant_fields = sorted(next(row for row in imported if row["role"] == "assistant"))
             proof["restart"] = {"bound_session_id": native_id, "branch_session_ids": branch_ids,
+                                "assistant_history_fields": assistant_fields,
                                 "preserved_bytes": [len(data) for data in snapshots.values()],
                                 "additional_model_posts": 2,
                                 "attempts": verify_captures(manage, received[-2:], account_token)}
