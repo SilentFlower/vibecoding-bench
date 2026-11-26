@@ -23,6 +23,7 @@ from verify_tui_http_handoff import message_sse
 
 QUESTION = "请选择是否需要合成便签工具。"
 DIRECT_REPLY = "模型直接返回合成文本。"
+SERIAL_INSTRUCTION = "每次响应最多调用一个合成工具，也可以直接回答。"
 
 
 class Receiver(QuietHandler):
@@ -73,7 +74,7 @@ class Receiver(QuietHandler):
 
 
 def verify(binary, folder):
-    """对照默认权限、允许指定工具和从上下文移除另一个工具。
+    """对照默认权限、工具范围和要求串行的系统指令。
     @param binary 官方 CLI 路径。@param folder 隔离目录。@return 模型实收证据。
     """
     if {name for _, name in if_nameindex()} != {"lo"}:
@@ -84,7 +85,8 @@ def verify(binary, folder):
     first, second = ("mcp__flower__" + tool["name"] for tool in (TOOL, SECOND_TOOL))
     variants = (("default", [], {first, second}),
                 ("allow_named", ["--allowedTools", second], {first, second}),
-                ("deny_other", ["--disallowedTools", first], {second}))
+                ("deny_other", ["--disallowedTools", first], {second}),
+                ("serial_instruction", ["--append-system-prompt", SERIAL_INSTRUCTION], {first, second}))
     results = {}
     with ExitStack() as stack:
         server = serve(stack, ThreadingHTTPServer(("127.0.0.1", 0), Receiver))
@@ -119,9 +121,13 @@ def verify(binary, folder):
             assert all(native[name]["input_schema"] == source_tools[name]["input_schema"] for name in expected)
             assert sum(QUESTION in b.get("text", "") for r in body["messages"] if r["role"] == "user"
                        for b in blocks(r)) == 1
+            system = body["system"]
+            text = system if isinstance(system, str) else "\n".join(block["text"] for block in system)
+            assert text.count(SERIAL_INSTRUCTION) == int(label == "serial_instruction"), (label, text)
             results[label] = {**record, "cli_flags": flags, "declared_count": declared_count,
                               "model_tools": sorted(native), "model_tool_choice": body.get("tool_choice"),
                               "model_tool_choice_present": "tool_choice" in body,
+                              "serial_system_instruction_present": SERIAL_INSTRUCTION in text,
                               "completed_direct_reply": True}
         assert not server.tool_calls, server.tool_calls
     with binary.open("rb") as program:

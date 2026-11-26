@@ -98,6 +98,8 @@ SECOND_REPLY = "SECOND：客户端工具合成错误"
 RECONNECT_PREFIX = "续轮在断开前已经交付的合成文本。"
 FINAL = "模型已收到本次客户端回执。"
 AUTO_TEXT_REPLY = "模型直接回答合成问题。"
+SERIAL_AUTO = {"type": "auto", "disable_parallel_tool_use": True}
+SERIAL_TOOL_QUESTION = "请调用一次合成便签工具后再回答。"
 TITLE_TEXT = "隔离标题用量对照"
 TITLE_REPLY = json.dumps({"title": TITLE_TEXT}, ensure_ascii=False, separators=(",", ":"))
 AUXILIARY_USAGE = (31, 7)
@@ -303,7 +305,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            recovery_slow_model=False, initial_idle_model_connection=False, trace_startup=False, cache_markers=False,
            history_cache_markers=False, history_cache_ttl=None, history_cache_scope=None,
            cache_capability=None, message_system_roles=False,
-           structured_output=False, forced_tool_choice=None, no_tool_choice=False, auxiliary_mode=None,
+           structured_output=False, forced_tool_choice=None, no_tool_choice=False, disable_parallel_tool_use=False,
+           auxiliary_mode=None,
            auxiliary_kind="title", auxiliary_sample=None, agent_progress=None, stock_client=False,
            cancel_and_change_question=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
@@ -352,6 +355,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param structured_output 是否核对普通 API 的结构化输出和实际发送路径。
     @param forced_tool_choice 核对强制工具选择及同进程或重启回执。
     @param no_tool_choice 是否核对无工具时的显式 none 和保留声明的兼容路径。
+    @param disable_parallel_tool_use 是否核对禁并行的公开策略与模型实收。
     @param auxiliary_mode 可选，观察等待工具时的公开辅助轮投递或本地拦截。
     @param auxiliary_kind 标题或建议。@param auxiliary_sample 从官方 CLI 隔离运行导出的请求。
     @param agent_progress 已捕获父子轮与固定进度请求样本。
@@ -370,7 +374,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         directory.mkdir(mode=0o700, parents=True, exist_ok=True)
         os.chown(directory, 1001, 1001)
     inspect_model_body = (cache_markers or message_system_roles or thinking_display_model or structured_output
-                          or forced_tool_choice or no_tool_choice)
+                          or forced_tool_choice or no_tool_choice or disable_parallel_tool_use)
     if inspect_model_body and v1_runtime is None:
         MODEL_BODY_TRACE.touch(mode=0o600, exist_ok=False)
         os.chown(MODEL_BODY_TRACE, 1001, 1001)
@@ -472,6 +476,14 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 wire = message_sse({"type": "text", "text": AUTO_TEXT_REPLY}, "end_turn", "msg_auto_text")
             elif no_tool_choice:
                 wire = message_sse({"type": "text", "text": FINAL}, "end_turn", "msg_cold_reply")
+            elif disable_parallel_tool_use:
+                # 只有实收协议字段要求禁并行时，才给工具往返对照发出单个合成调用。
+                submittable = body.get("tool_choice") == SERIAL_AUTO and not results and any(
+                    b.get("text") == SERIAL_TOOL_QUESTION for row in body["messages"] for b in blocks(row)
+                )
+                wire = (fixture_tool_sse({"type": "tool_use", "id": NEW_ID, "name": TOOL["name"], "input": ARGS},
+                                         with_signature=False) if submittable
+                        else message_sse({"type": "text", "text": FINAL}, "end_turn", "msg_cold_reply"))
             elif forced_tool_choice:
                 wire = fixture_forced_tool_sse(body)
             elif paused_question:
@@ -748,6 +760,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             return verify_structured_output(manage, token, identifier, received)
         if no_tool_choice:
             return verify_no_tool_choice(manage, token, identifier, received)
+        if disable_parallel_tool_use:
+            return verify_disable_parallel_tool_use(manage, token, identifier, received, sender_state_after_failure)
         if forced_tool_choice:
             def bound_forced_archive():
                 (binding_file,) = Path("/native/tui-workspaces").glob("*.json")
@@ -2426,6 +2440,108 @@ def verify_no_tool_choice(manage, token, identifier, received):
     return {"cases": cases, "model_posts": len(received), "wire_final": "unavailable"}
 
 
+def verify_disable_parallel_tool_use(manage, token, identifier, received, sender_status):
+    """核对禁并行、普通选择及账号策略的能力回报。
+    @param manage 管理入口。@param token 调用方。@param identifier 合成账号 ID。
+    @param received 隔离模型实收。@param sender_status 失败后查询发送器。@return 按请求关联的证据。
+    """
+    tools = [TOOL, PARALLEL_SECOND_TOOL]
+    account_path = f"accounts/{identifier}"
+    cases, capabilities, callbacks = {}, {}, []
+
+    def request(question, choice):
+        return {"model": MODEL, "max_tokens": 128, "stream": False, "system": SYSTEM[0],
+                "messages": [{"role": "user", "content": question}], "tools": tools, "tool_choice": choice}
+
+    def post(body, headers, phase, policy, expected_status, *, stop_reason="end_turn"):
+        before = len(received)
+        ingress = sha256(encoded(body)).hexdigest()
+        status, raw, request_id = checked_messages(
+            manage, token, body, headers, received, phase, expected_status=expected_status, trace_startup=True,
+            sender_status=sender_status,
+        )
+        reservation, record, claims = cache_marker_claims(manage, request_id)
+        proof = {"status": status, "request_id": request_id, "reservation_id": reservation,
+                 "attempt_count": record["attempt_count"], "model_posts": len(received) - before,
+                 "ingress_body_sha256": ingress, "input_tool_choice": body["tool_choice"]}
+        cases[phase] = proof
+        reply = json.loads(raw)
+        if status == 422:
+            assert not (claims or proof["attempt_count"] or proof["model_posts"]), (phase, proof)
+            assert reply["error"]["code"] == "unsupported_parameter", (phase, reply)
+            proof["error_code"] = reply["error"]["code"]
+            return reply
+        ((digest, model, _),), (claim,) = received[before:], claims
+        (attempt,) = manage("GET", "request-diagnostics/" + request_id)["attempts"]
+        from_cli = body["tool_choice"] != SERIAL_AUTO
+        provider_path = "interactive_cli" if from_cli else "account_sender"
+        assert proof["attempt_count"] == proof["model_posts"] == 1 and attempt["attempt_id"] == reservation
+        assert attempt["context"]["tui_body_source"] == provider_path, (phase, attempt)
+        assert claim["sha256"] == digest and claim["from_interactive_cli"] is from_cli, (phase, claim)
+        assert claim["cli_sha256"] and (claim["cli_sha256"] == digest) is from_cli, (phase, claim)
+        assert claim["uses_native_history"] is from_cli, (phase, claim)
+        assert claim["cli_tool_choice"] is None, (phase, claim)
+        if from_cli:
+            verify_automatic_model_tools(model, tools)
+        else:
+            assert model["tools"] == tools and model["tool_choice"] == body["tool_choice"], (phase, model)
+        texts = [b.get("text", "") for row in model["messages"] if row["role"] == "user" for b in blocks(row)]
+        question = body["messages"][0]["content"]
+        assert sum(text.count(question) for text in texts) == 1, (phase, texts)
+        system = model["system"]
+        system_texts = [system] if isinstance(system, str) else [b["text"] for b in system]
+        reminder = policy == "user_reminder"
+        assert sum(text.count(SYSTEM[0]) for text in texts) == int(reminder), (phase, texts)
+        assert sum(text.count(SYSTEM[0]) for text in system_texts) == int(not reminder), (phase, system_texts)
+        assert reply["stop_reason"] == stop_reason, (phase, reply)
+        if stop_reason == "end_turn":
+            assert reply["content"] == [{"type": "text", "text": FINAL}], (phase, reply)
+        proof.update(attempt_id=attempt["attempt_id"], provider_path=provider_path,
+                     model_body_sha256=digest, cli_body_sha256=claim["cli_sha256"],
+                     model_tool_choice=model.get("tool_choice"), model_tool_choice_present="tool_choice" in model,
+                     model_tools=model["tools"], client_stop_reason=reply["stop_reason"])
+        return reply
+
+    for policy in ("append", "replace", "user_reminder"):
+        written = manage("PUT", account_path, {"client_system_prompt_policy": policy})
+        detail = manage("GET", account_path)
+        listed, = (row for row in manage("GET", "accounts")["data"] if row["id"] == identifier)
+        keys = ("request_backend", "tui_v2_available", "tui_system_prompt_policy_available", "client_system_prompt_policy")
+        expected = dict(zip(keys, ("tui_v2", True, True, policy), strict=True))
+        capabilities[policy] = {surface: {key: view[key] for key in keys} for surface, view in (
+            ("update", written), ("detail", detail), ("list", listed),
+        )}
+        assert all(view == expected for view in capabilities[policy].values()), capabilities[policy]
+        for choice, label in ((SERIAL_AUTO, "disabled"), ({**SERIAL_AUTO, "disable_parallel_tool_use": False}, "allowed")):
+            phase = f"{policy}_{label}"
+            headers = {"User-Agent": "flower2api-parallel-tool-fixture/1", "x-session-id": str(uuid4())}
+            status = 200 if policy == "append" or choice != SERIAL_AUTO else 422
+            post(request("可直接回答的合成问题", choice), headers, phase, policy, status)
+        if policy == "append":
+            headers = {"User-Agent": "flower2api-parallel-tool-fixture/1", "x-session-id": str(uuid4())}
+            body = request(SERIAL_TOOL_QUESTION, SERIAL_AUTO)
+            reply = post(body, headers, "append_disabled_tool", policy, 200, stop_reason="tool_use")
+            assert reply["content"] == [{"type": "tool_use", "id": NEW_ID, "name": TOOL["name"], "input": ARGS}], reply
+            results = fixture_parallel_results(reply["content"], callbacks)
+            follow = {**body, "messages": [*body["messages"], {"role": "assistant", "content": reply["content"]},
+                                           {"role": "user", "content": results}]}
+            post(follow, headers, "append_disabled_receipt", policy, 200)
+            continuation = received[-1][1]
+            assert find_blocks(continuation, "id", NEW_ID) == [("assistant", reply["content"][0])], continuation
+            assert find_blocks(continuation, "tool_use_id", NEW_ID) == [("user", results[0])], continuation
+            cases["append_disabled_receipt"]["model_tool_result"] = results[0]
+            before = len(received)
+            status, _, request_id = checked_messages(
+                manage, token, follow, headers, received, "append_disabled_duplicate", expected_status=400,
+                trace_startup=True, sender_status=sender_status,
+            )
+            assert len(received) == before and callbacks == [NEW_ID]
+            cases["append_disabled_duplicate"] = {"status": status, "request_id": request_id, "model_posts": 0}
+    assert len(received) == 6 and not any(path.is_file() for path in Path("/flows/api").rglob("*"))
+    return {"cases": cases, "account_capabilities": capabilities, "client_tool_calls": callbacks,
+            "model_posts": len(received), "wire_final": "unavailable"}
+
+
 def fixture_forced_tool_sse(body):
     """按实收工具选择返回合成 tool_use。@param body 模型实收。@return 原始 SSE。"""
     choice = body.get("tool_choice", {})
@@ -3414,6 +3530,7 @@ def main():
     scenario.add_argument("--forced-tool-choice-contract",
                           choices=("live", "restart", "restart-metadata-only", "restart-closed-metadata-only"))
     scenario.add_argument("--no-tool-choice-contract", action="store_true")
+    scenario.add_argument("--disable-parallel-tool-use-contract", action="store_true")
     scenario.add_argument("--auto-tool-direct-text", action="store_true",
                           help="带两项工具声明的 auto 请求直接返回文本")
     scenario.add_argument("--interleaved-title", choices=("forward", "mock", "pooled", "pool-unsupported"))
@@ -3472,6 +3589,7 @@ def main():
     trace_startup = (args.initial_idle_model_connection or args.trace_initial_startup or cache_markers
                      or args.recovery_readiness_rejection
                      or args.structured_output_contract or bool(args.forced_tool_choice_contract) or args.no_tool_choice_contract
+                     or args.disable_parallel_tool_use_contract
                      or bool(auxiliary_mode or args.agent_progress)
                      or bool(args.thinking_display_contract)
                      or (bool(args.message_system_roles) and args.v1_runtime is None))
@@ -3519,6 +3637,7 @@ def main():
                        cache_capability=args.cache_marker_capabilities,
                        message_system_roles=args.message_system_roles, structured_output=args.structured_output_contract,
                        forced_tool_choice=args.forced_tool_choice_contract, no_tool_choice=args.no_tool_choice_contract,
+                       disable_parallel_tool_use=args.disable_parallel_tool_use_contract,
                        auxiliary_mode=auxiliary_mode,
                        auxiliary_kind="suggestion" if args.interleaved_suggestion else "title",
                        auxiliary_sample=json.loads(auxiliary_path.read_bytes()) if auxiliary_path else None,
