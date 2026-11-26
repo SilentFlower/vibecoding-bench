@@ -28,7 +28,7 @@ from uuid import UUID, uuid4
 
 from runtime_files import atomic_text
 from tui_capacity import TuiCapacity, TuiCapacityError
-from tui_cold_history import ColdHistory, MCP_SERVER, SIGNED_THINKING_TYPES
+from tui_cold_history import ColdHistory, MCP_SERVER, SIGNED_THINKING_TYPES, tool_result_has_images
 from tui_reconnect import ReceiptCheckpoints, digest
 from tui_input_policy import CONTEXT_BETA, InputRejection, native_input
 from tui_messages import (
@@ -964,7 +964,7 @@ class _Actor:
                     if not self.cold_history.matches_history_cache_markers(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
                             "code": "unsupported_parameter", "message": "CLI 未保留历史缓存标记"}}))
-                    if not self.cold_history.matches_history_tool_images(native):
+                    if not (self.recovery_history or self.cold_history).matches_history_tool_images(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
                             "code": "unsupported_parameter", "message": "CLI 未保留历史工具结果中的图文"}}))
                     if handle.kind == "recovered" and not self.recovery_history.matches_recovered_signatures(native):
@@ -1630,6 +1630,7 @@ class SessionDriver:
 
         checkpoint = None
         native_checkpoint = None
+        retire_for_images = None
         if not summary and (returned or reservation["continuation_only"]):
             if not returned:
                 raise ValueError("缺少原轮工具结果")
@@ -1661,11 +1662,6 @@ class SessionDriver:
                     checkpoint = self.checkpoints.find(actor_key)
                     if checkpoint is None:
                         raise InputRejection("unrecoverable_tool")
-                    branch, previous, expected, prior_request, revision, native_checkpoint = checkpoint
-                    answers = tool_receipts(messages, previous, expected,
-                                            input_format=reservation.get("input_format"), checkpoint=True)
-                    if native_checkpoint is None and prior_request is not None and prior_request != request:
-                        raise ValueError("已提交的工具结果或模型参数与重试不符")
             if actor is not None:
                 with actor.changed:
                     # 对外终帧可稍早于上一传输线程归还句柄。只等本次已经确认完成的交接。
@@ -1685,18 +1681,6 @@ class SessionDriver:
                         raise ValueError("原会话未准备接收该工具结果")
                     answers = tool_receipts(messages, actor.history, actor.expected,
                                             input_format=reservation.get("input_format"))
-                    handle = _Reserved(
-                        actor,
-                        "continuation",
-                        history,
-                        answers,
-                        body,
-                        stream,
-                        frozen,
-                        reservation,
-                        active_request,
-                        input_observation=input_observation,
-                    )
                     if actor.cold_history is not None:
                         prompt_index = len(actor.cold_history.history) + 1
                         # 继续使用原进程的生效设置，校验通过后才把回执交给等待工具。
@@ -1706,8 +1690,22 @@ class SessionDriver:
                         )
                         if not native_body_policy or plan != actor.cold_history or not tool_results_only:
                             raise InputRejection("unsupported_parameter")
-                    actor.claim = handle
-                    return handle
+                    if actor.cold_history is not None and any(tool_result_has_images(answer) for answer in answers.values()):
+                        checkpoint = self.checkpoints.find(actor_key)
+                        if checkpoint is None or checkpoint[4] != actor.receipt_revision or checkpoint[5] is None:
+                            raise InputRejection("unrecoverable_tool")
+                        retire_for_images = actor
+                    else:
+                        handle = _Reserved(actor, "continuation", history, answers, body, stream, frozen, reservation,
+                                           active_request, input_observation=input_observation)
+                        actor.claim = handle
+                        return handle
+            if checkpoint is not None:
+                branch, previous, expected, prior_request, revision, native_checkpoint = checkpoint
+                answers = tool_receipts(messages, previous, expected,
+                                        input_format=reservation.get("input_format"), checkpoint=True)
+                if native_checkpoint is None and prior_request is not None and prior_request != request:
+                    raise ValueError("已提交的工具结果或模型参数与重试不符")
 
         cold = recovery_history = None
         signed_tool_models = {}
@@ -1733,6 +1731,18 @@ class SessionDriver:
             cold = ColdHistory.from_request(body, system_policy, cache_ttl=native_cache_ttl)
         if cold is None and system_policy != "append" and not is_native and checkpoint is None:
             raise InputRejection("unsupported_parameter")
+        if retire_for_images is not None:
+            # 热续轮会移除结果图片。校验完整回执和可恢复历史后，复用同一修订的磁盘恢复入口。
+            with self.lock:
+                with retire_for_images.changed:
+                    if retire_for_images.claim is not None or retire_for_images.receipt_revision != revision:
+                        raise ValueError("原工具回执已经换轮")
+                    remaining()
+                    retire_for_images.abort()
+                while self.sessions.get(actor_key) is retire_for_images:
+                    self.lock.wait(min(remaining(), 0.05))
+                if actor_key in self.sessions:
+                    raise ValueError("原工具回执已被认领")
         launch_plan = recovery_history or cold
         prompt = launch_plan.submitted_prompt() if launch_plan is not None else prompt_text(messages)
         with self.lock:

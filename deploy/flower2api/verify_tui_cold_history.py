@@ -321,7 +321,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            auxiliary_mode=None,
            auxiliary_kind="title", auxiliary_sample=None, agent_progress=None, stock_client=False,
            cancel_and_change_question=False, oauth_rotation=False, provider_quota=None, slow_tool_stream=False,
-           model_connection_contract=None, external_signed_history=False, history_tool_images=None):
+           model_connection_contract=None, external_signed_history=False, history_tool_images=None,
+           tool_receipt_images=None):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -334,6 +335,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param history_images 是否核对用户历史里四种内嵌图像。
     @param history_tool_blocks 是否核对已完成工具结果的原始文本块。
     @param history_tool_images 核对已闭合工具结果的图文块，可显式声明成功或省略错误标志。
+    @param tool_receipt_images 核对本轮实际工具调用的图文回执及拒绝边界。
     @param previous 可选，旧发行源码、网关、发送器三个离线制品。
     @param failure_boundaries 是否分别在模型收件前后切断隔离连接。
     @param stock_client 是否通过真实外部 CLI 验证完整 V2 输入与工具回执。
@@ -1078,6 +1080,18 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         else:
             callbacks.append(tool["id"])
             result = {"role": "user", "content": [{"type": "tool_result", "tool_use_id": tool["id"], "content": REPLY}]}
+        if tool_receipt_images:
+            png, jpeg, gif, webp = fixture_image_blocks(all_formats=True)
+            for block in result["content"]:
+                images = [png, jpeg, gif, png, webp]
+                text = REPLY if block["tool_use_id"] == NEW_ID else "第二个工具的实际图文回执。"
+                if block["tool_use_id"] != NEW_ID:
+                    images.reverse()
+                block["content"] = [{"type": "text", "text": text}, images[0],
+                                    {"type": "text", "text": "第二段图注\n保留换行"}, *images[1:]]
+                block.pop("is_error", None)
+                if tool_receipt_images == "explicit-success":
+                    block["is_error"] = False
         if previous:
             assert received[0][1]["tools"][0]["name"] == TOOL["name"]
             assert not sender_state().get("idle")
@@ -1154,18 +1168,21 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             assert len(received) == 1
             expected_token = rotated_token
             startup_event("oauth_credential_rotated", model_posts=len(received), refresh_count=len(refresh_calls))
-        if recover_pending:
+        if recover_pending or tool_receipt_images:
             marker = ("--name=" + headers["x-session-id"]).encode()
             original, = [int(path.parent.name) for path in Path("/proc").glob("[0-9]*/cmdline")
                          if fixture_command_has(path, marker)]
-            os.kill(original, SIGKILL)
-            source = restart(source, "recovered_receipt")
-            assert not Path(f"/proc/{original}").exists()
+            if recover_pending:
+                os.kill(original, SIGKILL)
+                source = restart(source, "recovered_receipt")
+                assert not Path(f"/proc/{original}").exists()
             (binding_file,) = Path("/native/tui-workspaces").glob("*.json")
-            original_id = json.loads(binding_file.read_text())["native_session_id"]
+            original_binding = binding_file.read_bytes()
+            original_id = json.loads(original_binding)["native_session_id"]
             projects = Path("/native/tui-sessions") / original_id / "home/.claude/projects"
             (original_file,) = projects.glob("*/" + original_id + ".jsonl")
             original_history = original_file.read_bytes()
+        if recover_pending:
             manage("PUT", f"accounts/{identifier}", {"client_system_prompt_policy": "user_reminder"})
             modified_system = {**follow, "system": "更改已经冻结的指令"}
             changed_policy, response, _ = checked_messages(
@@ -1179,6 +1196,18 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 trace_startup=trace_startup,
             )
             assert changed_effort == 422 and len(received) == 1, (changed_effort, response, len(received))
+        if tool_receipt_images:
+            rejected = deepcopy(follow)
+            rejected["messages"][-1]["content"][0]["is_error"] = True
+            receipt_error_status, raw, receipt_error_request = checked_messages(
+                manage, token, rejected, headers, received, "error_tool_receipt_images", expected_status=422,
+                trace_startup=True, sender_status=sender_state_after_failure,
+            )
+            assert json.loads(raw)["error"]["code"] == "unsupported_parameter" and len(received) == 1
+            assert manage("GET", "request-diagnostics/" + receipt_error_request)["attempts"] == []
+            if not recover_pending:
+                assert fixture_command_has(Path(f"/proc/{original}/cmdline"), marker)
+                original_history = original_file.read_bytes()
         if current_text_blocks:
             merged = {"role": "user", "content": QUESTION + QUESTION_TAIL}
             changed = {**follow, "messages": [*messages[:-1], merged, *follow["messages"][-2:]]}
@@ -1500,8 +1529,35 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                                         if block["type"] == "image"],
                                             "content_sha256": sha256(encoded(old_result)).hexdigest(),
                                             "changed_order_http": changed_history_images}
-        else:
+        elif not tool_receipt_images:
             proof["old_tool_calls"] = 0
+        if tool_receipt_images:
+            assert final["stop_reason"] == "end_turn"
+            assert binding_file.read_bytes() == original_binding, binding_file
+            history_after_receipt = original_file.read_bytes()
+            assert history_after_receipt.startswith(original_history), (len(original_history), len(history_after_receipt))
+            appended = [json.loads(line) for line in history_after_receipt[len(original_history):].splitlines()]
+            assert all(block not in result["content"] for row in appended if row["type"] == "user"
+                       for block in blocks(row["message"]))
+            assert not Path(f"/proc/{original}").exists()
+            assert [attempt["diagnostic_session_origin"] for attempt in captures] == ["external_import", "disk_resume"]
+            assert all(attempt["diagnostic_body_source"] == "interactive_cli" for attempt in captures)
+            actual = {}
+            for block in result["content"]:
+                tool_id = block["tool_use_id"]
+                assert find_blocks(received[-1][1], "tool_use_id", tool_id) == [("user", block)]
+                actual[tool_id] = {"result_sha256": sha256(encoded(block)).hexdigest(),
+                                   "is_error_present": "is_error" in block,
+                                   "is_error": block.get("is_error"),
+                                   "formats": [item["source"]["media_type"] for item in block["content"]
+                                               if item["type"] == "image"]}
+            proof["tool_receipt_images"] = {"records": actual, "error_http": receipt_error_status,
+                                           "error_request_id": receipt_error_request,
+                                           "original_pid": original, "original_process_exited": True,
+                                           "original_history_prefix_preserved": True, "binding_preserved": True,
+                                           "original_history_bytes_equal": history_after_receipt == original_history,
+                                           "original_history_added_record_types": [row["type"] for row in appended],
+                                           "stop_reason": final["stop_reason"]}
         if model_connection_contract:
             count = 1 if model_connection_contract == "live" else 2
             ports = {port for port, _ in model_connection_posts}
@@ -1566,7 +1622,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 proof.update(nested_history_cache_markers=[find_blocks(model, "tool_use_id", PAST_ID)
                                                            for _, model, _ in received],
                              changed_nested_history_cache_status=changed_nested_cache)
-        if parallel_tools:
+        if parallel_tools and not tool_receipt_images:
             first, second = (document for _, document, _ in received)
             assert TOOL["input_schema"] != PARALLEL_SECOND_TOOL["input_schema"]
             for native in (first, second):
@@ -3949,6 +4005,8 @@ def main():
     parser.add_argument("--history-cache-scope", choices=("nested", "mixed"))
     parser.add_argument("--history-tool-images", nargs="?", const="explicit-success",
                         choices=("explicit-success", "implicit-success"))
+    parser.add_argument("--tool-receipt-images", nargs="?", const="explicit-success",
+                        choices=("explicit-success", "implicit-success"))
     system_roles = parser.add_mutually_exclusive_group()
     system_roles.add_argument("--message-system-roles", dest="message_system_roles", action="store_const", const="observe")
     system_roles.add_argument("--ordinary-message-system-contract", dest="message_system_roles", action="store_const",
@@ -4051,7 +4109,7 @@ def main():
     cache_markers = args.cache_markers or args.cache_marker_capabilities is not None
     trace_startup = (args.initial_idle_model_connection or args.trace_initial_startup or args.trace_recovery_resend or cache_markers
                      or args.model_connection_contract is not None or args.external_signed_history_contract
-                     or args.history_tool_images is not None
+                     or args.history_tool_images is not None or args.tool_receipt_images is not None
                      or args.recovery_readiness_rejection
                      or args.structured_output_contract or bool(args.forced_tool_choice_contract) or args.no_tool_choice_contract
                      or args.disable_parallel_tool_use_contract or bool(args.oauth_rotation or args.provider_quota)
@@ -4084,6 +4142,7 @@ def main():
                        output_effort=args.output_effort, history_png=args.history_png,
                        history_images=args.history_images, history_tool_blocks=args.history_tool_blocks,
                        history_tool_images=args.history_tool_images,
+                       tool_receipt_images=args.tool_receipt_images,
                        previous=previous,
                        failure_boundaries=args.failure_boundaries, current_text_blocks=args.current_text_blocks,
                        signed_tool_history=args.signed_tool_history, signed_tool_response=args.signed_tool_response,

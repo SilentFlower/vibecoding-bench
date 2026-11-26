@@ -124,10 +124,16 @@ def _result_blocks(content, *, allow_images):
     )
 
 
+def tool_result_has_images(block):
+    """识别结果中的图片块。@param block 工具结果。@return 是否包含图片。"""
+    content = block.get("content")
+    return isinstance(content, list) and any(isinstance(nested, dict) and nested.get("type") == "image"
+                                             for nested in content)
+
+
 def _historical_image_results(rows):
     return [(row["role"], block) for row in rows for block in _blocks(row)
-            if block.get("type") == "tool_result" and isinstance(block.get("content"), list)
-            and any(isinstance(nested, dict) and nested.get("type") == "image" for nested in block["content"])]
+            if block.get("type") == "tool_result" and tool_result_has_images(block)]
 
 
 def _marked_blocks(content):
@@ -404,6 +410,11 @@ class ColdHistory:
                     renamed.append(block)
                 content = renamed
             if role == "user":
+                # 原生历史会保留成功结果的内嵌图文。CLI 会剥掉错误结果的图片。
+                if any(block["type"] == "tool_result" and tool_result_has_images(block)
+                       and not _result_blocks(block["content"], allow_images=not block.get("is_error", False))
+                       for block in content):
+                    return None
                 content = [{**block, "content": block.get("content", "")} if block["type"] == "tool_result"
                            else block for block in content]
             if history and history[-1]["role"] == role:
