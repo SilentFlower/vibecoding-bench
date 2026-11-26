@@ -79,7 +79,7 @@ use crate::service::telemetry::{
     MessageTelemetryContext, MessageTelemetryResult, MessageTelemetryUsage, TelemetryService,
     merge_message_usage,
 };
-use crate::service::tui_backend::{self, LEGACY_BINDING, TUI_V2, TuiRequestRoute};
+use crate::service::tui_backend::{self, TUI_V2};
 use crate::service::tui_native_drain::{
     NativeTurn, active_agent_account, continuation_account, recovery_row, summary_account,
 };
@@ -2428,6 +2428,14 @@ impl GatewayService {
         let mut replay_owner = reconnect_key
             .as_ref()
             .and_then(|key| self.tui_reconnects.account(key));
+        if let Some(owner) = replay_owner {
+            // V2 响应缓存的存活期可能长于账号切换，按当前生效值决定是否接回。
+            match self.account_svc.tui_backend(owner).await {
+                Ok(state) if state.active == TUI_V2 => {}
+                Ok(_) | Err(AppError::NotFound) => replay_owner = None,
+                Err(error) => return Err(error),
+            }
+        }
         let mut recovery = if reconnect_key.is_some()
             && replay_owner.is_none()
             && let Some(token) = api_token
@@ -2739,7 +2747,7 @@ impl GatewayService {
             } else {
                 (account, None)
             };
-            if tool_owner.is_some() && tui_route.is_none() {
+            if tool_owner.is_some() && account.request_backend != TUI_V2 {
                 return Err(AppError::BadRequest("工具结果的原执行路径已退场".into()));
             }
             if (agent_account.is_some() || native_summary) && account.request_backend != TUI_V2 {
@@ -3252,11 +3260,6 @@ impl GatewayService {
                 SlotReleaseGuard::new(admission.permit.with_credential_activity(activity));
             if account.request_backend == "native293" && method == "POST" && path == "/v1/messages"
             {
-                let native_route = tui_route
-                    .as_ref()
-                    .zip(api_token)
-                    .map(|(route, principal)| (route, (principal.id, original_session)));
-                let mut native_turn = None;
                 // HTTP 头按 Latin-1 字节串交给统一白名单，合法 obs-text 也能先被过滤。
                 let native_headers: Vec<(String, String)> = native_header_map
                     .iter()
@@ -3283,8 +3286,6 @@ impl GatewayService {
                         native_message_cache,
                         &native_disabled_thinking,
                         &mut native_oauth_retry_used,
-                        native_route,
-                        &mut native_turn,
                     )
                     .await
                 {
@@ -3292,15 +3293,7 @@ impl GatewayService {
                     Err(AppError::SchedulingConflict) => continue,
                     Err(error) => return Err(error),
                 };
-                if response.status().is_client_error() || response.status().is_server_error() {
-                    if let Some(turn) = native_turn.as_ref() {
-                        turn.retire_v1_error().await?;
-                    }
-                }
-                let may_retry_account = !native_turn
-                    .as_ref()
-                    .is_some_and(NativeTurn::owns_continuation);
-                if response.status() == StatusCode::TOO_MANY_REQUESTS && may_retry_account {
+                if response.status() == StatusCode::TOO_MANY_REQUESTS {
                     if let Some(response) = self
                         .prepare_rate_limit_retry(
                             response,
@@ -3327,10 +3320,6 @@ impl GatewayService {
                     )
                 });
                 let codings = response_content_codings(response.headers());
-                let response = match native_turn {
-                    Some(turn) => turn.observe_response(response, &codings),
-                    None => response,
-                };
                 let (parts, body) = response.into_parts();
                 let guarded = SlotGuardBody::new(
                     body,
@@ -3673,24 +3662,6 @@ impl GatewayService {
                     .await;
             }
 
-            let legacy_turn = if !runtime_transport::tui_fixture(&account)
-                && let Some((route, principal)) = tui_route.as_ref().zip(api_token)
-            {
-                Some(
-                    route
-                        .begin_v1(
-                            &self.account_svc,
-                            &account,
-                            (principal.id, original_session),
-                            "legacy",
-                            &body_map,
-                            LEGACY_BINDING.into(),
-                        )
-                        .await?,
-                )
-            } else {
-                None
-            };
             // 转发到上游
             let usage_started_at = Utc::now();
             let t_upstream = std::time::Instant::now();
@@ -3735,11 +3706,7 @@ impl GatewayService {
                     return Err(e);
                 }
             };
-            if let Some(turn) = legacy_turn.as_ref() {
-                turn.mark_submitted();
-            }
             if resp.status() == StatusCode::UNAUTHORIZED
-                && tool_owner.is_none()
                 && let Some(failed_access_token) = upstream_token.as_deref()
             {
                 match await_preparation(
@@ -3782,9 +3749,6 @@ impl GatewayService {
                                 "gateway",
                             )
                             .await?;
-                            if let Some(turn) = legacy_turn.as_ref() {
-                                turn.retire_v1_error().await?;
-                            }
                             auth_failure_excluded = true;
                             exclude_ids.push(account.id);
                             drop(slot_guard);
@@ -3794,9 +3758,6 @@ impl GatewayService {
                     None => {
                         diagnostics::error_stage("auth_recovery");
                         diagnostics::retry_reason("credentials_rejected");
-                        if let Some(turn) = legacy_turn.as_ref() {
-                            turn.retire_v1_error().await?;
-                        }
                         auth_failure_excluded = true;
                         exclude_ids.push(account.id);
                         drop(slot_guard);
@@ -3804,7 +3765,7 @@ impl GatewayService {
                     }
                 }
             }
-            let (mut resp, signature_retry_stage) = self
+            let (resp, signature_retry_stage) = self
                 .maybe_retry_signature_error(
                     &method.to_string(),
                     &path,
@@ -3832,13 +3793,7 @@ impl GatewayService {
                 resp.status().as_u16()
             );
 
-            if resp.status().is_client_error() || resp.status().is_server_error() {
-                if let Some(turn) = legacy_turn.as_ref() {
-                    turn.retire_v1_error().await?;
-                }
-            }
-            // 已定位原工具轮的 429 保持原账号，其他请求沿用既有重试。
-            if resp.status() != StatusCode::TOO_MANY_REQUESTS || tool_owner.is_some() {
+            if resp.status() != StatusCode::TOO_MANY_REQUESTS {
                 let mut usage_capture = (path == "/v1/messages" && resp.status().is_success())
                     .then(|| {
                         UsageCapture::new(
@@ -3850,10 +3805,6 @@ impl GatewayService {
                     });
                 if let Some(lookup) = non_stream_probe_cache_lookup {
                     if resp.status().is_success() && signature_retry_stage.is_none() {
-                        if let Some(turn) = legacy_turn {
-                            let codings = response_content_codings(resp.headers());
-                            resp = turn.observe_response(resp, &codings);
-                        }
                         let (parts, body_bytes) = buffer_response_body(resp).await?;
                         if let Some(mut capture) = usage_capture.take() {
                             capture.observe_encoded(
@@ -3896,9 +3847,6 @@ impl GatewayService {
                 };
                 let permit = slot_guard.defuse();
                 let content_codings = response_content_codings(resp.headers());
-                if let Some(turn) = legacy_turn {
-                    resp = turn.observe_response(resp, &content_codings);
-                }
                 let (parts, body) = resp.into_parts();
                 let guarded_body = Body::new(
                     SlotGuardBody::new(
@@ -4776,8 +4724,6 @@ impl GatewayService {
         message_cache: MessageCacheControlRewrite,
         disabled_thinking: &DisabledThinkingRewrite,
         oauth_retry_used: &mut bool,
-        native_route: Option<(&TuiRequestRoute, (i64, Option<&str>))>,
-        native_turn: &mut Option<NativeTurn>,
     ) -> Result<Response, AppError> {
         let deadline = scheduling
             .map(SchedulingRequest::deadline)
@@ -4813,8 +4759,6 @@ impl GatewayService {
                 message_cache,
                 disabled_thinking,
                 None,
-                native_route,
-                native_turn,
             )
             .await?;
         if let Some(first) = rejected_oauth
@@ -4864,8 +4808,6 @@ impl GatewayService {
                     message_cache,
                     disabled_thinking,
                     Some(replay),
-                    native_route,
-                    native_turn,
                 ),
             )
             .await;
@@ -4915,8 +4857,6 @@ impl GatewayService {
                 message_cache,
                 disabled_thinking,
                 None,
-                native_route,
-                native_turn,
             ),
         )
         .await
@@ -4959,8 +4899,6 @@ impl GatewayService {
         message_cache: MessageCacheControlRewrite,
         disabled_thinking: &DisabledThinkingRewrite,
         mut oauth_retry: Option<NativeOAuthRetry<'_>>,
-        native_route: Option<(&TuiRequestRoute, (i64, Option<&str>))>,
-        native_turn: &mut Option<NativeTurn>,
     ) -> Result<(Response, Option<RejectedNativeOAuthAttempt>), AppError> {
         validate_native_account_features(account, headers, body_map)?;
         let log_mode = diagnostics::current_log_mode();
@@ -5039,29 +4977,6 @@ impl GatewayService {
         .await?
         .inspect_err(|_| diagnostics::error_stage("runtime_prepare"))?;
         let execution_location = transport.execution_location();
-        if let Some((route, owner)) = native_route {
-            let binding = transport.tui_native_binding(account);
-            if let Some(turn) = native_turn.as_ref() {
-                if binding != turn.binding {
-                    return Err(AppError::ServiceUnavailable(
-                        "原生工具轮环境代次待核对".into(),
-                    ));
-                }
-            } else {
-                *native_turn = Some(
-                    route
-                        .begin_v1(
-                            &self.account_svc,
-                            account,
-                            owner,
-                            NativeSourceVersion::Cc293.as_str(),
-                            ingress_body_map,
-                            binding,
-                        )
-                        .await?,
-                );
-            }
-        }
         await_preparation(scheduling, transport.native_ready())
             .await?
             .inspect_err(|_| diagnostics::error_stage("native_prepare"))?;
@@ -5075,12 +4990,6 @@ impl GatewayService {
             let mut bytes = [0; 16];
             bytes.copy_from_slice(&digest[..16]);
             context["sessionId"] = serde_json::json!(Uuid::from_bytes(bytes).to_string());
-            if runtime_transport::tui_fixture(account)
-                && let Some(server_session) =
-                    native_turn.as_ref().and_then(NativeTurn::stateless_session)
-            {
-                context["sessionId"] = serde_json::json!(server_session);
-            }
         }
         let id = Uuid::new_v4().to_string();
         let mut input = serde_json::json!({"schema_version":1,"request_id":id,"headers":headers,"context":context});
@@ -5148,9 +5057,6 @@ impl GatewayService {
         };
         if let Some(permit) = permit {
             permit.submitted();
-        }
-        if let Some(turn) = native_turn.as_ref() {
-            turn.mark_submitted();
         }
         info!(request_id = ?diagnostics::current_request_id(), native_job_id = %id,
             account_id = account.id, layer = "gateway", reason = "native_submission",
@@ -12130,8 +12036,6 @@ mod tests {
                     MessageCacheControlRewrite::Off,
                     &DisabledThinkingRewrite::off(),
                     &mut false,
-                    None,
-                    &mut None,
                 )
                 .await
                 .unwrap();
@@ -12192,6 +12096,154 @@ mod tests {
         );
         assert_native_oauth_recovery().await;
         assert_native_revoked_oauth().await;
+    }
+
+    /// 验证 V1 工具历史经正常接口转发。@return 无；存量账本干扰或写入新账本时失败。
+    #[tokio::test]
+    #[ignore = "由 tests/native_signature_fixture.py 提供隔离进程及回环 sender"]
+    async fn native_v1_receipt_gateway_roundtrip() {
+        use reqwest::Client;
+
+        assert_eq!(std::env::var("FLOWER_SIGNATURE_FIXTURE").unwrap(), "1");
+        let (service, store) = test_gateway_service_with_scheduling(
+            Arc::new(MemoryStore::new()),
+            "https://api.anthropic.com".into(),
+            "http://127.0.0.1:1".into(),
+            true,
+        )
+        .await;
+        let mut account =
+            create_gateway_account(&service, "native-receipt@example.invalid", 8, 0).await;
+        account.request_backend = "native293".into();
+        store.update(&account).await.unwrap();
+        let receipts = service.account_svc.tui_database();
+        let reconnects = service.tui_reconnects.clone();
+        let cache_layout = *service.message_cache_control_rewrite.read().await;
+        let cache_ttl = *service.cache_control_ttl_rewrite.read().await;
+        let (router, token) = authenticated_gateway_router(Arc::new(service)).await;
+        let client = Client::builder().no_proxy().build().unwrap();
+        let observations = format!("{}/observations", std::env::var("V3_RUNTIME_URL").unwrap());
+        let snapshot = || async {
+            client
+                .get(&observations)
+                .send()
+                .await
+                .unwrap()
+                .json::<Vec<Value>>()
+                .await
+                .unwrap()
+        };
+        let send = |payload: &Value, session: Option<&str>| {
+            let mut request = Request::builder()
+                .method("POST")
+                .uri("/v1/messages")
+                .header("x-api-key", &token.token)
+                .header("user-agent", "claude-cli/2.1.293 (external, cli)")
+                .header("content-type", "application/json");
+            if let Some(session) = session {
+                request = request.header("x-claude-code-session-id", session);
+            }
+            let request = request.body(Body::from(payload.to_string())).unwrap();
+            router.clone().oneshot(request)
+        };
+        let receipt_count = || async {
+            sqlx::query_scalar::<_, i64>(
+                "SELECT COUNT(*) FROM tui_native_turns WHERE account_id=$1",
+            )
+            .bind(account.id)
+            .fetch_one(&receipts)
+            .await
+            .unwrap()
+        };
+
+        let cases = [(true, false), (true, true), (false, false), (false, true)];
+        for (explicit, interrupted) in cases {
+            let session = Uuid::new_v4().to_string();
+            let header_session = explicit.then_some(session.as_str());
+            let mut payload = json!({"model":"claude-opus-5-5","max_tokens":128,"stream":false,
+                "messages":[{"role":"user","content":"v1-receipt-fixture"}]});
+            let before = receipt_count().await;
+            let offered = send(&payload, header_session).await.unwrap();
+            let status = offered.status();
+            let bytes = body::to_bytes(offered.into_body(), 4096).await.unwrap();
+            let answer = String::from_utf8_lossy(&bytes);
+            assert_eq!(status, StatusCode::OK, "{answer}");
+            assert_eq!(receipt_count().await, before);
+            let offered: Value = serde_json::from_slice(&bytes).unwrap();
+            let tool = &offered["content"][0];
+            assert_eq!(tool["type"], "tool_use");
+            let messages = payload["messages"].as_array_mut().unwrap();
+            messages.push(json!({"role":"assistant","content":[tool]}));
+            messages.push(json!({"role":"user","content":[
+                {"type":"tool_result","tool_use_id":tool["id"],"content":"合成结果"}]}));
+
+            // 同一正文可能仍命中切换前的 V2 响应缓存。
+            let mut headers = axum::http::HeaderMap::new();
+            headers.insert(
+                "user-agent",
+                "claude-cli/2.1.293 (external, cli)".parse().unwrap(),
+            );
+            let key = super::tui_reconnect::key(
+                token.id,
+                header_session,
+                &payload,
+                &headers,
+                true,
+                super::runtime_transport::TuiBodyPolicy::new(cache_layout, cache_ttl, false),
+                "",
+            )
+            .unwrap();
+            let _cached = match reconnects
+                .reserve(key, account.id, "old-v2-binding")
+                .unwrap()
+            {
+                super::Reservation::First(writer) => writer,
+                super::Reservation::Existing(_) => panic!("测试应登记独立缓存"),
+            };
+            // 模拟升级前留下的已认领记录和终态摘要。
+            let group = json!([tool["id"]]).to_string();
+            let tools = if interrupted {
+                format!("!{group}")
+            } else {
+                let marker = if explicit { 'E' } else { ':' };
+                format!("#{:020}{marker}{:x}", u64::MAX, Sha256::digest(&group))
+            };
+            sqlx::query(
+                "INSERT INTO tui_native_turns (id,account_id,principal_id,session_id,binding,version,tools)
+                 VALUES ($1,$2,$3,$4,'old-binding','2.1.293',$5)",
+            )
+            .bind(Uuid::new_v4().to_string())
+            .bind(account.id)
+            .bind(token.id)
+            .bind(&session)
+            .bind(tools)
+            .execute(&receipts)
+            .await
+            .unwrap();
+
+            let first_index = snapshot().await.len();
+            let first = send(&payload, header_session).await.unwrap();
+            assert_eq!(first.status(), StatusCode::OK);
+            if interrupted {
+                // 下游在读取响应体之前断开。
+                drop(first);
+            } else {
+                body::to_bytes(first.into_body(), 4096).await.unwrap();
+            }
+
+            let retry = send(&payload, header_session).await.unwrap();
+            let status = retry.status();
+            let bytes = body::to_bytes(retry.into_body(), 4096).await.unwrap();
+            let answer = String::from_utf8_lossy(&bytes);
+            assert_eq!(status, StatusCode::OK, "{answer}");
+            let sent = snapshot().await;
+            assert_eq!(sent.len() - first_index, 2);
+            for request in &sent[first_index..] {
+                assert_eq!(request["account_id"], account.id);
+                assert_eq!(request["body"]["messages"], payload["messages"]);
+            }
+            assert_eq!(receipt_count().await, before + 1);
+        }
     }
 
     /// 用首发屏障精确模拟在上游返回 401 前已有另一路完成换票。

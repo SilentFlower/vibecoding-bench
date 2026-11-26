@@ -16,11 +16,10 @@ use crate::service::runtime_transport::{
     TuiBindingStatus, TuiReadySender, tui_fixture, tui_input_rejection, tui_same_binding,
     tui_scope, tui_switch_status, tui_transition_status,
 };
-use crate::service::tui_native_drain::{self, NativeTurn, TUI_V2_RECEIPT_VERSION};
+use crate::service::tui_native_drain::{self, NativeTurn};
 use crate::store::account_store::TuiBackendSnapshot;
 
 pub(crate) const TUI_V2: &str = "tui_v2";
-pub(super) const LEGACY_BINDING: &str = "legacy:gateway";
 
 /// 在普通槽位等待期间冻结原账号路由和 sender 代次。
 pub(super) struct TuiRequestRoute {
@@ -30,42 +29,6 @@ pub(super) struct TuiRequestRoute {
 }
 
 impl TuiRequestRoute {
-    /// 在提交 V1 前登记或认领原工具组。@param service 账号服务。@param account 当前账号。
-    /// @param owner 入口主体及原会话。@param version 执行合同。@param body 公开 Messages。
-    /// @param binding 本次实际传输代次。@return 原生轮次。
-    pub(super) async fn begin_v1(
-        &self,
-        service: &AccountService,
-        account: &Account,
-        owner: (i64, Option<&str>),
-        version: &str,
-        body: &Value,
-        binding: String,
-    ) -> Result<NativeTurn, AppError> {
-        let _config = self.queue.tui_config.lock().await;
-        let state = service.tui_backend(account.id).await?;
-        let draining = !state.target.is_empty();
-        if state.active != account.request_backend
-            || (draining && tui_fixture(account) && binding != state.binding)
-        {
-            return Err(AppError::ServiceUnavailable(
-                "原工具轮执行路径或环境代次待核对".into(),
-            ));
-        }
-        let allow_untracked_history = !tui_fixture(account) || owner.1.is_some();
-        tui_native_drain::claim(
-            service.tui_database(),
-            account.id,
-            owner,
-            version,
-            body,
-            binding,
-            draining,
-            allow_untracked_history,
-        )
-        .await
-    }
-
     /// 判断该轮能否通过登记唤醒环境。@param service 账号服务。@param account 当前账号。
     /// @param continuation 是否为原工具回传。@return 是否允许唤醒。
     pub(super) async fn may_wake_v2(
@@ -88,7 +51,7 @@ impl TuiRequestRoute {
         if !state.target.is_empty() {
             return Err(AppError::AdmissionLimited { retry_after: 1 });
         }
-        Ok(!tui_native_drain::occupied(service.tui_database(), account.id).await?)
+        Ok(!tui_native_drain::occupied_v2(service.tui_database(), account.id).await?)
     }
 
     /// 登记已核验 sender 上的本轮。@param service 账号服务。@param account 当前账号。
@@ -126,7 +89,7 @@ impl TuiRequestRoute {
             && !continuation
             && sender.idle
             && let Ok(_permit) = account_route_config_permit(service, account).await
-            && !tui_native_drain::occupied(service.tui_database(), account.id).await?
+            && !tui_native_drain::occupied_v2(service.tui_database(), account.id).await?
             && idle_binding(account, &state.binding).await.as_deref() == Some(sender.key.as_str())
         {
             // 排空许可内重读编排登记和 sender 状态，确保保存的就是本次准备的代次。
@@ -155,11 +118,9 @@ impl TuiRequestRoute {
                     service.tui_database(),
                     account.id,
                     owner,
-                    TUI_V2_RECEIPT_VERSION,
                     body,
                     state.binding.clone(),
                     draining,
-                    false,
                 )
                 .await?,
             )
@@ -204,14 +165,16 @@ async fn reconcile_locked(
     if state.target.is_empty() {
         return Ok(state);
     }
-    // 没通过响应头的旧请求仍持读锁。普通 HTTP 响应和等待工具结果分别由旧门禁与 sender 核对。
+    // 响应头前由路由读锁保护。HTTP 在途由账号活动门禁保护。V2 等工具的会话由 sender 核对。
     let Ok(_route) = queue.tui_route.try_write() else {
         return Ok(state);
     };
     let fixture = tui_fixture(account);
-    let unbound_v2 = state.active == TUI_V2 && state.target != TUI_V2 && state.binding.is_empty();
+    let active_v2 = state.active == TUI_V2;
+    let unbound_v2 = active_v2 && state.target != TUI_V2 && state.binding.is_empty();
     if fixture
-        && (tui_native_drain::occupied(service.tui_database(), account.id).await?
+        && ((active_v2
+            && tui_native_drain::occupied_v2(service.tui_database(), account.id).await?)
             || idle_binding(account, &state.binding).await.is_none())
     {
         return Ok(state);
@@ -227,7 +190,10 @@ async fn reconcile_locked(
     let Ok(permit) = permit else {
         return Ok(state);
     };
-    if !fixture && tui_native_drain::occupied(service.tui_database(), account.id).await? {
+    if !fixture
+        && active_v2
+        && tui_native_drain::occupied_v2(service.tui_database(), account.id).await?
+    {
         return Ok(state);
     }
     let confirmed = if fixture || unbound_v2 {
@@ -453,7 +419,7 @@ async fn reconcile_account(
     Ok(())
 }
 
-/// 新请求在取得普通 HTTP 槽前只冻结生效值。V1 和 V2 续轮分别由各自可信收口数据验证。
+/// 冻结请求的生效后端。V1 切换期间只等当前在途请求收尾，V2 允许原交互会话交回结果。
 /// @param service 账号服务。@param account 已选定账号。@return 生效账号及路由快照。
 pub(super) async fn request_route(
     service: &AccountService,
@@ -475,11 +441,7 @@ pub(super) async fn request_route(
     let route = queue.tui_route.clone().read_owned().await;
     drop(config);
     account.request_backend = state.active;
-    let continuation_only = !state.target.is_empty();
-    if continuation_only
-        && tui_fixture(&account)
-        && !matches!(account.request_backend.as_str(), TUI_V2 | "native293")
-    {
+    if !state.target.is_empty() && account.request_backend != TUI_V2 {
         return Err(AppError::AdmissionLimited { retry_after: 1 });
     }
     Ok((

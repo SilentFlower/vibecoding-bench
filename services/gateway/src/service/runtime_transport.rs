@@ -482,14 +482,6 @@ pub struct PreparedTransport {
 }
 
 impl PreparedTransport {
-    /// 取得实际 V1 传输的轮次归属。@param account 已选定账号。@return 校验后的运行位置键。
-    pub(super) fn tui_native_binding(&self, account: &Account) -> String {
-        match &self.route {
-            PreparedRoute::V3 { binding, .. } => tui_binding_key(binding, tui_fixture(account)),
-            PreparedRoute::Direct(_) => "native:direct".into(),
-        }
-    }
-
     /// 读取发送器和已选内核共同支持的生成预算。@return 原生生成时长。
     pub(super) fn agy_generation_budget(&self) -> Duration {
         Duration::from_millis(if self.long_agy_generation {

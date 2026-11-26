@@ -1,4 +1,4 @@
-//! 账号的公开工具轮凭证由实际转发的响应登记。
+//! V2 交互会话的公开工具轮凭证由实际转发的响应登记。
 
 use axum::body::Body;
 use axum::response::Response;
@@ -18,6 +18,7 @@ use uuid::Uuid;
 use crate::error::AppError;
 use crate::service::request_session::valid_id;
 use crate::service::system_update::InferenceCutover;
+use crate::service::tui_backend::TUI_V2;
 use crate::service::tui_tool_history::{
     SERVER_SESSION_PREFIX, continuation_proof, has_result, history_key, preceding_tool_ids,
     result_ids,
@@ -97,25 +98,12 @@ pub(super) struct NativeTurn {
     background_agents: Vec<String>,
     stateless_history: Option<String>,
     session_id: String,
-    pub(super) binding: String,
     submitted: AtomicBool,
-    remember_receipt: bool,
     recovery: Option<ReceiptRow>,
     delivery: Option<Arc<Delivery>>,
 }
 
-/// 核对是否仍有等待工具、执行中或提交未知的 V1 轮。@param pool 数据库。@param account 账号。@return 是否阻止切换。
-pub(super) async fn occupied(pool: AnyPool, account: i64) -> Result<bool, AppError> {
-    let open =
-        // 旧版本没有登记主体的已终结工具轮无法授权；只把未知执行保留为排空阻塞。
-        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM tui_native_turns WHERE account_id=$1 AND tools NOT LIKE '#%' AND (principal_id<>0 OR tools='')")
-            .bind(account)
-            .fetch_one(&pool)
-            .await?;
-    Ok(open != 0)
-}
-
-/// 判断迁移是否仍需保留本账号的 V2 原进程。@param pool 数据库。@param account 账号。@return 有待回执或未知提交。
+/// 判断账号的 V2 进程是否仍有在途轮次。@param pool 数据库。@param account 账号。@return 有待回执或未知提交。
 pub(super) async fn occupied_v2(pool: AnyPool, account: i64) -> Result<bool, AppError> {
     let open = sqlx::query_scalar::<_, i64>(
         "SELECT COUNT(*) FROM tui_native_turns WHERE account_id=$1 AND version=$2 AND tools NOT LIKE '#%'",
@@ -290,25 +278,29 @@ pub(super) async fn active_agent_account(
     hint: &str,
 ) -> Result<Option<i64>, AppError> {
     let recorded = sqlx::query_scalar::<_, i64>(
-        "SELECT DISTINCT account_id FROM tui_native_turns
-         WHERE principal_id=$1 AND session_id=$2 AND version=$3
-         AND tools LIKE '#%' AND substr(tools,2,20)>$4 AND substr(tools,22)=$5 LIMIT 2",
+        "SELECT DISTINCT t.account_id FROM tui_native_turns t JOIN accounts a ON a.id=t.account_id
+         WHERE t.principal_id=$1 AND t.session_id=$2 AND t.version=$3
+         AND t.tools LIKE '#%' AND substr(t.tools,2,20)>$4 AND substr(t.tools,22)=$5
+         AND a.request_backend=$6 LIMIT 2",
     )
     .bind(principal)
     .bind(session)
     .bind(TUI_V2_RECEIPT_VERSION)
     .bind(format!("{:020}", now_ms()))
     .bind(format!("A{}", tool_digest(hint)))
+    .bind(TUI_V2)
     .fetch_all(&pool)
     .await?;
     let accounts = if recorded.is_empty() {
         sqlx::query_scalar::<_, i64>(
-            "SELECT DISTINCT account_id FROM tui_native_turns
-         WHERE principal_id=$1 AND session_id=$2 AND version=$3 AND tools NOT LIKE '#%' LIMIT 2",
+            "SELECT DISTINCT t.account_id FROM tui_native_turns t JOIN accounts a ON a.id=t.account_id
+             WHERE t.principal_id=$1 AND t.session_id=$2 AND t.version=$3 AND t.tools NOT LIKE '#%'
+             AND a.request_backend=$4 LIMIT 2",
         )
         .bind(principal)
         .bind(session)
         .bind(TUI_V2_RECEIPT_VERSION)
+        .bind(TUI_V2)
         .fetch_all(&pool)
         .await?
     } else {
@@ -416,12 +408,13 @@ async fn terminal_receipt(
     owner: Option<(i64, Option<&str>)>,
 ) -> Result<Option<&'static str>, AppError> {
     let found = sqlx::query_scalar::<_, i64>(
-        "SELECT CAST(CASE WHEN version IN ($6,$7) THEN 1 ELSE 0 END AS BIGINT)
-         FROM tui_native_turns WHERE tools LIKE '#%'
-         AND substr(tools,2,20)>$1 AND substr(tools,23)=$2
-         AND substr(tools,22,1)<>'A'
-         AND principal_id=COALESCE($3,principal_id) AND session_id=COALESCE($4,session_id)
-         AND ($5=0 OR substr(tools,22,1)<>'E') ORDER BY 1 DESC LIMIT 1",
+        "SELECT CAST(CASE WHEN t.version IN ($6,$7) THEN 1 ELSE 0 END AS BIGINT)
+         FROM tui_native_turns t JOIN accounts a ON a.id=t.account_id
+         WHERE a.request_backend=$8 AND t.version IN ($6,$7,$9,$10) AND t.tools LIKE '#%'
+         AND substr(t.tools,2,20)>$1 AND substr(t.tools,23)=$2
+         AND substr(t.tools,22,1)<>'A'
+         AND t.principal_id=COALESCE($3,t.principal_id) AND t.session_id=COALESCE($4,t.session_id)
+         AND ($5=0 OR substr(t.tools,22,1)<>'E') ORDER BY 1 DESC LIMIT 1",
     )
     .bind(format!("{:020}", now_ms()))
     .bind(tool_digest(tools))
@@ -431,6 +424,9 @@ async fn terminal_receipt(
     .bind(i64::from(matches!(owner, Some((_, None)))))
     .bind(ORPHANED_WAITING)
     .bind(ORPHANED_UNKNOWN)
+    .bind(TUI_V2)
+    .bind(TUI_V2_RECEIPT_VERSION)
+    .bind(UNDELIVERED)
     .fetch_optional(pool)
     .await?;
     Ok(found.map(|orphaned| {
@@ -448,13 +444,19 @@ async fn has_registered_group(
     declarations: &str,
 ) -> Result<bool, AppError> {
     let known = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM tui_native_turns t
+        "SELECT COUNT(*) FROM tui_native_turns t JOIN accounts a ON a.id=t.account_id
          LEFT JOIN tui_stateless_turn_proofs p ON p.turn_id=t.id
-         WHERE t.tools=$1 OR t.tools=$2 OR ($3<>'' AND p.declarations=$3)",
+         WHERE a.request_backend=$4 AND t.version IN ($5,$6,$7,$8)
+         AND (t.tools=$1 OR t.tools=$2 OR ($3<>'' AND p.declarations=$3))",
     )
     .bind(tools)
     .bind(format!("!{tools}"))
     .bind(declarations)
+    .bind(TUI_V2)
+    .bind(TUI_V2_RECEIPT_VERSION)
+    .bind(ORPHANED_WAITING)
+    .bind(ORPHANED_UNKNOWN)
+    .bind(UNDELIVERED)
     .fetch_one(pool)
     .await?;
     Ok(known != 0)
@@ -529,8 +531,10 @@ pub(super) async fn continuation_account(
     let declarations = proof.as_ref().map_or("", |(_, declarations)| declarations);
     let candidates = sqlx::query(
         "SELECT t.account_id, p.history, p.declarations
-         FROM tui_native_turns t LEFT JOIN tui_stateless_turn_proofs p ON p.turn_id=t.id
-         WHERE t.principal_id=$1 AND (t.tools=$2 OR t.tools=$3 OR ($4<>'' AND p.declarations=$4))
+         FROM tui_native_turns t JOIN accounts a ON a.id=t.account_id
+         LEFT JOIN tui_stateless_turn_proofs p ON p.turn_id=t.id
+         WHERE a.request_backend=$6 AND t.version=$7
+         AND t.principal_id=$1 AND (t.tools=$2 OR t.tools=$3 OR ($4<>'' AND p.declarations=$4))
          AND (($5='' AND p.turn_id IS NOT NULL) OR ($5<>'' AND t.session_id=$5 AND p.turn_id IS NULL))
          LIMIT 2",
     )
@@ -539,6 +543,8 @@ pub(super) async fn continuation_account(
     .bind(&claimed)
     .bind(declarations)
     .bind(explicit.unwrap_or(""))
+    .bind(TUI_V2)
+    .bind(TUI_V2_RECEIPT_VERSION)
     .fetch_all(&pool)
     .await?;
     if let Some(message) =
@@ -585,8 +591,9 @@ pub(super) async fn recovery_row(
     }
     let tools = serde_json::to_string(&ids).expect("纯字符串集合可编码");
     let query = format!(
-        "SELECT {RECEIPT_COLUMNS} FROM tui_native_turns t
-         LEFT JOIN tui_stateless_turn_proofs p ON p.turn_id=t.id WHERE t.principal_id=$1
+        "SELECT {RECEIPT_COLUMNS} FROM tui_native_turns t JOIN accounts a ON a.id=t.account_id
+         LEFT JOIN tui_stateless_turn_proofs p ON p.turn_id=t.id
+         WHERE a.request_backend=$12 AND t.principal_id=$1
          AND ((t.version=$2 AND t.tools=$3) OR (t.version IN ($4,$5,$11) AND t.tools LIKE '#%'
              AND substr(t.tools,2,20)>$6 AND substr(t.tools,23)=$7))
          AND ((p.turn_id IS NULL AND $8<>'' AND t.session_id=$8)
@@ -606,6 +613,7 @@ pub(super) async fn recovery_row(
         .bind(history)
         .bind(declarations)
         .bind(UNDELIVERED)
+        .bind(TUI_V2)
         .fetch_all(pool)
         .await?;
     if rows.len() > 1 {
@@ -648,28 +656,24 @@ impl ReceiptRow {
                 None
             },
             session_id: self.session_id.clone(),
-            binding: self.binding.clone(),
             submitted: AtomicBool::new(false),
-            remember_receipt: true,
             recovery: Some(self),
             delivery: None,
         })
     }
 }
 
-/// 认领受信的已交付工具组或登记新请求。调用方已持原账号配置锁。
-/// @param pool 数据库。@param account 账号。@param owner 真实主体与可选的客户端会话。@param version 已核验的执行合同。
+/// 认领受信的 V2 工具组或登记新 V2 请求。调用方已持原账号配置锁。
+/// @param pool 数据库。@param account 账号。@param owner 真实主体与可选的客户端会话。
 /// @param body 公开 Messages。@param binding 已核验代次。@param draining 是否只允许旧轮。
-/// @param allow_untracked_history 是否保留现有 V1 历史导入。@return 生命周期凭证。
+/// @return 生命周期凭证。
 pub(super) async fn claim(
     pool: AnyPool,
     account: i64,
     owner: (i64, Option<&str>),
-    version: &str,
     body: &Value,
     binding: String,
     draining: bool,
-    allow_untracked_history: bool,
 ) -> Result<NativeTurn, AppError> {
     let (principal, explicit) = owner;
     let rejected = || AppError::BadRequest(RECEIPT_MISMATCH.into());
@@ -678,18 +682,22 @@ pub(super) async fn claim(
     if draining && !returning_result {
         return Err(AppError::AdmissionLimited { retry_after: 1 });
     }
-    if returning_result && ids.is_none() && (draining || !allow_untracked_history) {
+    if returning_result && ids.is_none() {
         return Err(rejected());
     }
     if let Some(explicit) = explicit {
-        // V1 内核使用 UUID；公开自报同一个 UUID 也不能覆盖服务端登记的无头会话。
+        // 服务端登记的无头会话不能通过公开会话标识取得。
         let private = sqlx::query_scalar::<_, i64>(
             "SELECT COUNT(*) FROM tui_native_turns t
              JOIN tui_stateless_turn_proofs p ON p.turn_id=t.id
-             WHERE t.account_id=$1 AND t.session_id=$2",
+             WHERE t.account_id=$1 AND t.session_id=$2 AND t.version IN ($3,$4,$5,$6)",
         )
         .bind(account)
         .bind(explicit)
+        .bind(TUI_V2_RECEIPT_VERSION)
+        .bind(ORPHANED_WAITING)
+        .bind(ORPHANED_UNKNOWN)
+        .bind(UNDELIVERED)
         .fetch_one(&pool)
         .await?;
         if private != 0 {
@@ -697,11 +705,8 @@ pub(super) async fn claim(
         }
     }
     let next_history = if explicit.is_none() {
-        let history = body["messages"].as_array();
-        if history.is_none() && !allow_untracked_history {
-            return Err(rejected());
-        }
-        history.map(|history| history_key(history))
+        let history = body["messages"].as_array().ok_or_else(rejected)?;
+        Some(history_key(history))
     } else {
         None
     };
@@ -714,7 +719,7 @@ pub(super) async fn claim(
              WHERE t.account_id=$1 AND t.principal_id=$2 AND t.binding=$3 AND t.version=$4 AND t.tools=$5
              AND (($6='' AND p.turn_id IS NOT NULL) OR ($6<>'' AND t.session_id=$6 AND p.turn_id IS NULL))
              LIMIT 2",
-        ).bind(account).bind(principal).bind(&binding).bind(version).bind(&tools).bind(explicit.unwrap_or(""))
+        ).bind(account).bind(principal).bind(&binding).bind(TUI_V2_RECEIPT_VERSION).bind(&tools).bind(explicit.unwrap_or(""))
             .fetch_all(&pool).await?;
         if let Some(message) =
             terminal_receipt(&pool, &tools, (!candidates.is_empty()).then_some(owner)).await?
@@ -748,43 +753,21 @@ pub(super) async fn claim(
                 pool,
                 id,
                 previous_tools: Some(tools),
-                background_agents: if explicit.is_some() && version == TUI_V2_RECEIPT_VERSION {
+                background_agents: if explicit.is_some() {
                     background_agent_hashes(body)
                 } else {
                     Vec::new()
                 },
                 stateless_history: next_history,
                 session_id,
-                binding,
                 submitted: AtomicBool::new(false),
                 recovery: None,
                 delivery: None,
-                remember_receipt: version != "legacy",
             });
         }
         if !candidates.is_empty() {
             return Err(AppError::ServiceUnavailable("候选工具组归属有歧义".into()));
         }
-        if !allow_untracked_history || draining {
-            return Err(rejected());
-        }
-        let declarations = continuation_proof(body, &ids).map(|(_, declarations)| declarations);
-        let known = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM tui_native_turns t
-             LEFT JOIN tui_stateless_turn_proofs p ON p.turn_id=t.id
-             WHERE t.account_id=$1 AND (t.tools=$2 OR t.tools=$3 OR ($4<>'' AND p.declarations=$4))",
-        )
-        .bind(account)
-        .bind(&tools)
-        .bind(format!("!{tools}"))
-        .bind(declarations.as_deref().unwrap_or(""))
-        .fetch_one(&pool)
-        .await?;
-        if known != 0 {
-            return Err(rejected());
-        }
-    }
-    if draining {
         return Err(rejected());
     }
     let id = Uuid::new_v4().to_string();
@@ -799,7 +782,7 @@ pub(super) async fn claim(
     .bind(principal)
     .bind(&session_id)
     .bind(&binding)
-    .bind(version)
+    .bind(TUI_V2_RECEIPT_VERSION)
     .execute(&mut *tx)
     .await?;
     if let Some(history) = &next_history {
@@ -814,11 +797,9 @@ pub(super) async fn claim(
         background_agents: Vec::new(),
         stateless_history: next_history,
         session_id,
-        binding,
         submitted: AtomicBool::new(false),
         recovery: None,
         delivery: None,
-        remember_receipt: false,
     })
 }
 
@@ -956,14 +937,6 @@ impl NativeTurn {
             .map_or_else(String::new, |tools| format!("!{tools}"))
     }
 
-    /// 结束已明确不交付工具的 V1 新请求。@return 轮次回收结果。
-    pub(super) async fn retire_v1_error(&self) -> Result<(), AppError> {
-        if !self.owns_continuation() {
-            self.finish(Some((Vec::new(), None))).await?;
-        }
-        Ok(())
-    }
-
     /// 收口 V2 已返回的明确 HTTP 拒绝。@return 记录后的结果。
     pub(super) async fn retire_v2_rejection(&mut self) -> Result<(), AppError> {
         self.background_agents.clear();
@@ -983,10 +956,8 @@ impl NativeTurn {
         }
         let open = self.open_tools();
         let mut tx = self.pool.begin().await?;
-        if self.remember_receipt
-            && let Some(previous) = &self.previous_tools
-        {
-            // 原生 V1 与 V2 共用回执摘要。切换、重启后，V1 的历史导入也要拒绝已消费组。
+        if let Some(previous) = &self.previous_tools {
+            // 已交付 V2 回执保留持久摘要，防止重启后再次认领。
             let until = now_ms().saturating_add(BINDING_TTL_MS);
             // 使用既有分隔位标记显式会话，旧版本仍可按同一偏移读取期限和摘要。
             let separator = if self.stateless_history.is_none() {
@@ -1069,12 +1040,6 @@ impl NativeTurn {
         Ok(())
     }
 
-    /// 在转交原响应终态前落下原工具组或关闭轮次。@param response sender 原 HTTP 响应。
-    /// @param codings 原压缩编码。@return 保留原网络帧内容的流。
-    pub(super) fn observe_response(self, response: Response, codings: &[String]) -> Response {
-        self.observe_v2_response(response, codings, None)
-    }
-
     /// 在已开始交付 V2 工具的流上登记切换保护。@param response 原响应。@param codings 原编码。
     /// @param cutover 本次公开请求的切换信号。@return 原样输出的受观察响应。
     pub(super) fn observe_v2_response(
@@ -1147,7 +1112,7 @@ mod tests {
 
     use super::{
         Body, BodyExt, Ordering, Response, TUI_V2_RECEIPT_VERSION, Value, active_agent_account,
-        awaiting_v2_tools, claim, continuation_account, occupied, prune_terminal,
+        awaiting_v2_tools, claim, continuation_account, occupied_v2, prune_terminal,
     };
     use crate::service::request_body_codec::REQUEST_BODY_LIMIT;
     use crate::store::db::migrate;
@@ -1166,8 +1131,8 @@ mod tests {
             .await
             .unwrap();
         migrate(&pool, "sqlite").await.unwrap();
-        sqlx::query("INSERT INTO accounts(id,name,email,token,device_id) VALUES(1,'first','first@test.invalid','fixture','one')")
-            .execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO accounts(id,name,email,token,device_id,request_backend) VALUES(1,'first','first@test.invalid','fixture','one',$1)")
+            .bind(super::TUI_V2).execute(&pool).await.unwrap();
         let group = r#"["tool_a"]"#;
         let body = json!({"model":"chosen","messages":[{"role":"user","content":"question"},
             {"role":"assistant","content":[{"type":"tool_use","id":"tool_a","name":"Bash","input":{}}]},
@@ -1179,18 +1144,9 @@ mod tests {
             .await
             .unwrap();
         let owner = (7, Some("scope"));
-        let original = claim(
-            pool.clone(),
-            1,
-            owner,
-            TUI_V2_RECEIPT_VERSION,
-            &body,
-            "binding".into(),
-            false,
-            false,
-        )
-        .await
-        .unwrap();
+        let original = claim(pool.clone(), 1, owner, &body, "binding".into(), false)
+            .await
+            .unwrap();
         original.mark_submitted();
         for (principal, session) in [(8, Some("scope")), (7, Some("sibling")), (7, None)] {
             assert!(
@@ -1214,6 +1170,23 @@ mod tests {
         first.finish(Some((Vec::new(), None))).await.unwrap();
         let row = candidate().await.unwrap().unwrap();
         assert_eq!(row.version, super::UNDELIVERED);
+        sqlx::query("UPDATE accounts SET request_backend='native293' WHERE id=1")
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(candidate().await.unwrap().is_none());
+        assert_eq!(
+            continuation_account(pool.clone(), owner, &body)
+                .await
+                .unwrap(),
+            None
+        );
+        sqlx::query("UPDATE accounts SET request_backend=$1 WHERE id=1")
+            .bind(super::TUI_V2)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(candidate().await.unwrap().is_some());
         delivery.acknowledge().await.unwrap();
         assert!(candidate().await.unwrap().is_none());
         assert!(continuation_account(pool, owner, &body).await.is_err());
@@ -1391,8 +1364,8 @@ mod tests {
             .unwrap();
         migrate(&pool, "sqlite").await.unwrap();
         sqlx::query(
-            "INSERT INTO accounts(id,name,email,token,device_id)
-             VALUES(1,'synthetic','v2@example.invalid','synthetic','fixture')",
+            "INSERT INTO accounts(id,name,email,token,device_id,request_backend)
+             VALUES(1,'synthetic','v2@example.invalid','synthetic','fixture','tui_v2')",
         )
         .execute(&pool)
         .await
@@ -1495,9 +1468,9 @@ mod tests {
             .unwrap();
         migrate(&pool, "sqlite").await.unwrap();
         sqlx::query(
-            "INSERT INTO accounts(id,name,email,token,device_id) VALUES
-            (1,'first','first@test.invalid','synthetic','one'),
-            (2,'other','other@test.invalid','synthetic','two')",
+            "INSERT INTO accounts(id,name,email,token,device_id,request_backend) VALUES
+            (1,'first','first@test.invalid','synthetic','one','tui_v2'),
+            (2,'other','other@test.invalid','synthetic','two','tui_v2')",
         )
         .execute(&pool)
         .await
@@ -1589,9 +1562,9 @@ mod tests {
             .unwrap();
         migrate(&pool, "sqlite").await.unwrap();
         sqlx::query(
-            "INSERT INTO accounts(id,name,email,token,device_id)
-                    VALUES(1,'one','one@example.invalid','synthetic','fixture'),
-                          (2,'two','two@example.invalid','synthetic','fixture')",
+            "INSERT INTO accounts(id,name,email,token,device_id,request_backend)
+                    VALUES(1,'one','one@example.invalid','synthetic','fixture','tui_v2'),
+                          (2,'two','two@example.invalid','synthetic','fixture','tui_v2')",
         )
         .execute(&pool)
         .await
@@ -1602,10 +1575,8 @@ mod tests {
                 pool.clone(),
                 account,
                 (9, Some("session")),
-                TUI_V2_RECEIPT_VERSION,
                 &messages,
                 "local".into(),
-                false,
                 false,
             )
         };
@@ -1649,9 +1620,9 @@ mod tests {
             .unwrap();
         migrate(&pool, "sqlite").await.unwrap();
         sqlx::query(
-            "INSERT INTO accounts(id,name,email,token,device_id)
-                 VALUES(1,'one','one@example.invalid','synthetic','fixture'),
-                       (2,'two','two@example.invalid','synthetic','fixture')",
+            "INSERT INTO accounts(id,name,email,token,device_id,request_backend)
+                 VALUES(1,'one','one@example.invalid','synthetic','fixture','tui_v2'),
+                       (2,'two','two@example.invalid','synthetic','fixture','tui_v2')",
         )
         .execute(&pool)
         .await
@@ -1661,10 +1632,8 @@ mod tests {
             pool.clone(),
             1,
             (9, Some("session")),
-            TUI_V2_RECEIPT_VERSION,
             &body,
             "local".into(),
-            false,
             false,
         )
         .await
@@ -1693,17 +1662,15 @@ mod tests {
             pool.clone(),
             1,
             (9, Some("session")),
-            TUI_V2_RECEIPT_VERSION,
             &body,
             "local".into(),
-            false,
             false,
         )
         .await
         .unwrap();
         continued.mark_submitted();
         continued.finish(Some((vec![], None))).await.unwrap();
-        assert!(!super::occupied(pool.clone(), 1).await.unwrap());
+        assert!(!super::occupied_v2(pool.clone(), 1).await.unwrap());
         for (principal, session, hint, account) in [
             (9, "session", "agentA", Some(1)),
             (9, "session", "agentB", None),
@@ -1721,16 +1688,14 @@ mod tests {
             pool.clone(),
             2,
             (9, Some("session")),
-            TUI_V2_RECEIPT_VERSION,
             &json!({"messages":[{"role":"user","content":"另一个独立合成轮"}]}),
             "other-environment".into(),
-            false,
             false,
         )
         .await
         .unwrap();
         assert!(
-            super::occupied(pool.clone(), 2).await.unwrap(),
+            super::occupied_v2(pool.clone(), 2).await.unwrap(),
             "第二账号在同一会话已有活动轮"
         );
         assert_eq!(
@@ -1748,6 +1713,83 @@ mod tests {
         drop(competing);
     }
 
+    /// 查询只读取当前 V2 账号的 V2 回执。@return 无；旧版本或已切出的账本参与调度时失败。
+    #[tokio::test]
+    async fn old_receipts_do_not_route_to_the_retired_backend() {
+        install_default_drivers();
+        let pool = AnyPoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        migrate(&pool, "sqlite").await.unwrap();
+        sqlx::query(
+            "INSERT INTO accounts(id,name,email,token,device_id,request_backend)
+             VALUES(1,'one','one@example.invalid','synthetic','fixture','native293')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let owner = (7, Some("session"));
+        let live = r#"["toolu_old"]"#;
+        let terminal = format!(
+            "#{:020}E{}",
+            super::now_ms() + 60_000,
+            super::tool_digest(live)
+        );
+        let follow = json!({"messages":[
+            {"role":"user","content":"合成请求"},
+            {"role":"assistant","content":[{"type":"tool_use","id":"toolu_old","name":"Read","input":{}}]},
+            {"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_old","content":"合成结果"}]}
+        ]});
+        sqlx::query(
+            "INSERT INTO tui_native_turns VALUES('old',1,7,'session','binding','2.1.293',$1)",
+        )
+        .bind(live)
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert!(!occupied_v2(pool.clone(), 1).await.unwrap());
+        for backend in ["native293", "tui_v2"] {
+            sqlx::query("UPDATE accounts SET request_backend=$1 WHERE id=1")
+                .bind(backend)
+                .execute(&pool)
+                .await
+                .unwrap();
+            for tools in [live, &format!("!{live}"), terminal.as_str()] {
+                sqlx::query("UPDATE tui_native_turns SET tools=$1 WHERE id='old'")
+                    .bind(tools)
+                    .execute(&pool)
+                    .await
+                    .unwrap();
+                assert_eq!(
+                    continuation_account(pool.clone(), owner, &follow)
+                        .await
+                        .unwrap(),
+                    None
+                );
+            }
+        }
+        sqlx::query("UPDATE tui_native_turns SET version=$1 WHERE id='old'")
+            .bind(TUI_V2_RECEIPT_VERSION)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(
+            continuation_account(pool.clone(), owner, &follow)
+                .await
+                .is_err()
+        );
+        sqlx::query("UPDATE accounts SET request_backend='native293' WHERE id=1")
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            continuation_account(pool, owner, &follow).await.unwrap(),
+            None
+        );
+    }
+
     /// 续轮在提交中及终态均受原账号、会话、主体和代次的登记约束。
     #[tokio::test]
     async fn tui_receipts_bind_actor_session_generation_and_terminal() {
@@ -1759,23 +1801,15 @@ mod tests {
             .unwrap();
         migrate(&pool, "sqlite").await.unwrap();
         sqlx::query(
-            "INSERT INTO accounts(id,name,email,token,device_id)
-             VALUES(1,'one','one@example.invalid','synthetic','fixture'),
-                   (2,'two','two@example.invalid','synthetic','fixture')",
+            "INSERT INTO accounts(id,name,email,token,device_id,request_backend)
+             VALUES(1,'one','one@example.invalid','synthetic','fixture','tui_v2'),
+                   (2,'two','two@example.invalid','synthetic','fixture','tui_v2')",
         )
         .execute(&pool)
         .await
         .unwrap();
         let initial = json!({"messages":[{"role":"user","content":"初始请求"}]});
-        for (index, (version, explicit)) in [
-            (TUI_V2_RECEIPT_VERSION, None),
-            (TUI_V2_RECEIPT_VERSION, Some("original-session")),
-            ("2.1.293", None),
-            ("2.1.293", Some("original-session")),
-        ]
-        .into_iter()
-        .enumerate()
-        {
+        for (index, explicit) in [None, Some("original-session")].into_iter().enumerate() {
             let tool_id = format!("toolu_{index}_{}", "very-long-id".repeat(40));
             let follow = json!({"messages":[initial["messages"][0].clone(),
                 {"role":"assistant","content":[{"type":"tool_use","id":tool_id,"name":"Read","input":{"path":"fixture"}}]},
@@ -1784,10 +1818,8 @@ mod tests {
                 pool.clone(),
                 1,
                 (7, explicit),
-                version,
                 &initial,
                 "binding-1".into(),
-                false,
                 false,
             )
             .await
@@ -1800,7 +1832,7 @@ mod tests {
                 .finish(Some((vec![tool_id], Some(declarations))))
                 .await
                 .unwrap();
-            assert!(occupied(pool.clone(), 1).await.unwrap());
+            assert!(occupied_v2(pool.clone(), 1).await.unwrap());
             assert_eq!(
                 continuation_account(pool.clone(), (7, explicit), &follow)
                     .await
@@ -1849,11 +1881,9 @@ mod tests {
                         pool.clone(),
                         account,
                         (7, explicit),
-                        version,
                         &follow,
                         binding.into(),
                         false,
-                        false
                     )
                     .await
                     .is_err()
@@ -1863,11 +1893,9 @@ mod tests {
                 pool.clone(),
                 1,
                 (7, explicit),
-                version,
                 &with_context,
                 "binding-1".into(),
                 true,
-                false,
             )
             .await
             .unwrap();
@@ -1884,18 +1912,16 @@ mod tests {
                     pool.clone(),
                     1,
                     (7, explicit),
-                    version,
                     &follow,
                     "binding-1".into(),
                     false,
-                    false
                 )
                 .await
                 .is_err()
             );
             continuation.mark_submitted();
             continuation.finish(Some((vec![], None))).await.unwrap();
-            assert!(!occupied(pool.clone(), 1).await.unwrap());
+            assert!(!occupied_v2(pool.clone(), 1).await.unwrap());
             assert!(
                 continuation_account(pool.clone(), (7, explicit), &follow)
                     .await
@@ -1906,11 +1932,9 @@ mod tests {
                     pool.clone(),
                     2,
                     (7, explicit),
-                    "legacy",
                     &follow,
                     "legacy:gateway".into(),
                     false,
-                    true
                 )
                 .await
                 .is_err()
@@ -1941,7 +1965,7 @@ mod tests {
             .await
             .unwrap();
         migrate(&pool, "sqlite").await.unwrap();
-        sqlx::query("INSERT INTO accounts(id,name,email,token,device_id) VALUES(1,'one','one@example.invalid','synthetic','fixture')")
+        sqlx::query("INSERT INTO accounts(id,name,email,token,device_id,request_backend) VALUES(1,'one','one@example.invalid','synthetic','fixture','tui_v2')")
             .execute(&pool).await.unwrap();
         let initial = json!({"messages":[{"role":"user","content":"读取同名文件"}]});
         for (tool, owners) in [
@@ -1962,18 +1986,7 @@ mod tests {
                 {"role":"user","content":[{"type":"tool_result","tool_use_id":tool,"content":"文件内容"}]}]});
             let ids = super::result_ids(&follow).unwrap();
             let (_, declarations) = super::continuation_proof(&follow, &ids).unwrap();
-            let take = |owner, body| {
-                claim(
-                    pool.clone(),
-                    1,
-                    owner,
-                    TUI_V2_RECEIPT_VERSION,
-                    body,
-                    "binding".into(),
-                    false,
-                    false,
-                )
-            };
+            let take = |owner, body| claim(pool.clone(), 1, owner, body, "binding".into(), false);
             for owner in owners {
                 let turn = take(owner, &initial).await.unwrap();
                 turn.mark_submitted();
@@ -2011,18 +2024,9 @@ mod tests {
                 {"role":"assistant","content":[{"type":"tool_use","id":tool,"name":"Read","input":{}}]},
                 {"role":"user","content":[{"type":"tool_result","tool_use_id":tool,"content":"文件内容"}]}]});
             let owner = (7, None);
-            let turn = claim(
-                pool.clone(),
-                1,
-                owner,
-                TUI_V2_RECEIPT_VERSION,
-                &initial,
-                "binding".into(),
-                false,
-                false,
-            )
-            .await
-            .unwrap();
+            let turn = claim(pool.clone(), 1, owner, &initial, "binding".into(), false)
+                .await
+                .unwrap();
             let ids = super::result_ids(&body).unwrap();
             let (_, declarations) = super::continuation_proof(&body, &ids).unwrap();
             turn.mark_submitted();
@@ -2035,18 +2039,9 @@ mod tests {
                     .is_err()
             );
             assert!(
-                claim(
-                    pool.clone(),
-                    1,
-                    owner,
-                    TUI_V2_RECEIPT_VERSION,
-                    &body,
-                    "binding".into(),
-                    false,
-                    false
-                )
-                .await
-                .is_err()
+                claim(pool.clone(), 1, owner, &body, "binding".into(), false,)
+                    .await
+                    .is_err()
             );
         }
     }
@@ -2061,7 +2056,7 @@ mod tests {
             .await
             .unwrap();
         migrate(&pool, "sqlite").await.unwrap();
-        sqlx::query("INSERT INTO accounts(id,name,email,token,device_id) VALUES(1,'synthetic','one@example.invalid','synthetic','fixture')")
+        sqlx::query("INSERT INTO accounts(id,name,email,token,device_id,request_backend) VALUES(1,'synthetic','one@example.invalid','synthetic','fixture','tui_v2')")
             .execute(&pool).await.unwrap();
         let input = json!({"messages":[{"role":"user","content":"fixture"}]});
         let piece = "x".repeat(REQUEST_BODY_LIMIT / 32);
@@ -2070,10 +2065,8 @@ mod tests {
                 pool.clone(),
                 1,
                 (1, None),
-                "2.1.293",
                 &input,
                 "fixture:1".into(),
-                false,
                 false,
             )
             .await
@@ -2125,7 +2118,7 @@ mod tests {
             }
             let stream = iter(wire);
             let response = Response::new(Body::from_stream(stream));
-            let mut body = turn.observe_response(response, &[]).into_body();
+            let mut body = turn.observe_v2_response(response, &[], None).into_body();
             let mut delivered_len = 0;
             let mut delivered_hash = Sha256::new();
             for (index, sent) in frames.into_iter().enumerate() {

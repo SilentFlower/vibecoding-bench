@@ -1,4 +1,4 @@
-"""以回环私有 HTTP 模拟 sender，验证网关的签名修复及凭据重试。"""
+"""以回环私有 HTTP 模拟 sender，验证网关的签名修复、凭据重试及 V1 工具续轮。"""
 import base64
 import hashlib
 import json
@@ -59,6 +59,8 @@ class Handler(BaseHTTPRequestHandler):
         submission = json.loads(self.rfile.read(int(self.headers['content-length'])))
         body = submission['input']['body']
         labels = [message.get('content') for message in body['messages'] if isinstance(message.get('content'), str)]
+        tools_returned = any(block.get('type') == 'tool_result' for message in body['messages']
+            if isinstance(message.get('content'), list) for block in message['content'])
         signed = any(block.get('type') in ('thinking', 'redacted_thinking') for message in body['messages']
             if isinstance(message.get('content'), list) for block in message['content'])
         request_id = submission['request']['request_id']
@@ -115,6 +117,10 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(429, {'error': {'type': 'rate_limit_error', 'message': 'synthetic credit rejection'}}, headers)
         elif signed or 'always-signature' in labels:
             self.reply(400, {'error': {'type': 'invalid_request_error', 'message': 'Invalid signature in thinking block'}}, headers)
+        elif 'v1-receipt-fixture' in labels and not tools_returned:
+            self.reply(200, {'id': 'msg_fixture', 'type': 'message', 'role': 'assistant', 'model': body['model'],
+                'content': [{'type': 'tool_use', 'id': f'toolu_{request_id}', 'name': 'Read', 'input': {'path': 'fixture'}}],
+                'stop_reason': 'tool_use', 'usage': {'input_tokens': 2, 'output_tokens': 1}}, headers)
         else:
             self.reply(200, {'id': 'msg_fixture', 'type': 'message', 'role': 'assistant', 'model': body['model'],
                 'content': [{'type': 'text', 'text': '合成成功'}], 'stop_reason': 'end_turn', 'usage': {'input_tokens': 2, 'output_tokens': 1}}, headers)
@@ -129,8 +135,9 @@ def main():
         'V3_INTERNAL_TOKEN': 'synthetic-control-token' * 2, 'V3_DEPLOYMENT_ID': 'native-repair-fixture',
         'V3_RELEASE': 'native-repair-fixture', 'V3_UPDATE_GATE_DIR': '', 'FLOWER_SIGNATURE_FIXTURE': '1'}
     try:
-        return subprocess.run(['cargo', 'test', '--locked', '--lib', 'native_signature_repair_gateway_roundtrip',
-            '--', '--ignored', '--nocapture'], cwd=Path(__file__).resolve().parents[1], env=env).returncode
+        return subprocess.run(['cargo', 'test', '--locked', '--lib', '--', '--ignored', '--nocapture', '--test-threads=1',
+            'native_signature_repair_gateway_roundtrip', 'native_v1_receipt_gateway_roundtrip'],
+            cwd=Path(__file__).resolve().parents[1], env=env).returncode
     finally:
         server.shutdown()
         server.server_close()

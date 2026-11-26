@@ -15,7 +15,8 @@
 ### 3. Contracts
 
 - 受管 Claude 账号有原生 `native293` 与交互 `tui_v2` 的账号级选择。管理读取只查现有绑定。保存涉及 V2 的切换时，编排确认无运行绑定后可以按需准备该账号。
-- 切换以实际 sender 状态、绑定代次及在途工具回执为准。活动轮按原绑定收尾。V2 新请求沿账号凭据解析获取当次 AT，通过单次私有提交交给目标账号 sender。
+- V1 和 legacy 按 `POST /v1/messages` 提交的完整历史转发工具结果。持久工具回执由 V2 交互会话登记和认领。请求选号、终态查询和断线恢复只在当前生效为 `tui_v2` 的账号中匹配受支持的 V2 回执。查询内存中的原回复也要核对账号当前后端。
+- 从 V1 切出时，路由读锁和账号活动门禁保护当前 HTTP 请求。历史 V1 回执行退出请求和切换判定。V2 活动轮按原 sender、绑定代次和原回执收尾。V2 新请求沿账号凭据解析获取当次 AT，通过单次私有提交交给目标账号 sender。
 - 隔离程序读取运行内核的 Landlock ABI。ABI 2 组合目录授权和进程过滤器保护私有文件，允许 CLI 通过本会话获准写入的文件描述符保存配置与历史。已授权的项目工作区可以共享。ABI 3 及以上使用内核的文件截短权限。
 - 原 `NodeInspection`、`BoundIdentityRead` 与 `CredentialStatusRead` 保持现有字段。节点 `inspect` 仅在收到 `transport_gateway_account` 时按 `NodeTransportInspection` 解析。其他请求使用各自原模型。
 
@@ -27,14 +28,16 @@ SSH 节点完成更新后，日志中的 `target_account_release` 来自实际�
 | --- | --- |
 | 外部管理写入缺少修订或修订已变更 | 返回缺少修订或并发冲突 |
 | 编排确认账号没有运行绑定 | 只读返回空。保存涉及 V2 的切换可以请求准备 |
-| 正在交付旧轮或等待旧工具回执 | 待切目标保留，原内核继续处理 |
+| V1 请求正在交付 | 等当前 HTTP 请求收尾。待切期间新请求返回 HTTP 429 |
+| V2 原轮正在交付或等待工具回执 | 待切目标保留，原 sender 继续处理 |
+| V1 工具请求匹配历史 V1 回执 | 按本次完整历史转发 |
 | 节点账号、环境、发行或代次证明不一致 | 拒绝该绑定 |
 | Landlock ABI 低于 2、规则加载失败或进程过滤器加载失败 | 发送器隔离探测失败。账号切换沿现有未就绪路径返回 |
 
 ### 5. Scenarios and Examples
 
 - 正常：在休眠账号保存 `{"request_backend":"tui_v2","request_backend_revision":0}`，编排准备同一账号后由 Gateway 登记已核验的绑定。
-- 边界：工具续轮进行时保存 `native293`，待原轮收尾后对账生效。
+- V2 工具续轮进行时保存 `native293`，待原轮收尾后对账生效。切换生效后，携带完整历史的请求进入 V1 的普通转发路径。
 - 在 ABI 2 节点更新账号镜像后，通过实时就绪检查即可保存 V2。仅凭镜像标签或宿主版本号判断可用会漏掉规则加载失败。
 - 兼容：旧节点凭据回执按原模型完整字段比较。扩展字段登记在 V2 专用请求模型，保持凭据查询和身份回执可用。
 
@@ -44,6 +47,7 @@ SSH 节点完成更新后，日志中的 `target_account_release` 来自实际�
 - 后台子代理首轮若比父 `Agent.prompt` 恰好多一个 LF，只有同一账号、环境代次、主体和会话的原工具启动回执匹配子代理 ID 才能接入。先来的子轮复用有界回执等待。仅比较签名时兼容这一个字符。`test_background_child_receipt_accepts_one_cli_line_feed` 覆盖回执晚到、额外空格、双换行、CRLF 和重复提交。
 
 - `verify_tui_sender_status.py` 核对管理详情只读、休眠双向切换、在途工具续轮和错误绑定。
+- `native_v1_receipt_gateway_roundtrip` 核对显式及缺省会话下的工具结果重发、两次实际转发与持久回执行数。`old_receipts_do_not_route_to_the_retired_backend` 核对历史回执和 V2 原账号隔离。
 - `deploy/flower2api/verify_tui_guard.py` 验证私有配置、共享工作区、终端描述符及初始化失败。兼容性变更须在真实 ABI 2 与 ABI 3 或更高版本分别验证管理端切换、发送和重启后的原历史续写。
 - `test_cluster_credential_refresh`、`test_cluster_owner_runner` 核对旧节点凭据与身份回执。`test_cluster_transport` 核对排空时原 V2 路由可用和源隔离后的拒绝。
 
