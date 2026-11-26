@@ -11,6 +11,7 @@ use tracing::{debug, warn};
 use crate::error::AppError;
 use crate::model::account::{Account, TuiSystemPromptPolicy};
 use crate::service::account::{AccountQueue, AccountService};
+use crate::service::diagnostics::tui_admission_rejected;
 use crate::service::runtime_bridge::{account_config_permit, account_route_config_permit};
 use crate::service::runtime_transport::{
     TuiBindingStatus, TuiReadySender, tui_fixture, tui_input_rejection, tui_same_binding,
@@ -81,11 +82,13 @@ impl TuiRequestRoute {
             return Ok(false);
         }
         if self.queue.runtime_gate.node_migration_draining() {
+            tui_admission_rejected("tui_wake_node_migration");
             return Err(AppError::AdmissionLimited { retry_after: 1 });
         }
         let _config = self.queue.tui_config.lock().await;
         let state = service.tui_backend(account.id).await?;
         if !state.target.is_empty() {
+            tui_admission_rejected("tui_wake_backend_draining");
             return Err(AppError::AdmissionLimited { retry_after: 1 });
         }
         Ok(!tui_native_drain::occupied(service.tui_database(), account.id).await?)
@@ -108,10 +111,12 @@ impl TuiRequestRoute {
         let mut state = service.tui_backend(account.id).await?;
         let unavailable = || sender.binding_unavailable();
         if state.active != TUI_V2 || state.binding.is_empty() {
+            tui_admission_rejected("tui_turn_route_changed");
             return Err(unavailable());
         }
         let draining = !state.target.is_empty();
         if draining && !continuation {
+            tui_admission_rejected("tui_turn_backend_draining");
             return Err(AppError::AdmissionLimited { retry_after: 1 });
         }
         let same = tui_same_binding(&state.binding, &sender.key);
@@ -120,6 +125,7 @@ impl TuiRequestRoute {
                 || state.binding != self.binding
                 || !sender.can_advance(&state.binding))
         {
+            tui_admission_rejected("tui_turn_sender_binding");
             return Err(unavailable());
         }
         if state.binding != sender.key
@@ -135,6 +141,7 @@ impl TuiRequestRoute {
                 .await?;
         }
         if !tui_same_binding(&state.binding, &sender.key) {
+            tui_admission_rejected("tui_turn_binding_not_advanced");
             return Err(unavailable());
         }
         // 无显式会话时，原轮登记需要消息数组生成历史摘要。结构错误应保留公开输入分类。
@@ -161,7 +168,12 @@ impl TuiRequestRoute {
                     draining,
                     false,
                 )
-                .await?,
+                .await
+                .inspect_err(|error| {
+                    if matches!(error, AppError::AdmissionLimited { .. } | AppError::ServiceUnavailable(_)) {
+                        tui_admission_rejected("tui_turn_claim");
+                    }
+                })?,
             )
         } else {
             None
@@ -480,6 +492,7 @@ pub(super) async fn request_route(
 ) -> Result<(Account, Option<TuiRequestRoute>), AppError> {
     if !tui_scope(&account) {
         if account.request_backend == TUI_V2 {
+            tui_admission_rejected("tui_route_scope_unavailable");
             return Err(AppError::ServiceUnavailable("V2 环境不可用".into()));
         }
         return Ok((account, None));

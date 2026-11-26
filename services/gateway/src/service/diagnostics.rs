@@ -457,11 +457,11 @@ pub(crate) fn error_stage(stage: &'static str) {
     let _ = CURRENT_TRACE.try_with(|trace| trace.lock().request.error_stage = Some(stage.into()));
 }
 
-/// 写入隔离验证的单调时钟事件。@param stage 固定阶段。@param id sender 预留 ID。
+/// 写入隔离验证的单调时钟事件。@param stage 固定阶段。@param id 已分配的 sender 预留 ID。
 /// @param request 仅网关持有的公开请求 ID。@param result 固定阶段结果。@return 无。
 pub(super) fn tui_startup_event(
     stage: &'static str,
-    id: &str,
+    id: Option<&str>,
     request: Option<&str>,
     result: Option<&'static str>,
 ) {
@@ -474,8 +474,10 @@ pub(super) fn tui_startup_event(
         // 与同一隔离容器中的 Python 探针使用同一个单调时钟。
         if unsafe { clock_gettime(CLOCK_MONOTONIC, &mut clock) } == 0 {
             let ticks = clock.tv_sec as u64 * 1_000_000_000 + clock.tv_nsec as u64;
-            let mut event = json!({"event": "tui_startup", "stage": stage,
-                "monotonic_ns": ticks, "reservation_id": id});
+            let mut event = json!({"event": "tui_startup", "stage": stage, "monotonic_ns": ticks});
+            if let Some(id) = id {
+                event["reservation_id"] = json!(id);
+            }
             if let Some(request) = request {
                 event["request_id"] = json!(request);
             }
@@ -490,11 +492,21 @@ pub(super) fn tui_startup_event(
     let _ = (stage, id, request, result);
 }
 
+/// 记录预留前的准入拒绝。@param branch 网关实际返回错误的固定分支。@return 无返回值。
+pub(super) fn tui_admission_rejected(branch: &'static str) {
+    #[cfg(all(target_os = "linux", feature = "v3-verification"))]
+    if let Some(request) = current_request_id() {
+        tui_startup_event("gateway_tui_admission_rejected", None, Some(&request), Some(branch));
+    }
+    #[cfg(not(all(target_os = "linux", feature = "v3-verification")))]
+    let _ = branch;
+}
+
 /// 关联当前公开请求和账号发送器预留。@param id 网关生成的预留 ID。@return 无。
 pub(super) fn tui_reservation(id: &str) {
     #[cfg(all(target_os = "linux", feature = "v3-verification"))]
     if let Some(request) = current_request_id() {
-        tui_startup_event("gateway_reservation", id, Some(&request), None);
+        tui_startup_event("gateway_reservation", Some(id), Some(&request), None);
     }
     let _ = CURRENT_TRACE.try_with(|trace| {
         let mut state = trace.lock();

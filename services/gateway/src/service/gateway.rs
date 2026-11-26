@@ -2466,7 +2466,8 @@ impl GatewayService {
                 original_session,
                 &body_map,
             )
-            .await?
+            .await
+            .inspect_err(|_| diagnostics::tui_admission_rejected("tui_recovery_lookup"))?
         } else {
             None
         };
@@ -2485,7 +2486,12 @@ impl GatewayService {
                 (principal.id, original_session),
                 &body_map,
             )
-            .await?
+            .await
+            .inspect_err(|error| {
+                if matches!(error, AppError::ServiceUnavailable(_)) {
+                    diagnostics::tui_admission_rejected("tui_tool_owner_lookup");
+                }
+            })?
         } else {
             None
         };
@@ -2612,6 +2618,9 @@ impl GatewayService {
             let selected = match selection.inspect_err(|error| {
                 if matches!(error, AppError::ServiceUnavailable(_)) {
                     diagnostics::error_stage("account_selection");
+                    if tool_owner.is_some() {
+                        diagnostics::tui_admission_rejected("tui_tool_account_selection");
+                    }
                 }
             }) {
                 Ok(selected) => {
@@ -2783,15 +2792,22 @@ impl GatewayService {
             if method == "POST" && path == "/v1/messages" && account.request_backend == TUI_V2 {
                 let route = tui_route
                     .as_ref()
-                    .ok_or_else(|| AppError::ServiceUnavailable("V2 路由未就绪".into()))?;
+                    .ok_or_else(|| {
+                        diagnostics::tui_admission_rejected("tui_route_missing");
+                        AppError::ServiceUnavailable("V2 路由未就绪".into())
+                    })?;
                 let principal = api_token.ok_or(AppError::Unauthorized)?;
                 let request = scheduling_request
                     .as_ref()
-                    .ok_or_else(|| AppError::ServiceUnavailable("V2 入口需要 v3 准入".into()))?;
+                    .ok_or_else(|| {
+                        diagnostics::tui_admission_rejected("tui_admission_missing");
+                        AppError::ServiceUnavailable("V2 入口需要 v3 准入".into())
+                    })?;
                 if let Some(response) = session_policy_block::check_current().await? {
                     return Ok(response);
                 }
                 if route.binding.is_empty() {
+                    diagnostics::tui_admission_rejected("tui_binding_unregistered");
                     diagnostics::error_stage("tui_v2_readiness");
                     return Err(runtime_transport::tui_unbound(&account).await);
                 }
@@ -2830,7 +2846,8 @@ impl GatewayService {
                                     original_session,
                                     &body_map,
                                 )
-                                .await?;
+                                .await
+                                .inspect_err(|_| diagnostics::tui_admission_rejected("tui_recovery_lookup"))?;
                             }
                             Some(writer)
                         }

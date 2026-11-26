@@ -693,10 +693,17 @@ impl TuiSender {
                     .ok_or_else(invalid_identity)
             })
             .transpose()?;
+        let observe = |stage, result| {
+            tui_startup_event(stage, Some(&identity.reservation_id), None, Some(result))
+        };
+        observe("sender_private_prepare", "entered");
         let (deadline, replay_until) = identity.deadlines(binding, now_ms())?;
         let config = match setting(config) {
             Ok(config) => config,
-            Err(error) => return Ok(stage_response(error, TUI_SENDER_CONFIG)),
+            Err(error) => {
+                observe(TUI_SENDER_CONFIG, "rejected");
+                return Ok(stage_response(error, TUI_SENDER_CONFIG));
+            }
         };
         let (mut slot, mut cancelled) = self.reserve(
             identity.clone(),
@@ -719,6 +726,7 @@ impl TuiSender {
             };
         let mut stage = TUI_PREPARE_LEDGER;
         let prepared = async {
+            observe(stage, "started");
             if submission_log::was_consumed(
                 &self.submission_storage,
                 binding,
@@ -730,8 +738,10 @@ impl TuiSender {
             {
                 return Err(consumed());
             }
+            observe(stage, "confirmed");
             // 先在将承载正文的同一个 socket 核对账号。遇到错绑时连预留信封也不送出。
             stage = TUI_PREPARE_BIND;
+            observe(stage, "started");
             let VerifiedSource {
                 mut connection,
                 proof,
@@ -770,7 +780,9 @@ impl TuiSender {
             if system_prompt.is_some() && (!managed_oauth || !system_prompt_policy) {
                 return Err(unavailable());
             }
+            observe(stage, "confirmed");
             stage = TUI_PREPARE_EXCHANGE;
+            observe(stage, "started");
             if identity.session_id.starts_with(SUGGESTION_SESSION_PREFIX)
                 && (!prompt_suggestion || identity.continuation_only || identity.agent_hint.is_some())
             {
@@ -956,7 +968,10 @@ impl TuiSender {
         };
         let result = tokio::select! {
             biased;
-            _ = cancelled.changed() => return Err(consumed()),
+            _ = cancelled.changed() => {
+                observe("sender_private_prepare", "cancelled");
+                return Err(consumed());
+            },
             result = timeout_at(deadline, prepared) => result.unwrap_or_else(|_| Err(limited())),
         };
         let (
@@ -973,11 +988,18 @@ impl TuiSender {
             oauth_file,
             signature_repair,
         ) = match result {
-            Ok(prepared) => prepared,
+            Ok(prepared) => {
+                observe(stage, "confirmed");
+                prepared
+            }
             Err(error @ AppError::ServiceUnavailable(_)) => {
+                observe(stage, "failed");
                 return Ok(stage_response(error, stage));
             }
-            Err(error) => return Err(error),
+            Err(error) => {
+                observe(stage, "rejected");
+                return Err(error);
+            }
         };
         let mut book = self.book.lock().unwrap();
         let record = book
@@ -999,6 +1021,7 @@ impl TuiSender {
             cli_submission,
         };
         slot.armed = false;
+        observe("sender_private_prepare", "accepted");
         let mut response = (StatusCode::NO_CONTENT, [(HANDOFF_HEADER, kind)]).into_response();
         if identity.session_id.starts_with(SUGGESTION_SESSION_PREFIX) {
             response.headers_mut().insert(TUI_PROMPT_SUGGESTION, HeaderValue::from_static("1"));
@@ -1137,7 +1160,7 @@ impl TuiSender {
     ) -> Result<Response, AppError> {
         let identity = Identity::decode(headers, binding)?;
         let reservation_id = identity.reservation_id.clone();
-        let observe = |stage, result| tui_startup_event(stage, &reservation_id, None, Some(result));
+        let observe = |stage, result| tui_startup_event(stage, Some(&reservation_id), None, Some(result));
         observe("sender_private_send", "entered");
         let (deadline, _) = identity.deadlines(binding, now_ms())?;
         if let Err(error) = setting(config) {

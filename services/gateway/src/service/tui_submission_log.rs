@@ -268,7 +268,7 @@ pub(super) async fn consume(
         let directory = directory(&root)?;
         let submitting = matches!(terminal, Terminal::Submitted);
         if submitting {
-            tui_startup_event("sender_submission_ledger_lock", &id, None, Some("started"));
+            tui_startup_event("sender_submission_ledger_lock", Some(&id), None, Some("started"));
         }
         let lock = lock_until(&root, deadline);
         if submitting {
@@ -277,7 +277,7 @@ pub(super) async fn consume(
                 Err(error) if error.kind() == io::ErrorKind::TimedOut => "deadline",
                 Err(_) => "failed",
             };
-            tui_startup_event("sender_submission_ledger_lock", &id, None, Some(result));
+            tui_startup_event("sender_submission_ledger_lock", Some(&id), None, Some(result));
         }
         let _lock = lock?;
         let mut ledger = load(&root, account_id, environment_id, None)?;

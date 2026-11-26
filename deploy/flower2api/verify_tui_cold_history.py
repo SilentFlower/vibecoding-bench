@@ -298,6 +298,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            adaptive_thinking_model=None, adaptive_thinking_display="updates", thinking_display_model=None,
            thinking_cli_summaries=None,
            recovery_ledger_contention=False, recovery_ledger_deadline=False, recovery_workspace_rejection=False,
+           recovery_readiness_rejection=False,
            recovery_slow_model=False, initial_idle_model_connection=False, trace_startup=False, cache_markers=False,
            history_cache_markers=False, history_cache_ttl=None, history_cache_scope=None,
            cache_capability=None, message_system_roles=False,
@@ -336,6 +337,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param recovery_ledger_contention 是否在提交原回执时短暂占用账号账本锁。
     @param recovery_ledger_deadline 是否持续持锁直至回执触发准入截止，然后重交。
     @param recovery_workspace_rejection 是否核对工作区绑定拒绝及原回执再次认领。
+    @param recovery_readiness_rejection 是否在预留前触发账本就绪拒绝并复交原回执。
     @param recovery_slow_model 是否验证隔离模型收件后的公开超时和诊断归属。
     @param initial_idle_model_connection 是否先占用一个未握手的模型 TCP 连接。
     @param trace_startup 是否记录隔离启动阶段。
@@ -599,7 +601,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
 
         def start_sender(program=sender):
             tui = {"V3_TUI_SESSION_HOST": "1", "V3_TUI_MANAGED_OAUTH": "1"} if v1_runtime is None else {}
-            process = Popen([program], user=1001, group=1001, extra_groups=[], env={
+            process = Popen([program], user=1001, group=1001, extra_groups=[], stdout=stderr if trace_startup else None, env={
                 **common, **tui, "RUST_LOG": "warn", "V3_SENDER_CONFIG": str(config),
                 "FLOWER_V2_STARTUP_TRACE": str(int(trace_startup)),
             })
@@ -607,7 +609,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             return process
 
         def start_gateway(program, version, **gate):
-            process = Popen([program], cwd=temporary, env={
+            process = Popen([program], cwd=temporary, stdout=stderr if trace_startup else None, env={
                 **common, "SERVER_PORT": "18090", "SERVER_HOST": "127.0.0.1", "DATABASE_DRIVER": "sqlite",
                 "DATABASE_DSN": str(temporary / "gateway.db"), "ADMIN_PASSWORD": admin,
                 "V3_INTERNAL_TOKEN": internal, "V3_DEPLOYMENT_ID": deployment,
@@ -1111,6 +1113,32 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                         assert tools == [(registered_tools,)], tools
             finally:
                 manage("PUT", "settings", {budget_key: previous_budget})
+        if recovery_readiness_rejection:
+            started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+            with Path("/native/tui-v2-submissions.lock").open("rb") as readiness_lock:
+                # 防止先前拒绝的清理写入替换账本。就绪探测本身沿无锁读取路径。
+                flock(readiness_lock, LOCK_EX)
+                ledger = Path("/native/tui-v2-submissions.json")
+                original_mode = ledger.stat().st_mode & 0o777
+                assert original_mode == 0o600
+                try:
+                    ledger.chmod(0o644)
+                    readiness_status, _, readiness_request = checked_messages(
+                        manage, token, follow, headers, received, "recovered_receipt_readiness", expected_status=503,
+                        trace_startup=trace_startup,
+                    )
+                finally:
+                    ledger.chmod(original_mode)
+            assert readiness_request and len(received) == 1
+            evidence = report_request_diagnostics(
+                manage, "recovered_receipt_readiness", readiness_request, headers["x-session-id"], started_at,
+            )
+            readiness_record, = evidence["requests"]
+            assert (readiness_record["error_stage"], readiness_record["outcome"]) == (
+                "tui_readiness_ledger", "local_rejected",
+            ), readiness_record
+            assert readiness_record["attempt_count"] == 0 and readiness_record["attempts"] == [], readiness_record
+            assert "tui_reservation_id" not in readiness_record["diagnostic_context"], readiness_record
         if recovery_workspace_rejection:
             original_binding = binding_file.read_bytes()
             mismatched = {**json.loads(original_binding), "session_key": "0" * 64}
@@ -1408,6 +1436,13 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                     "attempt_count": record["attempt_count"], "request_id": rejected_request,
                     "reservation_id": reservation, "receipt_reopened": True,
                 }
+            if recovery_readiness_rejection:
+                assert readiness_request != continuation_request_id
+                proof["recovered_pending_tool"]["readiness_rejection"] = {
+                    "http_status": readiness_status, "error_stage": readiness_record["error_stage"],
+                    "attempt_count": readiness_record["attempt_count"], "request_id": readiness_request,
+                    "reservation_id": None, "receipt_reopened": True,
+                }
         if current_images and not recover_pending and not restart_history:
             proof["image_only"] = verify_image_only_requests(
                 manage, token, account_token, headers, received,
@@ -1538,6 +1573,7 @@ def checked_messages(manage, token, body, headers, received, phase, *, expected_
     def report(**details):
         failed_ns = monotonic_ns() if trace_startup else None
         event = {**evidence, **details, "elapsed_ms": round((monotonic() - started) * 1000),
+                 "session_id": session_id, "request_body_sha256": sha256(encoded(body)).hexdigest(),
                  "model_posts_before": before, "model_body_sha256": [sha for sha, _, _ in received[before:]]}
         if failed_ns is not None:
             event["monotonic_ns"] = failed_ns
@@ -3248,6 +3284,7 @@ def main():
     fault.add_argument("--recovery-ledger-contention", action="store_true")
     fault.add_argument("--recovery-ledger-deadline", action="store_true")
     fault.add_argument("--recovery-workspace-rejection", action="store_true")
+    fault.add_argument("--recovery-readiness-rejection", action="store_true")
     fault.add_argument("--recovery-slow-model", action="store_true")
     scenario = parser.add_mutually_exclusive_group()
     scenario.add_argument("--restart-history", action="store_true")
@@ -3307,7 +3344,7 @@ def main():
     if args.history_cache_scope and not args.history_cache_ttl:
         parser.error("--history-cache-scope 需要同用 --history-cache-ttl")
     if (args.recovery_ledger_contention or args.recovery_ledger_deadline or args.recovery_workspace_rejection
-        or args.recovery_slow_model) and (
+        or args.recovery_readiness_rejection or args.recovery_slow_model) and (
         not args.recover_pending_tool or args.signed_tool_history
     ):
         parser.error("恢复故障注入需要可提交的 --recover-pending-tool 原回执")
@@ -3317,6 +3354,7 @@ def main():
     previous = args.mixed_release
     cache_markers = args.cache_markers or args.cache_marker_capabilities is not None
     trace_startup = (args.initial_idle_model_connection or args.trace_initial_startup or cache_markers
+                     or args.recovery_readiness_rejection
                      or args.structured_output_contract or bool(args.forced_tool_choice_contract) or args.no_tool_choice_contract
                      or bool(auxiliary_mode or args.agent_progress)
                      or bool(args.thinking_display_contract)
@@ -3356,6 +3394,7 @@ def main():
                        recovery_ledger_contention=args.recovery_ledger_contention,
                        recovery_ledger_deadline=args.recovery_ledger_deadline,
                        recovery_workspace_rejection=args.recovery_workspace_rejection,
+                       recovery_readiness_rejection=args.recovery_readiness_rejection,
                        recovery_slow_model=args.recovery_slow_model,
                        initial_idle_model_connection=args.initial_idle_model_connection, trace_startup=trace_startup,
                        cache_markers=cache_markers, history_cache_markers=args.history_cache_markers,

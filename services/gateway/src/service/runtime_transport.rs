@@ -356,6 +356,16 @@ impl TuiV2Unavailable {
             _ => "tui_v2_readiness",
         }
     }
+
+    fn admission_branch(self) -> &'static str {
+        match self {
+            Self::NotConfigured => "tui_readiness_not_configured",
+            Self::NotRunning => "tui_readiness_not_running",
+            Self::MessagesToolAndUsageEventsUnavailable => "tui_readiness_events_unavailable",
+            Self::ReadinessUnverified => "tui_readiness_unverified",
+            _ => self.readiness_stage(),
+        }
+    }
 }
 
 fn tui_binding_present(binding: &TransportBinding) -> bool {
@@ -1429,9 +1439,13 @@ pub(super) async fn ready_tui_sender(
     wake: bool,
     registered: Option<&str>,
 ) -> Result<TuiReadySender, AppError> {
+    let deadline_reached = || {
+        super::diagnostics::tui_admission_rejected("tui_readiness_deadline");
+        AppError::AdmissionLimited { retry_after: 1 }
+    };
     let budget = deadline
         .checked_duration_since(Instant::now())
-        .ok_or(AppError::AdmissionLimited { retry_after: 1 })?;
+        .ok_or_else(deadline_reached)?;
     let (transport, (idle, agent_summary, system_prompt_policy)) = timeout(budget, async {
         let transport = tui_transport(account, wake.then_some(budget), registered, true).await?;
         if registered.is_none()
@@ -1451,8 +1465,9 @@ pub(super) async fn ready_tui_sender(
         Ok((transport, idle))
     })
     .await
-    .map_err(|_| AppError::AdmissionLimited { retry_after: 1 })?
+    .map_err(|_| deadline_reached())?
     .map_err(|reason| {
+        super::diagnostics::tui_admission_rejected(reason.admission_branch());
         super::diagnostics::error_stage(reason.readiness_stage());
         reject_tui(account.id, reason)
     })?;
@@ -2046,6 +2061,7 @@ pub(super) async fn prepare_tui(
             .ok_or_else(limited)
     };
     if input.agent_summary && !sender.agent_summary {
+        super::diagnostics::tui_admission_rejected("tui_prepare_agent_summary_capability");
         return Err(AppError::ServiceUnavailable(
             "原生进度请求需要支持独立摘要的账号发送器".into(),
         ));
@@ -2053,6 +2069,7 @@ pub(super) async fn prepare_tui(
     let explicit_system_policy =
         !input.native_cc && input.system_prompt_policy != TuiSystemPromptPolicy::Append;
     if explicit_system_policy && !sender.system_prompt_policy {
+        super::diagnostics::tui_admission_rejected("tui_prepare_system_prompt_capability");
         return Err(AppError::ServiceUnavailable(
             "原生账号发送器尚未支持客户端系统提示词动作".into(),
         ));
@@ -2078,7 +2095,11 @@ pub(super) async fn prepare_tui(
         principal_id,
         session_id,
         reservation_id: Uuid::new_v4().to_string(),
-        deadline_unix_ms: now_ms().saturating_add(remaining()?.as_millis() as u64),
+        deadline_unix_ms: now_ms().saturating_add(
+            remaining()
+                .inspect_err(|_| super::diagnostics::tui_admission_rejected("tui_prepare_deadline"))?
+                .as_millis() as u64,
+        ),
         continuation_only,
         agent_hint,
         agent_summary: input.agent_summary,
