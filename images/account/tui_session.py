@@ -61,6 +61,7 @@ _AGENT_HANDOFF_SECONDS = 2.0
 _BACKGROUND_AGENT_LIMIT = 1024
 # 与网关保留的服务端会话命名空间一致，对外自报不能打开子代理私有工作区。
 AGENT_SESSION_PREFIX = "gateway-tools-"
+TITLE_SESSION_PREFIX = AGENT_SESSION_PREFIX + "title-"
 
 
 @dataclass
@@ -994,7 +995,7 @@ class _Actor:
             if CONTEXT_BETA not in {v.strip() for v in beta.split(",")}:
                 headers = {**headers, "anthropic-beta": ",".join(filter(None, (beta, CONTEXT_BETA)))}
         raw, headers = provider_session(
-            raw, headers, self.identity[4], handle.upstream_session_id,
+            raw, headers, self.identity[4].removeprefix(TITLE_SESSION_PREFIX), handle.upstream_session_id,
         )
         return _ModelSubmission(step, handle, raw, headers, account_token)
 

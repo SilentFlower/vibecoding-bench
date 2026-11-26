@@ -68,6 +68,7 @@ use crate::service::tui_backend::TUI_V2;
 #[cfg(target_os = "linux")]
 use crate::service::tui_sender::TuiSender;
 use crate::service::tui_sender_response;
+use crate::service::tui_tool_history::TITLE_SESSION_PREFIX;
 use crate::tlsfp::{
     TlsProfileId, get_background_request_client_for_profile, get_request_client_for_profile,
 };
@@ -81,6 +82,7 @@ pub(super) const TUI_CAPTURE: &str = "x-v3-tui-http-capture";
 pub(super) const TUI_FINAL_CAPTURE: &str = "x-v3-tui-final-capture";
 pub(super) const TUI_CLI_SUBMISSION: &str = "x-v3-tui-cli-submission";
 pub(super) const TUI_UPSTREAM_SESSION: &str = "x-v3-tui-upstream-session";
+pub(super) const TUI_TITLE_SESSION_MAPPING: &str = "x-v3-tui-title-session-mapping";
 pub(super) const TUI_MANAGED_OAUTH: &str = "x-v3-tui-managed-oauth";
 pub(super) const TUI_SYSTEM_PROMPT_POLICY: &str = "x-v3-tui-system-prompt-policy";
 pub(super) const TUI_MODEL_HEADER_POLICY: &str = "x-v3-tui-model-header-policy";
@@ -1487,6 +1489,7 @@ pub(super) struct TuiReservation {
     input_policy: bool,
     model_header_policy: bool,
     session_mapping: bool,
+    title_session_mapping: bool,
     upstream_session: Option<String>,
     pub(super) managed_oauth: bool,
     pub(super) oauth_file: bool,
@@ -1525,6 +1528,11 @@ impl TuiReservation {
     /// 查询原来源是否确认出站会话映射协议。@return 是否支持本轮映射。
     pub(super) fn supports_session_mapping(&self) -> bool {
         self.session_mapping
+    }
+
+    /// 查询来源是否可从标题的执行键恢复出站映射的原会话。@return 是否支持标题映射。
+    pub(super) fn supports_title_session_mapping(&self) -> bool {
+        self.session_mapping && self.title_session_mapping
     }
 
     /// 设置只在单次提交时传递的账号池结果。@param session 已解析的上游 UUID。
@@ -2090,6 +2098,7 @@ pub(super) async fn prepare_tui(
         input_policy: false,
         model_header_policy: false,
         session_mapping: false,
+        title_session_mapping: false,
         upstream_session: None,
         managed_oauth: false,
         oauth_file: false,
@@ -2109,8 +2118,11 @@ pub(super) async fn prepare_tui(
     }
     let observe = super::diagnostics::current_log_mode() == RequestLogMode::Debug;
     if observe {
-        prepare = prepare.header(TUI_CAPTURE, "1").header(TUI_FINAL_CAPTURE, "1")
-            .header(TUI_CLI_SUBMISSION, "1");
+        prepare = prepare.header(TUI_CAPTURE, "1").header(TUI_CLI_SUBMISSION, "1");
+        // 标题沿用账号转发正文。这里只观察入口和组装，保留最终写出未采集的边界。
+        if !session_id.starts_with(TITLE_SESSION_PREFIX) {
+            prepare = prepare.header(TUI_FINAL_CAPTURE, "1");
+        }
     }
     let apply_policy = input.body_policy != TuiBodyPolicy::default();
     if apply_policy {
@@ -2195,6 +2207,8 @@ pub(super) async fn prepare_tui(
                 tui_projection_marker(response.headers(), TUI_MODEL_HEADER_POLICY, "1");
             reservation.session_mapping =
                 tui_projection_marker(response.headers(), TUI_UPSTREAM_SESSION, "1");
+            reservation.title_session_mapping =
+                tui_projection_marker(response.headers(), TUI_TITLE_SESSION_MAPPING, "1");
             reservation.signature_repair = input.signature_repair.is_some()
                 && tui_projection_marker(response.headers(), TUI_SIGNATURE_REPAIR, "1");
             if observe {
@@ -4711,6 +4725,7 @@ mod tests {
             input_policy: false,
             model_header_policy: false,
             session_mapping: false,
+            title_session_mapping: false,
             upstream_session: None,
             managed_oauth: false,
             oauth_file: false,

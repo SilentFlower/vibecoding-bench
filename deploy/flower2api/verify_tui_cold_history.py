@@ -82,6 +82,9 @@ REPLY = "CLIENT：合成便签内容"
 SECOND_REPLY = "SECOND：客户端工具合成错误"
 RECONNECT_PREFIX = "续轮在断开前已经交付的合成文本。"
 FINAL = "模型已收到本次客户端回执。"
+TITLE_TEXT = "隔离标题用量对照"
+TITLE_REPLY = json.dumps({"title": TITLE_TEXT}, ensure_ascii=False, separators=(",", ":"))
+TITLE_USAGE = (31, 7)
 FORCED_CHOICES = {"any": {"type": "any"}, "named": {"type": "tool", "name": SECOND_TOOL["name"]}}
 
 
@@ -232,7 +235,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            recovery_slow_model=False, initial_idle_model_connection=False, trace_startup=False, cache_markers=False,
            history_cache_markers=False, history_cache_ttl=None, history_cache_scope=None,
            cache_capability=None, message_system_roles=False,
-           structured_output=False, forced_tool_choice=None, no_tool_choice=False):
+           structured_output=False, forced_tool_choice=None, no_tool_choice=False, interleaved_title=None,
+           title_sample=None):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -274,6 +278,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param structured_output 是否核对普通 API 的结构化输出和实际发送路径。
     @param forced_tool_choice 核对强制工具选择及同进程或重启回执。
     @param no_tool_choice 是否核对无工具时的显式 none 和保留声明的兼容路径。
+    @param interleaved_title 可选，观察等待工具时的公开标题投递或本地拦截。
+    @param title_sample 从官方 CLI 隔离运行导出的标题请求。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -297,6 +303,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     config = Path("/run/v3/sender.json")
     copy2(temporary / "ca.der", config.with_name("verification-ca.der"))
     received, callbacks, proxy_targets = [], [], []
+    title_received = []
+    title_provider_sessions = []
     slow_tool_arrivals = []
     model_betas = []
     summarized_thinking = adaptive_thinking_model is not None and adaptive_thinking_display == "summarized"
@@ -324,9 +332,15 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             raw = self.rfile.read(int(self.headers["Content-Length"]))
             body = json.loads(raw)
             model_digest = sha256(raw).hexdigest()
-            received.append((model_digest, body, self.connection.version()))
+            is_title = title_sample is not None and body.get("output_config", {}).get("format") == (
+                title_sample["body"]["output_config"]["format"]
+            )
+            (title_received if is_title else received).append((model_digest, body, self.connection.version()))
+            if is_title:
+                title_provider_sessions.append(self.headers.get("x-claude-code-session-id"))
             if trace_startup:
                 startup_event("model_received", peer_port=self.client_address[1], model_posts=len(received),
+                              title_posts=len(title_received),
                               model_body_sha256=model_digest)
             if v1_runtime is not None or message_system_roles or adaptive_thinking_model:
                 model_betas.append(self.headers.get("anthropic-beta", ""))
@@ -341,7 +355,13 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 sleep(SLOW_MODEL_DELAY)
             restart = any(b.get("text") == AFTER_RESTART for row in body["messages"] for b in blocks(row))
             prefix = b""
-            if no_tool_choice:
+            if is_title:
+                frames = message_sse({"type": "text", "text": TITLE_REPLY}, "end_turn", "msg_interleaved_title")
+                events = [json.loads(line[5:]) for line in frames.splitlines() if line.startswith(b"data:")]
+                events[0]["message"].update(model=body["model"], usage={"input_tokens": TITLE_USAGE[0], "output_tokens": 0})
+                events[-2]["usage"]["output_tokens"] = TITLE_USAGE[1]
+                wire = b"".join(map(frame, events))
+            elif no_tool_choice:
                 wire = message_sse({"type": "text", "text": FINAL}, "end_turn", "msg_cold_reply")
             elif forced_tool_choice:
                 wire = fixture_forced_tool_sse(body)
@@ -541,6 +561,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
 
         manage("PUT", "settings", {"allowed_user_agents": "",
                                    "request_diagnostics_log_mode": "info" if inspect_model_body else "debug"})
+        if interleaved_title:
+            manage("PUT", "settings", {"intercept_warmup_title_enabled": "true" if interleaved_title == "mock" else "false"})
         if adaptive_thinking_model:
             manage("PUT", "settings", {"rewrite_disabled_thinking_enabled": "true",
                                        "rewrite_disabled_thinking_models": adaptive_thinking_model})
@@ -557,6 +579,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             "auto_telemetry": False, "auto_poll_usage": False, "concurrency": 2, "rpm_limit": 0,
         })
         identifier = account["id"]
+        if interleaved_title in ("pooled", "pool-unsupported"):
+            account = manage("PUT", f"accounts/{identifier}", {
+                "upstream_session_pool_enabled": True, "upstream_session_pool_size": 1,
+            })
+            assert account["upstream_session_pool_enabled"]
         account = manage("GET", f"accounts/{identifier}")
         if v1_runtime is not None:
             assert account["request_backend"] == "native293" and account["client_system_prompt_policy"] == "replace"
@@ -776,6 +803,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 assert signed_tool_models == expected_models, signed_tool_models
         follow = {**body, "stream": reconnect_tool_stream,
                   "messages": [*messages, {"role": "assistant", "content": offered}, result]}
+        if interleaved_title:
+            title_proof = verify_pending_title(manage, token, headers, received, title_received,
+                                               temporary / "gateway.db", title_sample, mode=interleaved_title)
         wrong_subject, _ = call(18090, "POST", "/v1/messages", foreign, follow, headers)
         wrong_session, _ = call(18090, "POST", "/v1/messages", token, follow,
                                 {**headers, "x-session-id": str(uuid4())})
@@ -1060,6 +1090,17 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                  "changed_tool_arguments_status": wrong_arguments,
                  "duplicate_receipt_status": duplicate, "tls_versions": [tls for _, _, tls in received],
                  "proxy_connections": len(proxy_targets), "attempts": captures}
+        if interleaved_title:
+            title_model = title_sample["body"]["model"] if title_received else None
+            rows = wait_for(lambda: title_usage_rows(temporary / "gateway.db", title_model))
+            assert all(TITLE_TEXT not in json.dumps(native, ensure_ascii=False) for _, native, _ in received)
+            assert title_proof["title_request_id"] not in {item["request_id"] for item in captures}
+            if interleaved_title == "pooled":
+                assert title_provider_sessions == [headers["x-session-id"]]
+                account, = [account for account in manage("GET", "accounts")["data"] if account["id"] == identifier]
+                assert account["upstream_session_pool_active_count"] == 1
+                title_proof["title_upstream_session_id"] = title_provider_sessions[0]
+            proof["interleaved_title"] = {**title_proof, "usage_records": rows}
         if initial_idle_model_connection:
             proof["initial_idle_model_connection"] = {"http_status": initial_status, "model_posts": 1}
         if history_tool_blocks:
@@ -1774,6 +1815,88 @@ def verify_thinking_display_contract(manage, token, identifier, received, model,
     assert not any(path.is_file() for path in Path("/flows/api").rglob("*"))
     return {"model": model, "cli_show_thinking_summaries": thinking_cli_summaries,
             "wire_final": "unavailable", "cases": proof, "model_posts": len(received)}
+
+
+def title_usage_rows(database, title_model):
+    """等待主轮与公开标题分别落账。@param database 隔离库。@param title_model 实际模型或本地拦截的空值。@return 用量行。"""
+    expected = [(MODEL, 10, 8)] * 2
+    if title_model is not None:
+        expected.append((title_model, *TITLE_USAGE))
+    with closing(connect(database)) as connection:
+        rows = connection.execute(
+            "SELECT model,input_tokens,output_tokens FROM usage_records WHERE account_id=1"
+        ).fetchall()
+    if len(rows) < len(expected):
+        return None
+    assert sorted(rows) == sorted(expected), rows
+    return rows
+
+
+def verify_pending_title(manage, token, headers, received, title_received, database, title_sample, *, mode):
+    """在真实 CLI 等待原回执时提交固定画像的公开标题。
+    @param manage 管理入口。@param token 调用方。@param headers 主轮会话。@param received 主轮模型实收。
+    @param title_received 标题模型实收。@param database 隔离库。@param title_sample 官方实际标题请求。
+    @param mode 转发、拦截或混合版本对照。@return 脱敏证据。
+    """
+    def waiting_rows():
+        with closing(connect(database)) as connection:
+            return connection.execute("SELECT * FROM tui_native_turns").fetchall()
+
+    (waiting,) = waiting_rows()
+    assert json.loads(waiting[-1]) == [NEW_ID]
+    (binding,) = Path("/native/tui-workspaces").glob("*.json")
+    bound_bytes = binding.read_bytes()
+    native_id = json.loads(bound_bytes)["native_session_id"]
+    projects = Path("/native/tui-sessions") / native_id / "home/.claude/projects"
+    archive, = projects.glob("*/" + native_id + ".jsonl")
+    snapshot = wait_for(lambda: (raw if NEW_ID.encode() in (raw := archive.read_bytes()) else None))
+    session = headers["x-session-id"]
+    body = deepcopy(title_sample["body"])
+    metadata = json.loads(body["metadata"]["user_id"])
+    metadata["session_id"] = session
+    body["metadata"]["user_id"] = encoded(metadata).decode()
+    incoming = {**title_sample["headers"], "x-session-id": session, "x-claude-code-session-id": session}
+    status, raw, request_id = checked_messages(
+        manage, token, body, incoming, title_received, "title_during_tool_wait",
+        expected_status=503 if mode == "pool-unsupported" else 200, trace_startup=True,
+    )
+    assert len(received) == 1
+    after = archive.read_bytes()
+    assert after == snapshot and TITLE_TEXT.encode() not in after
+    assert waiting_rows() == [waiting] and binding.read_bytes() == bound_bytes
+    detail = manage("GET", "request-diagnostics/" + request_id)
+    root, attempts = detail["request"], detail["attempts"]
+    assert root["original_session_id"] == session
+    proof = {"title_request_id": request_id, "title_status": status, "title_model_posts": len(title_received),
+             "main_archive_unchanged": after == snapshot,
+             "title_attempt_count": len(attempts), "tool_history_preserved": True}
+    if mode == "pool-unsupported":
+        assert not title_received and not attempts and root["error_stage"] == "tui_prepare_exchange"
+        proof["title_error_stage"] = root["error_stage"]
+        return proof
+    events = [json.loads(line[5:]) for line in raw.splitlines() if line.startswith(b"data:")]
+    assert events[-1]["type"] == "message_stop"
+    text = "".join(event["delta"]["text"] for event in events if event["type"] == "content_block_delta")
+    if mode == "mock":
+        assert json.loads(text) == {"title": "New Conversation"}
+        assert not title_received and not attempts and root["outcome"] == "mock"
+    else:
+        (digest, native, _), = title_received
+        (attempt,) = attempts
+        assert attempt["request_id"] == request_id and attempt["attempt_id"] == root["context"]["tui_reservation_id"]
+        assert text == TITLE_REPLY and native["output_config"] == body["output_config"]
+        assert native["messages"] == body["messages"] and native["system"] == body["system"]
+        assert native["metadata"] == body["metadata"] and not native.get("tools")
+        snapshot = wait_for(lambda: manage(
+            "GET", f"request-diagnostics/{request_id}/captures/{attempt['attempt_id']}"
+        ).get("snapshot"))
+        stages = {stage["stage"]: stage for stage in snapshot["stages"]}
+        assert stages["wire_final"]["status"] == "unavailable", stages["wire_final"]
+        proof.update(title_attempt_id=attempt["attempt_id"], title_model_body_sha256=digest,
+                     title_response_id=events[0]["message"]["id"],
+                     title_capture_representation=stages["tui_provider_request"]["representation"],
+                     final_tls_capture="unavailable")
+    return proof
 
 
 def verify_no_tool_choice(manage, token, identifier, received):
@@ -2695,6 +2818,8 @@ def main():
     scenario.add_argument("--structured-output-contract", action="store_true")
     scenario.add_argument("--forced-tool-choice-contract", choices=("live", "restart", "restart-metadata-only"))
     scenario.add_argument("--no-tool-choice-contract", action="store_true")
+    scenario.add_argument("--interleaved-title", choices=("forward", "mock", "pooled", "pool-unsupported"))
+    parser.add_argument("--title-request", type=Path, help="官方 CLI 隔离模型导出的标题请求")
     scenario.add_argument("--thinking-display-contract", choices=tuple(THINKING_DISPLAY_DEFAULTS))
     scenario.add_argument("--history-png", action="store_true")
     scenario.add_argument("--history-images", action="store_true")
@@ -2708,6 +2833,8 @@ def main():
     scenario.add_argument("--failure-boundaries", action="store_true")
     scenario.add_argument("--v1-runtime", type=Path)
     args = parser.parse_args()
+    if bool(args.interleaved_title) != bool(args.title_request):
+        parser.error("--interleaved-title 与 --title-request 需要一起使用")
     if args.adaptive_thinking_display != "updates" and args.adaptive_thinking_model is None:
         parser.error("--adaptive-thinking-display 需要同用 --adaptive-thinking-model")
     if args.signed_tool_response and not args.signed_tool_history:
@@ -2731,6 +2858,7 @@ def main():
     cache_markers = args.cache_markers or args.cache_marker_capabilities is not None
     trace_startup = (args.initial_idle_model_connection or args.trace_initial_startup or cache_markers
                      or args.structured_output_contract or bool(args.forced_tool_choice_contract) or args.no_tool_choice_contract
+                     or bool(args.interleaved_title)
                      or bool(args.thinking_display_contract)
                      or (bool(args.message_system_roles) and args.v1_runtime is None))
     if trace_startup and (previous or args.mixed_image_peers or args.v1_runtime):
@@ -2771,7 +2899,9 @@ def main():
                        history_cache_ttl=args.history_cache_ttl, history_cache_scope=args.history_cache_scope,
                        cache_capability=args.cache_marker_capabilities,
                        message_system_roles=args.message_system_roles, structured_output=args.structured_output_contract,
-                       forced_tool_choice=args.forced_tool_choice_contract, no_tool_choice=args.no_tool_choice_contract)
+                       forced_tool_choice=args.forced_tool_choice_contract, no_tool_choice=args.no_tool_choice_contract,
+                       interleaved_title=args.interleaved_title,
+                       title_sample=json.loads(args.title_request.read_bytes()) if args.title_request else None)
         print(json.dumps(proof, ensure_ascii=False))
 
 

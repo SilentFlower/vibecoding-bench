@@ -8,6 +8,7 @@ from hashlib import sha256
 from http.server import ThreadingHTTPServer
 from io import BytesIO
 import json
+from os import open as open_private
 from pathlib import Path
 from secrets import token_hex
 from socket import if_nameindex
@@ -106,6 +107,14 @@ class ManagedModel(LocalHandler):
             return self.send_error(413)
         body = json.loads(raw)
         title = is_title(body)
+        if title and self.server.title_request_path is not None:
+            headers = {
+                name.lower(): value for name, value in self.headers.items()
+                if name.lower() in ("user-agent", "x-app", "anthropic-beta", "x-claude-code-session-id")
+            }
+            with open(self.server.title_request_path, "x",
+                      opener=lambda path, flags: open_private(path, flags, 0o600)) as fixture:
+                json.dump({"body": body, "headers": headers}, fixture, ensure_ascii=False)
         label = token_hex(12)
         frames = chunks(body, label, title=TITLE if title else None)
         digest = sha256(raw).hexdigest()
@@ -378,9 +387,10 @@ class ManagedCase:
         }
 
 
-def check(gateway, sender, root, automatic_name, capture_mode):
+def check(gateway, sender, root, automatic_name, capture_mode, *, title_request_path=None):
     """启动独立 TLS 模型并跑受管账号。@param gateway 网关。@param sender 发送器。
     @param root 一次性数据库目录。@param automatic_name 启用原生自动命名。@param capture_mode 内容采集策略。@return 代理实测结果。
+    @param title_request_path 可选，导出隔离模型的合成会话标题样本。
     """
     if not Path("/.dockerenv").exists() or [i for _, i in if_nameindex()] != ["lo"]:
         raise RuntimeError("必须在全新的仅回环容器运行")
@@ -410,6 +420,7 @@ def check(gateway, sender, root, automatic_name, capture_mode):
     )
     with ExitStack() as stack:
         origin = stack.enter_context(ModelServer(("127.0.0.1", 0), ManagedModel))
+        origin.title_request_path = title_request_path
         origin.established = []
         origin.client_hellos = []
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -439,6 +450,7 @@ if __name__ == "__main__":
     parser.add_argument("--gateway", type=Path, required=True)
     parser.add_argument("--sender", type=Path, required=True)
     parser.add_argument("--fixed-name", action="store_true")
+    parser.add_argument("--export-title-request", type=Path)
     parser.add_argument("--require-cli-wire", action="store_true",
                         help="要求首轮和续轮均通过实际 CLI 写出校验")
     parser.add_argument(
@@ -448,7 +460,10 @@ if __name__ == "__main__":
     with TemporaryDirectory(prefix="managed-proxy-") as folder:
         if args.require_cli_wire and args.capture_mode != "debug":
             parser.error("验证最终写出需要开启 debug 采集")
-        result = check(args.gateway, args.sender, Path(folder), not args.fixed_name, args.capture_mode)
+        if args.export_title_request and args.fixed_name:
+            parser.error("导出需要启用原生自动命名")
+        result = check(args.gateway, args.sender, Path(folder), not args.fixed_name, args.capture_mode,
+                       title_request_path=args.export_title_request)
         missing = [aid for aid, capture in result["capture_api"].items()
                    if capture.get("wire_final") != "complete"]
         if args.require_cli_wire and missing:

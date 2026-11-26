@@ -44,12 +44,12 @@ use crate::service::runtime_transport::{
     TUI_CAPTURE, TUI_CLI_SUBMISSION, TUI_ERROR_SOURCE, TUI_FINAL_CAPTURE, TUI_MODEL_ACCEPT_OMITTED,
     TUI_MODEL_HEADER_POLICY, TUI_PREPARE_BIND, TUI_PREPARE_EXCHANGE, TUI_PREPARE_LEDGER,
     TUI_REPAIR_ATTEMPT, TUI_SEND_CLAIM, TUI_SENDER_CONFIG, TUI_SIGNATURE_REPAIR,
-    TUI_SUBMISSION_LEDGER, TUI_SYSTEM_PROMPT_POLICY, TUI_WORKSPACE_BIND, TuiReceiptProbe,
-    TuiV2Unavailable,
+    TUI_SUBMISSION_LEDGER, TUI_SYSTEM_PROMPT_POLICY, TUI_TITLE_SESSION_MAPPING, TUI_WORKSPACE_BIND,
+    TuiReceiptProbe, TuiV2Unavailable,
 };
 use crate::service::session_policy_block;
 use crate::service::tui_sender_response;
-use crate::service::tui_tool_history::SERVER_SESSION_PREFIX;
+use crate::service::tui_tool_history::{SERVER_SESSION_PREFIX, TITLE_SESSION_PREFIX};
 use axum::http::header::RETRY_AFTER;
 #[path = "tui_submission_log.rs"]
 mod submission_log;
@@ -446,6 +446,7 @@ struct VerifiedSource {
     agent_scope: bool,
     agent_summary: bool,
     session_mapping: bool,
+    title_session_mapping: bool,
     managed_oauth: bool,
     oauth_file: bool,
     signature_repair: bool,
@@ -482,6 +483,7 @@ async fn verify_source(
         agent_scope: reply["agent_scope_protocol"].as_u64() == Some(1),
         agent_summary: reply["agent_summary_protocol"].as_u64() == Some(1),
         session_mapping: reply["upstream_session_protocol"].as_u64() == Some(1),
+        title_session_mapping: reply["title_session_mapping_protocol"].as_u64() == Some(1),
         managed_oauth: reply["managed_oauth_protocol"].as_u64() == Some(1),
         oauth_file: reply["oauth_file_protocol"].as_u64() == Some(1),
         signature_repair: reply["signature_repair_protocol"].as_u64() == Some(1),
@@ -737,6 +739,7 @@ impl TuiSender {
                 agent_scope,
                 agent_summary,
                 session_mapping,
+                title_session_mapping,
                 managed_oauth,
                 oauth_file,
                 signature_repair,
@@ -930,6 +933,7 @@ impl TuiSender {
                 input_policy,
                 model_header_policy,
                 session_mapping,
+                title_session_mapping,
                 managed_oauth,
                 oauth_file,
                 if signature_repair {
@@ -953,6 +957,7 @@ impl TuiSender {
             input_policy,
             model_header_policy,
             session_mapping,
+            title_session_mapping,
             managed_oauth,
             oauth_file,
             signature_repair,
@@ -998,6 +1003,11 @@ impl TuiSender {
             response
                 .headers_mut()
                 .insert(TUI_UPSTREAM_SESSION, HeaderValue::from_static("1"));
+        }
+        if session_mapping && title_session_mapping {
+            response
+                .headers_mut()
+                .insert(TUI_TITLE_SESSION_MAPPING, HeaderValue::from_static("1"));
         }
         if managed_oauth {
             response
@@ -1124,11 +1134,15 @@ impl TuiSender {
             .next()
             .map(|value| {
                 let value = value.to_str().map_err(|_| invalid_identity())?;
+                let original = identity
+                    .session_id
+                    .strip_prefix(TITLE_SESSION_PREFIX)
+                    .unwrap_or(&identity.session_id);
                 if session_headers.next().is_some()
                     || value.len() != 36
                     || Uuid::parse_str(value).is_err()
-                    || identity.session_id.len() != 36
-                    || Uuid::parse_str(&identity.session_id).is_err()
+                    || original.len() != 36
+                    || Uuid::parse_str(original).is_err()
                 {
                     return Err(invalid_identity());
                 }

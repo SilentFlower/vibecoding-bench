@@ -84,7 +84,7 @@ use crate::service::tui_native_drain::{
     NativeTurn, active_agent_account, continuation_account, recovery_row, summary_account,
 };
 use crate::service::tui_reconnect::{self, BeforeHeaders, Reconnects, Reservation};
-use crate::service::tui_tool_history::{self, SERVER_SESSION_PREFIX};
+use crate::service::tui_tool_history::{self, SERVER_SESSION_PREFIX, TITLE_SESSION_PREFIX};
 use crate::service::usage::{ReconnectUsage, UsageCapture};
 use crate::service::v3_scheduling::{RequestPhase, SchedulingRequest};
 use crate::service::version_profile::{
@@ -2374,6 +2374,18 @@ impl GatewayService {
             (vec![], vec![])
         };
         let original_session = session.as_ref().and_then(RequestSession::original);
+        let native_title = method == "POST"
+            && path == "/v1/messages"
+            && client_type == ClientType::ClaudeCode
+            && original_session.is_some()
+            && is_tui_session_title(&body_map, &native_header_map)
+            && native_session_candidate(
+                native_header_map.get_all("x-claude-code-session-id").iter(),
+                |value| value.to_str().ok(),
+                &body_map,
+            )
+            .as_deref()
+                == original_session;
         let summary = if method == "POST"
             && path == "/v1/messages"
             && client_type == ClientType::ClaudeCode
@@ -2675,7 +2687,13 @@ impl GatewayService {
                     request_profile.unwrap_or_else(|| {
                         profile_for_version(&device_profile(&account).env.version)
                     }),
-                ) {
+                )
+                .or_else(|| {
+                    (account.request_backend == TUI_V2
+                        && native_title
+                        && warmup_config.title_enabled)
+                        .then_some(WarmupInterceptType::JsonTitle)
+                }) {
                     if should_bind_session {
                         let _ = self
                             .account_svc
@@ -2765,16 +2783,17 @@ impl GatewayService {
                     return Err(AppError::BadRequest("V2 服务端会话不可由客户端声明".into()));
                 }
                 let fixture = runtime_transport::tui_fixture(&account);
-                let owner = (!native_summary && (original_session.is_none() || !fixture))
+                let auxiliary = native_summary || native_title;
+                let owner = (!auxiliary && (original_session.is_none() || !fixture))
                     .then_some((principal.id, original_session));
-                let returning_tool = !native_summary && tui_tool_history::has_result(&body_map);
+                let returning_tool = !auxiliary && tui_tool_history::has_result(&body_map);
                 if owner.is_some() && returning_tool && tool_owner != Some(account.id) {
                     return Err(AppError::BadRequest(
                         "未找到可接续的工具轮，请用原入口令牌和会话提交原工具组。若原轮已结束，请发起新一轮".into(),
                     ));
                 }
                 if (returning_tool || agent_account == Some(account.id))
-                    && !native_summary
+                    && !auxiliary
                     && let Some(signal) = cutover.as_ref()
                 {
                     signal.protect_tui();
@@ -2839,7 +2858,13 @@ impl GatewayService {
                     .as_ref()
                     .and_then(NativeTurn::stateless_session)
                     .map(|session_id| format!("{SERVER_SESSION_PREFIX}{session_id}"));
-                let sender_session = original_session
+                // 标题复用公开会话的账号和用量归属。执行键独立，避免等原轮归还工具会话。
+                let title_session = original_session
+                    .filter(|_| native_title)
+                    .map(|session| format!("{TITLE_SESSION_PREFIX}{session}"));
+                let sender_session = title_session
+                    .as_deref()
+                    .or(original_session)
                     .or(assigned_session.as_deref())
                     .ok_or_else(|| AppError::Internal("V2 会话登记缺失".into()))?;
                 let owned_tool_group = turn.as_ref().is_some_and(NativeTurn::owns_continuation);
@@ -2907,7 +2932,7 @@ impl GatewayService {
                         session.as_ref().and_then(|s| s.source_header),
                     );
                 }
-                if (turn.is_some() || native_summary) && owned_tool_group != prepared.continuation {
+                if (turn.is_some() || auxiliary) && owned_tool_group != prepared.continuation {
                     return Err(AppError::ServiceUnavailable(
                         "V2 sender 工具归属与登记不符".into(),
                     ));
@@ -2939,14 +2964,20 @@ impl GatewayService {
                 if account.upstream_session_pool_enabled
                     && account.upstream_session_pool_size > 0
                     && client_type == ClientType::ClaudeCode
-                    && prepared.supports_session_mapping()
                     && let Some(real_session) = native_session_candidate(
                         native_header_map.get_all("x-claude-code-session-id").iter(),
                         |value| value.to_str().ok(),
                         &body_map,
                     )
                     && Some(real_session.as_str()) == original_session
+                    && (native_title || prepared.supports_session_mapping())
                 {
+                    if native_title && !prepared.supports_title_session_mapping() {
+                        diagnostics::error_stage("tui_prepare_exchange");
+                        return Err(AppError::ServiceUnavailable(
+                            "V2 标题会话池需要配套的账号发送器".into(),
+                        ));
+                    }
                     // 池只接触已获准提交的原生会话。原预留和工具归属始终使用入站值。
                     rewrite = await_preparation(
                         Some(request),
@@ -7987,6 +8018,61 @@ fn is_json_title_request(body: &serde_json::Value, profile: &ClaudeCodeProfile) 
             text.contains(
                 "Generate a concise, sentence-case title (3-7 words) that captures the main topic or goal of this coding session",
             )
+        })
+}
+
+/// 核对固定客户端自动生成的结构化标题。@param body 公开 Messages。@param headers 入站头。
+/// @return 是否可使用不拥有主轮的标题预留。
+fn is_tui_session_title(body: &JsonValue, headers: &HeaderMap) -> bool {
+    if runtime_transport::tui_cli_format(headers) != Some("claude_code")
+        || headers.contains_key("x-claude-code-agent-id")
+        || body["stream"] != true
+        || body.get("tool_choice").is_some()
+        || body
+            .get("tools")
+            .is_some_and(|tools| tools.as_array().is_none_or(|tools| !tools.is_empty()))
+    {
+        return false;
+    }
+    let Some([billing, identity, title_system]) = body["system"].as_array().map(Vec::as_slice)
+    else {
+        return false;
+    };
+    // 模型和预算随客户端配置而变。摘要与运行时固定 2.1.293 的标题提示词一致。
+    const TITLE_SYSTEM_SHA: &str =
+        "765b5ba2fa0a315a3c749c7e54bf5cef450084a745eb01e66371b8b6359d4752";
+    if !is_claude_code_billing_system_block(billing)
+        || !is_claude_code_identity_system_block(identity)
+        || title_system["type"] != "text"
+        || !title_system["text"].as_str().is_some_and(|text| {
+            format!("{:x}", Sha256::digest(text.as_bytes())) == TITLE_SYSTEM_SHA
+        })
+    {
+        return false;
+    }
+    let Some([message]) = body["messages"].as_array().map(Vec::as_slice) else {
+        return false;
+    };
+    let Some([content]) = message["content"].as_array().map(Vec::as_slice) else {
+        return false;
+    };
+    let format = &body["output_config"]["format"];
+    let schema = &format["schema"];
+    message["role"] == "user"
+        && content["type"] == "text"
+        && content["text"].as_str().is_some_and(|text| {
+            text.strip_prefix("<session>\n")
+                .is_some_and(|transcript| transcript.contains("\n</session>\n\n"))
+        })
+        && format["type"] == "json_schema"
+        && schema["type"] == "object"
+        && schema["required"] == serde_json::json!(["title"])
+        && schema["additionalProperties"] == false
+        && schema["properties"].as_object().is_some_and(|properties| {
+            properties.len() == 1
+                && properties
+                    .get("title")
+                    .is_some_and(|title| title["type"] == "string")
         })
 }
 

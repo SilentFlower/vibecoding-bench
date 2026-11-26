@@ -193,6 +193,7 @@ class AccountSource:
             "agent_scope_protocol": 1,
             "agent_summary_protocol": 1,
             "upstream_session_protocol": 1,
+            "title_session_mapping_protocol": 1,
         }
         if sender_features:
             state.update(capture_http_protocol=1, signature_repair_protocol=1)

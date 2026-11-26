@@ -10,6 +10,7 @@ use crate::service::request_body_codec::REQUEST_BODY_LIMIT;
 use crate::service::request_session::hash_json;
 
 pub(super) const SERVER_SESSION_PREFIX: &str = "gateway-tools-";
+pub(super) const TITLE_SESSION_PREFIX: &str = "gateway-tools-title-";
 
 /// 按最近一轮区分历史与回传。CLI 会在 user 工具回执后追加 system 上下文。
 /// @param body 原始 Messages 正文。@return 末轮前的消息及末轮切片，均借用原文。
