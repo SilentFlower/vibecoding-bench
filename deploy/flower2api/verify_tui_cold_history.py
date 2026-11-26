@@ -314,6 +314,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            recovery_ledger_contention=False, recovery_ledger_deadline=False, recovery_workspace_rejection=False,
            recovery_readiness_rejection=False,
            recovery_slow_model=False, initial_idle_model_connection=False, trace_startup=False, cache_markers=False,
+           trace_recovery_resend=False,
            history_cache_markers=False, history_cache_ttl=None, history_cache_scope=None,
            cache_capability=None, message_system_roles=False,
            structured_output=False, forced_tool_choice=None, no_tool_choice=False, disable_parallel_tool_use=False,
@@ -360,6 +361,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param recovery_slow_model 是否验证隔离模型收件后的公开超时和诊断归属。
     @param initial_idle_model_connection 是否先占用一个未握手的模型 TCP 连接。
     @param trace_startup 是否记录隔离启动阶段。
+    @param trace_recovery_resend 是否在隔离夹具中对合法恢复回执的 503 原样补发一次并分别取证。
     @param cache_markers 是否核对普通 Messages 显式缓存标记的模型实收和出站归属。
     @param history_cache_markers 是否冻结历史标记并验证工具往返。
     @param history_cache_ttl 工具往返启用的平台历史断点时长。
@@ -1359,7 +1361,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         status, raw, continuation_request_id = checked_messages(
             manage, token, follow, headers, received, "recovered_receipt" if recover_pending else "receipt",
             expected_status=422 if rejected_signed_recovery else 200, trace_startup=trace_startup,
-            sender_status=sender_state_after_failure,
+            sender_status=sender_state_after_failure, trace_recovery_resend=trace_recovery_resend,
         )
         if rejected_signed_recovery:
             # 缺少已记录的助手模型时在准备阶段拒绝恢复，保留原签名和归属。
@@ -1716,29 +1718,40 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
 
 
 def checked_messages(manage, token, body, headers, received, phase, *, expected_status=200, trace_startup=False,
-                     sender_status=None, observe_response=None):
+                     sender_status=None, observe_response=None, trace_recovery_resend=False, resend_of=None):
     """在断言前保留本轮公开响应与诊断归属。
     @param manage 管理入口。@param token 合成凭据。@param body 公开输入。@param headers 原入口头。
     @param received 隔离模型收件。@param phase 夹具阶段。@param expected_status 预期 HTTP 状态，空值保留实测状态。
     @param trace_startup 是否记录公开请求时间及失败后线程栈。
     @param sender_status 可选，只在已保留失败和请求诊断后读取隔离发送器状态。
     @param observe_response 可选，在连接仍打开时读取公开响应头或前缀。
+    @param trace_recovery_resend 可选，仅为隔离回执的 503 采集一次补发，保留原失败。
+    @param resend_of 可选，原请求的夹具观测 ID。
     @return 实际状态、响应字节和公开请求 ID。
     """
     started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
     started = monotonic()
     before = len(received)
     session_id = headers["x-session-id"]
-    evidence = {"event": "messages_failure", "phase": phase, "started_at": started_at,
-                "http_status": None, "request_id": None, "expected_status": expected_status}
+    attribution = {"phase": phase, "session_id": session_id, "observation_id": str(uuid4())}
+    if resend_of is not None:
+        attribution["resend_of"] = resend_of
+    evidence = {"started_at": started_at, "http_status": None, "request_id": None,
+                "expected_status": expected_status, "client_stage": "sending_request", "response_headers_ms": None}
+
+    def request_sent():
+        evidence["client_stage"] = "waiting_response_headers"
+        if trace_startup:
+            startup_event("public_request_sent", **attribution)
 
     def observe(response):
-        evidence.update(http_status=response.status, request_id=response.getheader("x-cc2api-request-id"))
+        evidence.update(http_status=response.status, request_id=response.getheader("x-cc2api-request-id"),
+                        response_headers_ms=round((monotonic() - started) * 1000), client_stage="reading_response_body")
         assert response.getheader("x-v3-tui-body-source") is None
         assert response.getheader("x-v3-tui-session-origin") is None
         assert response.getheader("x-v3-tui-instruction-location") is None
         if trace_startup:
-            startup_event("public_response_headers", phase=phase, session_id=session_id,
+            startup_event("public_response_headers", **attribution, response_headers_ms=evidence["response_headers_ms"],
                           request_id=evidence["request_id"], http_status=response.status,
                           model_posts_during=len(received) - before)
         if observe_response is not None:
@@ -1746,9 +1759,10 @@ def checked_messages(manage, token, body, headers, received, phase, *, expected_
 
     def report(failed_at, **details):
         failed_ns = monotonic_ns() if trace_startup else None
-        event = {**evidence, **details, "failed_at": failed_at.isoformat(timespec="milliseconds"),
+        event = {"event": "messages_failure", **attribution, **evidence, **details,
+                 "failed_at": failed_at.isoformat(timespec="milliseconds"),
                  "elapsed_ms": round((monotonic() - started) * 1000),
-                 "session_id": session_id, "request_body_sha256": sha256(encoded(body)).hexdigest(),
+                 "request_body_sha256": sha256(encoded(body)).hexdigest(),
                  "model_posts_before": before, "model_body_sha256": [sha for sha, _, _ in received[before:]]}
         if failed_ns is not None:
             event["monotonic_ns"] = failed_ns
@@ -1756,30 +1770,34 @@ def checked_messages(manage, token, body, headers, received, phase, *, expected_
         # 先留下原始观测。诊断读回失败时仍能保留同一请求的 HTTP 和模型收件情况。
         print(json.dumps(event, ensure_ascii=False), file=stderr, flush=True)
         if trace_startup:
-            startup_event("fixture_threads_after_failure")
+            startup_event("fixture_threads_after_failure", **attribution, request_id=evidence["request_id"],
+                          client_stage=evidence["client_stage"])
             with suppress(OSError, RuntimeError):
                 dump_traceback(file=stderr)
-        report_request_diagnostics(manage, phase, evidence["request_id"], session_id, started_at, failed_at=failed_at)
+        report_request_diagnostics(manage, phase, evidence["request_id"], session_id, started_at,
+                                   failed_at=failed_at, observation_id=attribution["observation_id"])
         if trace_startup and sender_status is not None:
             try:
                 state = sender_status()
             except (HTTPException, OSError, ValueError) as error:
-                startup_event("sender_status_after_failure", phase=phase, session_id=session_id,
+                startup_event("sender_status_after_failure", **attribution,
                               request_id=evidence["request_id"], lookup_error=type(error).__name__)
             else:
-                startup_event("sender_status_after_failure", phase=phase, session_id=session_id,
+                startup_event("sender_status_after_failure", **attribution,
                               request_id=evidence["request_id"], ready=state.get("ready"), idle=state.get("idle"))
 
     if trace_startup:
-        startup_event("public_request_start", phase=phase, session_id=session_id, model_posts_before=before)
+        startup_event("public_request_start", **attribution, started_at=started_at, model_posts_before=before)
     try:
-        status, raw = call(18090, "POST", "/v1/messages", token, body, headers, observe_headers=observe)
+        status, raw = call(18090, "POST", "/v1/messages", token, body, headers, observe_headers=observe,
+                           observe_request_sent=request_sent)
     except (HTTPException, OSError) as error:
         report(datetime.now(timezone.utc), transport_error=type(error).__name__,
                transport_stage="response_body" if evidence["http_status"] is not None else "before_response_headers")
         raise
     if expected_status is not None and status != expected_status:
         failed_at = datetime.now(timezone.utc)
+        evidence["client_stage"] = "response_complete"
         try:
             payload = json.loads(raw)
         except ValueError:
@@ -1789,17 +1807,33 @@ def checked_messages(manage, token, body, headers, received, phase, *, expected_
             error = {key: error[key] for key in ("type", "code", "message") if isinstance(error.get(key), str)}
         report(failed_at, response_error=error if isinstance(error, (dict, str)) else None,
                response_sha256=sha256(raw).hexdigest(), response_bytes=len(raw))
+        if status == 503 and trace_recovery_resend:
+            # 补发使用同一合成输入和新观测窗口。两次诊断各自收口，夹具仍报告第一次失败。
+            with suppress(HTTPException, OSError):
+                checked_messages(manage, token, body, headers, received, phase + "_resend", expected_status=None,
+                                 trace_startup=trace_startup, sender_status=sender_status,
+                                 resend_of=attribution["observation_id"])
         raise AssertionError((phase, status, expected_status, evidence["request_id"]))
+    if resend_of is not None:
+        startup_event("public_response_complete", **attribution, request_id=evidence["request_id"], http_status=status,
+                      model_posts_during=len(received) - before, request_body_sha256=sha256(encoded(body)).hexdigest())
+        report_request_diagnostics(manage, phase, evidence["request_id"], session_id, started_at,
+                                   failed_at=datetime.now(timezone.utc), observation_id=attribution["observation_id"],
+                                   event_name="messages_resend_diagnostics")
     return status, raw, evidence["request_id"]
 
 
-def report_request_diagnostics(manage, phase, request_id, session_id, started_at, *, failed_at=None):
+def report_request_diagnostics(manage, phase, request_id, session_id, started_at, *, failed_at=None,
+                               observation_id=None, event_name="messages_failure_diagnostics"):
     """在网关退出前读回本请求诊断。@param manage 管理入口。@param phase 夹具阶段。
     @param request_id 响应关联头，可为空。@param session_id 合成会话。@param started_at 本次 UTC 开始时间。
-    @param failed_at 无关联头时须传入原请求失败当刻的 UTC 时间。@return 诊断事件。
+    @param failed_at 无关联头时传入本次观测结束当刻的 UTC 时间。
+    @param observation_id 可选，本次夹具观测 ID。@param event_name 诊断事件名。@return 诊断事件。
     """
-    event = {"event": "messages_failure_diagnostics", "phase": phase, "request_id": request_id,
+    event = {"event": event_name, "phase": phase, "request_id": request_id,
              "correlation": "response_request_id" if request_id else "session_candidates", "requests": []}
+    if observation_id is not None:
+        event["observation_id"] = observation_id
     if request_id:
         query = {"correlation_id": request_id}
     else:
@@ -3780,6 +3814,8 @@ def main():
     parser.add_argument("--signed-tool-history", action="store_true")
     parser.add_argument("--signed-tool-response", choices=("signature-only", "missing-model"))
     parser.add_argument("--trace-initial-startup", action="store_true", help="记录源码 V2 夹具的启动阶段")
+    parser.add_argument("--trace-recovery-resend", action="store_true",
+                        help="隔离工具回执收到 503 后原样补发一次，分别取证并保留原失败")
     fault = parser.add_mutually_exclusive_group()
     fault.add_argument("--recovery-ledger-contention", action="store_true")
     fault.add_argument("--recovery-ledger-deadline", action="store_true")
@@ -3850,6 +3886,8 @@ def main():
         parser.error("--history-cache-ttl 需要同用 --history-cache-markers")
     if args.history_cache_scope and not args.history_cache_ttl:
         parser.error("--history-cache-scope 需要同用 --history-cache-ttl")
+    if args.trace_recovery_resend and not args.recover_pending_tool:
+        parser.error("--trace-recovery-resend 需要同用 --recover-pending-tool")
     if (args.recovery_ledger_contention or args.recovery_ledger_deadline or args.recovery_workspace_rejection
         or args.recovery_readiness_rejection or args.recovery_slow_model) and (
         not args.recover_pending_tool or args.signed_tool_history
@@ -3860,7 +3898,7 @@ def main():
         raise RuntimeError("请在空白的 docker --network none 账号容器中运行")
     previous = args.mixed_release
     cache_markers = args.cache_markers or args.cache_marker_capabilities is not None
-    trace_startup = (args.initial_idle_model_connection or args.trace_initial_startup or cache_markers
+    trace_startup = (args.initial_idle_model_connection or args.trace_initial_startup or args.trace_recovery_resend or cache_markers
                      or args.recovery_readiness_rejection
                      or args.structured_output_contract or bool(args.forced_tool_choice_contract) or args.no_tool_choice_contract
                      or args.disable_parallel_tool_use_contract or bool(args.oauth_rotation or args.provider_quota)
@@ -3909,6 +3947,7 @@ def main():
                        recovery_readiness_rejection=args.recovery_readiness_rejection,
                        recovery_slow_model=args.recovery_slow_model,
                        initial_idle_model_connection=args.initial_idle_model_connection, trace_startup=trace_startup,
+                       trace_recovery_resend=args.trace_recovery_resend,
                        cache_markers=cache_markers, history_cache_markers=args.history_cache_markers,
                        history_cache_ttl=args.history_cache_ttl, history_cache_scope=args.history_cache_scope,
                        cache_capability=args.cache_marker_capabilities,

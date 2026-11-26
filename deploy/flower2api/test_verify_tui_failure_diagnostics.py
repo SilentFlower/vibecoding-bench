@@ -8,10 +8,58 @@ from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlsplit
 
 import verify_tui_cold_history as fixture
+import verify_tui_final_tls as transport
 
 
 class FailureDiagnosticTests(TestCase):
     """核对精确关联与无响应头的会话候选。"""
+
+    def test_original_503_and_resend_header_timeout_keep_independent_attribution(self):
+        """原 503 精确查询后，补发无头时只查询补发窗口。@return 无。"""
+        start = datetime(2026, 11, 26, 19, 29, 13, 100000, tzinfo=timezone.utc)
+        original = {"request_id": "original", "finished_at": "已结束", "status_code": 503,
+                    "context": {"tui_reservation_id": "original-reservation"}}
+        resend = {"request_id": "resend-candidate", "original_session_id": "会话",
+                  "context": {"tui_reservation_id": "resend-reservation"}}
+        first_connection, second_connection = Mock(), Mock()
+        response = first_connection.getresponse.return_value
+        response.status = 503
+        response.getheader.side_effect = lambda name: "original" if name == "x-cc2api-request-id" else None
+        response.read.return_value = b'{"error":"synthetic"}'
+        second_connection.getresponse.side_effect = TimeoutError
+        clock = Mock()
+        clock.now.side_effect = [start.replace(microsecond=tick) for tick in (100000, 200000, 300000, 400000)]
+        manage = Mock(side_effect=[{"items": [original]}, {"request": original, "attempts": []},
+                                   {"items": [resend]}, {"request": resend, "attempts": []}])
+        with (
+            patch.object(fixture, "datetime", clock),
+            patch.object(transport, "HTTPConnection", side_effect=[first_connection, second_connection]),
+            patch.object(fixture, "stderr", StringIO()) as trace,
+            self.assertRaises(AssertionError) as failed,
+        ):
+            fixture.checked_messages(manage, "合成令牌", {}, {"x-session-id": "会话"}, [], "recovered_receipt",
+                                     trace_recovery_resend=True)
+
+        self.assertEqual(failed.exception.args[0], ("recovered_receipt", 503, 200, "original"))
+        self.assertEqual(first_connection.request.call_args, second_connection.request.call_args)
+        raw_original, diagnostic_original, raw_resend, diagnostic_resend = map(json.loads, trace.getvalue().splitlines())
+        self.assertEqual(raw_original["client_stage"], "response_complete")
+        self.assertIsNotNone(raw_original["response_headers_ms"])
+        self.assertEqual(raw_resend["resend_of"], raw_original["observation_id"])
+        self.assertNotEqual(raw_resend["observation_id"], raw_original["observation_id"])
+        self.assertEqual(raw_resend["request_body_sha256"], raw_original["request_body_sha256"])
+        self.assertEqual(raw_resend["client_stage"], "waiting_response_headers")
+        self.assertIsNone(raw_resend["http_status"])
+        self.assertIsNone(raw_resend["request_id"])
+        self.assertIsNone(raw_resend["response_headers_ms"])
+        for raw, diagnostic, reservation in ((raw_original, diagnostic_original, "original-reservation"),
+                                             (raw_resend, diagnostic_resend, "resend-reservation")):
+            self.assertEqual(diagnostic["observation_id"], raw["observation_id"])
+            self.assertEqual(diagnostic["requests"][0]["diagnostic_context"]["tui_reservation_id"], reservation)
+        self.assertEqual(diagnostic_original["correlation"], "response_request_id")
+        self.assertEqual(diagnostic_resend["correlation"], "session_candidates")
+        self.assertEqual(diagnostic_resend["since"], "2026-11-26T19:29:13.300+00:00")
+        self.assertEqual(diagnostic_resend["until"], "2026-11-26T19:29:13.401+00:00")
 
     def test_failure_window_excludes_later_request_in_same_session(self):
         """模拟查询前的真实后发顺序，保留失败所在毫秒的候选。@return 无。"""
