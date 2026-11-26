@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use axum::body::{Body, Bytes, to_bytes};
 use axum::extract::Request;
-use axum::http::{HeaderMap, HeaderValue, StatusCode, header::CONTENT_TYPE};
+use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode, header::CONTENT_TYPE};
 use axum::response::{IntoResponse, Response};
 use base64::{Engine, engine::general_purpose::STANDARD};
 use futures_util::stream::unfold;
@@ -23,6 +23,7 @@ use tokio::time::{Instant, sleep_until, timeout, timeout_at};
 use uuid::Uuid;
 
 use crate::error::AppError;
+use crate::service::gateway::is_passive_usage_header;
 use crate::service::native_capture::tui_wire::CaptureJob;
 use crate::service::native_capture::{TuiCaptureInput, tui_writer};
 use crate::service::request_body_codec::REQUEST_BODY_LIMIT;
@@ -956,14 +957,14 @@ impl TuiSender {
             command["oauth_file_len"] = json!(file.len());
         }
         // 两种受管凭据都交给账号发送器。私有凭据帧不属于采集正文。
-        let managed_capture = account_token.is_some() || oauth_file.is_some();
+        let managed_oauth = account_token.is_some() || oauth_file.is_some();
         let mut capture = capture.and_then(|(directory, input)| {
             let id = Uuid::parse_str(&identity.reservation_id).ok()?;
             Some((directory, input, identity.account_id, id, tui_writer()?))
         });
         let capturing = capture.is_some();
         let wire_protocol = tui_projection_marker(headers, TUI_FINAL_CAPTURE, "1");
-        if managed_capture && wire_protocol {
+        if managed_oauth && wire_protocol {
             if let Some((directory, input, _, _, permit)) = capture.take() {
                 if let Some(record) = self
                     .book
@@ -1045,7 +1046,7 @@ impl TuiSender {
                                     Ok(Ok((pairs, raw))) => {
                                         let written = tokio::task::spawn_blocking(move || {
                                             let _permit = permit;
-                                            let format = if managed_capture {
+                                            let format = if managed_oauth {
                                                 "request_to_account_sender"
                                             } else {
                                                 "http_request_written_to_loopback_provider"
@@ -1113,9 +1114,7 @@ impl TuiSender {
         if !status.is_success() && content_type == "application/json" {
             let origin = match head["error_source"].as_str() {
                 Some("local_provider_http") => Some("local_provider_http"),
-                Some("managed_oauth_http") if account_token.is_some() || oauth_file.is_some() => {
-                    Some("managed_oauth_http")
-                }
+                Some("managed_oauth_http") if managed_oauth => Some("managed_oauth_http"),
                 Some("oauth_file_before_model")
                     if oauth_file.is_some() && status == StatusCode::SERVICE_UNAVAILABLE =>
                 {
@@ -1138,6 +1137,28 @@ impl TuiSender {
                     response
                         .headers_mut()
                         .insert(RETRY_AFTER, HeaderValue::from(seconds));
+                }
+            }
+        }
+        // 额度跟随同一次受管预留。开发提供方和本机合成的限流回复都不具备该归属。
+        if managed_oauth
+            && (status == StatusCode::OK
+                || status == StatusCode::TOO_MANY_REQUESTS
+                    && tui_projection_marker(
+                        response.headers(),
+                        TUI_ERROR_SOURCE,
+                        "managed_oauth_http",
+                    ))
+            && let Some(quota) = head["quota_headers"].as_object()
+        {
+            for (name, value) in quota {
+                if is_passive_usage_header(name)
+                    && let Ok(name) = HeaderName::from_bytes(name.as_bytes())
+                    && let Some(value) = value
+                        .as_str()
+                        .and_then(|value| HeaderValue::from_str(value).ok())
+                {
+                    response.headers_mut().insert(name, value);
                 }
             }
         }
@@ -1445,6 +1466,10 @@ mod tests {
         let mut credential_headers = headers(&identity);
         let token = "synthetic-account-at";
         credential_headers.insert(TUI_MANAGED_OAUTH, HeaderValue::from_static(token));
+        credential_headers.insert(
+            TUI_SSE_PROJECTION_HEADER,
+            HeaderValue::from_static(TUI_SSE_PROJECTION_V1),
+        );
         let mut wrong_identity = identity.clone();
         wrong_identity.account_id += 1;
         let mut wrong_headers = headers(&wrong_identity);
@@ -1461,21 +1486,40 @@ mod tests {
             assert_eq!(command["account_token"], token);
             write_json(
                 &mut socket,
-                &json!({"status":200, "content_type":"text/event-stream"}),
+                &json!({
+                    "status":200, "content_type":"text/event-stream", "message_id_mode":"gateway",
+                    "quota_headers":{
+                        "anthropic-ratelimit-unified-5h-utilization":"0.25",
+                        "anthropic-ratelimit-unified-5h-reset":"2030-01-01T12:00:00Z",
+                        "anthropic-ratelimit-unified-7d-reset":"bad\r\nvalue",
+                        "anthropic-ratelimit-unified-overage-status":"rejected",
+                        "authorization":"synthetic-unapproved"
+                    }
+                }),
             )
             .await
             .unwrap();
             chunk(&mut socket, b"data: test\n\n").await;
             chunk(&mut socket, b"").await;
         });
+        let response = response.unwrap();
         assert_eq!(
-            response
-                .unwrap()
-                .into_body()
-                .collect()
-                .await
-                .unwrap()
-                .to_bytes(),
+            response.headers()["anthropic-ratelimit-unified-5h-utilization"],
+            "0.25"
+        );
+        assert_eq!(
+            response.headers()["anthropic-ratelimit-unified-5h-reset"],
+            "2030-01-01T12:00:00Z"
+        );
+        for name in [
+            "anthropic-ratelimit-unified-7d-reset",
+            "anthropic-ratelimit-unified-overage-status",
+            "authorization",
+        ] {
+            assert!(!response.headers().contains_key(name));
+        }
+        assert_eq!(
+            response.into_body().collect().await.unwrap().to_bytes(),
             "data: test\n\n"
         );
         assert!(send(&credential_headers).await.is_err());
@@ -1582,7 +1626,10 @@ mod tests {
             );
             write_json(
                 &mut socket,
-                &json!({"status":200, "content_type":"text/event-stream", "message_id_mode":"gateway"}),
+                &json!({
+                    "status":200, "content_type":"text/event-stream", "message_id_mode":"gateway",
+                    "quota_headers":{"anthropic-ratelimit-unified-7d-utilization":"0.43"}
+                }),
             )
             .await
             .unwrap();
@@ -1602,6 +1649,10 @@ mod tests {
         let response = response.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(response.headers()[TUI_CAPTURE], "queued");
+        assert_eq!(
+            response.headers()["anthropic-ratelimit-unified-7d-utilization"],
+            "0.43"
+        );
         response.into_body().collect().await.unwrap();
         let capture_path = capture_dir.join(format!("{}.json", identity.reservation_id));
         let stored = timeout(Duration::from_secs(5), async {
@@ -1632,30 +1683,50 @@ mod tests {
         assert!(send(&private).await.is_err());
     }
 
-    /// 只有来自绑定模型 HTTP 的 429 可将等待期带出私有 socket。@return 无。
+    /// 绑定模型 429 携带原退避。仅受管订阅 429 同时携带额度。@return 无。
     #[tokio::test]
     async fn provider_http_retry_after_from_bound_send_head() {
         let source = Source::new();
-        for (origin, seconds) in [
-            ("local_provider_http", Some(72)),
-            ("local_provider_event", None),
-            ("unknown", None),
+        for (origin, managed, seconds) in [
+            ("local_provider_http", false, Some(72)),
+            ("local_provider_event", true, None),
+            ("managed_oauth_http", true, Some(72)),
+            ("unknown", false, None),
         ] {
             let identity = source.identity();
             let (prepared, mut socket) = tokio::join!(source.prepare(&identity, b"{}"), async {
-                let (mut socket, mut reply) = source.receive("prepare").await;
+                let (mut socket, mut reply) = source.receive("bind").await;
+                if managed {
+                    reply["managed_oauth_protocol"] = json!(1);
+                }
+                write_json(&mut socket, &reply).await.unwrap();
+                assert_eq!(read_json(&mut socket).await.unwrap()["action"], "prepare");
                 socket.read_exact(&mut [0; 2]).await.unwrap();
                 reply["kind"] = json!("new");
                 write_json(&mut socket, &reply).await.unwrap();
                 socket
             });
             assert!(prepared.is_ok());
-            let (response, ()) = tokio::join!(source.send(&identity), async {
-                assert_eq!(read_json(&mut socket).await.unwrap()["action"], "send");
+            let mut send_headers = headers(&identity);
+            if managed {
+                send_headers.insert(
+                    TUI_MANAGED_OAUTH,
+                    HeaderValue::from_static("synthetic-account-at"),
+                );
+            }
+            let send =
+                source
+                    .sender
+                    .send(&source.binding, Some(&source.config), &send_headers, None);
+            let (response, ()) = tokio::join!(send, async {
+                let command = read_json(&mut socket).await.unwrap();
+                assert_eq!(command["action"], "send");
+                assert_eq!(command.get("account_token").is_some(), managed);
                 write_json(
                     &mut socket,
                     &json!({"status":429, "content_type":"application/json",
-                    "message_id_mode":"gateway", "error_source":origin, "retry_after":72}),
+                    "message_id_mode":"gateway", "error_source":origin, "retry_after":72,
+                    "quota_headers":{"anthropic-ratelimit-unified-5h-status":"rejected"}}),
                 )
                 .await
                 .unwrap();
@@ -1668,6 +1739,12 @@ mod tests {
             });
             let response = response.unwrap();
             assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+            assert_eq!(
+                response
+                    .headers()
+                    .contains_key("anthropic-ratelimit-unified-5h-status"),
+                origin == "managed_oauth_http"
+            );
             assert_eq!(
                 response.headers().get(RETRY_AFTER).map(|value| value
                     .to_str()

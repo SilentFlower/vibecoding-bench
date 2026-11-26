@@ -86,8 +86,20 @@ def _control(stream):
     return value
 
 
-def _reply(stream, fields):
-    stream.write(json.dumps(fields, ensure_ascii=False, separators=(",", ":")).encode() + b"\n")
+def _reply(stream, fields, *, quota_headers=None):
+    data = json_bytes(fields)
+    if quota_headers:
+        selected = {}
+        candidate = {**fields, "quota_headers": selected}
+        # 沿用原控制帧上限。优先放入短字段，避免异常长值挤掉其他窗口。
+        for name in sorted(quota_headers, key=lambda name: len(quota_headers[name])):
+            selected[name] = quota_headers[name]
+            encoded = json_bytes(candidate)
+            if len(encoded) < CONTROL_LIMIT:
+                data = encoded
+            else:
+                del selected[name]
+    stream.write(data + b"\n")
 
 
 class _Disconnected:
@@ -354,7 +366,7 @@ class AccountSource:
             return
         with closing(events):
             if not handle.stream:
-                self._message_json(writer, events, connection)
+                self._message_json(writer, events, connection, handle)
                 return
             # 第一帧之前发生的启动失败不能被发布为成功响应。
             try:
@@ -364,13 +376,14 @@ class AccountSource:
                 return
             if not first:
                 return
-            _reply(writer, {"status": 200, "content_type": "text/event-stream", "message_id_mode": "gateway"})
+            _reply(writer, {"status": 200, "content_type": "text/event-stream", "message_id_mode": "gateway"},
+                   quota_headers=handle.quota_headers)
             self._chunks(writer, first)
             for event in events:
                 self._chunks(writer, event)
             writer.write(struct.pack("!I", 0))
 
-    def _message_json(self, writer, events, connection):
+    def _message_json(self, writer, events, connection, handle):
         # 主轮始终只提交一次。与下游网关已有的 JSON 正常化容量一致。
         output = MessageJSON(BODY_LIMIT)
         sent = False
@@ -385,7 +398,8 @@ class AccountSource:
                     if data is not None:
                         output.add(data)
                 if not sent and (output.message is not None or time.monotonic() - last >= IO_TIMEOUT / 2):
-                    _reply(writer, {"status": 200, "content_type": "application/json", "message_id_mode": "gateway"})
+                    _reply(writer, {"status": 200, "content_type": "application/json", "message_id_mode": "gateway"},
+                           quota_headers=handle.quota_headers)
                     sent = True
                 if sent and time.monotonic() - last >= IO_TIMEOUT / 2:
                     # 长回答已持续产生模型事件，私有 JSON 流用合法空白维持分块空闲期限。
@@ -411,7 +425,7 @@ class AccountSource:
                 head["error_source"] = error.source
                 if error.retry_after is not None:
                     head["retry_after"] = error.retry_after
-            _reply(writer, head)
+            _reply(writer, head, quota_headers=error.quota_headers if error else None)
         self._chunks(writer, payload)
         writer.write(struct.pack("!I", 0))
 

@@ -2906,6 +2906,9 @@ impl GatewayService {
                 } else {
                     capture_state
                 };
+                if !fixture {
+                    self.observe_tui_passive_usage(account.id, &response);
+                }
                 // 本轮结果可能已被模型接纳，V2 的授权错误随响应交付原请求和原工具轮。
                 let mut response = runtime_transport::tui_public_response(
                     response,
@@ -4068,6 +4071,38 @@ impl GatewayService {
         })
     }
 
+    fn observe_tui_passive_usage(&self, account_id: i64, response: &reqwest::Response) {
+        let headers = response.headers();
+        let Some(usage) = extract_passive_usage(headers) else {
+            return;
+        };
+        let kind = match response.status() {
+            StatusCode::OK => UsageObservationKind::Allowed,
+            StatusCode::TOO_MANY_REQUESTS
+                if runtime_transport::tui_projection_marker(
+                    headers,
+                    runtime_transport::TUI_ERROR_SOURCE,
+                    "managed_oauth_http",
+                ) =>
+            {
+                UsageObservationKind::RejectedWindows(extract_rejected_passive_usage_windows(
+                    headers,
+                ))
+            }
+            _ => return,
+        };
+        self.record_passive_usage(account_id, usage, kind);
+    }
+
+    fn record_passive_usage(&self, account_id: i64, usage: JsonValue, kind: UsageObservationKind) {
+        let service = self.account_svc.clone();
+        tokio::spawn(async move {
+            if let Err(error) = service.update_passive_usage(account_id, usage, kind).await {
+                debug!(account_id, %error, "被动额度更新失败");
+            }
+        });
+    }
+
     /// 共用被动额度观察与响应字节处理，业务重试由各自调用方决定。
     /// @param resp 实际提交取得的原始 HTTP 响应。
     /// @param diagnostic 当前真实构造的诊断观察器。
@@ -4132,20 +4167,7 @@ impl GatewayService {
                     .unwrap_or_else(|| serde_json::json!({}))
             });
             if let Some(usage_json) = usage_from_headers.clone() {
-                let svc = self.account_svc.clone();
-                let account_id = account.id;
-                let usage_kind = usage_kind.clone();
-                tokio::spawn(async move {
-                    if let Err(e) = svc
-                        .update_passive_usage(account_id, usage_json, usage_kind)
-                        .await
-                    {
-                        debug!(
-                            "passive 429 usage update failed for account {}: {}",
-                            account_id, e
-                        );
-                    }
-                });
+                self.record_passive_usage(account.id, usage_json, usage_kind);
             }
             let body_result = resp.bytes().await;
             let complete = body_result.is_ok();
@@ -4222,19 +4244,10 @@ impl GatewayService {
         }
 
         // 成功响应只做被动采集，不触发 usage API；429 已在上方按拒绝样本持久化。
-        if resp.status().is_success() {
-            if let Some(usage_json) = extract_passive_usage(resp.headers()) {
-                let svc = self.account_svc.clone();
-                let aid = account.id;
-                tokio::spawn(async move {
-                    if let Err(e) = svc
-                        .update_passive_usage(aid, usage_json, UsageObservationKind::Allowed)
-                        .await
-                    {
-                        debug!("passive usage update failed for account {}: {}", aid, e);
-                    }
-                });
-            }
+        if resp.status().is_success()
+            && let Some(usage_json) = extract_passive_usage(resp.headers())
+        {
+            self.record_passive_usage(account.id, usage_json, UsageObservationKind::Allowed);
         }
 
         let request_log_config = *self.rate_limit_request_log_config.read().await;
@@ -8880,6 +8893,25 @@ const PASSIVE_USAGE_WINDOWS: [(&str, &str); 3] = [
     ("seven_day", "7d"),
     ("seven_day_fable", "7d_oi"),
 ];
+const PASSIVE_USAGE_HEADER_PREFIX: &str = "anthropic-ratelimit-unified-";
+
+/// 核对私有响应里网关可用的额度头。@param name 上游头名。@return 是否属于已知窗口和字段。
+#[cfg(target_os = "linux")]
+pub(super) fn is_passive_usage_header(name: &str) -> bool {
+    let Some((window, field)) = name
+        .strip_prefix(PASSIVE_USAGE_HEADER_PREFIX)
+        .and_then(|suffix| suffix.split_once('-'))
+    else {
+        return false;
+    };
+    PASSIVE_USAGE_WINDOWS
+        .iter()
+        .any(|(_, known)| *known == window)
+        && matches!(
+            field,
+            "utilization" | "reset" | "status" | "surpassed-threshold"
+        )
+}
 
 /// 从 429 响应头中识别实际拒绝请求的用量窗口。
 ///
@@ -8948,22 +8980,23 @@ fn extract_passive_usage_window(
     header_window: &str,
     max_ahead: chrono::Duration,
 ) -> Option<serde_json::Value> {
-    let utilization_name = format!("anthropic-ratelimit-unified-{}-utilization", header_window);
-    let reset_name = format!("anthropic-ratelimit-unified-{}-reset", header_window);
+    let utilization_name = format!("{PASSIVE_USAGE_HEADER_PREFIX}{header_window}-utilization");
+    let reset_name = format!("{PASSIVE_USAGE_HEADER_PREFIX}{header_window}-reset");
     let utilization = headers
         .get(utilization_name.as_str())
         .and_then(|value| value.to_str().ok())?
         .parse::<f64>()
         .ok()?;
+    // 响应头返回比例，乘以 100 后与 OAuth usage API 的百分比格式保持一致。
+    let utilization = utilization * 100.0;
     if !utilization.is_finite() || utilization < 0.0 {
         return None;
     }
     let reset_raw = headers.get(reset_name.as_str())?.to_str().ok()?;
     let reset = normalize_passive_reset_timestamp(reset_raw, max_ahead)?;
 
-    // 响应头返回比例，乘以 100 后与 OAuth usage API 的百分比格式保持一致。
     Some(serde_json::json!({
-        "utilization": utilization * 100.0,
+        "utilization": utilization,
         "resets_at": reset,
     }))
 }
@@ -10598,6 +10631,17 @@ mod tests {
             reqwest::header::HeaderValue::from_static("-0.1"),
         );
 
+        assert!(extract_passive_usage(&headers).is_none());
+
+        let future_5h_reset = (Utc::now() + chrono::Duration::hours(1)).timestamp();
+        headers.insert(
+            "anthropic-ratelimit-unified-5h-reset",
+            HeaderValue::from_str(&future_5h_reset.to_string()).unwrap(),
+        );
+        headers.insert(
+            "anthropic-ratelimit-unified-5h-utilization",
+            HeaderValue::from_static("1e308"),
+        );
         assert!(extract_passive_usage(&headers).is_none());
     }
 

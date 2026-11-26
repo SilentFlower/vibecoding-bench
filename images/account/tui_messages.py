@@ -1,5 +1,6 @@
 """受管本机推理服务的冻结 Messages 输入和同一响应的原始 SSE 观察。"""
 
+from email.message import Message
 import hashlib
 import json
 import math
@@ -53,6 +54,19 @@ def encode(value):
 def valid_model_header_value(value):
     """校验私有帧中的 HTTP 字节表示。@param value 协议头值。@return 是否可无损发送。"""
     return isinstance(value, str) and all(c == "\t" or 32 <= ord(c) <= 255 and ord(c) != 127 for c in value)
+
+
+def passive_quota_headers(headers: Message) -> dict[str, str]:
+    """提取受管模型的额度证据。@param headers 实际上游响应头。@return 单值额度头。"""
+    observed = {}
+    # 只接收网关理解的窗口字段，重复值无法作为唯一的官方观测。
+    for window in ("5h", "7d", "7d_oi"):
+        for field in ("utilization", "reset", "status", "surpassed-threshold"):
+            name = f"anthropic-ratelimit-unified-{window}-{field}"
+            values = headers.get_all(name, ())
+            if len(values) == 1 and values[0] and all(" " <= char <= "~" for char in values[0]):
+                observed[name] = values[0]
+    return observed
 
 
 _JSON_SPACE = re.compile(r"[ \t\r\n]*")
@@ -120,11 +134,15 @@ class SubagentAmbiguousError(SubagentBindingError):
 class ModelResponseError(RuntimeError):
     """本机模型在首帧前返回的 Messages 错误。@param status 模型 HTTP 状态。@param raw 上游错误正文。"""
 
-    def __init__(self, status, raw, *, source=None, retry_after=None):
-        """过滤错误扩展。@param source 受信传输归属。@param retry_after 已核验的退避秒数。@return 无。"""
+    def __init__(self, status, raw, *, source=None, retry_after=None, quota_headers=None):
+        """过滤错误扩展并保存私有观察。@param status 模型 HTTP 状态。@param raw 上游错误正文。
+        @param source 受信传输归属。@param retry_after 已核验的退避秒数。
+        @param quota_headers 已提取的受管模型额度头。@return 无。
+        """
         self.status = status if 400 <= status < 600 else 502
         self.source = source
         self.retry_after = retry_after
+        self.quota_headers = quota_headers
         fallback = {401: "authentication_error", 403: "permission_error", 429: "rate_limit_error"}
         error = {"type": fallback.get(self.status, "api_error"), "message": f"本机模型返回 HTTP {self.status}"}
         try:

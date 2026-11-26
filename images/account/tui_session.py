@@ -35,6 +35,7 @@ from tui_messages import (
     WireStep,
     history_digest,
     input_message,
+    passive_quota_headers,
     prompt_text,
     provider_session,
     split_reply,
@@ -814,6 +815,9 @@ class _Actor:
                 != "text/event-stream"
             ):
                 raise RuntimeError("受管本机提供方没有交付成功的 Messages 事件流")
+            if self.driver.managed_oauth:
+                # 发布首个模型事件前把同轮额度交给预留，避免事件源先发送私有响应头。
+                handle.quota_headers = passive_quota_headers(upstream.headers)
             http.model_stream_started = True
             http.send_response(200)
             http.send_header("Content-Type", "text/event-stream")
@@ -902,6 +906,7 @@ class _Reserved:
         self.upstream_session_id = None
         self.reservation = reservation
         self.account_token = None
+        self.quota_headers = None
         self.expires_at = None
         # 原生请求已声明完整的协议上下文。普通 API 的历史管理需要本次实际 CLI 提供能力。
         self.api_context = body.get("context_management") if "metadata" not in body else None

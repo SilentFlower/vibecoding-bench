@@ -15,7 +15,7 @@ import time
 import unittest
 from uuid import uuid4
 
-from tui_source import AccountSource, CHUNK_LIMIT, listen
+from tui_source import AccountSource, CHUNK_LIMIT, CONTROL_LIMIT, listen
 from tui_messages import ModelResponseError
 
 
@@ -42,6 +42,7 @@ class Driver:
         self.stream = True
         self.frames = None
         self.reservation = None
+        self.quota_headers = None
 
     def ready(self):
         """返回驱动是否就绪。@return 就绪状态。"""
@@ -203,13 +204,19 @@ class SourceTests(unittest.TestCase):
     def test_send_chunking_and_single_reservation(self):
         """准备后按原记录提交，大分片按线上协议分块并保留内容。@return 无。"""
         body = "正文🌸".encode()
+        quota = {"anthropic-ratelimit-unified-5h-utilization": "0.25",
+                 "anthropic-ratelimit-unified-5h-reset": "2030-01-01T12:00:00Z"}
+        self.driver.quota_headers = {**quota, "anthropic-ratelimit-unified-7d-reset": "x" * CONTROL_LIMIT}
         with self._connect() as (proof, stream):
             command = self._prepare(proof, stream, body)
             ready = json.loads(stream.readline())
             self.assertEqual((ready["kind"], ready["workspace_protocol"]), ("new", 1))
             self.assertEqual(self.driver.submitted, 0)
             self._write(stream, command)
-            self.assertEqual(json.loads(stream.readline())["content_type"], "text/event-stream")
+            head = stream.readline()
+            self.assertLessEqual(len(head), CONTROL_LIMIT)
+            self.assertEqual(json.loads(head)["content_type"], "text/event-stream")
+            self.assertEqual(json.loads(head)["quota_headers"], quota)
             collected = []
             while True:
                 size, = struct.unpack("!I", stream.read(4))
@@ -290,7 +297,11 @@ class SourceTests(unittest.TestCase):
         ending = b'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":7}}\n\n'
         stop = b'data: {"type":"message_stop"}\n\n'
         error = b'event: error\ndata: {"type":"error","error":{"type":"overloaded_error","message":"busy"}}\n\n'
-        status, msg = self._nonstream([opening, ending, stop])
+        self.driver.quota_headers = {"anthropic-ratelimit-unified-7d-utilization": "0.43",
+                                     "anthropic-ratelimit-unified-7d-reset": "2030-01-08T12:00:00Z"}
+        status, msg = self._nonstream(
+            [opening, ending, stop], expected_headers={"quota_headers": self.driver.quota_headers})
+        self.driver.quota_headers = None
         self.assertEqual((status, msg["id"], msg["usage"]), (200, "msg_source", {"input_tokens": 5, "output_tokens": 7}))
         self.assertEqual(self._nonstream([b": ping\n\n", error]), (529, {"type": "error", "error": {
             "type": "overloaded_error", "message": "busy"}}))
@@ -303,11 +314,14 @@ class SourceTests(unittest.TestCase):
         """同一上游首帧前的失败在两种响应模式均保留 HTTP 状态和标准错误。@return 无。"""
         upstream_error = {"type": "error", "error": {"type": "rate_limit_error", "message": "fixture busy"}}
 
+        quota = {"anthropic-ratelimit-unified-5h-status": "rejected"}
+
         def failed():
             yield from ()
-            raise ModelResponseError(429, json.dumps(upstream_error).encode(), source="local_provider_http", retry_after=42)
+            raise ModelResponseError(429, json.dumps(upstream_error).encode(),
+                                     source="managed_oauth_http", retry_after=42, quota_headers=quota)
 
-        expected = {"status": 429, "error_source": "local_provider_http", "retry_after": 42}
+        expected = {"status": 429, "error_source": "managed_oauth_http", "retry_after": 42, "quota_headers": quota}
         self.assertEqual(self._nonstream(failed(), expected_headers=expected), (429, upstream_error))
         self.driver.stream = True
         self.driver.frames = failed()

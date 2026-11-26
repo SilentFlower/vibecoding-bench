@@ -63,6 +63,9 @@ class ManagedOAuthTests(TestCase):
         token = "synthetic-account-at"
         binding = {"account_id": 42, "environment_id": "test-environment", "generation": 3}
         reservation = {**binding, "reservation_id": "test-round", "deadline_unix_ms": 55}
+        quota = {"anthropic-ratelimit-unified-5h-utilization": "1",
+                 "anthropic-ratelimit-unified-5h-reset": "2030-01-01T12:00:00Z",
+                 "anthropic-ratelimit-unified-5h-status": "rejected"}
 
         class Sender(BaseHTTPRequestHandler):
             """接收本次模型请求的私有 sender。"""
@@ -75,10 +78,22 @@ class ManagedOAuthTests(TestCase):
                 raw = self.rfile.read(int(self.headers["Content-Length"]))
                 calls.append((self.path, self.headers["Authorization"], raw,
                               json.loads(b64decode(self.headers["x-v3-request"]))))
-                self.send_response(200)
-                self.send_header("Content-Type", "text/event-stream")
+                if len(calls) == 1:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/event-stream")
+                    self.end_headers()
+                    self.wfile.write(b"data: isolated\n\n")
+                    return
+                self.send_response(429)
+                self.send_header("Retry-After", "42")
+                for name, value in quota.items():
+                    self.send_header(name, value)
+                self.send_header("anthropic-ratelimit-unified-7d-utilization", "0.4")
+                self.send_header("anthropic-ratelimit-unified-7d-utilization", "0.6")
+                self.send_header("anthropic-ratelimit-unified-overage-status", "rejected")
+                if len(calls) == 3:
+                    self.send_header("x-v3-transport-error", "submitted")
                 self.end_headers()
-                self.wfile.write(b"data: isolated\n\n")
 
         capture = []
         with TemporaryDirectory() as root, ThreadingHTTPServer(("127.0.0.1", 0), Sender) as server:
@@ -104,11 +119,22 @@ class ManagedOAuthTests(TestCase):
                         body, account_token=token, reservation={**reservation, "account_id": 43}, headers={},
                     ):
                         self.fail("错绑请求不能到达 sender")
+                    for transport_error in (False, True):
+                        with self.assertRaises(launch.ModelResponseError) as caught, launch.managed_model_response(
+                            body, account_token=token, headers={},
+                            reservation={**reservation, "reservation_id": f"quota-{transport_error}"},
+                        ):
+                            self.fail("429 不应启动事件流")
+                        error = caught.exception
+                        self.assertEqual(error.status, 429)
+                        self.assertEqual(error.retry_after, None if transport_error else 42)
+                        self.assertEqual(error.quota_headers, None if transport_error else quota)
             finally:
                 server.shutdown()
                 thread.join()
 
-        (path, auth, actual, meta), = calls
+        self.assertEqual(len(calls), 3)
+        path, auth, actual, meta = calls[0]
         self.assertEqual((path, auth, actual), ("/internal/send", "Bearer private-sender-binding", body))
         self.assertEqual({key: meta[key] for key in binding}, binding)
         self.assertEqual(meta["request_id"], reservation["reservation_id"])

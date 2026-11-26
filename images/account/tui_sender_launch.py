@@ -24,7 +24,7 @@ from uuid import UUID
 from runtime_files import atomic_json, atomic_text, directory_fd, private_directory
 from tui_messages import (
     BODY_LIMIT, MODEL_PROTOCOL_HEADERS, MODEL_VERSION_HEADERS, OAUTH_FILE_LIMIT,
-    ModelResponseError, encode, valid_model_header_value,
+    ModelResponseError, encode, passive_quota_headers, valid_model_header_value,
 )
 from tui_workspace_launch import launch_workspace_cli
 
@@ -302,8 +302,11 @@ def managed_model_response(raw, *, account_token, reservation, headers, capture=
                 if response.getheader("x-v3-transport-error"):
                     raise ModelResponseError(response.status, b"")
                 retry = response.headers.get_all("Retry-After", []) if response.status == 429 else []
-                raise ModelResponseError(response.status, error if len(error) <= BODY_LIMIT else b"",
-                                         source="managed_oauth_http", retry_after=_retry_seconds(retry))
+                raise ModelResponseError(
+                    response.status, error if len(error) <= BODY_LIMIT else b"",
+                    source="managed_oauth_http", retry_after=_retry_seconds(retry),
+                    quota_headers=passive_quota_headers(response.headers) if response.status == 429 else None,
+                )
             if capture is not None:
                 # 采集只记录交给实际发送器的内容，并在这里移除真实账号授权。
                 capture.append(([(name, "[REDACTED]" if name == "authorization" else value)

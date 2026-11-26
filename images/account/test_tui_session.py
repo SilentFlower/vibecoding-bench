@@ -2,6 +2,7 @@
 
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from contextlib import closing
+from email.message import Message
 from hashlib import sha256
 from io import BytesIO
 import json
@@ -1730,6 +1731,48 @@ class SessionTests(unittest.TestCase):
                         actor._main_request({**wire, "messages": wrong}, h)
                     )
             self.assertFalse(actor._main_request({**wire, "model": "其他模型"}, h))
+
+    def test_managed_quota_headers_follow_reserved_response(self):
+        """实际事件发布前登记本轮上游额度。@return 无。"""
+        events = [
+            {"type": "message_start", "message": {}},
+            {"type": "message_delta", "delta": {"stop_reason": "end_turn"}},
+            {"type": "message_stop"},
+        ]
+        wire = b"".join(b"data: " + encode(event) + b"\n\n" for event in events)
+        quota = {"anthropic-ratelimit-unified-5h-utilization": "0.25",
+                 "anthropic-ratelimit-unified-5h-reset": "2030-01-01T12:00:00Z"}
+        response = BytesIO(wire)
+        response.status = 200
+        response.headers = Message()
+        response.headers["Content-Type"] = "text/event-stream"
+        for name, value in quota.items():
+            response.headers[name] = value
+        response.getheader = response.headers.get
+
+        with closing(self._driver()) as driver, ThreadPoolExecutor(1) as pool:
+            driver.managed_oauth = True
+            driver.launcher = Mock()
+            driver.launcher.managed_model_response.return_value = response
+            request = self._body()
+            with closing(driver.prepare(self._identity("quota"), encode(request))) as handle:
+                actor = handle.actor
+                with patch.object(actor, "start"):
+                    output = pool.submit(list, handle.send({"account_token": "synthetic"}))
+                    try:
+                        with actor.changed:
+                            self.assertTrue(actor.changed.wait_for(lambda: actor.step is not None, 2))
+                        turn = {"turn": "quota", "step": 0, "model": "chosen"}
+                        actor.callback("/begin", turn)
+                        marker = f"<system-reminder>\nprompt.submit hook additional context: {actor.guard_text}\n</system-reminder>"
+                        native = {**request, "messages": [{"role": "user", "content": [{"type": "text", "text": marker}]}]}
+                        actor.serve_model(Mock(headers={}), native)
+                        self.assertEqual(handle.quota_headers, quota)
+                        actor.callback("/end", {**turn, "reason": "end_turn"})
+                        actor.callback("/complete", {"turn": turn["turn"], "aborted": False})
+                        self.assertEqual(b"".join(output.result(2)), wire)
+                    finally:
+                        actor.abort()
 
     def test_http_model_error_keeps_status_and_messages_fields(self):
         """首帧前转交上游错误，保留状态和公开字段。@return 无。"""

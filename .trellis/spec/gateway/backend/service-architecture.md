@@ -669,6 +669,7 @@ let permit = slots.acquire_many_owned(slot_units).await?;
 ### 1. Scope / Trigger
 
 - Trigger：修改 `service::oauth::fetch_usage`、`GatewayService` 被动用量采集、`AccountService::refresh_usage`、`UsagePollerService`、`apps/web/src/api.ts`、`Accounts.vue` 中 usage 解析或展示时适用。
+- 修改受管 `tui_v2` 的真实模型响应、账号发送器回包和网关额度写入时按本场景核对。
 - 背景：Claude Code 新版 usage API 可能把模型专属周用量放在 `limits[]` 的 scoped 结构里，而不是顶层 `seven_day_<model>` 字段。
 
 ### 2. Signatures
@@ -679,6 +680,7 @@ let permit = slots.acquire_many_owned(slot_units).await?;
 - 后台服务：`UsagePollerService::new(account_svc, interval: Duration, enabled: bool)`；`run()` 在 disabled 时直接返回。v3 使用 `UsagePollerService::for_resets(account_svc)`，仅补充已结束周期的观测。
 - 被动解析：`gateway::extract_passive_usage(headers) -> Option<serde_json::Value>`
 - 被动写入：`AccountService::update_passive_usage(id, partial, UsageObservationKind).await -> Result<(), AppError>`
+- V2 的 Unix `send` 响应控制帧支持可选 `quota_headers` 字段。对象的键为小写官方响应头，值为单值 ASCII 字符串。账号发送器从该字段生成私有 HTTP 响应头。
 - 管理端接口：`POST /admin/accounts/:id/usage -> { status: "ok", usage }`
 - 前端类型：`UsageData` 包含 `five_hour`、`seven_day`、`seven_day_sonnet`、`seven_day_fable`、`limits`
 
@@ -693,6 +695,8 @@ let permit = slots.acquire_many_owned(slot_units).await?;
 - 后端归一化只能补稳定字段，不得删除 `limits`、`spend`、`extra_usage` 等原始字段，方便排查上游变化。
 - 前端展示应优先读取稳定字段；为了兼容旧缓存，也可从 `usage_data.limits` 回退提取 Fable。
 - Gateway 必须从 Anthropic unified 响应头被动解析 `5h`、`7d` 与 Fable 专属 `7d_oi`；`7d_oi` 归一化为稳定字段 `seven_day_fable`。窗口必须同时具备合法 `utilization` 与未来合理范围内的 `reset`，缺失或异常时不得覆盖已有数据。
+- 受管 V2 的原预留已通过凭据校验时，事件源在模型 HTTP 200 或真实上游 429 中采集额度。仅传递 `anthropic-ratelimit-unified-{window}-{field}` 的已知组合。窗口为 `5h`、`7d`、`7d_oi`，字段为 `utilization`、`reset`、`status`、`surpassed-threshold`。控制帧含换行至多 4096 字节。重复头和无法装入控制帧的字段跳过。
+- Gateway 在公开 Messages 投影前读取私有额度头，按原账号 ID 异步更新 `usage_data` 和 `usage_fetched_at`。真实 429 的来源标记为 `managed_oauth_http`，按各自窗口状态合并。账号列表沿用现有只读接口。公开响应沿原投影白名单交付。
 - 普通业务请求无论成功或 429 都不得调用 usage API。v3（`V3_RUNTIME_URL.trim()` 非空）后台每 15 秒扫描 active OAuth 账号，仅对普通 5h／7d 旧窗口已到期的账号调用既有 `refresh_usage`，独立于历史 `auto_poll_usage` 开关；从未获取或只有非法额度资料的账号不自动补查。非 v3 保留 active OAuth＋`auto_poll_usage=true` 的定时刷新；管理员手动接口继续可用。
 - 重置刷新串行发送，账号间隔 500ms，同账号尝试至少间隔 5 分钟，成功但仍返回旧窗口时也遵守此间隔。发送前重新读取账号状态与窗口，沿用更新维护和凭据归属门禁；被动或手动观测已推进周期后跳过刷新。重试记录仅在进程内保存，删除账号后清理。
 - 成功响应、PrimePoller 成功和显式 usage 查询使用 `UsageObservationKind::Allowed`；429 使用按窗口构造的 `RejectedWindows`。窗口 `status=rejected` 时视为拒绝，`status=allowed` 时明确视为允许；缺少明确状态时才用 `surpassed-threshold=true/正数` 或 `utilization >= 1.0` 兜底。旧 reset 已到期、新 reset 已推进，且窗口本身未被拒绝时，若旧值和新值仍处于 97% 以上高位，必须保存新 reset 并把首次新周期 utilization 归零；只有真实拒绝窗口保留高位值。
@@ -708,6 +712,8 @@ let permit = slots.acquire_many_owned(slot_units).await?;
 | Fable scoped 项 `resets_at: null` | 窗口保留 `resets_at: null`，前端显示 `—` |
 | 顶层已有 `seven_day_fable` 对象 | 保留顶层对象，不用 `limits` 覆盖 |
 | 成功响应携带完整 `7d_oi` | 被动写入 `seven_day_fable`，不调用 usage API |
+| 受管 V2 成功响应携带完整窗口 | 流式、JSON 和原工具续轮均按实际执行账号写入窗口 |
+| V2 私有额度字段缺失、旧版发送器、本地开发提供方或本地合成拒绝 | 保留账号额度，沿对应来源的原响应传输 |
 | 429 携带完整 `7d_oi` 且该窗口 `status=rejected` | 按拒绝样本持久化；Fable 耗尽只影响 Fable 模型族 |
 | 5h 触发 429，7d/Fable 窗口为 `status=allowed` 且携带跨周期高位值 | 仅 5h 参与限流；7d/Fable 保存新 reset 并将首次 utilization 归零 |
 | 旧 99%/100% reset 已到期，成功样本给出新 reset 但仍是高位 | 新 reset 保留，首次 utilization 写 0 |
@@ -723,6 +729,8 @@ let permit = slots.acquire_many_owned(slot_units).await?;
 
 - Good：usage 先返回 session/weekly all 两个 `scope: null` limit，后返回 Fable scoped limit；解析器跳过前两项并补出 `seven_day_fable`。
 - Good：Fable 成功响应带 `7d_oi utilization/reset`，Gateway 收到响应头后异步写入 `seven_day_fable`，整个请求生命周期不访问 usage API。
+- 受管 V2 首轮可以通过 `"quota_headers":{"anthropic-ratelimit-unified-5h-utilization":"0.25","anthropic-ratelimit-unified-5h-reset":"<未来窗口时间>"}` 交付 25% 的 5h 样本。后续只有 5h 样本时，周窗口保留上次有效观察。
+- 错误用法是用响应正文里的 Token 数推算订阅百分比。正确做法是读取同一模型响应的官方窗口，待账号列表读回真实快照。
 - Good：旧 7d 为 99% 且 reset 已过期，下一次成功响应把 reset 推到下周但仍回 99%；合并层保存新 reset 并返回 0%，后续同 reset 的真实样本可继续更新。
 - Base：非 v3 沿用账号开关轮询；v3 只在普通旧窗口结束后补查，手动查询可用。
 - Good：5h 旧窗口到期，后台刷新取得 `utilization: 0, resets_at: null` 后停止补查；调度按真实零用量计算。错误做法是让未知资料触发每轮查询；正确处理是仅刷新 `reset_pending`，失败后等待重试间隔。
@@ -737,6 +745,7 @@ let permit = slots.acquire_many_owned(slot_units).await?;
 - `service::gateway` 单测覆盖：5h/7d/7d_oi 完整解析、秒/毫秒 reset、缺失字段、非法数值和异常时间。
 - `service::account` 单测覆盖：Allowed rollover 高位清零、已下降值采用、同周期后续更新、RejectedWindows 仅保留明确拒绝窗口高位及未观察字段不丢失。
 - `service::gateway` 单测覆盖：429 按窗口 `status` 判定拒绝，显式 `allowed` 优先于高位 utilization，缺少 status 时兼容数值型 `surpassed-threshold`。
+- V2 源端测试核对实际模型头、200 的两种投影、429 来源和控制帧大小。Rust 发送器测试核对同账号预留、头名白名单以及本地错误无法写入额度。隔离回环从公开 Messages 到 `GET /admin/accounts` 验证流式、工具续轮、缺项保留、按窗口判定 429 和单次模型提交。
 - `UsagePollerService` 使用真实 SQLite 账号与本地 TCP 代理，验证 disabled 零连接、enabled 保留轮询；账号 auto_poll_usage 不被改写。
 - `reset_refresh_targets_expired_windows_and_throttles_retries`：仅到期的活动 OAuth 账号产生连接，覆盖开关关闭、未知资料、有效窗口、零用量无 reset、停用与非 OAuth、失败冷却和新观测后停止。
 - 静态搜索必须确认 `refresh_usage` 只由 usage poller 和管理端手动接口等显式入口调用，不存在 Gateway 请求后刷新链路。
