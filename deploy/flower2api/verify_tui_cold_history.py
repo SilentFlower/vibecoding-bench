@@ -3,8 +3,9 @@
 import argparse
 from base64 import b64encode
 from contextlib import ExitStack, closing
+from datetime import datetime, timezone
 from hashlib import sha256
-from http.client import HTTPConnection
+from http.client import HTTPConnection, HTTPException
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
@@ -18,11 +19,11 @@ from sqlite3 import connect
 import ssl
 from struct import pack
 from subprocess import PIPE, Popen, run
-from sys import executable
+from sys import executable, stderr
 from tempfile import TemporaryDirectory
 from threading import Event
-from time import sleep, time_ns
-from urllib.parse import parse_qs, urlsplit
+from time import monotonic, sleep, time_ns
+from urllib.parse import parse_qs, urlencode, urlsplit
 from uuid import uuid4
 from zlib import compress, crc32
 
@@ -471,8 +472,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             body["tool_choice"] = {"type": "auto", "disable_parallel_tool_use": False}
         if recover_pending:
             body["output_config"] = {"effort": "medium"}
-        status, raw = call(18090, "POST", "/v1/messages", token, body, headers)
-        assert status == 200, (status, raw)
+        _, raw, initial_request_id = checked_messages(manage, token, body, headers, received, "initial")
         events = [json.loads(line[5:]) for line in raw.splitlines() if line.startswith(b"data:")]
         assert events[-1]["type"] == "message_stop", events
         offered = []
@@ -584,7 +584,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                                  received, finish_stream, callbacks)
             verify_model(received[:2], policy="append", old_content=old_result, current_text_blocks=current_text_blocks)
             return proof
-        status, raw = call(18090, "POST", "/v1/messages", token, follow, headers)
+        expected_status = 422 if signed_tool_history and recover_pending else 200
+        status, raw, continuation_request_id = checked_messages(
+            manage, token, follow, headers, received, "recovered_receipt" if recover_pending else "receipt",
+            expected_status=expected_status,
+        )
         if signed_tool_history and recover_pending:
             # 固定 CLI 在本轮冷恢复的继续提示之后会裁掉签名。准备拒绝必须先于第二次模型投递。
             assert status == 422 and len(received) == 1, (status, raw, len(received))
@@ -592,10 +596,6 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             (first_attempt,) = verify_captures(manage, received, account_token)
             return {"cold_recovery_status": status, "changed_signature_status": changed_signature,
                     "model_posts": len(received), "original_history_preserved": True, "attempt": first_attempt}
-        if status != 200:
-            trace = [{key: row.get(key) for key in ("status_code", "outcome", "error_stage", "attempt_count")}
-                     for row in manage("GET", "request-diagnostics")["items"]]
-            raise AssertionError((status, raw, len(received), trace))
         final = json.loads(raw)
         assert final["content"] == [{"type": "text", "text": FINAL}]
         duplicate, _ = call(18090, "POST", "/v1/messages", token, follow, headers)
@@ -636,10 +636,12 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                     "new_attempt": new_attempt}
         verify_model(received, policy=tool_policy or "append", old_content=old_result, current_text_blocks=current_text_blocks)
         captures = verify_captures(manage, received, account_token)
-        for attempt, request_body, reply_id, model_id in zip(
-            captures, (body, follow), (events[0]["message"]["id"], final["id"]),
+        for attempt, request_id, request_body, reply_id, model_id in zip(
+            captures, (initial_request_id, continuation_request_id),
+            (body, follow), (events[0]["message"]["id"], final["id"]),
             ("msg_cold_tool", "msg_cold_reply"), strict=True,
         ):
+            assert attempt["request_id"] == request_id
             assert attempt["ingress_body_sha256"] == sha256(encoded(request_body)).hexdigest()
             assert attempt["cli_and_https_body_sha256"] != attempt["ingress_body_sha256"]
             attempt.update(client_message_id=reply_id, model_message_id=model_id)
@@ -705,11 +707,13 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             restored_id = json.loads(native_recovery["metadata"]["user_id"])["session_id"]
             assert restored_id != original_id and (original_file.parent / (restored_id + ".jsonl")).is_file()
             restored_text = [(row["role"], block.get("text")) for row in native_recovery["messages"] for block in blocks(row)]
-            assert restored_text.count(("user", "Continue from where you left off.")) == 1
+            continue_prompt_count = restored_text.count(("user", "Continue from where you left off."))
+            assert continue_prompt_count == 1
             proof["recovered_pending_tool"] = {"changed_system_http": changed_policy, "frozen_policy": "append",
                                               "changed_effort_http": changed_effort, "frozen_effort": "medium",
                                               "old_session_id": original_id, "recovered_session_id": restored_id,
-                                              "original_history_preserved": True}
+                                              "original_history_preserved": True,
+                                              "continue_prompt_count": continue_prompt_count}
         if current_images and not recover_pending and not restart_history:
             proof["image_only"] = verify_image_only_requests(
                 manage, token, account_token, headers, received,
@@ -786,6 +790,98 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                 "additional_model_posts": 2,
                                 "attempts": verify_captures(manage, received[-2:], account_token)}
         return proof
+
+
+def checked_messages(manage, token, body, headers, received, phase, *, expected_status=200):
+    """在断言前保留本轮公开响应与诊断归属。
+    @param manage 管理入口。@param token 合成凭据。@param body 公开输入。@param headers 原入口头。
+    @param received 隔离模型收件。@param phase 夹具阶段。@param expected_status 预期 HTTP 状态。
+    @return 实际状态、响应字节和公开请求 ID。
+    """
+    started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+    started = monotonic()
+    before = len(received)
+    evidence = {"event": "messages_failure", "phase": phase, "started_at": started_at,
+                "http_status": None, "request_id": None, "expected_status": expected_status}
+
+    def observe(response):
+        evidence.update(http_status=response.status, request_id=response.getheader("x-cc2api-request-id"))
+
+    def report(**details):
+        event = {**evidence, **details, "elapsed_ms": round((monotonic() - started) * 1000),
+                 "model_posts_before": before, "model_body_sha256": [sha for sha, _, _ in received[before:]]}
+        event["model_posts_during"] = len(event["model_body_sha256"])
+        # 先留下原始观测。诊断读回失败时仍能保留同一请求的 HTTP 和模型收件情况。
+        print(json.dumps(event, ensure_ascii=False), file=stderr, flush=True)
+        report_request_diagnostics(manage, phase, evidence["request_id"], headers["x-session-id"], started_at)
+
+    try:
+        status, raw = call(18090, "POST", "/v1/messages", token, body, headers, observe_headers=observe)
+    except (HTTPException, OSError) as error:
+        report(transport_error=type(error).__name__,
+               transport_stage="response_body" if evidence["http_status"] is not None else "before_response_headers")
+        raise
+    if status != expected_status:
+        try:
+            payload = json.loads(raw)
+        except ValueError:
+            payload = None
+        error = payload.get("error") if isinstance(payload, dict) else None
+        if isinstance(error, dict):
+            error = {key: error[key] for key in ("type", "code", "message") if isinstance(error.get(key), str)}
+        report(response_error=error if isinstance(error, (dict, str)) else None,
+               response_sha256=sha256(raw).hexdigest(), response_bytes=len(raw))
+        raise AssertionError((phase, status, expected_status, evidence["request_id"]))
+    return status, raw, evidence["request_id"]
+
+
+def report_request_diagnostics(manage, phase, request_id, session_id, started_at):
+    """在网关退出前读回本请求诊断。@param manage 管理入口。@param phase 夹具阶段。
+    @param request_id 响应关联头，可为空。@param session_id 合成会话。@param started_at 本次 UTC 开始时间。
+    @return 无。
+    """
+    query = {"correlation_id": request_id} if request_id else {"since": started_at, "page_size": 100}
+    event = {"event": "messages_failure_diagnostics", "phase": phase, "request_id": request_id,
+             "correlation": "response_request_id" if request_id else "session_candidates", "requests": []}
+    latest = []
+
+    def observe():
+        nonlocal latest
+        rows = manage("GET", "request-diagnostics?" + urlencode(query))["items"]
+        latest = [row for row in rows if (
+            row["request_id"] == request_id if request_id else row.get("original_session_id") == session_id
+        )]
+        return latest if not request_id or all(row.get("finished_at") for row in latest) else None
+
+    def selected_context(row):
+        context = row.get("context") or {}
+        return {key: context[key] for key in (
+            "control_state", "control_error_code", "control_recovery", "observed_control_http_status",
+            "native_receive_ended", "native_source_terminal",
+            "tool_continuation_mode", "tool_continuation_path", "tool_continuation_reason",
+        ) if context.get(key) is not None}
+
+    try:
+        wait_for(observe)
+    except (AssertionError, HTTPException, OSError, ValueError, KeyError) as error:
+        event["lookup_error"] = type(error).__name__
+    for row in latest:
+        keys = ("request_id", "account_id", "started_at", "finished_at", "status_code",
+                "outcome", "error_stage", "attempt_count", "native_rejection")
+        item = {key: row.get(key) for key in keys}
+        try:
+            detail = manage("GET", "request-diagnostics/" + row["request_id"])
+            assert detail["request"]["request_id"] == row["request_id"]
+            item["diagnostic_context"] = selected_context(detail["request"])
+            fields = ("attempt_id", "request_id", "ordinal", "account_id", "execution_location",
+                      "status_code", "outcome", "error_stage", "error_type", "retry_reason")
+            assert all(attempt["request_id"] == row["request_id"] for attempt in detail["attempts"])
+            item["attempts"] = [{**{key: attempt.get(key) for key in fields},
+                                 "diagnostic_context": selected_context(attempt)} for attempt in detail["attempts"]]
+        except (AssertionError, HTTPException, OSError, ValueError, KeyError) as error:
+            item["lookup_error"] = type(error).__name__
+        event["requests"].append(item)
+    print(json.dumps(event, ensure_ascii=False), file=stderr, flush=True)
 
 
 def verify_tool_stream_reconnect(manage, temporary, token, account_token, headers, follow,

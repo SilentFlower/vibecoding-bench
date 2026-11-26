@@ -66,9 +66,10 @@ def wait_for(operation):
     raise AssertionError('等待合成现场就绪超时')
 
 
-def call(port, method, path, secret, data=None, headers=None):
+def call(port, method, path, secret, data=None, headers=None, *, observe_headers=None):
     """请求隔离命名空间中的服务。@param port 本机端口。@param method 方法。@param path 路径。
-    @param secret 合成凭据。@param data 可选 JSON。@param headers 合成的额外头。@return 状态及响应字节。
+    @param secret 合成凭据。@param data 可选 JSON。@param headers 合成的额外头。
+    @param observe_headers 可选，在读取正文前记录响应状态及关联头。@return 状态及响应字节。
     """
     with closing(HTTPConnection('127.0.0.1', port, timeout=30)) as conn:
         conn.request(
@@ -83,6 +84,8 @@ def call(port, method, path, secret, data=None, headers=None):
             },
         )
         response = conn.getresponse()
+        if observe_headers is not None:
+            observe_headers(response)
         return response.status, response.read()
 
 
