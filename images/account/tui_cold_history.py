@@ -136,11 +136,11 @@ def tool_result_is_empty(block):
     return block.get("content", "") in ("", [])
 
 
-def tool_result_has_plain_text_blocks(block):
-    """识别非空纯文本数组。@param block 工具结果。@return 是否全部为非空纯文本块。"""
+def tool_result_has_text_blocks(block):
+    """识别可恢复的纯文本数组。@param block 工具结果。@return 是否为非空文本数组，允许内层缓存标记。"""
     content = block.get("content")
     return isinstance(content, list) and bool(content) and all(
-        isinstance(nested, dict) and _plain_text(nested) for nested in content
+        isinstance(nested, dict) and _history_text(nested) for nested in content
     )
 
 
@@ -522,9 +522,9 @@ class ColdHistory:
         return _matches_history_results(native, expected)
 
     def matches_history_tool_text_blocks(self, native):
-        """核对原有纯文本结果数组。@param native CLI 实际正文。@return 原结果角色、字段及分块是否保留。"""
+        """按调用 ID 核对文本及内层缓存标记。@param native CLI 实际正文。@return 原结果块是否保留。"""
         expected = [(row["role"], block) for row in self.history for block in _blocks(row)
-                    if block.get("type") == "tool_result" and tool_result_has_plain_text_blocks(block)]
+                    if block.get("type") == "tool_result" and tool_result_has_text_blocks(block)]
         return _matches_history_results(native, expected)
 
     def matches_history_cache_markers(self, native):
@@ -537,7 +537,7 @@ class ColdHistory:
         def positions(rows):
             return [(index, role, offset, inner, tool_id, block) for index, (role, content) in enumerate(rows)
                     for offset, inner, tool_id, block in _marked_blocks(content)
-                    # 新工具回传中的嵌套字段有自己的回执合同。这里只冻结已确认前缀内的嵌套断点。
+                    # 只核对计划已载入的前缀。仍在线交回的工具结果不属于该前缀。
                     if inner is None or (index < len(history) and offset < len(history[index][1]))]
 
         # 自动断点关闭后只允许已确认的历史标记。按消息和块位置匹配可区分重复文本。

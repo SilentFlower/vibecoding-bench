@@ -497,6 +497,32 @@ class ColdHistoryTests(TestCase):
         incoming.pop("is_error")
         self.assertFalse(resumed.matches_history_tool_text_blocks(modeled))
 
+    def test_resumed_tool_result_nested_cache_requires_original_tool_and_block_position(self):
+        """按原调用 ID 核对重复文本中的断点位置及 TTL。@return 无。"""
+        text = {"type": "text", "text": "重复段"}
+        marked = {**text, "cache_control": {"type": "ephemeral", "ttl": "5m"}}
+        tool_ids = ("toolu_new", "toolu_other")
+        results = [
+            {"type": "tool_result", "tool_use_id": tool_ids[0], "content": [marked, text], "is_error": False},
+            {"type": "tool_result", "tool_use_id": tool_ids[1], "content": [text, text], "is_error": True},
+        ]
+        messages = [*self.body["messages"],
+                    {"role": "assistant", "content": [
+                        {"type": "tool_use", "id": tool_id, "name": "LookupNote", "input": {}} for tool_id in tool_ids]},
+                    {"role": "user", "content": results}]
+        resumed = ColdHistory.from_request(self.body).resume_receipts(messages)
+        modeled = {"messages": deepcopy(resumed.history)}
+        self.assertTrue(resumed.matches_history_tool_text_blocks(modeled))
+        first, second = modeled["messages"][-1]["content"]
+        first["content"] = [text, marked]
+        self.assertFalse(resumed.matches_history_tool_text_blocks(modeled))
+        first["content"] = [{**marked, "cache_control": {"type": "ephemeral", "ttl": "1h"}}, text]
+        self.assertFalse(resumed.matches_history_tool_text_blocks(modeled))
+        first["content"] = [text, text]
+        self.assertFalse(resumed.matches_history_tool_text_blocks(modeled))
+        second["content"] = [marked, text]
+        self.assertFalse(resumed.matches_history_tool_text_blocks(modeled))
+
     def test_completed_empty_results_keep_content_shape_when_resumed(self):
         """核对空结果的三种入站形状、旧归属及回执冻结。@return 无。"""
         for fields in ({}, {"content": []}, {"content": ""}, {"is_error": True}):

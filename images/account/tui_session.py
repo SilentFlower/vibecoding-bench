@@ -29,8 +29,7 @@ from uuid import UUID, uuid4
 from runtime_files import atomic_text
 from tui_capacity import TuiCapacity, TuiCapacityError
 from tui_cold_history import (
-    ColdHistory, MCP_SERVER, SIGNED_THINKING_TYPES, tool_result_has_images, tool_result_has_plain_text_blocks,
-    tool_result_is_empty,
+    ColdHistory, MCP_SERVER, SIGNED_THINKING_TYPES, tool_result_has_images, tool_result_has_text_blocks, tool_result_is_empty,
 )
 from tui_reconnect import ReceiptCheckpoints, digest
 from tui_input_policy import CONTEXT_BETA, InputRejection, native_input
@@ -430,6 +429,7 @@ class _Actor:
                         }
                     }
                     plan = self.cold_history
+                    launch_plan = self.recovery_history or plan
                     if plan is not None and (plan.thinking or {}).get("display") == "summarized":
                         classic["showThinkingSummaries"] = True
                     opts = [
@@ -472,7 +472,6 @@ class _Actor:
                                 },
                             }}}))
                             opts.extend(["--mcp-config", str(mcp)])
-                        launch_plan = self.recovery_history or plan
                         launch_options["prepare_history"] = launch_plan.import_session
                         if self.recovery_history is None:
                             launch_options["prepare_history"] = partial(
@@ -501,7 +500,7 @@ class _Actor:
                     )
                     if self.settings.get("thinking", {}).get("type") == "disabled":
                         env["MAX_THINKING_TOKENS"] = "0"
-                    if self.cold_history is not None and self.cold_history.has_history_cache_markers():
+                    if launch_plan is not None and launch_plan.has_history_cache_markers():
                         # CLI 的自动断点会与客户前缀同时出现，还可能改变 TTL 顺序。
                         env["DISABLE_PROMPT_CACHING"] = "1"
                     self.process = self.driver.launcher.launch_session(
@@ -964,10 +963,10 @@ class _Actor:
                     if not self.cold_history.matches_tool_choice(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
                             "code": "unsupported_parameter", "message": "CLI 未保留请求的工具选择"}}))
-                    if not self.cold_history.matches_history_cache_markers(native):
+                    output_history = self.recovery_history or self.cold_history
+                    if not output_history.matches_history_cache_markers(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
                             "code": "unsupported_parameter", "message": "CLI 未保留历史缓存标记"}}))
-                    output_history = self.recovery_history or self.cold_history
                     if not output_history.matches_history_tool_images(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
                             "code": "unsupported_parameter", "message": "CLI 未保留历史工具结果中的图文"}}))
@@ -1704,7 +1703,7 @@ class SessionDriver:
                                                 for answer in answers.values())
                         # 纯文本数组仅在整轮可恢复时转入磁盘，保留扩展字段或缺少签名来源时的在线续轮。
                         if requires_recovery or (
-                            any(tool_result_has_plain_text_blocks(answer) for answer in answers.values())
+                            any(tool_result_has_text_blocks(answer) for answer in answers.values())
                             and plan.resume_receipts(messages, signed_tool_models=actor.signed_tool_models) is not None
                         ):
                             checkpoint = self.checkpoints.find(actor_key)
