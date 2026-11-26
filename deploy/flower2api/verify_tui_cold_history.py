@@ -4,7 +4,7 @@ import argparse
 from base64 import b64encode
 from contextlib import ExitStack, closing, suppress
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from faulthandler import dump_traceback
 from fcntl import LOCK_EX, flock
 from hashlib import sha256
@@ -1613,9 +1613,10 @@ def checked_messages(manage, token, body, headers, received, phase, *, expected_
                           request_id=evidence["request_id"], http_status=response.status,
                           model_posts_during=len(received) - before)
 
-    def report(**details):
+    def report(failed_at, **details):
         failed_ns = monotonic_ns() if trace_startup else None
-        event = {**evidence, **details, "elapsed_ms": round((monotonic() - started) * 1000),
+        event = {**evidence, **details, "failed_at": failed_at.isoformat(timespec="milliseconds"),
+                 "elapsed_ms": round((monotonic() - started) * 1000),
                  "session_id": session_id, "request_body_sha256": sha256(encoded(body)).hexdigest(),
                  "model_posts_before": before, "model_body_sha256": [sha for sha, _, _ in received[before:]]}
         if failed_ns is not None:
@@ -1627,7 +1628,7 @@ def checked_messages(manage, token, body, headers, received, phase, *, expected_
             startup_event("fixture_threads_after_failure")
             with suppress(OSError, RuntimeError):
                 dump_traceback(file=stderr)
-        report_request_diagnostics(manage, phase, evidence["request_id"], session_id, started_at)
+        report_request_diagnostics(manage, phase, evidence["request_id"], session_id, started_at, failed_at=failed_at)
         if trace_startup and sender_status is not None:
             try:
                 state = sender_status()
@@ -1643,10 +1644,11 @@ def checked_messages(manage, token, body, headers, received, phase, *, expected_
     try:
         status, raw = call(18090, "POST", "/v1/messages", token, body, headers, observe_headers=observe)
     except (HTTPException, OSError) as error:
-        report(transport_error=type(error).__name__,
+        report(datetime.now(timezone.utc), transport_error=type(error).__name__,
                transport_stage="response_body" if evidence["http_status"] is not None else "before_response_headers")
         raise
     if expected_status is not None and status != expected_status:
+        failed_at = datetime.now(timezone.utc)
         try:
             payload = json.loads(raw)
         except ValueError:
@@ -1654,20 +1656,28 @@ def checked_messages(manage, token, body, headers, received, phase, *, expected_
         error = payload.get("error") if isinstance(payload, dict) else None
         if isinstance(error, dict):
             error = {key: error[key] for key in ("type", "code", "message") if isinstance(error.get(key), str)}
-        report(response_error=error if isinstance(error, (dict, str)) else None,
+        report(failed_at, response_error=error if isinstance(error, (dict, str)) else None,
                response_sha256=sha256(raw).hexdigest(), response_bytes=len(raw))
         raise AssertionError((phase, status, expected_status, evidence["request_id"]))
     return status, raw, evidence["request_id"]
 
 
-def report_request_diagnostics(manage, phase, request_id, session_id, started_at):
+def report_request_diagnostics(manage, phase, request_id, session_id, started_at, *, failed_at=None):
     """在网关退出前读回本请求诊断。@param manage 管理入口。@param phase 夹具阶段。
     @param request_id 响应关联头，可为空。@param session_id 合成会话。@param started_at 本次 UTC 开始时间。
-    @return 诊断事件。
+    @param failed_at 无关联头时须传入原请求失败当刻的 UTC 时间。@return 诊断事件。
     """
-    query = {"correlation_id": request_id} if request_id else {"since": started_at, "page_size": 100}
     event = {"event": "messages_failure_diagnostics", "phase": phase, "request_id": request_id,
              "correlation": "response_request_id" if request_id else "session_candidates", "requests": []}
+    if request_id:
+        query = {"correlation_id": request_id}
+    else:
+        if failed_at is None:
+            raise ValueError("会话候选查询须提供原失败时间")
+        # 存储按毫秒记录起点。排他上界取下一毫秒，保留失败所在毫秒内的候选。
+        until = (failed_at + timedelta(milliseconds=1)).isoformat(timespec="milliseconds")
+        event.update(since=started_at, until=until)
+        query = {"since": started_at, "until": until, "page_size": 100}
     latest = []
 
     def observe():
