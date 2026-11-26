@@ -34,6 +34,7 @@ HISTORY = [
 ]
 QUESTION = "NOW：查询新便签并回答。"
 AFTER_RESTART = "RESTART：从已确认的旧问答开启另一轮。"
+DROP_REPLY = "FAILURE：模型收到正文后关闭响应连接。"
 SYSTEM = ["RULE1：你是便签助手。", "RULE2：请只使用已声明的工具。"]
 PAST_ID = "toolu_past_fixture"
 NEW_ID = "toolu_cold_fixture"
@@ -95,7 +96,7 @@ def build_cutover_record(temporary, old, deployment, release):
 
 def verify(gateway, sender, temporary, *, restart_history=False, text_input=False, system_policy=False,
            toggle_pending_policy=False, tool_policy=None, recover_pending=False, output_effort=False,
-           history_png=False, history_tool_blocks=False, previous=None):
+           history_png=False, history_tool_blocks=False, previous=None, failure_boundaries=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -107,6 +108,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param history_png 是否核对用户历史里的内嵌 PNG。
     @param history_tool_blocks 是否核对已完成工具结果的原始文本块。
     @param previous 可选，旧发行源码、网关、发送器三个离线制品。
+    @param failure_boundaries 是否分别在模型收件前后切断隔离连接。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -126,6 +128,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     copy2(temporary / "ca.der", config.with_name("verification-ca.der"))
     received, callbacks, proxy_targets = [], [], []
     lookups = []
+    deny_proxy = False
+    denied_tunnels = []
 
     class Receiver(QuietHandler):
         """以生产主机名的临时证书接收原生请求，返回固定工具或文本。"""
@@ -141,6 +145,10 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             raw = self.rfile.read(int(self.headers["Content-Length"]))
             body = json.loads(raw)
             received.append((sha256(raw).hexdigest(), body, self.connection.version()))
+            if failure_boundaries and any(block.get("text") == DROP_REPLY
+                                          for row in body["messages"] for block in blocks(row)):
+                self.close_connection = True
+                return
             tool = next((t for t in body.get("tools", []) if t.get("description") == TOOL["description"]), None)
             results = find_blocks(body, "tool_use_id", NEW_ID)
             restart = any(b.get("text") == AFTER_RESTART for row in body["messages"] for b in blocks(row))
@@ -162,6 +170,10 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             """保持代理与模型的 TLS 边界。@return 无。"""
             if self.path != "api.anthropic.com:443":
                 self.send_error(403)
+                return
+            if deny_proxy:
+                denied_tunnels.append(self.path)
+                self.send_error(502)
                 return
             with create_connection(("127.0.0.1", receiver.server_port), timeout=10) as target:
                 _relay(self, target, proxy_targets.append)
@@ -268,6 +280,29 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                           for name in ("cold-history-owner", "cold-history-foreign"))
         headers = {"x-session-id": str(uuid4()), "User-Agent": "flower2api-cold-history-fixture/1"}
         messages = [{"role": role, "content": text} for role, text in HISTORY]
+        if failure_boundaries:
+            def post(question):
+                request = {"model": MODEL, "max_tokens": 128, "stream": False,
+                           "messages": [{"role": "user", "content": question}]}
+                return call(18090, "POST", "/v1/messages", token, request,
+                            {**headers, "x-session-id": str(uuid4())})
+
+            deny_proxy = True
+            before, before_body = post(AFTER_RESTART)
+            assert before == 502 and not received, (before, before_body, len(received))
+            assert denied_tunnels == ["api.anthropic.com:443"], denied_tunnels
+            deny_proxy = False
+            after, after_body = post(DROP_REPLY)
+            assert after == 502 and len(received) == 1, (after, after_body, len(received))
+            status, answer = post(AFTER_RESTART)
+            assert status == 200 and len(received) == 2, (status, answer, len(received))
+            assert json.loads(answer)["content"] == [{"type": "text", "text": FINAL}]
+            (failed, success) = verify_captures(manage, received, account_token)
+            for attempt in (failed, success):
+                assert attempt["cli_and_https_body_sha256"] != attempt["ingress_body_sha256"]
+            return {"before_send": before, "before_model_posts": 0, "after_send": after,
+                    "after_model_posts": 1, "next_request": status, "next_model_posts": 1,
+                    "attempts": [failed, success]}
         if text_input:
             return verify_text_inputs(manage, token, account_token, headers, messages, received)
         if output_effort:
@@ -769,6 +804,7 @@ def main():
     scenario.add_argument("--history-tool-blocks", action="store_true")
     scenario.add_argument("--mixed-release", nargs=3, type=Path,
                           metavar=("OLD_SOURCE", "OLD_GATEWAY", "OLD_SENDER"))
+    scenario.add_argument("--failure-boundaries", action="store_true")
     args = parser.parse_args()
     if (not Path("/.dockerenv").exists() or {name for _, name in if_nameindex()} != {"lo"}
             or Path("/run/v3/sender.json").exists() or any(Path("/native").glob("*"))):
@@ -780,7 +816,8 @@ def main():
                        system_policy=args.system_policy, toggle_pending_policy=args.toggle_pending_policy,
                        tool_policy=args.tool_policy, recover_pending=args.recover_pending_tool,
                        output_effort=args.output_effort, history_png=args.history_png,
-                       history_tool_blocks=args.history_tool_blocks, previous=args.mixed_release)
+                       history_tool_blocks=args.history_tool_blocks, previous=args.mixed_release,
+                       failure_boundaries=args.failure_boundaries)
         print(json.dumps(proof, ensure_ascii=False))
 
 

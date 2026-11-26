@@ -163,6 +163,7 @@ src/tlsfp/
 - `deploy/flower2api/verify_tui_guard.py` 用原生和 ABI 2 兼容路径验证串联回环、直接连接失败、地址/端口错配和文件隔离。
 - 隔离的固定官方 CLI、真实 Gateway 和两个 Sender 用例覆盖临期、过期、后台慢换票、重启、混跑、旧 Gateway 回切和原进程两次续轮。分段记录首回包、真实刷新、文件写入和模型发送计数。
 - `deploy/flower2api/verify_tui_cold_history.py --mixed-release` 用两个版本的真实网关、发送器和事件源验收。隔离编排夹具持续暴露受信旧本机绑定；公开入口核对新轮拒绝、旧轮回执的归属和单次收口，并在新代次核对原生正文及定向采集。
+- `deploy/flower2api/verify_tui_cold_history.py --failure-boundaries` 在真实 V2 新轮的账号代理握手和隔离模型收件后分别断开连接。核对模型投递次数分别为零和一。后续独立新轮成功一次，采集正文对应真实 CLI。
 - SQLite 与 PostgreSQL 迁移测试覆盖历史记录、同一 RT 重复发送保护和同 RT 刷新成功后的状态清理。
 
 ## Scenario: 原生持续预热、实时就绪与请求进程诊断
