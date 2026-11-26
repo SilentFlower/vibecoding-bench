@@ -34,7 +34,11 @@ def main():
             """观察准备过程。@param reservation 已核验预留。@param raw 原正文。@param cancel_event 取消探针。@return 原预留票据。"""
             ident = reservation["reservation_id"]
             startup_event("source_prepare", reservation_id=ident)
-            handle = super().prepare(reservation, raw, cancel_event=cancel_event)
+            try:
+                handle = super().prepare(reservation, raw, cancel_event=cancel_event)
+            except Exception as error:
+                startup_event("source_prepare_rejected", reservation_id=ident, error_type=type(error).__name__)
+                raise
             startup_event("source_prepared", reservation_id=ident)
             return handle
 

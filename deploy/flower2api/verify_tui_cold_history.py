@@ -261,9 +261,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 startup_event("model_http_headers", peer_port=self.client_address[1])
             raw = self.rfile.read(int(self.headers["Content-Length"]))
             body = json.loads(raw)
-            received.append((sha256(raw).hexdigest(), body, self.connection.version()))
+            model_digest = sha256(raw).hexdigest()
+            received.append((model_digest, body, self.connection.version()))
             if trace_startup:
-                startup_event("model_received", peer_port=self.client_address[1], model_posts=len(received))
+                startup_event("model_received", peer_port=self.client_address[1], model_posts=len(received),
+                              model_body_sha256=model_digest)
             if v1_runtime is not None or message_system_roles:
                 v1_betas.append(self.headers.get("anthropic-beta", ""))
             if failure_boundaries and any(block.get("text") == DROP_REPLY
@@ -412,18 +414,37 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         def sender_state():
             return json.loads(call(8091, "GET", "/internal/status", secret)[1]).get("tui_v2", {})
 
-        def restart(process):
+        def sender_state_after_failure():
+            # 首先保留公开故障。这次额外读取有独立预算，不能把夹具失败再挂住 30 秒。
+            with closing(HTTPConnection("127.0.0.1", 8091, timeout=1)) as connection:
+                connection.request("GET", "/internal/status", headers={"Authorization": "Bearer " + secret})
+                response = connection.getresponse()
+                if response.status != 200:
+                    raise ValueError("无法读取隔离发送器状态")
+                return json.loads(response.read()).get("tui_v2", {})
+
+        def ready_sender(process, phase, *, require_idle=False):
+            def observe():
+                state = sender_state()
+                return state if state.get("ready") and (not require_idle or state.get("idle")) else None
+
+            state = wait_for(observe)
+            if trace_startup:
+                startup_event("sender_ready", phase=phase, sender_pid=process.pid,
+                              ready=state["ready"], idle=state.get("idle"))
+
+        def restart(process, phase):
             wait_for(lambda: sender_state().get("idle"))
             stop(process)
             restarted = start_sender()
             try:
-                wait_for(lambda: sender_state().get("ready") and sender_state().get("idle"))
+                ready_sender(restarted, phase, require_idle=True)
             except AssertionError as error:
                 raise AssertionError(("账号发送器重启后未就绪", restarted.poll(), sender_state())) from error
             return restarted
 
         if v1_runtime is None:
-            wait_for(lambda: sender_state().get("ready"))
+            ready_sender(source, "initial")
         else:
             def native_ready():
                 status, raw = call(8091, "GET", "/internal/native/status", secret)
@@ -564,6 +585,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 startup_event("idle_model_tcp_connected", peer_port=idle.getsockname()[1])
             initial_status, raw, initial_request_id = checked_messages(
                 manage, token, body, headers, received, "initial", trace_startup=trace_startup,
+                sender_status=sender_state_after_failure,
             )
             if initial_idle_model_connection:
                 assert len(received) == 1
@@ -643,7 +665,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             original, = [int(path.parent.name) for path in Path("/proc").glob("[0-9]*/cmdline")
                          if fixture_command_has(path, marker)]
             os.kill(original, SIGKILL)
-            source = restart(source)
+            source = restart(source, "recovered_receipt")
             assert not Path(f"/proc/{original}").exists()
             (binding_file,) = Path("/native/tui-workspaces").glob("*.json")
             original_id = json.loads(binding_file.read_text())["native_session_id"]
@@ -654,11 +676,13 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             modified_system = {**follow, "system": "更改已经冻结的指令"}
             changed_policy, response, _ = checked_messages(
                 manage, token, modified_system, headers, received, "recovered_changed_system", expected_status=422,
+                trace_startup=trace_startup,
             )
             assert changed_policy == 422 and len(received) == 1, (changed_policy, response, len(received))
             modified_effort = {**follow, "output_config": {"effort": "low"}}
             changed_effort, response, _ = checked_messages(
                 manage, token, modified_effort, headers, received, "recovered_changed_effort", expected_status=422,
+                trace_startup=trace_startup,
             )
             assert changed_effort == 422 and len(received) == 1, (changed_effort, response, len(received))
         if current_text_blocks:
@@ -802,7 +826,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         expected_status = 422 if signed_tool_history and recover_pending else 200
         status, raw, continuation_request_id = checked_messages(
             manage, token, follow, headers, received, "recovered_receipt" if recover_pending else "receipt",
-            expected_status=expected_status,
+            expected_status=expected_status, trace_startup=trace_startup,
+            sender_status=sender_state_after_failure,
         )
         if signed_tool_history and recover_pending:
             # 固定 CLI 在本轮冷恢复的继续提示之后会裁掉签名。准备拒绝必须先于第二次模型投递。
@@ -993,7 +1018,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             staged_path = history_file.with_name(staged_id + ".jsonl")
             staged_bytes = staged_path.read_bytes()
             assert set(history_file.parent.glob("*.jsonl")) == {history_file, staged_path}
-            restarted = restart(source)
+            restarted = restart(source, "restart_history")
             expected_history = [("user", divergent), *HISTORY[1:]]
             history_texts = {text for _, text in expected_history}
             branch_ids = []
@@ -1056,23 +1081,28 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         return proof
 
 
-def checked_messages(manage, token, body, headers, received, phase, *, expected_status=200, trace_startup=False):
+def checked_messages(manage, token, body, headers, received, phase, *, expected_status=200, trace_startup=False,
+                     sender_status=None):
     """在断言前保留本轮公开响应与诊断归属。
     @param manage 管理入口。@param token 合成凭据。@param body 公开输入。@param headers 原入口头。
     @param received 隔离模型收件。@param phase 夹具阶段。@param expected_status 预期 HTTP 状态，空值保留实测状态。
-    @param trace_startup 是否记录首请求时间及失败后线程栈。
+    @param trace_startup 是否记录公开请求时间及失败后线程栈。
+    @param sender_status 可选，只在已保留失败和请求诊断后读取隔离发送器状态。
     @return 实际状态、响应字节和公开请求 ID。
     """
     started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
     started = monotonic()
     before = len(received)
+    session_id = headers["x-session-id"]
     evidence = {"event": "messages_failure", "phase": phase, "started_at": started_at,
                 "http_status": None, "request_id": None, "expected_status": expected_status}
 
     def observe(response):
         evidence.update(http_status=response.status, request_id=response.getheader("x-cc2api-request-id"))
         if trace_startup:
-            startup_event("public_response_headers", request_id=evidence["request_id"], http_status=response.status)
+            startup_event("public_response_headers", phase=phase, session_id=session_id,
+                          request_id=evidence["request_id"], http_status=response.status,
+                          model_posts_during=len(received) - before)
 
     def report(**details):
         failed_ns = monotonic_ns() if trace_startup else None
@@ -1087,10 +1117,19 @@ def checked_messages(manage, token, body, headers, received, phase, *, expected_
             startup_event("fixture_threads_after_failure")
             with suppress(OSError, RuntimeError):
                 dump_traceback(file=stderr)
-        report_request_diagnostics(manage, phase, evidence["request_id"], headers["x-session-id"], started_at)
+        report_request_diagnostics(manage, phase, evidence["request_id"], session_id, started_at)
+        if trace_startup and sender_status is not None:
+            try:
+                state = sender_status()
+            except (HTTPException, OSError, ValueError) as error:
+                startup_event("sender_status_after_failure", phase=phase, session_id=session_id,
+                              request_id=evidence["request_id"], lookup_error=type(error).__name__)
+            else:
+                startup_event("sender_status_after_failure", phase=phase, session_id=session_id,
+                              request_id=evidence["request_id"], ready=state.get("ready"), idle=state.get("idle"))
 
     if trace_startup:
-        startup_event("public_request_start")
+        startup_event("public_request_start", phase=phase, session_id=session_id, model_posts_before=before)
     try:
         status, raw = call(18090, "POST", "/v1/messages", token, body, headers, observe_headers=observe)
     except (HTTPException, OSError) as error:
@@ -2113,7 +2152,7 @@ def main():
     previous = args.mixed_release
     cache_markers = args.cache_markers or args.cache_marker_capabilities is not None
     trace_startup = (args.initial_idle_model_connection or args.trace_initial_startup or cache_markers
-                     or (args.message_system_roles and args.v1_runtime is None))
+                     or (bool(args.message_system_roles) and args.v1_runtime is None))
     if trace_startup and (previous or args.mixed_image_peers or args.v1_runtime):
         parser.error("启动观测需要当前 V2 源码夹具")
     if args.mixed_image_peers:
