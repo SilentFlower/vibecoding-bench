@@ -21,6 +21,7 @@ from urllib.parse import parse_qs, urlsplit
 from uuid import uuid4
 
 from fixtures.native_model_send.fixture_tunnel import _relay
+from verify_tui_concurrency import frame
 from verify_tui_final_tls import call, encoded, serve, stop, wait_for
 from verify_tui_http_handoff import MODEL, message_sse
 from native_capture import read_capture
@@ -39,6 +40,7 @@ DROP_REPLY = "FAILURE：模型收到正文后关闭响应连接。"
 SYSTEM = ["RULE1：你是便签助手。", "RULE2：请只使用已声明的工具。"]
 PAST_ID = "toolu_past_fixture"
 NEW_ID = "toolu_cold_fixture"
+SIGNED_THINKING = {"type": "thinking", "thinking": "隔离模型的合成思考段。", "signature": "c2lnbmF0dXJlLWZpeHR1cmU="}
 TOOL = {"name": "Lookup-Note", "description": "读取合成便签", "input_schema": {
     "type": "object", "required": ["key", "options"], "additionalProperties": False,
     "properties": {"key": {"type": "string"}, "options": {
@@ -100,10 +102,28 @@ def build_cutover_record(temporary, old, deployment, release):
     return gate
 
 
+def fixture_tool_sse(tool, *, with_signature):
+    """交付隔离模型工具流。@param tool 原生工具调用。@param with_signature 是否先交付合成签名块。@return SSE。"""
+    wire = message_sse(tool, "tool_use", "msg_cold_tool")
+    if not with_signature:
+        return wire
+    events = [json.loads(line[5:]) for line in wire.splitlines() if line.startswith(b"data:")]
+    for event in events:
+        if "index" in event:
+            event["index"] += 1
+    events[1:1] = [
+        {"type": "content_block_start", "index": 0, "content_block": {"type": "thinking", "thinking": ""}},
+        {"type": "content_block_delta", "index": 0, "delta": {"type": "thinking_delta", "thinking": SIGNED_THINKING["thinking"]}},
+        {"type": "content_block_delta", "index": 0, "delta": {"type": "signature_delta", "signature": SIGNED_THINKING["signature"]}},
+        {"type": "content_block_stop", "index": 0},
+    ]
+    return b"".join(map(frame, events))
+
+
 def verify(gateway, sender, temporary, *, restart_history=False, text_input=False, system_policy=False,
            toggle_pending_policy=False, tool_policy=None, recover_pending=False, output_effort=False,
            history_png=False, history_images=False, history_tool_blocks=False, previous=None, failure_boundaries=False,
-           current_text_blocks=False):
+           current_text_blocks=False, signed_tool_history=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -118,6 +138,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param previous 可选，旧发行源码、网关、发送器三个离线制品。
     @param failure_boundaries 是否分别在模型收件前后切断隔离连接。
     @param current_text_blocks 是否验证本轮文本块顺序及边界归属。
+    @param signed_tool_history 是否核对隔离模型原工具轮的签名块。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -163,7 +184,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             restart = any(b.get("text") == AFTER_RESTART for row in body["messages"] for b in blocks(row))
             if not results and tool and not restart:
                 content = {"type": "tool_use", "id": NEW_ID, "name": tool["name"], "input": ARGS}
-                wire = message_sse(content, "tool_use", "msg_cold_tool")
+                wire = fixture_tool_sse(content, with_signature=signed_tool_history)
             else:
                 wire = message_sse({"type": "text", "text": FINAL}, "end_turn", "msg_cold_reply")
             self.send_response(200)
@@ -358,12 +379,13 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         assert status == 200, (status, raw)
         events = [json.loads(line[5:]) for line in raw.splitlines() if line.startswith(b"data:")]
         assert events[-1]["type"] == "message_stop", events
-        (tool,) = [e["content_block"] for e in events if e["type"] == "content_block_start"]
+        (tool,) = [e["content_block"] for e in events if e["type"] == "content_block_start"
+                   and e["content_block"]["type"] == "tool_use"]
         assert tool.get("id") == NEW_ID and tool.get("name") == TOOL["name"], (
             tool, [[t["name"] for t in document.get("tools", [])] for _, document, _ in received],
         )
         tool["input"] = json.loads("".join(e["delta"]["partial_json"] for e in events
-                                          if e["type"] == "content_block_delta"))
+                                          if e["type"] == "content_block_delta" and e["delta"]["type"] == "input_json_delta"))
         assert tool["input"] == ARGS
         # 合成客户端只执行登记过的这一个调用。旧工具的 ID 不经过公开回执。
         callbacks.append(tool["id"])
@@ -384,12 +406,18 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             changed = manage("PUT", f"accounts/{identifier}", {"client_system_prompt_policy": "replace"})
             assert changed["client_system_prompt_policy"] == "replace"
         result = {"role": "user", "content": [{"type": "tool_result", "tool_use_id": NEW_ID, "content": REPLY}]}
-        follow = {**body, "stream": False, "messages": [*messages, {"role": "assistant", "content": [tool]}, result]}
+        offered = [tool]
+        if signed_tool_history:
+            deltas = [event["delta"] for event in events if event["type"] == "content_block_delta" and event["index"] == 0]
+            assert deltas == [{"type": "thinking_delta", "thinking": SIGNED_THINKING["thinking"]},
+                              {"type": "signature_delta", "signature": SIGNED_THINKING["signature"]}]
+            offered.insert(0, SIGNED_THINKING)
+        follow = {**body, "stream": False, "messages": [*messages, {"role": "assistant", "content": offered}, result]}
         wrong_subject, _ = call(18090, "POST", "/v1/messages", foreign, follow, headers)
         wrong_session, _ = call(18090, "POST", "/v1/messages", token, follow,
                                 {**headers, "x-session-id": str(uuid4())})
         changed = {**follow, "messages": [*messages, {"role": "assistant", "content": [
-            {**tool, "input": {**ARGS, "key": "another-note"}}]}, result]}
+            *offered[:-1], {**tool, "input": {**ARGS, "key": "another-note"}}]}, result]}
         wrong_arguments, rejection = call(18090, "POST", "/v1/messages", token, changed, headers)
         rejected = wrong_subject, wrong_session, wrong_arguments, len(received)
         assert rejected == (400, 400, 422, 1), (rejected, rejection)
@@ -422,7 +450,19 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             changed = {**follow, "messages": [*messages[:-1], merged, *follow["messages"][-2:]]}
             changed_blocks, response = call(18090, "POST", "/v1/messages", token, changed, headers)
             assert changed_blocks == 422 and len(received) == 1, (changed_blocks, response, len(received))
+        if signed_tool_history:
+            tampered = {**SIGNED_THINKING, "signature": "Y2hhbmdlZA=="}
+            changed = {**follow, "messages": [*messages, {"role": "assistant", "content": [tampered, tool]}, result]}
+            changed_signature, response = call(18090, "POST", "/v1/messages", token, changed, headers)
+            assert changed_signature == 422 and len(received) == 1, (changed_signature, response, len(received))
         status, raw = call(18090, "POST", "/v1/messages", token, follow, headers)
+        if signed_tool_history and recover_pending:
+            # 固定 CLI 在本轮冷恢复的继续提示之后会裁掉签名。准备拒绝必须先于第二次模型投递。
+            assert status == 422 and len(received) == 1, (status, raw, len(received))
+            assert original_file.read_bytes() == original_history
+            (first_attempt,) = verify_captures(manage, received, account_token)
+            return {"cold_recovery_status": status, "changed_signature_status": changed_signature,
+                    "model_posts": len(received), "original_history_preserved": True, "attempt": first_attempt}
         if status != 200:
             trace = [{key: row.get(key) for key in ("status_code", "outcome", "error_stage", "attempt_count")}
                      for row in manage("GET", "request-diagnostics")["items"]]
@@ -483,6 +523,12 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             proof["historical_tool_result_blocks"] = len(old_result)
         if current_text_blocks:
             proof.update(current_text_blocks=2, changed_current_blocks_status=changed_blocks)
+        if signed_tool_history:
+            hydrated = find_blocks(received[1][1], "type", "thinking")
+            assert hydrated == [("assistant", SIGNED_THINKING)], (
+                hydrated, [(row["role"], [block["type"] for block in blocks(row)]) for row in received[1][1]["messages"]],
+            )
+            proof.update(observed_signature_preserved=True, changed_signature_status=changed_signature)
         if toggle_pending_policy:
             proof["pending_policy"] = "append"
         if tool_policy:
@@ -837,6 +883,7 @@ def main():
     parser.add_argument("--gateway", type=Path, required=True)
     parser.add_argument("--sender", type=Path, required=True)
     parser.add_argument("--current-text-blocks", action="store_true")
+    parser.add_argument("--signed-tool-history", action="store_true")
     scenario = parser.add_mutually_exclusive_group()
     scenario.add_argument("--restart-history", action="store_true")
     scenario.add_argument("--text-input", action="store_true")
@@ -864,7 +911,8 @@ def main():
                        output_effort=args.output_effort, history_png=args.history_png,
                        history_images=args.history_images, history_tool_blocks=args.history_tool_blocks,
                        previous=args.mixed_release,
-                       failure_boundaries=args.failure_boundaries, current_text_blocks=args.current_text_blocks)
+                       failure_boundaries=args.failure_boundaries, current_text_blocks=args.current_text_blocks,
+                       signed_tool_history=args.signed_tool_history)
         print(json.dumps(proof, ensure_ascii=False))
 
 

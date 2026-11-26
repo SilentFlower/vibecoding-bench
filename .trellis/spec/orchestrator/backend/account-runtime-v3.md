@@ -2561,6 +2561,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 工具声明由会话私有 HTTP MCP 返回。有工具的轮次等待 `tools/list` 应答写出后才提交 PTY 提示。公开调用块恢复原名，ID 与参数增量仍对应原模型事件。工具结果通过原进程的回执账本交付，接收方、历史、原调用和本轮生效设置均需匹配。
 - 普通工具名中的连字符与下划线分别保留。固定 CLI 2.1.293 仅增加会话 MCP 前缀，嵌套 Schema 与参数沿原描述交付。重启后工具回执仍核对原名、ID 和完整参数。
 - 原生等待进程丢失时，私有回执按同一修订核对根轮策略及正文摘要。新原生会话导入客户端已核对的工具结果，保留原 JSONL。由受管 PTY 使用 CLI 的继续提示启动模型步骤，原问题和已完成工具保持在历史中。旧工具回执仍以原表布局读取。
+- 活跃工具组的签名属于发送器实收的助手块。回传时核对原签名和工具参数。固定 CLI 2.1.293 对这组已闭合签名工具历史的冷恢复会在继续提示后裁掉签名。此形状准备阶段返回 422，保留原会话文件，模型零新增投递。
 - CLI 回环模型请求沿原账号 sender 授权路径送到固定供应商。该次请求交付 CLI 实际生成的 JSON 实体。调试快照的正文摘要取自这一实体，`wire_final.status` 为 `unavailable`。
 - 账户、会话、模型、替代的调用方参数或连接归属变更均沿原预留和回执门槛处理。冷导入只协商当前支持的普通输入形状。其他形状继续沿该发行既有入口合同。
 
@@ -2596,3 +2597,4 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `verify_tui_cold_history.py --history-images` 在同一旧用户消息中核对 PNG、JPEG、GIF、WebP 的顺序和原始数据。
 - `verify_tui_cold_history.py --history-tool-blocks` 核对已闭合的两个文本结果块、顺序及原 ID，并完成一次新工具回执。
 - `verify_tui_cold_history.py --current-text-blocks` 核对本轮两个独立文本块的模型实收，合并边界的回执返回 422。与 `--recover-pending-tool` 组合时，另核对重启后原始文本块、记录和工具结果仍被保留。
+- `verify_tui_cold_history.py --signed-tool-history` 由隔离模型发出真实 SSE 签名事件，验证同一活跃工具轮的原块实收和改签名拒绝。与 `--recover-pending-tool` 组合时，核对当前固定版的冷恢复拒绝和零新增投递。
