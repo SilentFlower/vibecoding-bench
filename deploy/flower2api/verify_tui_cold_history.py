@@ -229,7 +229,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            history_png=False, history_images=False, history_tool_blocks=False, previous=None, failure_boundaries=False,
            current_text_blocks=False, signed_tool_history=False, signed_tool_response=None, split_history_tools=False,
            v1_runtime=None,
-           parallel_tools=False, reconnect_tool_stream=False, current_images=False, auto_tool_choice=False,
+           parallel_tools=False, reconnect_tool_stream=False, current_images=False, current_image_ending="text",
+           auto_tool_choice=False,
            adaptive_thinking_model=None, adaptive_thinking_display="updates", thinking_display_model=None,
            thinking_cli_summaries=None,
            recovery_ledger_contention=False, recovery_ledger_deadline=False, recovery_workspace_rejection=False,
@@ -259,6 +260,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param parallel_tools 是否验证同一步多个新工具的回执。
     @param reconnect_tool_stream 是否在真实续轮流中断开再接回。
     @param current_images 是否用本轮原生图文替换纯文本问题。
+    @param current_image_ending 本轮九块图文以文字或图片结尾。
     @param auto_tool_choice 是否核对显式自动选择和并行工具。
     @param adaptive_thinking_model 可选，核对显式 adaptive 的固定模型。
     @param adaptive_thinking_display 在工具首轮与续轮冻结的显式显示值。
@@ -736,8 +738,12 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         current = ([{"type": "text", "text": part} for part in (QUESTION, QUESTION_TAIL)]
                    if current_text_blocks else QUESTION)
         if current_images:
-            current = [{"type": "text", "text": QUESTION}, *fixture_image_blocks(all_formats=True),
+            png, jpeg, gif, webp = fixture_image_blocks(all_formats=True)
+            caption = {"type": "text", "text": "  重复图注\n第二行  "}
+            current = [{"type": "text", "text": QUESTION}, png, jpeg, caption, png, caption, gif, webp,
                        {"type": "text", "text": QUESTION_TAIL}]
+            if current_image_ending == "image":
+                current[-2], current[-1] = current[-1], current[-2]
         messages.append({"role": "user", "content": current})
         # 历史中的旧工具结果和当前问题之间保留完成边界，CLI 启动后只提交当前问题。
         declared = [TOOL, SECOND_TOOL] if parallel_tools else [TOOL]
@@ -1175,10 +1181,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         if current_text_blocks:
             proof.update(current_text_blocks=2, changed_current_blocks_status=changed_blocks)
         if current_images:
-            for index, (_, native, _) in enumerate(received):
-                verify_current_image_row(native, current, require_alias=index == 0)
+            stages = ("first", "recovered" if recover_pending else "warm_receipt")
+            raw_media = {stage: verify_raw_current_image_row(native, current, stage=stage)
+                         for stage, (_, native, _) in zip(stages, received, strict=True)}
             proof.update(current_images=[block["source"]["media_type"] for block in current if block["type"] == "image"],
-                         changed_current_images_status=changed_media)
+                         changed_current_images_status=changed_media, raw_current_image_content=raw_media)
         if auto_tool_choice:
             observed = [native.get("tool_choice") for _, native, _ in received]
             assert all(choice in (None, {"type": "auto"}, body["tool_choice"]) for choice in observed)
@@ -2685,6 +2692,50 @@ def verify_current_image_row(native, expected, *, require_alias):
         assert len(sources) == len(images)
 
 
+def verify_raw_current_image_row(native, expected, *, stage):
+    """独立核对原始模型图文块及 CLI 附加数据。@param native 模型正文。@param expected 公开业务块。
+    @param stage 首轮、同进程回执或丢进程恢复。@return 原始收件字段及摘要。
+    """
+    row, = [row for row in native["messages"] if any(block["type"] == "image" for block in blocks(row))]
+    assert row["role"] == "user"
+    raw = row["content"]
+    if stage == "recovered":
+        assert raw == expected
+        prefix = sources = []
+        business = raw
+    else:
+        images = [block["source"] for block in expected if block["type"] == "image"]
+        business_start = len(raw) - len(expected) - len(images)
+        assert business_start >= 0
+        prefix, business, sources = raw[:business_start], raw[business_start:-len(images)], raw[-len(images):]
+        assert all(set(block) == {"type", "text"} and block["type"] == "text"
+                   and block["text"].startswith("<system-reminder>\n")
+                   and block["text"].rstrip("\n").endswith("</system-reminder>") for block in prefix)
+        final = expected[-1]
+        suffix = {**final, "text": final["text"] + "\n"} if final["type"] == "text" else final
+        assert business == [*expected[:-1], suffix]
+        descriptors = set()
+        for number, (block, image) in enumerate(zip(sources, images, strict=True), 1):
+            extension = image["media_type"].split("/")[-1]
+            match = fullmatch(rf"\[Image: source: /proc/self/fd/([0-9]+)/attachment-{number}\.{extension}\]",
+                              block.get("text", ""))
+            assert match is not None and block["type"] == "text"
+            descriptors.add(match[1])
+            fields = {"type", "text"}
+            if "cache_control" in block:
+                assert stage == "first" and number == len(images)
+                assert block["cache_control"] == {"type": "ephemeral", "ttl": "1h"}
+                fields.add("cache_control")
+            assert block.keys() == fields
+        assert len(descriptors) == 1
+    return {"role": row["role"], "raw_content_sha256": sha256(encoded(raw)).hexdigest(),
+            "raw_content_equal": raw == expected, "raw_business_slice_equal": business == expected,
+            "business_block_count": len(business), "raw_block_count": len(raw),
+            "extra_terminal_lf": stage != "recovered" and expected[-1]["type"] == "text",
+            "cli_context_count": len(prefix), "cli_attachment_source_count": len(sources),
+            "cli_source_cache_control": [block["cache_control"] for block in sources if "cache_control" in block]}
+
+
 def verify_history_images(manage, token, account_token, account_id, headers, received, *, all_formats):
     """核对历史用户图像与新问题的真实出站。
     @param manage 管理接口。@param token 公共令牌。@param account_token 合成账号凭据。
@@ -2816,6 +2867,7 @@ def main():
     parser.add_argument("--shared-state", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--current-text-blocks", action="store_true")
     parser.add_argument("--current-images", action="store_true")
+    parser.add_argument("--current-image-ending", choices=("text", "image"), default="text")
     parser.add_argument("--history-cache-markers", action="store_true")
     parser.add_argument("--history-cache-ttl", choices=("5m", "1h"))
     parser.add_argument("--history-cache-scope", choices=("nested", "mixed"))
@@ -2866,6 +2918,8 @@ def main():
     scenario.add_argument("--failure-boundaries", action="store_true")
     scenario.add_argument("--v1-runtime", type=Path)
     args = parser.parse_args()
+    if args.current_image_ending == "image" and not args.current_images:
+        parser.error("--current-image-ending 需要同用 --current-images")
     if bool(args.interleaved_title) != bool(args.title_request):
         parser.error("--interleaved-title 与 --title-request 需要一起使用")
     if bool(args.interleaved_suggestion) != bool(args.suggestion_request):
@@ -2922,6 +2976,7 @@ def main():
                        split_history_tools=args.split_history_tools,
                        v1_runtime=args.v1_runtime, parallel_tools=args.parallel_new_tools,
                        reconnect_tool_stream=args.reconnect_tool_stream, current_images=args.current_images,
+                       current_image_ending=args.current_image_ending,
                        auto_tool_choice=args.auto_tool_choice,
                        adaptive_thinking_model=args.adaptive_thinking_model,
                        adaptive_thinking_display=args.adaptive_thinking_display,
