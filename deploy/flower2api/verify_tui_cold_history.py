@@ -77,8 +77,13 @@ TOOL = {"name": "Lookup-Note", "description": "读取合成便签", "input_schem
 NATIVE_TOOL_NAME = "mcp__flower__" + TOOL["name"]
 SECOND_TOOL = {**TOOL, "name": "Set-Tag", "description": "为合成便签设置标签"}
 NATIVE_SECOND_TOOL_NAME = "mcp__flower__" + SECOND_TOOL["name"]
+PARALLEL_SECOND_TOOL = {**SECOND_TOOL, "input_schema": {
+    "type": "object", "required": ["tag_id", "active"], "additionalProperties": False,
+    "properties": {"tag_id": {"type": "integer"}, "active": {"type": "boolean"}},
+}}
 ARGS = {"key": "synthetic-note", "options": {"labels": ["项目", "便签"]}}
 SECOND_ARGS = {**ARGS, "key": "synthetic-other"}
+PARALLEL_SECOND_ARGS = {"tag_id": 74, "active": False}
 REPLY = "CLIENT：合成便签内容"
 SECOND_REPLY = "SECOND：客户端工具合成错误"
 RECONNECT_PREFIX = "续轮在断开前已经交付的合成文本。"
@@ -184,6 +189,32 @@ def fixture_tool_sse(tool, *, with_signature, second=None, model=MODEL, thinking
     ])
     events[1:1] = signed
     return b"".join(map(frame, events))
+
+
+def fixture_parallel_results(calls, callbacks):
+    """按公开返回的调用执行两种合成工具，逆序交付结果。
+    @param calls 从公开 SSE 重组的调用。@param callbacks 实际执行记录。@return 逆序的结果块。
+    """
+    def lookup_note(arguments):
+        assert arguments == ARGS, arguments
+        return REPLY
+
+    def set_tag(arguments):
+        assert arguments == PARALLEL_SECOND_ARGS, arguments
+        raise ValueError(SECOND_REPLY)
+
+    handlers = {TOOL["name"]: lookup_note, PARALLEL_SECOND_TOOL["name"]: set_tag}
+    results = []
+    for tool_call in calls:
+        call_id = tool_call["id"]
+        result = {"type": "tool_result", "tool_use_id": call_id}
+        try:
+            result["content"] = handlers[tool_call["name"]](tool_call["input"])
+        except ValueError as error:
+            result.update(content=str(error), is_error=True)
+        callbacks.append(call_id)
+        results.append(result)
+    return list(reversed(results))
 
 
 def fixture_reconnect_sse(name):
@@ -392,8 +423,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 content = {"type": "tool_use", "id": NEW_ID, "name": tool["name"], "input": ARGS}
                 second = None
                 if parallel_tools:
-                    other, = [t for t in body["tools"] if t.get("description") == SECOND_TOOL["description"]]
-                    second = {"type": "tool_use", "id": SECOND_ID, "name": other["name"], "input": SECOND_ARGS}
+                    other, = [t for t in body["tools"] if t.get("description") == PARALLEL_SECOND_TOOL["description"]]
+                    second = {"type": "tool_use", "id": SECOND_ID, "name": other["name"], "input": PARALLEL_SECOND_ARGS}
                 response_model = None if signed_tool_response == "missing-model" else body["model"]
                 wire = fixture_tool_sse(content, with_signature=signed_tool_history, second=second,
                                         model=response_model, thinking_text=signed_thinking_text)
@@ -753,7 +784,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 current[-2], current[-1] = current[-1], current[-2]
         messages.append({"role": "user", "content": current})
         # 历史中的旧工具结果和当前问题之间保留完成边界，CLI 启动后只提交当前问题。
-        declared = [TOOL, SECOND_TOOL] if parallel_tools else [TOOL]
+        declared = [TOOL, PARALLEL_SECOND_TOOL] if parallel_tools else [TOOL]
         expected_ids = [NEW_ID, SECOND_ID] if parallel_tools else [NEW_ID]
         registered_tools = encoded(expected_ids).decode()
         body = {"model": MODEL, "max_tokens": 128, "stream": True, "messages": messages,
@@ -792,10 +823,15 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             offered.append(block)
         assert [block["id"] for block in offered] == expected_ids, offered
         assert [block["name"] for block in offered] == [item["name"] for item in declared], offered
-        assert [block["input"] for block in offered] == ([ARGS, SECOND_ARGS] if parallel_tools else [ARGS]), offered
+        assert [block["input"] for block in offered] == (
+            [ARGS, PARALLEL_SECOND_ARGS] if parallel_tools else [ARGS]
+        ), offered
         tool = offered[0]
-        # 只有准确收到的本轮调用进入客户端执行清单。
-        callbacks.extend(expected_ids)
+        if parallel_tools:
+            result = {"role": "user", "content": fixture_parallel_results(offered, callbacks)}
+        else:
+            callbacks.append(tool["id"])
+            result = {"role": "user", "content": [{"type": "tool_result", "tool_use_id": tool["id"], "content": REPLY}]}
         if previous:
             assert received[0][1]["tools"][0]["name"] == TOOL["name"]
             assert not sender_state().get("idle")
@@ -812,11 +848,6 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         if toggle_pending_policy:
             changed = manage("PUT", f"accounts/{identifier}", {"client_system_prompt_policy": "replace"})
             assert changed["client_system_prompt_policy"] == "replace"
-        result = {"role": "user", "content": [{"type": "tool_result", "tool_use_id": NEW_ID, "content": REPLY}]}
-        if parallel_tools:
-            # 故意按相反顺序回传，并区分成功和失败。接收方须按调用 ID 归属。
-            result["content"].insert(0, {"type": "tool_result", "tool_use_id": SECOND_ID,
-                                         "content": SECOND_REPLY, "is_error": True})
         if signed_tool_history:
             (start,) = [event["content_block"] for event in events if event["type"] == "content_block_start"
                         and event["index"] == 0 and event["content_block"]["type"] == "thinking"]
@@ -853,7 +884,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         partial_statuses = {}
         if parallel_tools:
             second_result = result["content"][0]
-            for name, invalid in (("missing_tool", [second_result]), ("duplicate_tool_id", [second_result] * 2)):
+            for name, invalid in (
+                ("missing_tool", [second_result]),
+                ("duplicate_tool_id", [second_result] * 2),
+                ("complete_plus_duplicate", [*result["content"], second_result]),
+            ):
                 partial = {**follow, "messages": [*follow["messages"][:-1], {**result, "content": invalid}]}
                 partial_status, partial_raw = call(18090, "POST", "/v1/messages", token, partial, headers)
                 assert partial_status == 400 and len(received) == 1, (name, partial_status, partial_raw)
@@ -1170,18 +1205,27 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                              changed_nested_history_cache_status=changed_nested_cache)
         if parallel_tools:
             first, second = (document for _, document, _ in received)
+            assert TOOL["input_schema"] != PARALLEL_SECOND_TOOL["input_schema"]
             for native in (first, second):
                 second_tool, = [t for t in native["tools"] if t["name"] == NATIVE_SECOND_TOOL_NAME]
-                assert second_tool["input_schema"] == SECOND_TOOL["input_schema"]
+                assert second_tool["input_schema"] == PARALLEL_SECOND_TOOL["input_schema"]
             assert not find_blocks(first, "id", SECOND_ID) and not find_blocks(first, "tool_use_id", SECOND_ID)
             assert find_blocks(second, "id", SECOND_ID) == [("assistant", {
-                "type": "tool_use", "name": NATIVE_SECOND_TOOL_NAME, "id": SECOND_ID, "input": SECOND_ARGS,
+                "type": "tool_use", "name": NATIVE_SECOND_TOOL_NAME, "id": SECOND_ID, "input": PARALLEL_SECOND_ARGS,
             })]
+            (success_role, success), = find_blocks(second, "tool_use_id", NEW_ID)
+            assert success_role == "user" and not success.get("is_error", False) and success["content"] == REPLY
             (role, failed), = find_blocks(second, "tool_use_id", SECOND_ID)
             assert role == "user" and failed["is_error"] is True
             # CLI 会在最后一个结果补足原生 Token 提醒，原始失败正文必须保持在开头。
-            assert failed["content"].split("\n\n<system-reminder>\n<total_tokens>", 1)[0] == SECOND_REPLY
-            proof.update(parallel_tool_receipt_rejections=partial_statuses, preserved_tool_error=True)
+            assert failed["content"].startswith(SECOND_REPLY + "\n\n<system-reminder>\n<total_tokens>")
+            client_order = [block["tool_use_id"] for block in result["content"]]
+            model_order = [block["tool_use_id"] for row in second["messages"] for block in blocks(row)
+                           if block.get("tool_use_id") in expected_ids]
+            assert client_order == expected_ids[::-1] and model_order == expected_ids, (client_order, model_order)
+            proof.update(parallel_tool_receipt_rejections=partial_statuses, preserved_tool_error=True,
+                         client_result_order=client_order, model_result_order=model_order,
+                         distinct_tool_schemas=True, exact_success_text=True, failure_token_reminder=True)
         if split_history_tools:
             for _, native, _ in received:
                 assert find_blocks(native, "id", PAST_SECOND_ID) == [("assistant", {
