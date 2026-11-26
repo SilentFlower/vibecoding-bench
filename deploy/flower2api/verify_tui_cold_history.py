@@ -41,6 +41,7 @@ SYSTEM = ["RULE1：你是便签助手。", "RULE2：请只使用已声明的工�
 PAST_ID = "toolu_past_fixture"
 PAST_SECOND_ID = "toolu_past_second_fixture"
 NEW_ID = "toolu_cold_fixture"
+SECOND_ID = "toolu_second_cold_fixture"
 SIGNED_THINKING = {"type": "thinking", "thinking": "隔离模型的合成思考段。", "signature": "c2lnbmF0dXJlLWZpeHR1cmU="}
 V1_RUNTIME_SHA256 = "017ec892b9dfbf08bf4cb2e5bf59048cb41a0ecfc21b1ad518751a23a911b9b7"
 TOOL = {"name": "Lookup-Note", "description": "读取合成便签", "input_schema": {
@@ -51,8 +52,12 @@ TOOL = {"name": "Lookup-Note", "description": "读取合成便签", "input_schem
     }},
 }}
 NATIVE_TOOL_NAME = "mcp__flower__" + TOOL["name"]
+SECOND_TOOL = {**TOOL, "name": "Set-Tag", "description": "为合成便签设置标签"}
+NATIVE_SECOND_TOOL_NAME = "mcp__flower__" + SECOND_TOOL["name"]
 ARGS = {"key": "synthetic-note", "options": {"labels": ["项目", "便签"]}}
+SECOND_ARGS = {**ARGS, "key": "synthetic-other"}
 REPLY = "CLIENT：合成便签内容"
+SECOND_REPLY = "SECOND：客户端工具合成错误"
 FINAL = "模型已收到本次客户端回执。"
 
 
@@ -104,12 +109,20 @@ def build_cutover_record(temporary, old, deployment, release):
     return gate
 
 
-def fixture_tool_sse(tool, *, with_signature):
-    """交付隔离模型工具流。@param tool 原生工具调用。@param with_signature 是否先交付合成签名块。@return SSE。"""
+def fixture_tool_sse(tool, *, with_signature, second=None):
+    """交付隔离模型工具流。@param tool 原生工具调用。@param with_signature 是否先交付合成签名块。
+    @param second 可选的同轮第二次工具调用。@return SSE。"""
     wire = message_sse(tool, "tool_use", "msg_cold_tool")
-    if not with_signature:
+    if not with_signature and second is None:
         return wire
     events = [json.loads(line[5:]) for line in wire.splitlines() if line.startswith(b"data:")]
+    if second is not None:
+        secondary = message_sse(second, "tool_use", "msg_fixture_unused")
+        extra = [json.loads(line[5:]) for line in secondary.splitlines() if line.startswith(b"data:")]
+        # 第二个调用的原始增量属于同一消息，放在该消息的终帧之前。
+        events[-2:-2] = [{**event, "index": 1} for event in extra if "index" in event]
+    if not with_signature:
+        return b"".join(map(frame, events))
     for event in events:
         if "index" in event:
             event["index"] += 1
@@ -125,7 +138,8 @@ def fixture_tool_sse(tool, *, with_signature):
 def verify(gateway, sender, temporary, *, restart_history=False, text_input=False, system_policy=False,
            toggle_pending_policy=False, tool_policy=None, recover_pending=False, output_effort=False,
            history_png=False, history_images=False, history_tool_blocks=False, previous=None, failure_boundaries=False,
-           current_text_blocks=False, signed_tool_history=False, split_history_tools=False, v1_runtime=None):
+           current_text_blocks=False, signed_tool_history=False, split_history_tools=False, v1_runtime=None,
+           parallel_tools=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -143,6 +157,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param signed_tool_history 是否核对隔离模型原工具轮的签名块。
     @param split_history_tools 是否将已闭合的旧工具组分为相邻消息。
     @param v1_runtime 固定 V1 制品，提供时仅验证 V1 内核的公开能力。
+    @param parallel_tools 是否验证同一步多个新工具的回执。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -190,7 +205,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             restart = any(b.get("text") == AFTER_RESTART for row in body["messages"] for b in blocks(row))
             if not results and tool and not restart and v1_runtime is None:
                 content = {"type": "tool_use", "id": NEW_ID, "name": tool["name"], "input": ARGS}
-                wire = fixture_tool_sse(content, with_signature=signed_tool_history)
+                second = None
+                if parallel_tools:
+                    other, = [t for t in body["tools"] if t.get("description") == SECOND_TOOL["description"]]
+                    second = {"type": "tool_use", "id": SECOND_ID, "name": other["name"], "input": SECOND_ARGS}
+                wire = fixture_tool_sse(content, with_signature=signed_tool_history, second=second)
             else:
                 wire = message_sse({"type": "text", "text": FINAL}, "end_turn", "msg_cold_reply")
             self.send_response(200)
@@ -400,24 +419,33 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                    if current_text_blocks else QUESTION)
         messages.append({"role": "user", "content": current})
         # 历史中的旧工具结果和当前问题之间保留完成边界，CLI 启动后只提交当前问题。
+        declared = [TOOL, SECOND_TOOL] if parallel_tools else [TOOL]
+        expected_ids = [NEW_ID, SECOND_ID] if parallel_tools else [NEW_ID]
+        registered_tools = encoded(expected_ids).decode()
         body = {"model": MODEL, "max_tokens": 128, "stream": True, "messages": messages,
-                "tools": [TOOL], "system": [{"type": "text", "text": part} for part in SYSTEM]}
+                "tools": declared, "system": [{"type": "text", "text": part} for part in SYSTEM]}
         if recover_pending:
             body["output_config"] = {"effort": "medium"}
         status, raw = call(18090, "POST", "/v1/messages", token, body, headers)
         assert status == 200, (status, raw)
         events = [json.loads(line[5:]) for line in raw.splitlines() if line.startswith(b"data:")]
         assert events[-1]["type"] == "message_stop", events
-        (tool,) = [e["content_block"] for e in events if e["type"] == "content_block_start"
-                   and e["content_block"]["type"] == "tool_use"]
-        assert tool.get("id") == NEW_ID and tool.get("name") == TOOL["name"], (
-            tool, [[t["name"] for t in document.get("tools", [])] for _, document, _ in received],
-        )
-        tool["input"] = json.loads("".join(e["delta"]["partial_json"] for e in events
-                                          if e["type"] == "content_block_delta" and e["delta"]["type"] == "input_json_delta"))
-        assert tool["input"] == ARGS
-        # 合成客户端只执行登记过的这一个调用。旧工具的 ID 不经过公开回执。
-        callbacks.append(tool["id"])
+        offered = []
+        for event in events:
+            if event["type"] != "content_block_start" or event["content_block"]["type"] != "tool_use":
+                continue
+            block = event["content_block"]
+            deltas = [item["delta"]["partial_json"] for item in events
+                      if item["type"] == "content_block_delta" and item["index"] == event["index"]
+                      and item["delta"]["type"] == "input_json_delta"]
+            block["input"] = json.loads("".join(deltas))
+            offered.append(block)
+        assert [block["id"] for block in offered] == expected_ids, offered
+        assert [block["name"] for block in offered] == [item["name"] for item in declared], offered
+        assert [block["input"] for block in offered] == ([ARGS, SECOND_ARGS] if parallel_tools else [ARGS]), offered
+        tool = offered[0]
+        # 只有准确收到的本轮调用进入客户端执行清单。
+        callbacks.extend(expected_ids)
         if previous:
             assert received[0][1]["tools"][0]["name"] == TOOL["name"]
             assert not sender_state().get("idle")
@@ -435,7 +463,10 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             changed = manage("PUT", f"accounts/{identifier}", {"client_system_prompt_policy": "replace"})
             assert changed["client_system_prompt_policy"] == "replace"
         result = {"role": "user", "content": [{"type": "tool_result", "tool_use_id": NEW_ID, "content": REPLY}]}
-        offered = [tool]
+        if parallel_tools:
+            # 故意按相反顺序回传，并区分成功和失败。接收方须按调用 ID 归属。
+            result["content"].insert(0, {"type": "tool_result", "tool_use_id": SECOND_ID,
+                                         "content": SECOND_REPLY, "is_error": True})
         if signed_tool_history:
             deltas = [event["delta"] for event in events if event["type"] == "content_block_delta" and event["index"] == 0]
             assert deltas == [{"type": "thinking_delta", "thinking": SIGNED_THINKING["thinking"]},
@@ -446,15 +477,24 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         wrong_session, _ = call(18090, "POST", "/v1/messages", token, follow,
                                 {**headers, "x-session-id": str(uuid4())})
         changed = {**follow, "messages": [*messages, {"role": "assistant", "content": [
-            *offered[:-1], {**tool, "input": {**ARGS, "key": "another-note"}}]}, result]}
+            {**block, "input": {**ARGS, "key": "another-note"}} if block is tool else block
+            for block in offered]}, result]}
         wrong_arguments, rejection = call(18090, "POST", "/v1/messages", token, changed, headers)
         rejected = wrong_subject, wrong_session, wrong_arguments, len(received)
         assert rejected == (400, 400, 422, 1), (rejected, rejection)
+        partial_statuses = {}
+        if parallel_tools:
+            second_result = result["content"][0]
+            for name, invalid in (("missing_tool", [second_result]), ("duplicate_tool_id", [second_result] * 2)):
+                partial = {**follow, "messages": [*follow["messages"][:-1], {**result, "content": invalid}]}
+                partial_status, partial_raw = call(18090, "POST", "/v1/messages", token, partial, headers)
+                assert partial_status == 400 and len(received) == 1, (name, partial_status, partial_raw)
+                partial_statuses[name] = partial_status
         with closing(connect(temporary / "gateway.db")) as database:
             stored = database.execute("SELECT tools FROM tui_native_turns WHERE tools IN (?, ?)",
-                                      (json.dumps([NEW_ID]), "!" + json.dumps([NEW_ID]))).fetchall()
+                                      (registered_tools, "!" + registered_tools)).fetchall()
             # 公开拒绝完成时，正确回执已经可以重新认领，查询不等待后台归还。
-            assert stored == [(json.dumps([NEW_ID]),)], stored
+            assert stored == [(registered_tools,)], stored
         if recover_pending:
             marker = ("--name=" + headers["x-session-id"]).encode()
             original, = [int(path.parent.name) for path in Path("/proc").glob("[0-9]*/cmdline")
@@ -481,7 +521,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             assert changed_blocks == 422 and len(received) == 1, (changed_blocks, response, len(received))
         if signed_tool_history:
             tampered = {**SIGNED_THINKING, "signature": "Y2hhbmdlZA=="}
-            changed = {**follow, "messages": [*messages, {"role": "assistant", "content": [tampered, tool]}, result]}
+            changed = {**follow, "messages": [*messages, {"role": "assistant", "content": [tampered, *offered[1:]]}, result]}
             changed_signature, response = call(18090, "POST", "/v1/messages", token, changed, headers)
             assert changed_signature == 422 and len(received) == 1, (changed_signature, response, len(received))
         status, raw = call(18090, "POST", "/v1/messages", token, follow, headers)
@@ -500,7 +540,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         assert final["content"] == [{"type": "text", "text": FINAL}]
         duplicate, _ = call(18090, "POST", "/v1/messages", token, follow, headers)
         assert duplicate == 400 and len(received) == 2, (duplicate, len(received))
-        assert callbacks == [NEW_ID]
+        assert callbacks == expected_ids
         if previous:
             ((role, old_receipt),) = find_blocks(received[1][1], "tool_use_id", NEW_ID)
             assert role == "user" and REPLY in json.dumps(old_receipt, ensure_ascii=False)
@@ -551,6 +591,20 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                  "proxy_connections": len(proxy_targets), "attempts": captures}
         if history_tool_blocks:
             proof["historical_tool_result_blocks"] = len(old_result)
+        if parallel_tools:
+            first, second = (document for _, document, _ in received)
+            for native in (first, second):
+                second_tool, = [t for t in native["tools"] if t["name"] == NATIVE_SECOND_TOOL_NAME]
+                assert second_tool["input_schema"] == SECOND_TOOL["input_schema"]
+            assert not find_blocks(first, "id", SECOND_ID) and not find_blocks(first, "tool_use_id", SECOND_ID)
+            assert find_blocks(second, "id", SECOND_ID) == [("assistant", {
+                "type": "tool_use", "name": NATIVE_SECOND_TOOL_NAME, "id": SECOND_ID, "input": SECOND_ARGS,
+            })]
+            (role, failed), = find_blocks(second, "tool_use_id", SECOND_ID)
+            assert role == "user" and failed["is_error"] is True
+            # CLI 会在最后一个结果补足原生 Token 提醒，原始失败正文必须保持在开头。
+            assert failed["content"].split("\n\n<system-reminder>\n<total_tokens>", 1)[0] == SECOND_REPLY
+            proof.update(parallel_tool_receipt_rejections=partial_statuses, preserved_tool_error=True)
         if split_history_tools:
             for _, native, _ in received:
                 assert find_blocks(native, "id", PAST_SECOND_ID) == [("assistant", {
@@ -985,6 +1039,7 @@ def main():
     scenario.add_argument("--history-images", action="store_true")
     scenario.add_argument("--history-tool-blocks", action="store_true")
     scenario.add_argument("--split-history-tools", action="store_true")
+    scenario.add_argument("--parallel-new-tools", action="store_true")
     scenario.add_argument("--mixed-release", nargs=3, type=Path,
                           metavar=("OLD_SOURCE", "OLD_GATEWAY", "OLD_SENDER"))
     scenario.add_argument("--mixed-image-peers", nargs=2, type=Path, help=argparse.SUPPRESS)
@@ -1013,7 +1068,7 @@ def main():
                        previous=previous,
                        failure_boundaries=args.failure_boundaries, current_text_blocks=args.current_text_blocks,
                        signed_tool_history=args.signed_tool_history, split_history_tools=args.split_history_tools,
-                       v1_runtime=args.v1_runtime)
+                       v1_runtime=args.v1_runtime, parallel_tools=args.parallel_new_tools)
         print(json.dumps(proof, ensure_ascii=False))
 
 

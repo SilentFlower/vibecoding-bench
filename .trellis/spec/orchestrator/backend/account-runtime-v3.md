@@ -2597,6 +2597,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `verify_tui_cold_history.py --history-png` 核对追加、用户提醒两种动作下的原角色、历史图像字节和单次当前问题。
 - `verify_tui_cold_history.py --history-images` 在同一旧用户消息中核对 PNG、JPEG、GIF、WebP 的顺序和原始数据。
 - `verify_tui_cold_history.py --history-tool-blocks` 核对已闭合的两个文本结果块、顺序及原 ID，并完成一次新工具回执。
+- `verify_tui_cold_history.py --parallel-new-tools` 从公开入口核对同一模型响应的两个工具。按调用 ID 解析参数增量并逆序回传成功和失败结果。缺少结果和重复 ID 均拒绝，合法回传沿原工具组完成。
 - `verify_tui_cold_history.py --split-history-tools` 核对分行的两对旧工具及结果、原顺序和单次新工具执行。
 - `verify_tui_cold_history.py --current-text-blocks` 核对本轮两个独立文本块的模型实收，合并边界的回执返回 422。与 `--recover-pending-tool` 组合时，另核对重启后原始文本块、记录和工具结果仍被保留。
 - `verify_tui_cold_history.py --signed-tool-history` 由隔离模型发出真实 SSE 签名事件，验证同一活跃工具轮的原块实收和改签名拒绝。与 `--recover-pending-tool` 组合时，核对当前固定版的冷恢复拒绝和零新增投递。
