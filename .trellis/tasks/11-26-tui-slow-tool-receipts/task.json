@@ -1,0 +1,42 @@
+{
+  "id": "tui-slow-tool-receipts",
+  "name": "tui-slow-tool-receipts",
+  "title": "V2 子代理慢工具回执与后台进度摘要",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-26",
+  "completedAt": "2026-11-26",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-26T01:13:39Z",
+    "blockers": []
+  },
+  "branch": "fix/v2-slow-tool-receipts",
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "completedSteps": [
+      "V2 慢工具回执按 20 秒分段等待，原会话单次续轮",
+      "系统设置支持原生进度与本地进度切换，两个模式的用量、计费及并发回执已验证",
+      "网关、账号、前端和单并发真实链路通过验收，修复已推送到 flower2api"
+    ],
+    "partialStep": null,
+    "nextStep": "按独立发版流程集成该修复",
+    "notes": "原生模式默认启用，本地进度返回明确零用量。",
+    "updatedAt": "2026-11-26T01:13:39Z"
+  }
+}
