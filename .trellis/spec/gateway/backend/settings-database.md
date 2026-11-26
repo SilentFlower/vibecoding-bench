@@ -605,6 +605,42 @@ Gateway 与发送器在已鉴权的 prepare 和 send 上协商 `x-v3-tui-final-c
 
 `tui_capture_records_only_consumed_context_headers` 覆盖相同入站字段被采用与被跳过的两条路径。`verify_request_detail_design.py` 验证新旧快照、动作筛选、三阶段状态和三个屏宽。
 
+## Scenario: V2 Messages 协议头
+
+### 1. 适用范围
+
+V2 的 `POST /v1/messages` 调用方协议头与 V1 `services/runtime/src/control/header-policy.ts` 保持同一组九个名称。账号身份与 SDK 运行时头由已绑定的发送链组装。
+
+### 2. 接口
+
+- 网关在私有 prepare 提出 `x-v3-tui-model-header-policy: 1`。发送器同时收到已鉴权 Unix 源的 `model_headers_protocol: 1` 和 `model_header_policy_protocol: 1` 时才确认，并写入整数 `model_header_policy: 1`。
+- `model_headers_len` 沿用独立 JSON 对象段，长度上限为 `BODY_LIMIT`。字段值为 HTTP 字节的 Latin-1 表示。未协商时，支持 `model_headers_protocol` 的旧组合沿用 ASCII 版本与 beta 两字段转送。
+
+### 3. 数据合同
+
+- 允许 `anthropic-version`、`anthropic-beta`、`accept`、`accept-language`、`cache-control`、`anthropic-dangerous-direct-browser-access`、`x-claude-code-prev-tool-durations`、`x-claude-code-compaction`、`x-claude-code-context-compacted`。跳过 `Connection` 点名的字段。多行 beta 按顺序以逗号合并，三个 HTTP 列表字段以逗号加空格合并。
+- 账号源从本轮已认证的 CLI 模型回调取得 SDK 默认头和 `x-stainless-*`。已准入的调用方值覆盖同名非版本、非 beta 默认头。`Accept` 仅在公开 `stream: true` 时允许覆盖。公开非流式转上游 SSE 时使用 SDK 的 `Accept`，SDK 省略该头时由发送器补 `text/event-stream`，受管请求详情将该出站头标为运行时生成。
+- 普通 API 选项通过本轮 SDK beta 子集校验后使用 SDK 的能力声明。原生输入或含 `system` 角色消息的输入保留非空调用方 beta。受管发送器在缺少 OAuth beta 时追加该声明。
+
+### 4. 异常
+
+| 条件 | 行为 |
+| --- | --- |
+| 单值协议头重复 | 网关返回 400 `duplicate_header` |
+| 声明的 `anthropic-version` 与支持版本不符 | 返回 422 `unsupported_parameter` |
+| 普通 API 请求的 beta 超出该轮原生 SDK 能力 | 在认领模型回调之前返回 422 `unsupported_parameter` |
+| 私有选项出现额外名称、不可发送的字节或未知策略编号 | 账号源拒绝该次预留 |
+
+### 5. 场景
+
+调用方设置 `anthropic-dangerous-direct-browser-access: false` 时，协商成功后的出站使用该值。调用方提供的 `x-stainless-os` 由网关丢弃，最终 SDK 字段取自本轮回调。网关已升级且账号组件尚未升级时，新网关仍先校验入口协议头，账号侧按旧握手处理。
+
+调用方传入 `Accept: application/json;q=0.9`，本轮 SDK 使用 `Accept: application/json`。公开流式请求出站保留 `q=0.9`。公开非流式请求出站使用 SDK 的 `application/json`，正文仍向模型请求 SSE。
+
+### 6. 验证
+
+`tui_model_header_policy_matches_v1_field_and_value_rules` 覆盖多值、`Connection`、合法扩展字节和错误码。`negotiated_model_headers_follow_intact_body_only` 核对长选项段与正文的独立性。账号侧 `test_tui_session.py` 核对 SDK 头来源、显式或隐式非流式的 `Accept` 选择与无效 beta 零模型投递。`verify_tui_final_tls.py` 核对流式透传、非流式转 SSE 的头和正文、对应的请求详情标记、旧协议兼容和无效版本零模型投递。
+
 ## Scenario: 原生额外空闲进程回收时间热配置
 
 ### 1. Scope / Trigger

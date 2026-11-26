@@ -93,7 +93,10 @@ class ManagedOAuthTests(TestCase):
                                    side_effect=lambda host, _, **opts: HTTPConnection(host, server.server_port, **opts))):
                     with launch.managed_model_response(
                         body, account_token=token, reservation=reservation,
-                        headers={"anthropic-beta": "test-beta", "x-claude-code-session-id": "test-session"},
+                        headers={"anthropic-beta": "test-beta", "x-claude-code-session-id": "test-session",
+                                 "accept": "application/json", "accept-language": "café",
+                                 "anthropic-dangerous-direct-browser-access": "false",
+                                 "x-stainless-os": "fixture-sdk"},
                         capture=capture,
                     ) as response:
                         self.assertEqual(response.read(), b"data: isolated\n\n")
@@ -115,6 +118,10 @@ class ManagedOAuthTests(TestCase):
         self.assertEqual(headers["authorization"], "Bearer " + token)
         self.assertEqual(headers["anthropic-beta"], "test-beta,oauth-2025-04-20")
         self.assertEqual(headers["x-claude-code-session-id"], "test-session")
+        self.assertEqual(headers["accept"], "application/json")
+        self.assertEqual(headers["accept-language"], "café")
+        self.assertEqual(headers["anthropic-dangerous-direct-browser-access"], "false")
+        self.assertEqual(headers["x-stainless-os"], "fixture-sdk")
         self.assertNotIn(token, repr(capture))
 
 

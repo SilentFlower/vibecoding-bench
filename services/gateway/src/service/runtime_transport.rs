@@ -24,7 +24,9 @@ use axum::Router;
 use axum::body::to_bytes;
 use axum::body::{Body, Bytes};
 use axum::extract::{DefaultBodyLimit, Request, State};
-use axum::http::header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE, RETRY_AFTER, USER_AGENT};
+use axum::http::header::{
+    CONNECTION, CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE, RETRY_AFTER, USER_AGENT,
+};
 use axum::http::{HeaderMap, HeaderValue, Method};
 use axum::middleware::{Next, from_fn_with_state};
 use axum::response::{IntoResponse, Response};
@@ -79,6 +81,7 @@ pub(super) const TUI_CAPTURE: &str = "x-v3-tui-http-capture";
 pub(super) const TUI_FINAL_CAPTURE: &str = "x-v3-tui-final-capture";
 pub(super) const TUI_UPSTREAM_SESSION: &str = "x-v3-tui-upstream-session";
 pub(super) const TUI_MANAGED_OAUTH: &str = "x-v3-tui-managed-oauth";
+pub(super) const TUI_MODEL_HEADER_POLICY: &str = "x-v3-tui-model-header-policy";
 pub(super) const TUI_OAUTH_FILE: &str = "x-v3-tui-oauth-file";
 pub(super) const TUI_ACCOUNT_EXPIRY: &str = "x-v3-tui-account-expiry";
 const TUI_ACCOUNT_MODEL: &str = "x-v3-tui-account-model";
@@ -420,7 +423,7 @@ async fn send_with_client(
     prepared: &PreparedRequest,
     body: impl Into<RequestBody>,
 ) -> Result<reqwest::Response, AppError> {
-    send_observed(client, prepared, body, None).await
+    send_observed(client, prepared, body, None, false).await
 }
 
 async fn send_observed(
@@ -428,6 +431,7 @@ async fn send_observed(
     prepared: &PreparedRequest,
     body: impl Into<RequestBody>,
     observer: Option<hyper::ext::AcceptedWrite>,
+    tui_account_model: bool,
 ) -> Result<reqwest::Response, AppError> {
     let method = Method::from_bytes(prepared.method.as_bytes())
         .map_err(|_| AppError::BadRequest("invalid upstream method".into()))?;
@@ -450,6 +454,8 @@ async fn send_observed(
                 .map_err(|_| AppError::BadRequest("上游凭据格式无效".into()))?;
             authorization.set_sensitive(true);
             request = request.header(name, authorization);
+        } else if tui_account_model {
+            request = request.header(name, tui_header_value(value)?);
         } else {
             request = request.header(name, value);
         }
@@ -1417,6 +1423,7 @@ pub(super) struct TuiReservation {
     agent_header_used: bool,
     submission_started: bool,
     input_policy: bool,
+    model_header_policy: bool,
     session_mapping: bool,
     upstream_session: Option<String>,
     pub(super) managed_oauth: bool,
@@ -1497,8 +1504,13 @@ impl TuiReservation {
                 self.agent_header_used.then_some("x-claude-code-agent-id"),
                 session_header,
             ];
-            self.capture =
-                super::native_capture::TuiCaptureInput::encode(headers, raw, parsed, &context);
+            self.capture = super::native_capture::TuiCaptureInput::encode(
+                headers,
+                raw,
+                parsed,
+                &context,
+                self.model_header_policy,
+            );
             self.capture_state = Some(if self.capture.is_some() {
                 "queued"
             } else {
@@ -1746,6 +1758,8 @@ const TUI_PREPARE_REASON: &str = "x-v3-tui-prepare-reason";
 pub(super) fn tui_input_rejection(reason: &str) -> Option<AppError> {
     use StatusCode as S;
     const REASONS: &[(&str, S, &str)] = &[
+        ("invalid_header", S::BAD_REQUEST, "请求头格式不合法"),
+        ("duplicate_header", S::BAD_REQUEST, "单值协议请求头重复"),
         ("invalid_model", S::BAD_REQUEST, "model 必须为非空字符串"),
         ("invalid_messages", S::BAD_REQUEST, "messages 必须为非空数组"),
         ("invalid_message", S::BAD_REQUEST, "消息角色无效"),
@@ -1935,6 +1949,7 @@ pub(super) async fn prepare_tui(
         wire_capture: false,
         capture: None,
         input_policy: false,
+        model_header_policy: false,
         session_mapping: false,
         upstream_session: None,
         managed_oauth: false,
@@ -1964,8 +1979,9 @@ pub(super) async fn prepare_tui(
     {
         prepare = prepare.header(TUI_INPUT_FORMAT, format);
     }
-    for (name, value) in tui_model_headers(input.headers)? {
-        prepare = prepare.header(name, value);
+    prepare = prepare.header(TUI_MODEL_HEADER_POLICY, "1");
+    for (name, value) in tui_model_headers(input.headers, true)? {
+        prepare = prepare.header(name, tui_header_value(&value)?);
     }
     let response = prepare
         .body(input.body.clone())
@@ -1998,6 +2014,8 @@ pub(super) async fn prepare_tui(
             }
             reservation.input_policy =
                 tui_projection_marker(response.headers(), TUI_INPUT_POLICY, "1");
+            reservation.model_header_policy =
+                tui_projection_marker(response.headers(), TUI_MODEL_HEADER_POLICY, "1");
             reservation.session_mapping =
                 tui_projection_marker(response.headers(), TUI_UPSTREAM_SESSION, "1");
             if observe {
@@ -2075,18 +2093,60 @@ pub(super) async fn prepare_tui(
     }
 }
 
-/// 取本轮显式选择的 Messages 协议选项，重复的 beta 按行顺序合并。
-/// @param headers 已通过 HTTP 层检查的请求头。@return 可转送给独立模型的功能声明。
+const TUI_LEGACY_MODEL_HEADERS: &[&str] = &["anthropic-version", "anthropic-beta"];
+const TUI_PROTOCOL_HEADERS: &[&str] = &[
+    "anthropic-version",
+    "anthropic-beta",
+    "accept",
+    "accept-language",
+    "cache-control",
+    "anthropic-dangerous-direct-browser-access",
+    "x-claude-code-prev-tool-durations",
+    "x-claude-code-compaction",
+    "x-claude-code-context-compacted",
+];
+
+/// 按协商版本选取 Messages 协议头。@param headers HTTP 入站头。
+/// @param full_policy 是否使用 V1 的完整协议头规则。@return 可送往账号事件源的选项。
 pub(super) fn tui_model_headers(
     headers: &HeaderMap,
+    full_policy: bool,
 ) -> Result<BTreeMap<&'static str, String>, AppError> {
+    let fields = if full_policy {
+        TUI_PROTOCOL_HEADERS
+    } else {
+        TUI_LEGACY_MODEL_HEADERS
+    };
+    let connection = headers.get_all(CONNECTION);
+    let connection_fields: Vec<_> = connection
+        .iter()
+        .flat_map(|value| value.as_bytes().split(|byte| *byte == b','))
+        .map(|name| name.trim_ascii())
+        .collect();
     let mut options: BTreeMap<_, String> = BTreeMap::new();
-    for name in ["anthropic-version", "anthropic-beta"] {
+    for &name in fields {
+        if full_policy
+            && connection_fields
+                .iter()
+                .any(|field| field.eq_ignore_ascii_case(name.as_bytes()))
+        {
+            continue;
+        }
         for raw in headers.get_all(name) {
-            let value = raw
-                .to_str()
-                .map_err(|_| AppError::BadRequest("Messages 协议头格式无效".into()))?;
-            let value = value.trim().replace('\t', " ");
+            let value = if full_policy {
+                // 与 V1 的信封采用同一字节表示，保留合法的 HTTP 扩展字节。
+                raw.as_bytes()
+                    .trim_ascii()
+                    .iter()
+                    .copied()
+                    .map(char::from)
+                    .collect()
+            } else {
+                raw.to_str()
+                    .map_err(|_| AppError::BadRequest("Messages 协议头格式无效".into()))?
+                    .trim()
+                    .replace('\t', " ")
+            };
             match options.get_mut(name) {
                 None => {
                     options.insert(name, value);
@@ -2095,12 +2155,42 @@ pub(super) fn tui_model_headers(
                     previous.push(',');
                     previous.push_str(&value);
                 }
+                Some(previous)
+                    if full_policy
+                        && matches!(name, "accept" | "accept-language" | "cache-control") =>
+                {
+                    previous.push_str(", ");
+                    previous.push_str(&value);
+                }
+                Some(_) if full_policy => {
+                    return Err(tui_input_rejection("duplicate_header").expect("已登记重复头错误"));
+                }
                 Some(previous) if *previous == value => {}
                 Some(_) => return Err(AppError::BadRequest("Messages 协议版本声明冲突".into())),
             }
         }
     }
+    if full_policy
+        && options
+            .get("anthropic-version")
+            .is_some_and(|version| version != "2023-06-01")
+    {
+        return Err(tui_input_rejection("unsupported_parameter").expect("已登记不支持参数错误"));
+    }
     Ok(options)
+}
+
+fn tui_header_value(value: &str) -> Result<HeaderValue, AppError> {
+    let invalid = || tui_input_rejection("invalid_header").expect("已登记请求头格式错误");
+    if value.is_ascii() {
+        return HeaderValue::from_str(value).map_err(|_| invalid());
+    }
+    let bytes = value
+        .chars()
+        .map(|character| u8::try_from(u32::from(character)))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| invalid())?;
+    HeaderValue::from_bytes(&bytes).map_err(|_| invalid())
 }
 
 /// 只解析已经运行的账号环境，后台准备不会唤醒休眠环境。
@@ -3417,7 +3507,14 @@ async fn forward(State(state): State<SenderState>, headers: HeaderMap, body: Byt
                     }
                     submitted = true;
                     let stream = stream_once(async move { Ok::<_, IoError>(body) });
-                    send_observed(&client, &prepared, RequestBody::wrap_stream(stream), observer).await
+                    send_observed(
+                        &client,
+                        &prepared,
+                        RequestBody::wrap_stream(stream),
+                        observer,
+                        true,
+                    )
+                    .await
                 } else if purpose.is_some() {
                     let client = get_background_request_client_for_profile(
                         &config.proxy_url,
@@ -4367,6 +4464,7 @@ mod tests {
             wire_capture: false,
             capture: None,
             input_policy: false,
+            model_header_policy: false,
             session_mapping: false,
             upstream_session: None,
             managed_oauth: false,
@@ -5837,6 +5935,73 @@ mod tests {
             }
         }
         server.abort();
+    }
+
+    /// 对照 V1 的协议头、连接级过滤、重复和版本错误。
+    #[test]
+    fn tui_model_header_policy_matches_v1_field_and_value_rules() {
+        let mut headers = HeaderMap::new();
+        headers.append("accept", HeaderValue::from_static("application/json"));
+        headers.append("accept", HeaderValue::from_static("text/event-stream"));
+        headers.append(
+            "accept-language",
+            HeaderValue::from_bytes(b"caf\xe9").unwrap(),
+        );
+        headers.append("cache-control", HeaderValue::from_static("no-cache"));
+        headers.append("connection", HeaderValue::from_static("CACHE-Control"));
+        headers.append("anthropic-version", HeaderValue::from_static("2023-06-01"));
+        headers.append("anthropic-beta", HeaderValue::from_static("one"));
+        headers.append("anthropic-beta", HeaderValue::from_static("two"));
+        headers.append(
+            "anthropic-dangerous-direct-browser-access",
+            HeaderValue::from_static("false"),
+        );
+        headers.append(
+            "x-claude-code-prev-tool-durations",
+            HeaderValue::from_static("Read=12"),
+        );
+        headers.append("x-claude-code-compaction", HeaderValue::from_static("true"));
+        headers.append(
+            "x-claude-code-context-compacted",
+            HeaderValue::from_static("true"),
+        );
+        headers.append("x-stainless-arch", HeaderValue::from_static("caller"));
+        headers.append("authorization", HeaderValue::from_static("synthetic"));
+        headers.append("anthropic-other", HeaderValue::from_static("ignored"));
+        let selected = tui_model_headers(&headers, true).unwrap();
+        assert_eq!(selected.len(), 8);
+        assert_eq!(selected["accept"], "application/json, text/event-stream");
+        assert_eq!(selected["anthropic-beta"], "one,two");
+        assert_eq!(
+            selected["anthropic-dangerous-direct-browser-access"],
+            "false"
+        );
+        assert_eq!(
+            tui_header_value(&selected["accept-language"])
+                .unwrap()
+                .as_bytes(),
+            b"caf\xe9"
+        );
+        assert_eq!(tui_model_headers(&headers, false).unwrap().len(), 2);
+        headers.append("anthropic-version", HeaderValue::from_static("2023-06-01"));
+        assert!(matches!(
+            tui_model_headers(&headers, true),
+            Err(AppError::TuiInput {
+                code: "duplicate_header",
+                status: StatusCode::BAD_REQUEST,
+                ..
+            })
+        ));
+        assert!(tui_model_headers(&headers, false).is_ok());
+        headers.insert("anthropic-version", HeaderValue::from_static("2024-01-01"));
+        assert!(matches!(
+            tui_model_headers(&headers, true),
+            Err(AppError::TuiInput {
+                code: "unsupported_parameter",
+                status: StatusCode::UNPROCESSABLE_ENTITY,
+                ..
+            })
+        ));
     }
 
     /// 无 billing 的原生输入只接收 V1 已认识的单个 UA；重复声明仍按普通 API 校验。

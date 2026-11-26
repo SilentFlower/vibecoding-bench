@@ -35,7 +35,7 @@ use crate::service::runtime_transport::{
     tui_input_rejection, tui_model_headers, tui_projection_marker, valid_tui_account_token,
 };
 use crate::service::runtime_transport::{
-    TUI_CAPTURE, TUI_ERROR_SOURCE, TUI_FINAL_CAPTURE, TuiReceiptProbe,
+    TUI_CAPTURE, TUI_ERROR_SOURCE, TUI_FINAL_CAPTURE, TUI_MODEL_HEADER_POLICY, TuiReceiptProbe,
 };
 use crate::service::tui_sender_response;
 use crate::service::tui_tool_history::SERVER_SESSION_PREFIX;
@@ -350,6 +350,7 @@ struct VerifiedSource {
     idle: bool,
     receipt_idle: Option<bool>,
     model_headers: bool,
+    model_header_policy: bool,
     capture_http: bool,
     body_policy: bool,
     input_policy: bool,
@@ -383,6 +384,7 @@ async fn verify_source(
         receipt_idle: reply["receipt_idle"].as_bool(),
         capture_http: reply["capture_http_protocol"].as_u64() == Some(1),
         model_headers: reply["model_headers_protocol"].as_u64() == Some(1),
+        model_header_policy: reply["model_header_policy_protocol"].as_u64() == Some(1),
         body_policy: reply["body_policy_protocol"].as_u64() == Some(1),
         input_policy: reply["input_policy_protocol"].as_u64() == Some(1),
         agent_scope: reply["agent_scope_protocol"].as_u64() == Some(1),
@@ -562,6 +564,8 @@ impl TuiSender {
         )?;
         let capture_requested = tui_projection_marker(request.headers(), TUI_CAPTURE, "1");
         let wire_protocol = tui_projection_marker(request.headers(), TUI_FINAL_CAPTURE, "1");
+        let offer_header_policy =
+            tui_projection_marker(request.headers(), TUI_MODEL_HEADER_POLICY, "1");
         let prepared = async {
             if submission_log::was_consumed(
                 &self.submission_storage,
@@ -578,6 +582,7 @@ impl TuiSender {
                 mut connection,
                 proof,
                 model_headers,
+                model_header_policy,
                 capture_http,
                 body_policy,
                 input_policy,
@@ -599,8 +604,9 @@ impl TuiSender {
             if policy.is_some() && !body_policy {
                 return Err(unavailable());
             }
+            let model_header_policy = offer_header_policy && model_header_policy && model_headers;
             let option_bytes = if model_headers {
-                let options = tui_model_headers(request.headers())?;
+                let options = tui_model_headers(request.headers(), model_header_policy)?;
                 (!options.is_empty())
                     .then(|| serde_json::to_vec(&options).expect("版本和功能声明均为字符串"))
             } else {
@@ -636,6 +642,9 @@ impl TuiSender {
             }
             if let Some(format) = native_input {
                 control["input_format"] = json!(format);
+            }
+            if model_header_policy {
+                control["model_header_policy"] = json!(1);
             }
             if let Some(bytes) = &option_bytes {
                 // 独立分段，较长的功能清单也不挤占旧握手的 4KiB 控制帧。
@@ -734,6 +743,7 @@ impl TuiSender {
                 workspace,
                 capture_http,
                 input_policy,
+                model_header_policy,
                 session_mapping,
                 managed_oauth,
                 oauth_file,
@@ -745,6 +755,7 @@ impl TuiSender {
             workspace,
             capture_http,
             input_policy,
+            model_header_policy,
             session_mapping,
             managed_oauth,
             oauth_file,
@@ -776,6 +787,11 @@ impl TuiSender {
             response
                 .headers_mut()
                 .insert(TUI_INPUT_POLICY, HeaderValue::from_static("1"));
+        }
+        if model_header_policy {
+            response
+                .headers_mut()
+                .insert(TUI_MODEL_HEADER_POLICY, HeaderValue::from_static("1"));
         }
         if session_mapping {
             response
@@ -1537,7 +1553,8 @@ mod tests {
         let mut stale = headers(&another);
         stale.insert(TUI_OAUTH_FILE, file.header().unwrap());
         assert!(send(&stale).await.is_err());
-        let encoded = TuiCaptureInput::encode(&HeaderMap::new(), b"{}", &json!({}), &[]).unwrap();
+        let encoded =
+            TuiCaptureInput::encode(&HeaderMap::new(), b"{}", &json!({}), &[], false).unwrap();
         let capture = serde_json::from_slice(&encoded).unwrap();
         let capture_dir = source.sender.submission_storage.join("capture");
         let sending = source.sender.send(
@@ -1678,6 +1695,8 @@ mod tests {
             .header("authorization", "fixture-local-only")
             .header("x-api-key", "fixture-client-only")
             .header(TUI_INPUT_FORMAT, "claude_code")
+            .header(TUI_MODEL_HEADER_POLICY, "1")
+            .header("anthropic-dangerous-direct-browser-access", "false")
             .header(TUI_BODY_POLICY, policy.to_string())
             .body(Body::from("{}"))
             .unwrap();
@@ -1688,11 +1707,13 @@ mod tests {
             async {
                 let (mut socket, mut reply) = source.receive("bind").await;
                 reply["model_headers_protocol"] = json!(1);
+                reply["model_header_policy_protocol"] = json!(1);
                 reply["body_policy_protocol"] = json!(1);
                 reply["input_policy_protocol"] = json!(1);
                 write_json(&mut socket, &reply).await.unwrap();
                 let control = read_json(&mut socket).await.unwrap();
                 assert_eq!(control["input_format"], "claude_code");
+                assert_eq!(control["model_header_policy"], 1);
                 assert_eq!(control["body_policy"], policy);
                 let mut original = [0; 2];
                 socket.read_exact(&mut original).await.unwrap();
@@ -1701,7 +1722,8 @@ mod tests {
                 socket.read_exact(&mut data).await.unwrap();
                 assert_eq!(
                     serde_json::from_slice::<Value>(&data).unwrap(),
-                    json!({"anthropic-version":"2023-06-01","anthropic-beta":format!("first,{option}")})
+                    json!({"anthropic-version":"2023-06-01","anthropic-beta":format!("first,{option}"),
+                        "anthropic-dangerous-direct-browser-access":"false"})
                 );
                 reply["kind"] = json!("new");
                 write_json(&mut socket, &reply).await.unwrap();
@@ -1711,6 +1733,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::NO_CONTENT);
         assert_eq!(response.headers()[TUI_BODY_POLICY], "1");
         assert_eq!(response.headers()[TUI_INPUT_POLICY], "1");
+        assert_eq!(response.headers()[TUI_MODEL_HEADER_POLICY], "1");
         assert_eq!(source.cancel(&id).await.unwrap(), StatusCode::NO_CONTENT);
     }
 

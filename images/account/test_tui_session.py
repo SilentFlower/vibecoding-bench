@@ -35,6 +35,47 @@ from tui_messages import (
 class SessionTests(unittest.TestCase):
     """固定版结构化事件和账号内原生进程预留的回归。"""
 
+    def test_protocol_headers_use_current_sdk_and_reject_unsupported_beta(self):
+        """普通 API 校验同轮原生能力，协议值按准入结果覆盖默认值。@return 无。"""
+        identity = {
+            **self._identity("header-test"), "model_header_policy": 1,
+            "model_headers": {"accept": "text/plain", "anthropic-beta": "sdk-a"},
+        }
+        sdk = {"Accept": "application/json", "anthropic-beta": "sdk-a,sdk-b",
+               "X-Stainless-OS": "sdk-os", "Authorization": "synthetic"}
+        with closing(self._driver(1)) as driver, closing(driver.prepare(identity, encode(self._body()))) as handle:
+            self.assertEqual(handle.actor._protocol_headers(sdk, handle), {
+                "accept": "text/plain", "anthropic-beta": "sdk-a,sdk-b", "x-stainless-os": "sdk-os",
+            })
+            handle.model_headers["anthropic-beta"] = "extra"
+            actor = handle.actor
+            actor.step = SimpleNamespace(native=("turn", 1), claimed=False)
+            driver.launcher = SimpleNamespace(local_model_response=Mock())
+            with patch.object(actor, "_main_request", return_value=True), self.assertRaises(ModelResponseError) as caught:
+                actor.serve_model(SimpleNamespace(headers=sdk), {})
+            self.assertEqual(caught.exception.status, 422)
+            self.assertEqual(json.loads(caught.exception.private_body)["error"]["code"], "unsupported_parameter")
+            self.assertFalse(actor.step.claimed)
+            driver.launcher.local_model_response.assert_not_called()
+
+    def test_non_stream_accept_uses_sdk_for_upstream_sse(self):
+        """公开非流式请求向模型取流时使用同轮 SDK 的 Accept。@return 无。"""
+        for explicit in (False, None):
+            with self.subTest(stream=explicit), closing(self._driver(1)) as driver:
+                body = self._body()
+                if explicit is None:
+                    del body["stream"]
+                else:
+                    body["stream"] = explicit
+                identity = {**self._identity("accept-json"), "model_header_policy": 1,
+                            "model_headers": {"accept": "application/json;q=0.9"}}
+                with closing(driver.prepare(identity, encode(body))) as handle:
+                    self.assertFalse(handle.stream)
+                    self.assertIs(json.loads(handle.raw)["stream"], True)
+                    self.assertEqual(handle.actor._protocol_headers({"Accept": "application/json"}, handle),
+                                     {"accept": "application/json"})
+                    self.assertNotIn("accept", handle.actor._protocol_headers({}, handle))
+
     def test_provider_session_rewrites_only_user_id_and_session_header(self):
         """发送副本保留缓存前缀、工具 ID、原始字节及其他元数据。@return 无。"""
         original = "a1234567-1234-4123-8123-123456789abc"

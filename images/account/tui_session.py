@@ -24,9 +24,10 @@ from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 
 from tui_capacity import TuiCapacity, TuiCapacityError
-from tui_input_policy import CONTEXT_BETA
+from tui_input_policy import CONTEXT_BETA, native_input
 from tui_messages import (
     BODY_LIMIT,
+    MODEL_PROTOCOL_HEADERS,
     ModelResponseError,
     SubagentAmbiguousError,
     SubagentBindingError,
@@ -38,6 +39,7 @@ from tui_messages import (
     provider_session,
     split_reply,
     tool_receipts,
+    valid_model_header_value,
     wire_events,
 )
 
@@ -680,6 +682,38 @@ class _Actor:
             == 1
         )
 
+    @staticmethod
+    def _protocol_headers(sdk_headers, handle):
+        # 能力由本轮 SDK 实际声明，普通 API 只能选择已具备的 beta。
+        options = handle.model_headers
+        version = options.get("anthropic-version")
+        beta = options.get("anthropic-beta")
+        sdk_beta = sdk_headers.get("anthropic-beta", "")
+        supported = {token.strip() for token in sdk_beta.split(",")}
+        if (version is not None and version != sdk_headers.get("anthropic-version", "2023-06-01")
+                or beta is not None and not handle.preserve_model_beta
+                and any(token.strip() not in supported for token in beta.split(","))):
+            raise ModelResponseError(422, _json({"type": "error", "error": {
+                "type": "invalid_request_error", "code": "unsupported_parameter",
+                "message": "请求的协议版本或 beta 超出本轮原生 SDK 能力",
+            }}).encode())
+        actual = {}
+        for name, value in sdk_headers.items():
+            name = name.lower()
+            if (name in MODEL_PROTOCOL_HEADERS - {"anthropic-version", "anthropic-beta"}
+                    or name.startswith("x-stainless-")) and valid_model_header_value(value):
+                actual[name] = value
+        for name, value in options.items():
+            # 公开 JSON 转成上游 SSE 时，沿用同轮原生请求的接收声明。
+            if name != "accept" or handle.stream:
+                actual[name] = value
+        if not (handle.preserve_model_beta and beta):
+            if sdk_beta:
+                actual["anthropic-beta"] = sdk_beta
+            else:
+                actual.pop("anthropic-beta", None)
+        return actual
+
     def serve_model(self, http, native):
         """一轮原生模型 POST 开启一次冻结的本机请求。@param http 当前 TUI 的模型连接。
         @param native 原生 CLI 请求，仅用于核对已开放的主步骤。@return 无。
@@ -713,6 +747,9 @@ class _Actor:
                 ):
                     # sender 已允许启动终端时，父工具仍可能拒绝。提交模型前再核对一次。
                     raise SubagentBindingError("子代理的原工具已拒绝或取消")
+                headers = handle.model_headers
+                if handle.model_header_policy:
+                    headers = self._protocol_headers(http.headers, handle)
                 if handle.kind == "new" and self.agent_offer is not None:
                     self.agent_offer.messages.clear()
                     self.agent_messages.clear()
@@ -729,7 +766,6 @@ class _Actor:
             http.send_error(409, "No pending model step")
             return
         # 旧进程仍校验启动 AT。文件模式的令牌已经与原生步骤绑定。
-        headers = handle.model_headers
         if handle.api_context is not None:
             offered = {v.strip() for v in http.headers.get("anthropic-beta", "").split(",")}
             thinking = handle.thinking if handle.thinking is not None else native.get("thinking", {})
@@ -858,6 +894,11 @@ class _Reserved:
         self.stream = stream
         self.raw = raw
         self.model_headers = dict(reservation.get("model_headers") or {})
+        self.model_header_policy = reservation.get("model_header_policy") == 1
+        self.preserve_model_beta = self.model_header_policy and (
+            native_input(body, reservation.get("input_format"))
+            or any(row["role"] == "system" for row in body["messages"])
+        )
         self.upstream_session_id = None
         self.reservation = reservation
         self.account_token = None

@@ -25,6 +25,7 @@ import sys
 import tempfile
 from threading import Event, Thread
 import time
+from types import SimpleNamespace
 from uuid import uuid4
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -40,8 +41,9 @@ from native_capture import read_capture
 from tls_clienthello import parse_body
 from tls_http import certificates
 from tui_sender_launch import managed_model_response
+from tui_session import _Actor
 from tui_source import _oauth_file
-from tui_messages import ModelResponseError
+from tui_messages import ModelResponseError, input_message
 from verify_tui_http_handoff import message_sse
 
 
@@ -64,9 +66,9 @@ def wait_for(operation):
     raise AssertionError('等待合成现场就绪超时')
 
 
-def call(port, method, path, secret, data=None):
+def call(port, method, path, secret, data=None, headers=None):
     """请求隔离命名空间中的服务。@param port 本机端口。@param method 方法。@param path 路径。
-    @param secret 合成凭据。@param data 可选 JSON。@return 状态及响应字节。
+    @param secret 合成凭据。@param data 可选 JSON。@param headers 合成的额外头。@return 状态及响应字节。
     """
     with closing(HTTPConnection('127.0.0.1', port, timeout=30)) as conn:
         conn.request(
@@ -77,6 +79,7 @@ def call(port, method, path, secret, data=None):
                 'Authorization': 'Bearer ' + secret,
                 'Content-Type': 'application/json',
                 'anthropic-version': '2023-06-01',
+                **(headers or {}),
             },
         )
         response = conn.getresponse()
@@ -115,8 +118,11 @@ def verify(folder, gateway, sender):
     )
     records, hellos, source_errors = [], [], []
     submitted_hashes = {}
+    outbound_hashes = {}
     file_mode = Event()
     file_mode.set()
+    model_header_policy = Event()
+    model_header_policy.set()
     received_modes = []
     cancel_arrived, cancel_release = Event(), Event()
     root = folder / 'account'
@@ -258,6 +264,7 @@ def verify(folder, gateway, sender):
                 model_headers_protocol=1,
                 body_policy_protocol=1,
                 upstream_session_protocol=1,
+                **({'model_header_policy_protocol': 1} if model_header_policy.is_set() else {}),
                 **({'oauth_file_protocol': 1} if file_mode.is_set() else {}),
             )
             if action != 'bind':
@@ -265,6 +272,17 @@ def verify(folder, gateway, sender):
             prepare = json.loads(self.rfile.readline())
             raw = self.rfile.read(prepare['body_len'])
             headers = json.loads(self.rfile.read(prepare.get('model_headers_len', 0)) or b'{}')
+            reservation = prepare['reservation']
+            _, public_stream, outbound = input_message(
+                raw, native=prepare.get('input_format'), session_id=reservation['session_id'],
+                body_policy=prepare.get('body_policy'),
+            )
+            if prepare.get('model_header_policy') == 1:
+                headers = _Actor._protocol_headers(
+                    {'accept': 'application/json', 'x-stainless-os': 'fixture-sdk'},
+                    SimpleNamespace(model_headers=headers, preserve_model_beta=False, stream=public_stream),
+                )
+                reservation = {**reservation, 'model_header_policy': 1}
             file_selected = prepare.get('oauth_file_protocol') == 1
             reply(kind='new', **({'oauth_file_protocol': 1} if file_selected else {}))
             line = self.rfile.readline()
@@ -300,11 +318,12 @@ def verify(folder, gateway, sender):
                 )
                 self.wfile.write(struct.pack('!I', len(error_body)) + error_body + b'\0\0\0\0')
                 return
+            outbound_hashes[reservation['reservation_id']] = sha256(outbound).hexdigest()
             try:
                 with managed_model_response(
-                    raw,
+                    outbound,
                     account_token=bearer,
-                    reservation=prepare['reservation'],
+                    reservation=reservation,
                     headers=headers,
                     capture_assembly=command.get('capture_assembly') is True,
                 ) as response:
@@ -452,14 +471,14 @@ def verify(folder, gateway, sender):
         )
         token = manage('POST', 'tokens', dict(name='wire', allowed_accounts='1'))['token']
 
-        def post(text, stream=True):
+        def post(text, stream=True, headers=None):
             data = {
                 'model': 'claude-sonnet-4-6',
                 'max_tokens': 64,
                 'stream': stream,
                 'messages': [{'role': 'user', 'content': text}],
             }
-            return call(18090, 'POST', '/v1/messages', token, data)[0]
+            return call(18090, 'POST', '/v1/messages', token, data, headers)[0]
 
         assert post('same') == 200
         assert not list(private.glob('*.json'))
@@ -475,6 +494,24 @@ def verify(folder, gateway, sender):
         assert post('same', False) == 200
         assert records[1][3] == records[2][3]
         assert received_modes == ['file', 'file', 'file']
+        protocol_headers = {
+            'accept': 'application/json;q=0.9',
+            'accept-language': 'café',
+            'cache-control': 'no-cache',
+            'anthropic-dangerous-direct-browser-access': 'false',
+            'x-claude-code-prev-tool-durations': 'Read=12',
+            'x-claude-code-compaction': 'true',
+            'x-claude-code-context-compacted': 'true',
+        }
+        caller_headers = {**protocol_headers, 'x-stainless-os': 'fixture-caller', 'x-forwarded-for': '192.0.2.1'}
+        assert post('fixture-header-parity', headers=caller_headers) == 200
+        assert post('fixture-header-json', stream=False, headers=caller_headers) == 200
+        model_header_policy.clear()
+        assert post('fixture-header-legacy', headers=caller_headers) == 200
+        model_header_policy.set()
+        before_http = len(records)
+        assert post('fixture-header-version', headers={'anthropic-version': '2024-01-01'}) == 422
+        assert len(records) == before_http
         file_mode.clear()
         assert post('legacy-token') == 200 and received_modes[-1] == 'legacy'
         file_mode.set()
@@ -561,6 +598,7 @@ def verify(folder, gateway, sender):
         wait_for(lambda: len(list(private.glob('*.json'))) == len(expected) + 1)
         expected = sorted((http, body, size) for http, body, size, _ in expected)
         actual = []
+        projected_accept_verified = False
         for path in private.glob('*.json'):
             snapshot = read_capture(root, 1, path.stem)
 
@@ -591,7 +629,8 @@ def verify(folder, gateway, sender):
             assert wire['request_id'] == path.stem and wire['source'] == 'tui_sender_tls'
             saved = path.read_bytes()
             assert account_token.encode() not in saved and account_refresh.encode() not in saved
-            assert snapshot['original_body_sha256'] == submitted_hashes[path.stem]
+            assert snapshot['ingress']['original_body_sha256'] == submitted_hashes[path.stem]
+            assert snapshot['original_body_sha256'] == outbound_hashes[path.stem]
             if not wire['complete']:
                 assert (
                     wire['status'] == 'unavailable'
@@ -601,9 +640,26 @@ def verify(folder, gateway, sender):
                 continue
             if wire['observed_body_bytes'] > 2 * 1024 * 1024:
                 assert wire['body_truncated']
-            assert wire['body_sha256'] == submitted_hashes[path.stem]
+            wire_headers = dict(wire['headers'])
+            if 'fixture-header-parity' in snapshot['body']:
+                for name, value in protocol_headers.items():
+                    assert wire_headers[name] == value and decisions[name]['action'] == 'keep'
+                assert wire_headers['x-stainless-os'] == 'fixture-sdk'
+                assert decisions['x-stainless-os']['action'] == 'runtime'
+                assert 'x-forwarded-for' not in wire_headers
+            if 'fixture-header-json' in snapshot['body']:
+                assert json.loads(wire['body'])['stream'] is True
+                assert wire_headers['accept'] == 'application/json'
+                assert decisions['accept']['action'] == 'runtime'
+                assert wire_headers['cache-control'] == protocol_headers['cache-control']
+                projected_accept_verified = True
+            if 'fixture-header-legacy' in snapshot['body']:
+                assert wire_headers['accept'] == 'text/event-stream'
+                assert 'anthropic-dangerous-direct-browser-access' not in wire_headers
+                assert decisions['anthropic-dangerous-direct-browser-access']['action'] == 'drop'
+            assert wire['body_sha256'] == outbound_hashes[path.stem]
             actual.append((wire['http_sha256'], wire['body_sha256'], wire['observed_http_bytes']))
-        assert sorted(actual) == expected and not source_errors
+        assert sorted(actual) == expected and not source_errors and projected_accept_verified
         from playwright.sync_api import sync_playwright, expect
 
         with sync_playwright() as playwright:
@@ -625,6 +681,9 @@ def verify(folder, gateway, sender):
             'cancelled_after_write': 1,
             'credential_modes': sorted(set(received_modes)),
             'failed_before_model': 1,
+            'protocol_headers_verified': len(protocol_headers),
+            'projected_accept_verified': projected_accept_verified,
+            'legacy_header_policy_verified': True,
             'hello_same': True,
             'http_same': True,
             'reused': True,

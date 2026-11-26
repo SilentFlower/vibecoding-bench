@@ -890,24 +890,30 @@ pub(super) struct TuiCaptureInput {
 
 impl TuiCaptureInput {
     /// 生成本轮采集旁路数据。@param headers 原入站头。@param raw 入站实体。@param parsed 原正文。
-    /// @return 有界的私有信封，无法采集时业务继续。
+    /// @param model_header_policy 本次已协商的协议头规则。@return 有界私有信封。
     pub(super) fn encode(
         headers: &HeaderMap,
         raw: &[u8],
         parsed: &Value,
         context: &[Option<&str>],
+        model_header_policy: bool,
     ) -> Option<Bytes> {
         let pairs: Vec<_> = headers
             .iter()
             .map(|(name, value)| {
                 (
                     name.as_str().to_owned(),
-                    String::from_utf8_lossy(value.as_bytes()).into_owned(),
+                    value.as_bytes().iter().copied().map(char::from).collect(),
                 )
             })
             .collect();
         let mut ingress = ingress_snapshot(&pairs, raw, parsed, "", false)?;
-        let selected = super::runtime_transport::tui_model_headers(headers).ok()?;
+        let mut selected =
+            super::runtime_transport::tui_model_headers(headers, model_header_policy).ok()?;
+        // 公开非流式响应需要聚合，账号源保留原生模型请求的 Accept。
+        if parsed["stream"] != true {
+            selected.remove("accept");
+        }
         // 旧 sender 仅读取 ingress 的既有字段。记录真正被协议选择器接纳的名称，不保存值。
         ingress["_tui_context"] = json!(context.iter().flatten().collect::<Vec<_>>());
         ingress["_tui_options"] = json!(selected.keys().collect::<Vec<_>>());
@@ -921,10 +927,6 @@ impl TuiCaptureInput {
         let mut repeated = Vec::new();
         collect(parsed, &mut repeated);
         let body = std::str::from_utf8(raw).ok()?;
-        let options: Vec<_> = pairs
-            .iter()
-            .filter(|(k, _)| matches!(k.as_str(), "anthropic-beta" | "anthropic-version"))
-            .collect();
         for (k, v) in &pairs {
             if sensitive(k) {
                 let mut values = Vec::new();
@@ -933,7 +935,7 @@ impl TuiCaptureInput {
                     let escaped = serde_json::to_string(secret).expect("字符串可编码");
                     body.contains(secret)
                         || body.contains(&escaped[1..escaped.len() - 1])
-                        || options.iter().any(|(_, v)| v.contains(secret))
+                        || selected.values().any(|v| v.contains(secret))
                 }));
             }
         }
@@ -967,6 +969,8 @@ impl TuiCaptureInput {
                 } else if selected.iter().any(|key| key.as_str() == Some(&name)) {
                     if name == "anthropic-version" && self.ingress["_version_preserved"] == true {
                         ("keep", "网关保留调用方的协议版本")
+                    } else if !matches!(name.as_str(), "anthropic-version" | "anthropic-beta") {
+                        ("keep", "按已登记的协议头规则保留调用方值")
                     } else {
                         ("runtime", "网关规范化并汇总本轮协议声明")
                     }
@@ -980,7 +984,11 @@ impl TuiCaptureInput {
             for (name, _) in pairs {
                 let reason = match name.as_str() {
                     "authorization" => "由本轮账号授权生成",
-                    "content-type" | "accept" | "accept-encoding" => "受管组装器按模型流式请求设置",
+                    "accept" if rows.get(name).is_some_and(|(action, _)| *action == "keep") => {
+                        continue;
+                    }
+                    "accept" => "取自本轮 SDK 的流式请求或发送器默认值",
+                    "content-type" | "accept-encoding" => "受管组装器按模型流式请求设置",
                     "anthropic-version" if !explicit_version => "受管组装器采用默认协议版本",
                     "anthropic-version" => {
                         rows.entry(name.clone())
@@ -989,6 +997,7 @@ impl TuiCaptureInput {
                     }
                     "anthropic-beta" => "受管组装器合并功能声明与账号必需的 OAuth 声明",
                     "user-agent" | "x-app" => "取自当前原生进程的模型回调",
+                    name if name.starts_with("x-stainless-") => "取自当前原生 SDK 的模型回调",
                     "x-claude-code-session-id"
                         if rows
                             .get(name)
@@ -1476,7 +1485,8 @@ mod tests {
                 used.then_some("x-claude-code-agent-id"),
                 used.then_some("x-session-id"),
             ];
-            let bytes = TuiCaptureInput::encode(&headers, b"{}", &json!({}), &context).unwrap();
+            let bytes =
+                TuiCaptureInput::encode(&headers, b"{}", &json!({}), &context, false).unwrap();
             let input: TuiCaptureInput = serde_json::from_slice(&bytes).unwrap();
             let policy = input.decisions(&[], None).unwrap();
             let rows = policy["decisions"].as_array().unwrap();
@@ -1507,7 +1517,7 @@ mod tests {
         headers.insert("cookie", "strictly-header-only".parse().unwrap());
         let raw = br#"{"metadata":{"secret":"inside-metadata"},"messages":[{"role":"user","content":"outside-only-key inside-metadata provided-locally"}]}"#;
         let parsed = serde_json::from_slice(raw).unwrap();
-        let input = TuiCaptureInput::encode(&headers, raw, &parsed, &[]).unwrap();
+        let input = TuiCaptureInput::encode(&headers, raw, &parsed, &[], false).unwrap();
         assert!(
             !std::str::from_utf8(&input)
                 .unwrap()
@@ -1566,8 +1576,8 @@ mod tests {
         let visibly_cut = "unique-CANARY";
         let raw = format!("{start}{}{secret}\"}}}}", "x".repeat(INGRESS_PREVIEW_LIMIT-start.len()-visibly_cut.len()));
         let parsed = serde_json::from_str(&raw).unwrap();
-        let input =
-            TuiCaptureInput::encode(&HeaderMap::new(), raw.as_bytes(), &parsed, &[]).unwrap();
+        let input = TuiCaptureInput::encode(&HeaderMap::new(), raw.as_bytes(), &parsed, &[], false)
+            .unwrap();
         let input: TuiCaptureInput = serde_json::from_slice(&input).unwrap();
         assert!(input.ingress["body"].as_str().unwrap().ends_with(visibly_cut));
         input.save(&root,7,attempt,vec![("Authorization".into(),format!("Bearer {secret}"))],b"{}".to_vec(),"request_to_account_sender",false,None).unwrap();
