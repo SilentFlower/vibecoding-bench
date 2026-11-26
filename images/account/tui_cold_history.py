@@ -118,7 +118,7 @@ def _inline_image(block, *, for_paste=False):
 
 
 def _result_blocks(content, *, allow_images):
-    return isinstance(content, list) and bool(content) and all(
+    return isinstance(content, list) and all(
         isinstance(block, dict) and (_history_text(block) or (allow_images and _inline_image(block)))
         for block in content
     )
@@ -134,6 +134,15 @@ def tool_result_has_images(block):
 def _historical_image_results(rows):
     return [(row["role"], block) for row in rows for block in _blocks(row)
             if block.get("type") == "tool_result" and tool_result_has_images(block)]
+
+
+def _matches_history_results(native, expected):
+    if not expected:
+        return True
+    ids = {block["tool_use_id"] for _, block in expected}
+    observed = [(row["role"], block) for row in native["messages"] for block in _blocks(row)
+                if block.get("type") == "tool_result" and block.get("tool_use_id") in ids]
+    return observed == expected
 
 
 def _marked_blocks(content):
@@ -187,7 +196,7 @@ def _closed_history(rows, *, result_types=(str,), signed_rows=()):
                     and block.keys() <= {"type", "tool_use_id", "content", "is_error"}
                     and isinstance(block.get("tool_use_id"), str)
                     and block["tool_use_id"] not in results
-                    and (isinstance(block.get("content"), result_types)
+                    and (isinstance(block.get("content", ""), result_types)
                          # 固定 CLI 会移除错误工具结果中的图像，并将原文本块合并。
                          or _result_blocks(block.get("content"), allow_images=not block.get("is_error", False)))
                     and type(block.get("is_error", False)) is bool):
@@ -416,8 +425,10 @@ class ColdHistory:
                        and not _result_blocks(block["content"], allow_images=not block.get("is_error", False))
                        for block in content):
                     return None
-                content = [{**block, "content": block.get("content", "")} if block["type"] == "tool_result"
-                           else block for block in content]
+                # 已确认的空结果保持原字段形状。新回执沿用现有的缺省值。
+                if index > len(self.history):
+                    content = [{**block, "content": block.get("content", "")} if block["type"] == "tool_result"
+                               else block for block in content]
             if history and history[-1]["role"] == role:
                 history[-1]["content"] += content
             else:
@@ -493,13 +504,13 @@ class ColdHistory:
 
     def matches_history_tool_images(self, native):
         """核对旧工具图文结果。@param native CLI 实际正文。@return 已确认图文仍按原工具 ID 交付。"""
-        expected = _historical_image_results(self.history)
-        if not expected:
-            return True
-        ids = {block["tool_use_id"] for _, block in expected}
-        observed = [(row["role"], block) for row in native["messages"] for block in _blocks(row)
-                    if block.get("type") == "tool_result" and block.get("tool_use_id") in ids]
-        return observed == expected
+        return _matches_history_results(native, _historical_image_results(self.history))
+
+    def matches_history_empty_tool_results(self, native):
+        """核对已闭合的空结果。@param native CLI 实际正文。@return 原结果形状和工具 ID 是否保留。"""
+        expected = [(row["role"], block) for row in self.history for block in _blocks(row)
+                    if block.get("type") == "tool_result" and block.get("content", "") in ("", [])]
+        return _matches_history_results(native, expected)
 
     def matches_history_cache_markers(self, native):
         """核对原生出站的历史断点。@param native CLI 实际生成的请求。@return 原位置与标记是否完整保留。"""

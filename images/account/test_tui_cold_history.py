@@ -474,6 +474,31 @@ class ColdHistoryTests(TestCase):
         result["content"][1]["cache_control"]["ttl"] = "unsupported"
         self.assertIsNone(ColdHistory.from_request(body))
 
+    def test_completed_empty_results_keep_content_shape_when_resumed(self):
+        """核对空结果的三种入站形状、旧归属及回执冻结。@return 无。"""
+        for fields in ({}, {"content": []}, {"content": ""}, {"is_error": True}):
+            with self.subTest(fields=fields):
+                body = deepcopy(self.body)
+                result = body["messages"][2]["content"][0]
+                result.pop("content")
+                result.update(fields)
+                plan = ColdHistory.from_request(body)
+                self.assertTrue(plan.matches_history_empty_tool_results(body))
+                changed = deepcopy(body)
+                changed["messages"][2]["content"][0]["content"] = None
+                self.assertIsNone(ColdHistory.from_request(changed))
+                self.assertFalse(plan.matches_history_empty_tool_results(changed))
+
+                continuation = [*body["messages"],
+                                {"role": "assistant", "content": [
+                                    {"type": "tool_use", "id": "toolu_new", "name": "LookupNote", "input": {}}]},
+                                {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_new"}]}]
+                resumed = plan.resume_receipts(continuation)
+                self.assertEqual(resumed.history[2]["content"], [result])
+                self.assertEqual(resumed.history[-1]["content"], [
+                    {"type": "tool_result", "tool_use_id": "toolu_new", "content": ""},
+                ])
+
     def test_completed_tool_result_images_keep_content_and_ownership(self):
         """核对旧工具图文的原位置、归属及内嵌来源。@return 无。"""
         body = deepcopy(self.body)

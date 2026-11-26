@@ -322,7 +322,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            auxiliary_kind="title", auxiliary_sample=None, agent_progress=None, stock_client=False,
            cancel_and_change_question=False, oauth_rotation=False, provider_quota=None, slow_tool_stream=False,
            model_connection_contract=None, external_signed_history=False, history_tool_images=None,
-           tool_receipt_images=None, explicit_custom_tool_type=False):
+           tool_receipt_images=None, explicit_custom_tool_type=False, history_empty_tool_result=None):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -334,6 +334,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param history_png 是否核对用户历史里的内嵌 PNG。
     @param history_images 是否核对用户历史里四种内嵌图像。
     @param history_tool_blocks 是否核对已完成工具结果的原始文本块。
+    @param history_empty_tool_result 已闭合空结果的缺省、空数组或空串形状。
     @param history_tool_images 核对已闭合工具结果的图文块，可显式声明成功或省略错误标志。
     @param tool_receipt_images 核对本轮实际工具调用的图文回执及拒绝边界。
     @param explicit_custom_tool_type 是否通过显式 custom 的客户端声明进行原生工具往返。
@@ -994,6 +995,15 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         historical_result = {"type": "tool_result", "tool_use_id": PAST_ID, "content": old_result}
         if history_tool_images == "explicit-success":
             historical_result["is_error"] = False
+        if history_empty_tool_result:
+            shape, _, failed = history_empty_tool_result.partition("-")
+            old_result = {"omitted": None, "array": [], "string": ""}[shape]
+            if shape == "omitted":
+                historical_result.pop("content")
+            else:
+                historical_result["content"] = old_result
+            if failed:
+                historical_result["is_error"] = True
         messages[3:3] = [
             {"role": "assistant", "content": [{"type": "tool_use", "name": "OldNote", "id": PAST_ID, "input": ARGS}]},
             {"role": "user", "content": [historical_result]},
@@ -1232,6 +1242,19 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 trace_startup=trace_startup,
             )
             assert len(received) == 1
+        if history_empty_tool_result:
+            changed = deepcopy(follow)
+            (_, historical), = find_blocks(changed, "tool_use_id", PAST_ID)
+            if "content" in historical:
+                historical.pop("content")
+            else:
+                historical["content"] = []
+            changed_empty_history, _, empty_history_request_id = checked_messages(
+                manage, token, changed, headers, received, "changed_empty_tool_history", expected_status=422,
+                trace_startup=trace_startup, sender_status=sender_state_after_failure,
+            )
+            assert len(received) == 1
+            assert manage("GET", "request-diagnostics/" + empty_history_request_id)["attempts"] == []
         if auto_tool_choice:
             # 两种 auto 字段形状在模型端等效，工具回执仍须匹配根轮实际提交的形状。
             other_auto = {"type": "auto"}
@@ -1541,8 +1564,16 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                                         if block["type"] == "image"],
                                             "content_sha256": sha256(encoded(old_result)).hexdigest(),
                                             "changed_order_http": changed_history_images}
-        elif not tool_receipt_images:
+        elif not (tool_receipt_images or history_empty_tool_result):
             proof["old_tool_calls"] = 0
+        if history_empty_tool_result:
+            observed = [find_blocks(model, "tool_use_id", PAST_ID) for _, model, _ in received]
+            assert observed == [[("user", historical_result)]] * 2, observed
+            assert all(attempt["diagnostic_body_source"] == "interactive_cli" for attempt in captures)
+            proof["history_empty_tool_result"] = {"input_shape": history_empty_tool_result,
+                                                  "observed_results": observed,
+                                                  "changed_shape_http": changed_empty_history,
+                                                  "changed_shape_request_id": empty_history_request_id}
         if tool_receipt_images:
             assert final["stop_reason"] == "end_turn"
             assert binding_file.read_bytes() == original_binding, binding_file
@@ -3972,7 +4003,7 @@ def verify_model(received, *, policy, old_content, current_text_blocks=False):
         (old,) = find_blocks(body, "id", PAST_ID)
         (old_result,) = find_blocks(body, "tool_use_id", PAST_ID)
         assert old == ("assistant", {"type": "tool_use", "id": PAST_ID, "name": "OldNote", "input": ARGS})
-        assert old_result[0] == "user" and old_result[1]["content"] == old_content, old_result
+        assert old_result[0] == "user" and old_result[1].get("content") == old_content, old_result
         (tool,) = [t for t in body["tools"] if t.get("description") == TOOL["description"]]
         assert tool["name"] == NATIVE_TOOL_NAME and tool["input_schema"] == TOOL["input_schema"]
     assert not find_blocks(first, "id", NEW_ID) and not find_blocks(first, "tool_use_id", NEW_ID)
@@ -4035,6 +4066,8 @@ def main():
     parser.add_argument("--history-cache-scope", choices=("nested", "mixed"))
     parser.add_argument("--history-tool-images", nargs="?", const="explicit-success",
                         choices=("explicit-success", "implicit-success"))
+    parser.add_argument("--history-empty-tool-result",
+                        choices=("omitted", "array", "string", "omitted-error", "array-error", "string-error"))
     parser.add_argument("--tool-receipt-images", nargs="?", const="explicit-success",
                         choices=("explicit-success", "implicit-success"))
     parser.add_argument("--explicit-custom-tool-type", action="store_true")
@@ -4126,6 +4159,8 @@ def main():
         parser.error("--history-cache-ttl 需要同用 --history-cache-markers")
     if args.history_cache_scope and not args.history_cache_ttl:
         parser.error("--history-cache-scope 需要同用 --history-cache-ttl")
+    if args.history_empty_tool_result and (args.history_tool_blocks or args.history_tool_images or args.history_cache_markers):
+        parser.error("--history-empty-tool-result 需要独立的历史工具结果形状")
     if args.trace_recovery_resend and not (args.recover_pending_tool or args.model_connection_contract == "restart"):
         parser.error("--trace-recovery-resend 需要 --recover-pending-tool 或 --model-connection-contract restart")
     if (args.recovery_ledger_contention or args.recovery_ledger_deadline or args.recovery_workspace_rejection
@@ -4141,6 +4176,7 @@ def main():
     trace_startup = (args.initial_idle_model_connection or args.trace_initial_startup or args.trace_recovery_resend or cache_markers
                      or args.model_connection_contract is not None or args.external_signed_history_contract
                      or args.history_tool_images is not None or args.tool_receipt_images is not None
+                     or args.history_empty_tool_result is not None
                      or args.explicit_custom_tool_type
                      or args.recovery_readiness_rejection
                      or args.structured_output_contract or bool(args.forced_tool_choice_contract) or args.no_tool_choice_contract
@@ -4174,6 +4210,7 @@ def main():
                        output_effort=args.output_effort, history_png=args.history_png,
                        history_images=args.history_images, history_tool_blocks=args.history_tool_blocks,
                        history_tool_images=args.history_tool_images,
+                       history_empty_tool_result=args.history_empty_tool_result,
                        tool_receipt_images=args.tool_receipt_images,
                        explicit_custom_tool_type=args.explicit_custom_tool_type,
                        previous=previous,

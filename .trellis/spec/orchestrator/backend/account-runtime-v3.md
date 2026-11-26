@@ -2567,6 +2567,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 丢进程恢复用原始业务块重建该图文历史行。公开回归的恢复模型请求中，这一行的原始 `content` 与客户端业务数组逐块相等。续轮的工具结果及继续提示各有自己的消息边界。
 - 固定版的 `--print --input-format stream-json` 对照也保留四种格式及重复块，并生成来源文本和相同的末文字换行。普通交互 PTY 拒绝该参数组合。X11 剪贴板 `Ctrl+V` 对照中，四种格式单张实收的 MIME/Base64 均相等，CLI 每张也生成一条来源文本。直接经当前 `session.append` 提交新图块的隔离探针未达到图片提交边界。当前入口继续使用实际粘贴。[CLI 输入参数](https://code.claude.com/docs/en/cli-reference) · [交互剪贴板入口](https://code.claude.com/docs/en/interactive-mode)
 - 已闭合的旧工具结果可保留非空有序 `text` 块数组和原工具 ID。其余扩展字段沿现有输入合同，先前完成的工具保持已完成。
+- 已闭合的空工具结果允许省略 `content`，或显式提交 `[]`、`""`。原生导入和磁盘恢复保留原字段形状、用户角色、工具 ID 及结果的 `is_error`。提交模型前核对对应结果块。工具回执改写已确认历史里的空值形状返回 422、零新增投递。[Messages 空工具结果](https://platform.claude.com/docs/en/agents-and-tools/tool-use/handle-tool-calls#example-of-empty-tool-result)
 - 已闭合的成功工具结果可在同一个 `tool_result.content` 数组内混合有序文本和内嵌 Base64 PNG、JPEG、GIF、WebP。原生会话恢复保留重复图块、多行文字、原调用 ID 及 `is_error` 缺省或显式 `false` 的字段形状。账号组件在发送前核对 CLI 生成的结果块及原角色。改写该段历史的回执继续按原归属拒绝。
 - 对 `is_error:true` 的图文结果，固定 2.1.293 读取历史时去掉图像并合并文本。该形状沿原账号路径兼容。已有原生计划在实际出站核对失败时返回 422，模型零收件。
 - 普通原生工具轮的当前成功图文回执单独走已核验的磁盘恢复入口。固定 2.1.293 的活跃工具续轮会丢弃图像。原进程仍活跃时，先核对完整工具组、原历史、原生计划与持久回执修订，再回收原进程并从同一修订恢复。已丢进程时沿相同恢复入口。两个入口均核对实际 CLI 出站的原调用 ID、块顺序、内容和结果标志，消费一次恢复许可，只提交一次续轮。原进程回收期间仍可能补写自身尚未落盘的记录。
@@ -2663,6 +2664,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `verify_tui_cold_history.py --current-images` 核对本轮九块交错图文、四种内嵌格式、重复 PNG、重复多行文字与边界内纯图片请求的实际模型正文。增加 `--current-image-ending image` 对照图片末块。两种末块均覆盖同进程和 `--recover-pending-tool`，独立比较原始业务块、额外上下文和每条来源文本，并报告原始数组等价性及摘要。九块样本含五张图，首轮及热续轮实收九个业务块、五个 CLI 上下文块和五个附件来源块。末块为文字时多一个 LF。丢进程恢复的该历史行与客户端原始九块逐块相等。交换图片顺序的回执返回 422。夹具还覆盖隔离程序当前 HOME 的目录描述符读取及外部 HOME 拒绝。
 - 独立图像补测使用可完整解码的透明 PNG、带 EXIF 的渐进 JPEG、双帧 GIF、双帧 WebP 及重复图块。核对原 MIME、Base64、顺序和上述原始数组差异。像素和字节边界的 18 例包含三种动作的 2000 像素、512000 字节正例，以及 2001 像素、512001 字节在有无顶层 `system` 时的路由和投递。正例各投递一次。超界 `append` 四例各投递一次，保留原 `messages`。另外八例均为 `422/unsupported_parameter`、零投递。
 - `verify_tui_cold_history.py --history-tool-blocks` 核对已闭合的两个文本结果块、顺序及原 ID，并完成一次新工具回执。`--history-cache-markers` 还核对重复的工具结果文本上单个嵌套断点的准确位置，以及在线续轮、丢进程恢复和篡改拒绝。
+- `verify_tui_cold_history.py --history-empty-tool-result` 用 `omitted`、`array`、`string` 及对应的 `-error` 形状核对模型实收。三种账号动作及丢进程恢复保留已闭合记录。改写历史空值形状后合法回执仍可完成。
 - `verify_tui_cold_history.py --history-tool-images` 核对嵌套图文的四种内嵌格式、重复 PNG、多行文字及原工具 ID。包括三种账号动作、显式成功及 `implicit-success`、在线续轮及丢进程恢复。交换原历史图像顺序的工具回执返回 422，合法回执仍由交互 CLI 投递。可与已确认的直接、嵌套缓存标记组合。
 - `verify_tui_cold_history.py --explicit-custom-tool-type` 核对显式自定义工具的公开调用及模型实收声明。三种账号动作、正常续轮、双工具和丢进程恢复均核对名称、说明和 schema。回执移除已提交的显式字段返回 422，合法原样回执仍可完成。
 - `verify_tui_cold_history.py --tool-receipt-images` 核对本轮实际回执的四种内嵌格式、文字、重复项及原工具 ID。三种账号动作覆盖原 CLI 活跃时的恢复路径，`implicit-success` 与 `--recover-pending-tool` 对照显式成功和原进程丢失。错误图文返回 422 后，合法回执仍成功，重复及异主体／异会话结果均被拒绝。可以用 `--parallel-new-tools` 核对两个工具的逆序图文回执。
