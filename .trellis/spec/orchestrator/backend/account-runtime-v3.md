@@ -2639,6 +2639,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `verify_tui_cold_history.py --current-images` 核对本轮九块交错图文、四种内嵌格式、重复 PNG、重复多行文字与边界内纯图片请求的实际模型正文。增加 `--current-image-ending image` 对照图片末块。两种末块均覆盖同进程和 `--recover-pending-tool`，独立比较原始业务块、额外上下文和每条来源文本，并报告原始数组等价性及摘要。交换图片顺序的回执返回 422。追加动作下单独核对超过像素、字节边界的原入口。隔离程序的目录描述符用例覆盖当前 HOME 读取及外部 HOME 拒绝。
 - `verify_tui_cold_history.py --history-tool-blocks` 核对已闭合的两个文本结果块、顺序及原 ID，并完成一次新工具回执。`--history-cache-markers` 还核对重复的工具结果文本上单个嵌套断点的准确位置，以及在线续轮、丢进程恢复和篡改拒绝。
 - `verify_tui_cold_history.py --stock-client` 让未修改的固定 Claude Code 2.1.293 从公开 V2 入口执行 `Read`。三种账号提示词策略各用独立客户端 HOME，隔离模型实收正文与客户端逻辑正文逐字节一致。按相同调用 ID 核对工具参数、原回执、客户端读到的便签与最终答复。当前六次投递在管理记录均归属旧账号发送器，并分别关联新进程与热续轮。此结果是完整 CC 的退役前基线。最终 TLS 写出未采集。
+- `verify_tui_cold_history.py --cancel-and-change-question` 在公开首轮交付工具 ID 和部分参数时断开读者，隔离模型继续保留尾段。确认原请求终态为取消后，沿同一公开会话从客户端确认的历史改问。新轮走交互 CLI，已取消问题和工具不会进入模型正文，原绑定和会话档案按原字节保留。迟交被取消的工具回执返回 400、零尝试。两轮各一次模型实收。
 - `verify_tui_cold_history.py --parallel-new-tools` 从公开入口核对同一模型响应的两个不同 Schema 的工具。客户端执行返回的调用并按原 ID 逆序回传。模型实收恢复调用顺序，成功文本逐字保留，失败保留 `is_error` 和原文本及原生 token 提醒。缺少结果、用重复 ID 代替缺项、齐全后追加重复项均返回 400，模型零新增收件。随后合法组完成一次。
 - `verify_tui_cold_history.py --auto-tool-choice --parallel-new-tools` 核对显式自动选择下的并行工具和改写拒绝。与 `--recover-pending-tool` 组合时核对原选择在丢进程后的续轮仍受保护。
 - `verify_tui_cold_history.py --split-history-tools` 核对分行的两对旧工具及结果、原顺序和单次新工具执行。

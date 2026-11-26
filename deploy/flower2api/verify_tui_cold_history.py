@@ -53,6 +53,9 @@ HISTORY = [
 HISTORY_CACHE = ({"type": "ephemeral", "ttl": "1h"}, {"type": "ephemeral"})
 QUESTION = "NOW：查询新便签并回答。"
 QUESTION_TAIL = "NOW：保留本轮问题第二段。"
+CANCELLED_QUESTION = "CANCEL：暂停这道尚未完成的问题。"
+CHANGED_QUESTION = "CHANGE：改问已确认的旧订单号。"
+CHANGED_REPLY = "新问题的答案只来自已确认历史。"
 AFTER_RESTART = "RESTART：从已确认的旧问答开启另一轮。"
 DROP_REPLY = "FAILURE：模型收到正文后关闭响应连接。"
 REJECT_MODEL_REQUEST = "FAILURE：模型收到正文后返回合成拒绝。"
@@ -239,6 +242,20 @@ def fixture_reconnect_sse(name):
     return b"".join(map(frame, prefix)), b"".join(map(frame, tail))
 
 
+def fixture_cancelled_tool_sse(name):
+    """分隔工具参数流，以公开客户端断开时的未完整输入为验收边界。
+    @param name 隔离模型实收的工具名。@return 断开前可见前缀及未交付尾段。
+    """
+    wire = message_sse({"type": "tool_use", "id": NEW_ID, "name": name, "input": ARGS},
+                       "tool_use", "msg_cancelled_question")
+    events = [json.loads(line[5:]) for line in wire.splitlines() if line.startswith(b"data:")]
+    partial = events[2]["delta"]["partial_json"]
+    split_at = len(partial) // 2
+    head = {**events[2], "delta": {**events[2]["delta"], "partial_json": partial[:split_at]}}
+    tail = {**events[2], "delta": {**events[2]["delta"], "partial_json": partial[split_at:]}}
+    return b"".join(map(frame, [*events[:2], head])), b"".join(map(frame, [tail, *events[3:]]))
+
+
 def fixture_thinking_display_sse(body, *, message_id="msg_cold_thinking_display"):
     """按实收的思考设置与模型默认值生成合成流。
     @param body 隔离模型实收。@param message_id 合成助手消息 ID。@return SSE 字节。
@@ -278,7 +295,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            history_cache_markers=False, history_cache_ttl=None, history_cache_scope=None,
            cache_capability=None, message_system_roles=False,
            structured_output=False, forced_tool_choice=None, no_tool_choice=False, auxiliary_mode=None,
-           auxiliary_kind="title", auxiliary_sample=None, agent_progress=None, stock_client=False):
+           auxiliary_kind="title", auxiliary_sample=None, agent_progress=None, stock_client=False,
+           cancel_and_change_question=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -293,6 +311,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param previous 可选，旧发行源码、网关、发送器三个离线制品。
     @param failure_boundaries 是否分别在模型收件前后切断隔离连接。
     @param stock_client 是否通过真实外部 CLI 验证完整 V2 输入与工具回执。
+    @param cancel_and_change_question 是否在首轮工具参数未完成时取消并从确认历史改问。
     @param current_text_blocks 是否验证本轮文本块顺序及边界归属。
     @param signed_tool_history 是否核对隔离模型原工具轮的签名块。
     @param signed_tool_response 可选，模拟空思考正文或缺少助手模型的隔离响应。
@@ -413,6 +432,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 slow_tool_arrivals.append(monotonic())
                 sleep(SLOW_MODEL_DELAY)
             restart = any(b.get("text") == AFTER_RESTART for row in body["messages"] for b in blocks(row))
+            paused_question = cancel_and_change_question and any(
+                b.get("text") == CANCELLED_QUESTION for row in body["messages"] for b in blocks(row)
+            )
             prefix = b""
             if stock_client:
                 wire = stock_model_reply(body, stock_homes, FINAL)
@@ -437,6 +459,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 wire = message_sse({"type": "text", "text": FINAL}, "end_turn", "msg_cold_reply")
             elif forced_tool_choice:
                 wire = fixture_forced_tool_sse(body)
+            elif paused_question:
+                assert tool and tool["name"] == NATIVE_TOOL_NAME
+                prefix, wire = fixture_cancelled_tool_sse(tool["name"])
+            elif cancel_and_change_question:
+                wire = message_sse({"type": "text", "text": CHANGED_REPLY}, "end_turn", "msg_changed_question")
             elif not results and tool and not restart and v1_runtime is None:
                 content = {"type": "tool_use", "id": NEW_ID, "name": tool["name"], "input": ARGS}
                 second = None
@@ -465,7 +492,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 self.wfile.write(prefix)
                 self.wfile.flush()
                 # 公开读者须实际读到首段并在模型结束前断开。夹具结束时也会释放模型。
-                if not finish_stream.wait(30):
+                if not finish_stream.wait(30) or paused_question:
                     self.close_connection = True
                     return
             self.wfile.write(wire)
@@ -681,6 +708,14 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         session_id = auxiliary_sample["headers"]["x-claude-code-session-id"] if auxiliary_sample else str(uuid4())
         headers = {"x-session-id": session_id, "User-Agent": "flower2api-cold-history-fixture/1"}
         messages = [{"role": role, "content": text} for role, text in HISTORY]
+        if cancel_and_change_question:
+            try:
+                return verify_cancelled_question(
+                    manage, token, headers, messages, received, finish_stream, sender_state, trace_startup,
+                )
+            finally:
+                # 人为暂停的隔离模型应在通用进程回收前释放等待。
+                finish_stream.set()
         if thinking_display_model:
             return verify_thinking_display_contract(manage, token, identifier, received, thinking_display_model,
                                                     thinking_cli_summaries)
@@ -1577,6 +1612,120 @@ def report_request_diagnostics(manage, phase, request_id, session_id, started_at
         event["requests"].append(item)
     print(json.dumps(event, ensure_ascii=False), file=stderr, flush=True)
     return event
+
+
+def verify_cancelled_question(manage, token, headers, history, received, release_model, sender_state, trace_startup):
+    """取消未完整工具流，再按客户端确认历史改问。
+    @param manage 管理入口。@param token 合成公开令牌。@param headers 同一公开会话。
+    @param history 客户端已确认的历史。@param received 隔离模型收件。
+    @param release_model 原隔离模型的尾段等待。@param sender_state 真实 sender 的状态读取。
+    @param trace_startup 是否记录同钟阶段。@return 取消、新轮及旧回执的证据。
+    """
+    session_id = headers["x-session-id"]
+    old = {"model": MODEL, "max_tokens": 128, "stream": True, "tools": [TOOL],
+           "messages": [*history, {"role": "user", "content": CANCELLED_QUESTION}]}
+    since = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+    if trace_startup:
+        startup_event("public_request_start", phase="cancelled_question", session_id=session_id, model_posts_before=0)
+    with closing(HTTPConnection("127.0.0.1", 18090, timeout=30)) as connection:
+        connection.request("POST", "/v1/messages", encoded(old), {
+            "Authorization": "Bearer " + token, "Content-Type": "application/json",
+            "anthropic-version": "2023-06-01", **headers,
+        })
+        with closing(connection.getresponse()) as response:
+            request_id = response.getheader("x-cc2api-request-id")
+            assert response.status == 200 and request_id, (response.status, request_id)
+            if trace_startup:
+                startup_event("public_response_headers", phase="cancelled_question", request_id=request_id,
+                              session_id=session_id, http_status=response.status, model_posts_during=len(received))
+            prefix = []
+            while line := response.readline():
+                if not line.startswith(b"data:"):
+                    continue
+                event = json.loads(line[5:])
+                prefix.append(event)
+                if event.get("delta", {}).get("type") == "input_json_delta":
+                    break
+            assert [event["type"] for event in prefix] == [
+                "message_start", "content_block_start", "content_block_delta",
+            ], prefix
+            tool = prefix[1]["content_block"]
+            assert (tool["type"], tool["name"], tool["id"]) == ("tool_use", TOOL["name"], NEW_ID)
+            argument_prefix = prefix[-1]["delta"]["partial_json"]
+            complete_args = encoded(ARGS).decode()
+            assert argument_prefix and complete_args.startswith(argument_prefix) and argument_prefix != complete_args
+            connection.sock.shutdown(SHUT_RDWR)
+            if trace_startup:
+                startup_event("public_tool_prefix_cancelled", request_id=request_id, session_id=session_id,
+                              tool_id=tool["id"])
+
+    cancelled, = report_request_diagnostics(manage, "cancelled_question", request_id, session_id, since)["requests"]
+    assert cancelled["outcome"] == "cancelled" and cancelled["status_code"] == 200, cancelled
+    assert cancelled["attempt_count"] == cancelled["diagnostic_context"]["tui_confirmed_model_responses"] == 1
+    def sender_is_idle():
+        state = sender_state()
+        return state.get("ready") and state.get("idle")
+
+    wait_for(sender_is_idle)
+    assert len(received) == 1 and not release_model.is_set()
+    original = received[0][1]
+    original_id = json.loads(original["metadata"]["user_id"])["session_id"]
+    (binding_file,) = Path("/native/tui-workspaces").glob("*.json")
+    binding_snapshot = binding_file.read_bytes()
+    bound = json.loads(binding_snapshot)["native_session_id"]
+    projects = Path("/native/tui-sessions") / bound / "home/.claude/projects"
+    (archive,) = projects.glob(f"*/{original_id}.jsonl")
+    original_archive = archive.read_bytes()
+
+    new_since = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+    new = {"model": MODEL, "max_tokens": 128, "stream": False,
+           "messages": [*history, {"role": "user", "content": CHANGED_QUESTION}]}
+    status, raw, new_request_id = checked_messages(
+        manage, token, new, headers, received, "changed_question_after_cancel", trace_startup=trace_startup,
+    )
+    assert len(received) == 2 and not release_model.is_set()
+    assert json.loads(raw)["content"] == [{"type": "text", "text": CHANGED_REPLY}]
+    new_digest, submitted, _ = received[1]
+    new_id = json.loads(submitted["metadata"]["user_id"])["session_id"]
+    assert new_id != original_id and archive.read_bytes() == original_archive
+    assert binding_file.read_bytes() == binding_snapshot
+    assert not submitted.get("tools") and not find_blocks(submitted, "id", NEW_ID)
+    assert not find_blocks(submitted, "tool_use_id", NEW_ID)
+    roles = [(row["role"], block.get("text")) for row in submitted["messages"] for block in blocks(row)]
+    expected = [(row["role"], row["content"]) for row in new["messages"]]
+    relevant = {text for _, text in expected} | {CANCELLED_QUESTION}
+    assert [(role, text) for role, text in roles if text in relevant] == expected, roles
+    changed, = report_request_diagnostics(
+        manage, "changed_question_after_cancel", new_request_id, session_id, new_since,
+    )["requests"]
+    assert changed["outcome"] == "success"
+    assert changed["attempt_count"] == changed["diagnostic_context"]["tui_confirmed_model_responses"] == 1
+    attempt, = changed["attempts"]
+    assert attempt["diagnostic_context"]["tui_body_source"] == "interactive_cli"
+
+    stale = {**old, "stream": False, "messages": [
+        *old["messages"], {"role": "assistant", "content": [{**tool, "input": ARGS}]},
+        {"role": "user", "content": [{"type": "tool_result", "tool_use_id": NEW_ID, "content": REPLY}]},
+    ]}
+    stale_since = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+    rejected, _, rejected_request_id = checked_messages(
+        manage, token, stale, headers, received, "cancelled_tool_receipt", expected_status=400,
+        trace_startup=trace_startup,
+    )
+    assert len(received) == 2 and not release_model.is_set()
+    stale_record, = report_request_diagnostics(
+        manage, "cancelled_tool_receipt", rejected_request_id, session_id, stale_since,
+    )["requests"]
+    assert stale_record["attempt_count"] == 0 and stale_record["attempts"] == [], stale_record
+    return {
+        "cancelled_request": cancelled, "changed_request": changed, "changed_http_status": status,
+        "public_session": session_id, "cancelled_native_session": original_id, "changed_native_session": new_id,
+        "cancelled_tool_id": tool["id"], "partial_argument_chars": len(argument_prefix),
+        "model_body_sha256": [received[0][0], new_digest], "model_posts": len(received),
+        "stale_receipt_http": rejected, "stale_receipt_request_id": rejected_request_id,
+        "stale_receipt_attempts": stale_record["attempt_count"], "sender_idle_after_cancel": True,
+        "original_archive_preserved": True, "binding_preserved": True, "wire_final": "unavailable",
+    }
 
 
 def verify_tool_stream_reconnect(manage, temporary, token, account_token, headers, follow,
@@ -3076,6 +3225,7 @@ def main():
     scenario.add_argument("--split-history-tools", action="store_true")
     scenario.add_argument("--parallel-new-tools", action="store_true")
     scenario.add_argument("--reconnect-tool-stream", action="store_true")
+    scenario.add_argument("--cancel-and-change-question", action="store_true")
     scenario.add_argument("--mixed-release", nargs=3, type=Path,
                           metavar=("OLD_SOURCE", "OLD_GATEWAY", "OLD_SENDER"))
     scenario.add_argument("--mixed-image-peers", nargs=2, type=Path, help=argparse.SUPPRESS)
@@ -3086,6 +3236,8 @@ def main():
         parser.error("--current-image-ending 需要同用 --current-images")
     if args.stock_client and args.v1_runtime:
         parser.error("--stock-client 使用 V2 账号")
+    if args.cancel_and_change_question and args.v1_runtime:
+        parser.error("--cancel-and-change-question 使用 V2 账号")
     if bool(args.interleaved_title) != bool(args.title_request):
         parser.error("--interleaved-title 与 --title-request 需要一起使用")
     if bool(args.interleaved_suggestion) != bool(args.suggestion_request):
@@ -3143,6 +3295,7 @@ def main():
                        split_history_tools=args.split_history_tools,
                        v1_runtime=args.v1_runtime, parallel_tools=args.parallel_new_tools,
                        reconnect_tool_stream=args.reconnect_tool_stream, current_images=args.current_images,
+                       cancel_and_change_question=args.cancel_and_change_question,
                        current_image_ending=args.current_image_ending,
                        auto_tool_choice=args.auto_tool_choice,
                        adaptive_thinking_model=args.adaptive_thinking_model,
