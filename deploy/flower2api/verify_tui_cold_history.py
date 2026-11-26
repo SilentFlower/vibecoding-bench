@@ -13,7 +13,8 @@ from signal import SIGKILL
 from socket import create_connection, if_nameindex
 from sqlite3 import connect
 import ssl
-from subprocess import Popen
+from subprocess import PIPE, Popen, run
+from sys import executable
 from tempfile import TemporaryDirectory
 from time import time_ns
 from uuid import uuid4
@@ -356,19 +357,27 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         if restart_history:
             wait_for(lambda: sender_state().get("idle"))
             (binding_file,) = Path("/native/tui-workspaces").glob("*.json")
-            native_id = json.loads(binding_file.read_text())["native_session_id"]
+            binding_bytes = binding_file.read_bytes()
+            native_id = json.loads(binding_bytes)["native_session_id"]
             assert all(json.loads(document["metadata"]["user_id"])["session_id"] == native_id
                        for _, document, _ in received)
-            projects = Path("/native/tui-sessions") / native_id / "home/.claude/projects"
-            (history_file,) = projects.glob("*/" + native_id + ".jsonl")
+            cli_config = Path("/native/tui-sessions") / native_id / "home/.claude"
+            (history_file,) = (cli_config / "projects").glob("*/" + native_id + ".jsonl")
             original = history_file.read_bytes()
-            imported = [json.loads(line)["message"] for line in original.splitlines()[:len(messages) - 1]]
+            imported_rows = [json.loads(line) for line in original.splitlines()[:len(messages) - 1]]
+            imported = [row["message"] for row in imported_rows]
             assert imported == [{"role": row["role"], "content": blocks(row)} for row in messages[:-1]]
-            restarted = restart(source)
             divergent = "H1：分叉历史中的项目名是水杉。"
             branch = {**body, "stream": False,
                       "messages": [{"role": "user", "content": divergent}, *messages[1:-1],
                                    {"role": "user", "content": AFTER_RESTART}]}
+            # 以生产导入器模拟分叉已落盘、当前问题尚未交给 CLI 时重启发送器。
+            staged_id = stage_history_branch(cli_config, imported_rows[0]["cwd"], native_id, branch)
+            assert staged_id != native_id
+            staged_path = history_file.with_name(staged_id + ".jsonl")
+            staged_bytes = staged_path.read_bytes()
+            assert set(history_file.parent.glob("*.jsonl")) == {history_file, staged_path}
+            restarted = restart(source)
             expected_history = [("user", divergent), *HISTORY[1:]]
             history_texts = {text for _, text in expected_history}
             branch_ids = []
@@ -390,16 +399,43 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 assert branch_id not in (native_id, *branch_ids)
                 branch_ids.append(branch_id)
                 path = history_file.parent / (branch_id + ".jsonl")
+                if post == 3:
+                    assert branch_id == staged_id and path.read_bytes().startswith(staged_bytes)
+                    assert set(history_file.parent.glob("*.jsonl")) == {history_file, staged_path}
                 snapshots[path] = path.read_bytes()
                 if post == 3:
                     restart(restarted)
+            assert list(binding_file.parent.glob("*.json")) == [binding_file]
+            assert binding_file.read_bytes() == binding_bytes
             assistant_fields = sorted(next(row for row in imported if row["role"] == "assistant"))
             proof["restart"] = {"bound_session_id": native_id, "branch_session_ids": branch_ids,
+                                "staged_branch_session_id": staged_id,
+                                "binding_preserved": True,
                                 "assistant_history_fields": assistant_fields,
                                 "preserved_bytes": [len(data) for data in snapshots.values()],
                                 "additional_model_posts": 2,
                                 "attempts": verify_captures(manage, received[-2:], account_token)}
         return proof
+
+
+def stage_history_branch(config, work, native_id, body):
+    """在原账号权限下发布尚未推进的分叉。
+    @param config 原绑定的 CLI 配置目录。@param work 已验证对话的工作目录。
+    @param native_id 已登记原生 UUID。@param body 即将从公开入口提交的确认历史。
+    @return 生产导入器选中的分叉 UUID。
+    """
+    command = (
+        "import json, sys\n"
+        "from pathlib import Path\n"
+        "sys.path.insert(0, '/opt/flower/tui')\n"
+        "from tui_cold_history import ColdHistory\n"
+        "plan = ColdHistory.from_request(json.load(sys.stdin))\n"
+        "print(plan.import_session(Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]))\n"
+    )
+    output = run([executable, "-I", "-B", "-c", command, str(config), work, native_id],
+                 input=encoded(body), stdout=PIPE, user=1001, group=1001, extra_groups=[],
+                 env={}, check=True, timeout=10)
+    return output.stdout.decode().strip()
 
 
 def verify_text_inputs(manage, token, account_token, headers, history, received, *, policy="append"):

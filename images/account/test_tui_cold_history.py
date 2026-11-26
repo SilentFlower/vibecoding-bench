@@ -138,7 +138,11 @@ class ColdHistoryTests(TestCase):
             fork = Path(path)
             self.assertNotEqual(fork, history)
             fork_snapshot = fork.read_bytes()
-            self.assertEqual(start(fork_plan.import_session), [flag, path])
+            for resume in (True, None):
+                with self.subTest(branch=fork.stem, resume=resume):
+                    restored = ColdHistory.from_request(deepcopy(changed))
+                    self.assertEqual(start(restored.import_session, resume=resume), ["--resume", str(fork)])
+            self.assertEqual(start(resume=True), expected)
             self.assertEqual(start(), expected)
             self.assertEqual(set(project.iterdir()), {history, fork})
             self.assertEqual(history.read_bytes(), snapshot)
