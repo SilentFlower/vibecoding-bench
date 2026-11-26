@@ -320,7 +320,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            structured_output=False, forced_tool_choice=None, no_tool_choice=False, disable_parallel_tool_use=False,
            auxiliary_mode=None,
            auxiliary_kind="title", auxiliary_sample=None, agent_progress=None, stock_client=False,
-           cancel_and_change_question=False, oauth_rotation=False, provider_quota=None, slow_tool_stream=False):
+           cancel_and_change_question=False, oauth_rotation=False, provider_quota=None, slow_tool_stream=False,
+           model_connection_contract=None):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -346,6 +347,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param parallel_tools 是否验证同一步多个新工具的回执。
     @param reconnect_tool_stream 是否在真实续轮流中断开再接回。
     @param slow_tool_stream 是否在原公开连接上慢读真实续轮，核对独立用量。
+    @param model_connection_contract 可选，验证模型连接复用、模型端关闭或 sender 重启后的连接归属。
     @param current_images 是否用本轮原生图文替换纯文本问题。
     @param current_image_ending 本轮九块图文以文字或图片结尾。
     @param auto_tool_choice 原请求中自动选择的字段形状。
@@ -403,6 +405,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     config = Path("/run/v3/sender.json")
     copy2(temporary / "ca.der", config.with_name("verification-ca.der"))
     received, callbacks, proxy_targets = [], [], []
+    model_tunnels, model_client_hellos, model_connection_posts = {}, [], []
     quota_reads = []
     quota_reset = time_ns() // 1_000_000_000
     quota_windows = {"5h": quota_reset + 3600, "7d": quota_reset + 6 * 86400, "7d_oi": quota_reset + 5 * 86400}
@@ -463,6 +466,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             raw = self.rfile.read(int(self.headers["Content-Length"]))
             body = json.loads(raw)
             model_digest = sha256(raw).hexdigest()
+            if model_connection_contract:
+                model_connection_posts.append((self.client_address[1], model_digest))
             is_auxiliary = False
             if auxiliary_sample is not None:
                 sample = auxiliary_sample["body"]
@@ -579,6 +584,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Content-Length", str(len(prefix) + len(middle) + len(wire)))
+            if model_connection_contract == "server-close":
+                self.send_header("Connection", "close")
             for name, value in quota.items():
                 self.send_header(name, value)
             self.end_headers()
@@ -616,8 +623,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             if trace_startup:
                 startup_event("proxy_connect_accepted", peer_port=self.client_address[1])
             with create_connection(("127.0.0.1", receiver.server_port), timeout=10) as target:
+                peer_port = target.getsockname()[1]
+                if model_connection_contract:
+                    model_tunnels[peer_port] = self.client_address[1]
                 if trace_startup:
-                    startup_event("proxy_model_tcp_connected", peer_port=target.getsockname()[1])
+                    startup_event("proxy_model_tcp_connected", peer_port=peer_port)
                 _relay(self, target, proxy_targets.append)
 
     class Registry(QuietHandler):
@@ -661,6 +671,14 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                     else ThreadingHTTPServer(("127.0.0.1", 0), Receiver))
         tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         tls.load_cert_chain(temporary / "leaf.pem", temporary / "leaf.key")
+        if model_connection_contract:
+            def record_client_hello(connection, server_name, _):
+                # 由接收端记录握手和 SNI，后续实收与同一 TCP 对端关联。
+                peer_port = connection.getpeername()[1]
+                model_client_hellos.append((peer_port, server_name))
+                startup_event("model_client_hello", peer_port=peer_port, server_name=server_name)
+
+            tls.sni_callback = record_client_hello
         # 握手由已接收连接的工作线程完成，空闲 TCP 不会占住监听线程。
         receiver.socket = tls.wrap_socket(receiver.socket, server_side=True, do_handshake_on_connect=False)
         serve(stack, receiver)
@@ -1448,6 +1466,25 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                  "changed_tool_arguments_status": wrong_arguments,
                  "duplicate_receipt_status": duplicate, "tls_versions": [tls for _, _, tls in received],
                  "proxy_connections": len(proxy_targets), "attempts": captures}
+        if model_connection_contract:
+            count = 1 if model_connection_contract == "live" else 2
+            ports = {port for port, _ in model_connection_posts}
+            assert len(ports) == len(model_tunnels) == len(model_client_hellos) == len(proxy_targets) == count
+            assert set(model_tunnels) == set(proxy_targets) == ports
+            assert set(model_client_hellos) == {(port, "api.anthropic.com") for port in ports}
+            observations = []
+            for (port, digest), attempt, session_origin in zip(
+                model_connection_posts, captures,
+                ("external_import", "disk_resume" if recover_pending else "live_process"), strict=True,
+            ):
+                assert attempt["diagnostic_body_source"] == "interactive_cli"
+                assert attempt["diagnostic_session_origin"] == session_origin
+                assert attempt["confirmed_model_responses"] == 1 and attempt["cli_and_https_body_sha256"] == digest
+                observations.append({"model_peer_port": port, "proxy_peer_port": model_tunnels[port],
+                                     "model_body_sha256": digest, "request_id": attempt["request_id"],
+                                     "attempt_id": attempt["attempt_id"], "session_origin": session_origin})
+            proof["model_connection_contract"] = {"mode": model_connection_contract,
+                                                  "client_hellos": model_client_hellos, "model_posts": observations}
         if oauth_rotation:
             assert refresh_calls == [True]
             assert [row["credential"] for row in credential_observations] == ["initial", "rotated"]
@@ -3831,6 +3868,8 @@ def main():
     scenario.add_argument("--toggle-pending-policy", action="store_true")
     scenario.add_argument("--tool-policy", choices=("replace", "user_reminder"))
     scenario.add_argument("--recover-pending-tool", action="store_true")
+    scenario.add_argument("--model-connection-contract", choices=("live", "server-close", "restart"),
+                          help="经账号代理核对两轮模型请求的 TLS 连接归属")
     scenario.add_argument("--oauth-rotation", choices=("live", "restart"))
     scenario.add_argument("--provider-quota", choices=("sse", "json"))
     scenario.add_argument("--initial-idle-model-connection", action="store_true")
@@ -3886,8 +3925,8 @@ def main():
         parser.error("--history-cache-ttl 需要同用 --history-cache-markers")
     if args.history_cache_scope and not args.history_cache_ttl:
         parser.error("--history-cache-scope 需要同用 --history-cache-ttl")
-    if args.trace_recovery_resend and not args.recover_pending_tool:
-        parser.error("--trace-recovery-resend 需要同用 --recover-pending-tool")
+    if args.trace_recovery_resend and not (args.recover_pending_tool or args.model_connection_contract == "restart"):
+        parser.error("--trace-recovery-resend 需要 --recover-pending-tool 或 --model-connection-contract restart")
     if (args.recovery_ledger_contention or args.recovery_ledger_deadline or args.recovery_workspace_rejection
         or args.recovery_readiness_rejection or args.recovery_slow_model) and (
         not args.recover_pending_tool or args.signed_tool_history
@@ -3899,6 +3938,7 @@ def main():
     previous = args.mixed_release
     cache_markers = args.cache_markers or args.cache_marker_capabilities is not None
     trace_startup = (args.initial_idle_model_connection or args.trace_initial_startup or args.trace_recovery_resend or cache_markers
+                     or args.model_connection_contract is not None
                      or args.recovery_readiness_rejection
                      or args.structured_output_contract or bool(args.forced_tool_choice_contract) or args.no_tool_choice_contract
                      or args.disable_parallel_tool_use_contract or bool(args.oauth_rotation or args.provider_quota)
@@ -3922,7 +3962,10 @@ def main():
                        restart_history=args.restart_history, text_input=args.text_input,
                        system_policy=args.system_policy, toggle_pending_policy=args.toggle_pending_policy,
                        stock_client=args.stock_client,
-                       tool_policy=args.tool_policy, recover_pending=args.recover_pending_tool or args.oauth_rotation == "restart",
+                       tool_policy=args.tool_policy,
+                       recover_pending=(args.recover_pending_tool or args.oauth_rotation == "restart"
+                                        or args.model_connection_contract == "restart"),
+                       model_connection_contract=args.model_connection_contract,
                        oauth_rotation=bool(args.oauth_rotation), provider_quota=args.provider_quota,
                        output_effort=args.output_effort, history_png=args.history_png,
                        history_images=args.history_images, history_tool_blocks=args.history_tool_blocks,
