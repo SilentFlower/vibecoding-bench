@@ -11,6 +11,14 @@ use crate::service::request_session::hash_json;
 
 pub(super) const SERVER_SESSION_PREFIX: &str = "gateway-tools-";
 pub(super) const TITLE_SESSION_PREFIX: &str = "gateway-tools-title-";
+pub(super) const SUGGESTION_SESSION_PREFIX: &str = "gateway-tools-suggestion-";
+
+/// 从辅助轮的执行键取出公开会话。@param session 私有执行键。@return 原公开会话。
+pub(super) fn auxiliary_original_session(session: &str) -> Option<&str> {
+    session
+        .strip_prefix(TITLE_SESSION_PREFIX)
+        .or_else(|| session.strip_prefix(SUGGESTION_SESSION_PREFIX))
+}
 
 /// 按最近一轮区分历史与回传。CLI 会在 user 工具回执后追加 system 上下文。
 /// @param body 原始 Messages 正文。@return 末轮前的消息及末轮切片，均借用原文。

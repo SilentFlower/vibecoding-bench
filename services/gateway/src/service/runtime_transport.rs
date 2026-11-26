@@ -68,7 +68,7 @@ use crate::service::tui_backend::TUI_V2;
 #[cfg(target_os = "linux")]
 use crate::service::tui_sender::TuiSender;
 use crate::service::tui_sender_response;
-use crate::service::tui_tool_history::TITLE_SESSION_PREFIX;
+use crate::service::tui_tool_history::{SUGGESTION_SESSION_PREFIX, auxiliary_original_session};
 use crate::tlsfp::{
     TlsProfileId, get_background_request_client_for_profile, get_request_client_for_profile,
 };
@@ -83,6 +83,7 @@ pub(super) const TUI_FINAL_CAPTURE: &str = "x-v3-tui-final-capture";
 pub(super) const TUI_CLI_SUBMISSION: &str = "x-v3-tui-cli-submission";
 pub(super) const TUI_UPSTREAM_SESSION: &str = "x-v3-tui-upstream-session";
 pub(super) const TUI_TITLE_SESSION_MAPPING: &str = "x-v3-tui-title-session-mapping";
+pub(super) const TUI_PROMPT_SUGGESTION: &str = "x-v3-tui-prompt-suggestion";
 pub(super) const TUI_MANAGED_OAUTH: &str = "x-v3-tui-managed-oauth";
 pub(super) const TUI_SYSTEM_PROMPT_POLICY: &str = "x-v3-tui-system-prompt-policy";
 pub(super) const TUI_MODEL_HEADER_POLICY: &str = "x-v3-tui-model-header-policy";
@@ -2119,8 +2120,8 @@ pub(super) async fn prepare_tui(
     let observe = super::diagnostics::current_log_mode() == RequestLogMode::Debug;
     if observe {
         prepare = prepare.header(TUI_CAPTURE, "1").header(TUI_CLI_SUBMISSION, "1");
-        // 标题沿用账号转发正文。这里只观察入口和组装，保留最终写出未采集的边界。
-        if !session_id.starts_with(TITLE_SESSION_PREFIX) {
+        // 辅助轮沿用账号转发正文。这里只观察入口和组装，保留最终写出未采集的边界。
+        if auxiliary_original_session(session_id).is_none() {
             prepare = prepare.header(TUI_FINAL_CAPTURE, "1");
         }
     }
@@ -2195,6 +2196,12 @@ pub(super) async fn prepare_tui(
     }
     match response.status() {
         StatusCode::NO_CONTENT => {
+            if session_id.starts_with(SUGGESTION_SESSION_PREFIX)
+                && !tui_projection_marker(response.headers(), TUI_PROMPT_SUGGESTION, "1")
+            {
+                super::diagnostics::error_stage(TUI_PREPARE_EXCHANGE);
+                return Err(AppError::ServiceUnavailable("V2 建议请求需要支持独立建议的账号发送器".into()));
+            }
             reservation.managed_oauth =
                 tui_projection_marker(response.headers(), TUI_MANAGED_OAUTH, "1");
             reservation.oauth_file = tui_projection_marker(response.headers(), TUI_OAUTH_FILE, "1");

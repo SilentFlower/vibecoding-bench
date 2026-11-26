@@ -84,7 +84,9 @@ use crate::service::tui_native_drain::{
     NativeTurn, active_agent_account, continuation_account, recovery_row, summary_account,
 };
 use crate::service::tui_reconnect::{self, BeforeHeaders, Reconnects, Reservation};
-use crate::service::tui_tool_history::{self, SERVER_SESSION_PREFIX, TITLE_SESSION_PREFIX};
+use crate::service::tui_tool_history::{
+    self, SERVER_SESSION_PREFIX, SUGGESTION_SESSION_PREFIX, TITLE_SESSION_PREFIX,
+};
 use crate::service::usage::{ReconnectUsage, UsageCapture};
 use crate::service::v3_scheduling::{RequestPhase, SchedulingRequest};
 use crate::service::version_profile::{
@@ -2374,18 +2376,31 @@ impl GatewayService {
             (vec![], vec![])
         };
         let original_session = session.as_ref().and_then(RequestSession::original);
-        let native_title = method == "POST"
+        let auxiliary_session_prefix = if method == "POST"
             && path == "/v1/messages"
             && client_type == ClientType::ClaudeCode
             && original_session.is_some()
-            && is_tui_session_title(&body_map, &native_header_map)
+            && runtime_transport::tui_cli_format(&native_header_map) == Some("claude_code")
+            && !native_header_map.contains_key("x-claude-code-agent-id")
             && native_session_candidate(
                 native_header_map.get_all("x-claude-code-session-id").iter(),
                 |value| value.to_str().ok(),
                 &body_map,
             )
             .as_deref()
-                == original_session;
+                == original_session
+        {
+            if is_tui_session_title(&body_map) {
+                Some(TITLE_SESSION_PREFIX)
+            } else if is_tui_prompt_suggestion(&body_map) {
+                Some(SUGGESTION_SESSION_PREFIX)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        let native_title = auxiliary_session_prefix == Some(TITLE_SESSION_PREFIX);
         let summary = if method == "POST"
             && path == "/v1/messages"
             && client_type == ClientType::ClaudeCode
@@ -2783,7 +2798,7 @@ impl GatewayService {
                     return Err(AppError::BadRequest("V2 服务端会话不可由客户端声明".into()));
                 }
                 let fixture = runtime_transport::tui_fixture(&account);
-                let auxiliary = native_summary || native_title;
+                let auxiliary = native_summary || auxiliary_session_prefix.is_some();
                 let owner = (!auxiliary && (original_session.is_none() || !fixture))
                     .then_some((principal.id, original_session));
                 let returning_tool = !auxiliary && tui_tool_history::has_result(&body_map);
@@ -2858,11 +2873,11 @@ impl GatewayService {
                     .as_ref()
                     .and_then(NativeTurn::stateless_session)
                     .map(|session_id| format!("{SERVER_SESSION_PREFIX}{session_id}"));
-                // 标题复用公开会话的账号和用量归属。执行键独立，避免等原轮归还工具会话。
-                let title_session = original_session
-                    .filter(|_| native_title)
-                    .map(|session| format!("{TITLE_SESSION_PREFIX}{session}"));
-                let sender_session = title_session
+                // 辅助轮复用公开会话的账号和用量归属。执行键独立，避免等原轮归还工具会话。
+                let auxiliary_session = auxiliary_session_prefix
+                    .zip(original_session)
+                    .map(|(prefix, session)| format!("{prefix}{session}"));
+                let sender_session = auxiliary_session
                     .as_deref()
                     .or(original_session)
                     .or(assigned_session.as_deref())
@@ -8021,12 +8036,10 @@ fn is_json_title_request(body: &serde_json::Value, profile: &ClaudeCodeProfile) 
         })
 }
 
-/// 核对固定客户端自动生成的结构化标题。@param body 公开 Messages。@param headers 入站头。
+/// 核对固定客户端自动生成的结构化标题。@param body 已核对来源的公开 Messages。
 /// @return 是否可使用不拥有主轮的标题预留。
-fn is_tui_session_title(body: &JsonValue, headers: &HeaderMap) -> bool {
-    if runtime_transport::tui_cli_format(headers) != Some("claude_code")
-        || headers.contains_key("x-claude-code-agent-id")
-        || body["stream"] != true
+fn is_tui_session_title(body: &JsonValue) -> bool {
+    if body["stream"] != true
         || body.get("tool_choice").is_some()
         || body
             .get("tools")
@@ -8073,6 +8086,30 @@ fn is_tui_session_title(body: &JsonValue, headers: &HeaderMap) -> bool {
                 && properties
                     .get("title")
                     .is_some_and(|title| title["type"] == "string")
+        })
+}
+
+/// 核对固定 2.1.293 建议请求。@param body 已核对来源的公开 Messages。
+/// @return 是否为已经观测的独立建议输入。
+fn is_tui_prompt_suggestion(body: &JsonValue) -> bool {
+    const SUGGESTION_SHA: &str = "848ab6d7d37cb9e01ff58d81467438a21ff26e5287bbf510e76d387df592fb0d";
+    let Some((last, history)) = body["messages"]
+        .as_array()
+        .and_then(|rows| rows.split_last())
+    else {
+        return false;
+    };
+    // 原版保留普通对话与工具声明用于缓存。独立建议指令是最后一条完整 user 消息。
+    body["stream"] == true
+        && last["role"] == "user"
+        && history.last().is_some_and(|row| row["role"] == "assistant")
+        && body
+            .pointer("/system/0/text")
+            .and_then(JsonValue::as_str)
+            .is_some_and(|text| text.starts_with("x-anthropic-billing-header: cc_version=2.1.293."))
+        && last["content"].as_str().is_some_and(|text| {
+            text.starts_with("[SUGGESTION MODE:")
+                && format!("{:x}", Sha256::digest(text.as_bytes())) == SUGGESTION_SHA
         })
 }
 

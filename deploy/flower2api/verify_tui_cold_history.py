@@ -84,7 +84,8 @@ RECONNECT_PREFIX = "续轮在断开前已经交付的合成文本。"
 FINAL = "模型已收到本次客户端回执。"
 TITLE_TEXT = "隔离标题用量对照"
 TITLE_REPLY = json.dumps({"title": TITLE_TEXT}, ensure_ascii=False, separators=(",", ":"))
-TITLE_USAGE = (31, 7)
+AUXILIARY_USAGE = (31, 7)
+SUGGESTION_REPLY = "summarize the synthetic note next"
 FORCED_CHOICES = {"any": {"type": "any"}, "named": {"type": "tool", "name": SECOND_TOOL["name"]}}
 
 
@@ -235,8 +236,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            recovery_slow_model=False, initial_idle_model_connection=False, trace_startup=False, cache_markers=False,
            history_cache_markers=False, history_cache_ttl=None, history_cache_scope=None,
            cache_capability=None, message_system_roles=False,
-           structured_output=False, forced_tool_choice=None, no_tool_choice=False, interleaved_title=None,
-           title_sample=None):
+           structured_output=False, forced_tool_choice=None, no_tool_choice=False, auxiliary_mode=None,
+           auxiliary_kind="title", auxiliary_sample=None):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -278,8 +279,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param structured_output 是否核对普通 API 的结构化输出和实际发送路径。
     @param forced_tool_choice 核对强制工具选择及同进程或重启回执。
     @param no_tool_choice 是否核对无工具时的显式 none 和保留声明的兼容路径。
-    @param interleaved_title 可选，观察等待工具时的公开标题投递或本地拦截。
-    @param title_sample 从官方 CLI 隔离运行导出的标题请求。
+    @param auxiliary_mode 可选，观察等待工具时的公开辅助轮投递或本地拦截。
+    @param auxiliary_kind 标题或建议。@param auxiliary_sample 从官方 CLI 隔离运行导出的请求。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -303,8 +304,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     config = Path("/run/v3/sender.json")
     copy2(temporary / "ca.der", config.with_name("verification-ca.der"))
     received, callbacks, proxy_targets = [], [], []
-    title_received = []
-    title_provider_sessions = []
+    auxiliary_received = []
+    auxiliary_provider_sessions = []
+    suggestion = auxiliary_kind == "suggestion"
+    auxiliary_reply = SUGGESTION_REPLY if suggestion else TITLE_REPLY
+    auxiliary_text = SUGGESTION_REPLY if suggestion else TITLE_TEXT
     slow_tool_arrivals = []
     model_betas = []
     summarized_thinking = adaptive_thinking_model is not None and adaptive_thinking_display == "summarized"
@@ -332,15 +336,19 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             raw = self.rfile.read(int(self.headers["Content-Length"]))
             body = json.loads(raw)
             model_digest = sha256(raw).hexdigest()
-            is_title = title_sample is not None and body.get("output_config", {}).get("format") == (
-                title_sample["body"]["output_config"]["format"]
-            )
-            (title_received if is_title else received).append((model_digest, body, self.connection.version()))
-            if is_title:
-                title_provider_sessions.append(self.headers.get("x-claude-code-session-id"))
+            is_auxiliary = False
+            if auxiliary_sample is not None:
+                sample = auxiliary_sample["body"]
+                if suggestion:
+                    is_auxiliary = body["messages"][-1]["content"] == sample["messages"][-1]["content"]
+                else:
+                    is_auxiliary = body.get("output_config", {}).get("format") == sample["output_config"]["format"]
+            (auxiliary_received if is_auxiliary else received).append((model_digest, body, self.connection.version()))
+            if is_auxiliary:
+                auxiliary_provider_sessions.append(self.headers.get("x-claude-code-session-id"))
             if trace_startup:
                 startup_event("model_received", peer_port=self.client_address[1], model_posts=len(received),
-                              title_posts=len(title_received),
+                              **{f"{auxiliary_kind}_posts": len(auxiliary_received)},
                               model_body_sha256=model_digest)
             if v1_runtime is not None or message_system_roles or adaptive_thinking_model:
                 model_betas.append(self.headers.get("anthropic-beta", ""))
@@ -355,11 +363,20 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 sleep(SLOW_MODEL_DELAY)
             restart = any(b.get("text") == AFTER_RESTART for row in body["messages"] for b in blocks(row))
             prefix = b""
-            if is_title:
-                frames = message_sse({"type": "text", "text": TITLE_REPLY}, "end_turn", "msg_interleaved_title")
+            if is_auxiliary:
+                if auxiliary_mode == "tool-output":
+                    frames = fixture_tool_sse({"type": "tool_use", "name": "Read", "id": "toolu_unexpected_suggestion",
+                                               "input": {"file_path": "synthetic-note.txt"}}, with_signature=False)
+                else:
+                    frames = message_sse(
+                        {"type": "text", "text": auxiliary_reply}, "end_turn", f"msg_interleaved_{auxiliary_kind}",
+                    )
                 events = [json.loads(line[5:]) for line in frames.splitlines() if line.startswith(b"data:")]
-                events[0]["message"].update(model=body["model"], usage={"input_tokens": TITLE_USAGE[0], "output_tokens": 0})
-                events[-2]["usage"]["output_tokens"] = TITLE_USAGE[1]
+                events[0]["message"].update(
+                    id=f"msg_interleaved_{auxiliary_kind}", model=body["model"],
+                    usage={"input_tokens": AUXILIARY_USAGE[0], "output_tokens": 0},
+                )
+                events[-2]["usage"]["output_tokens"] = AUXILIARY_USAGE[1]
                 wire = b"".join(map(frame, events))
             elif no_tool_choice:
                 wire = message_sse({"type": "text", "text": FINAL}, "end_turn", "msg_cold_reply")
@@ -561,8 +578,10 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
 
         manage("PUT", "settings", {"allowed_user_agents": "",
                                    "request_diagnostics_log_mode": "info" if inspect_model_body else "debug"})
-        if interleaved_title:
-            manage("PUT", "settings", {"intercept_warmup_title_enabled": "true" if interleaved_title == "mock" else "false"})
+        if auxiliary_mode:
+            manage("PUT", "settings", {
+                f"intercept_warmup_{auxiliary_kind}_enabled": "true" if auxiliary_mode == "mock" else "false",
+            })
         if adaptive_thinking_model:
             manage("PUT", "settings", {"rewrite_disabled_thinking_enabled": "true",
                                        "rewrite_disabled_thinking_models": adaptive_thinking_model})
@@ -579,7 +598,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             "auto_telemetry": False, "auto_poll_usage": False, "concurrency": 2, "rpm_limit": 0,
         })
         identifier = account["id"]
-        if interleaved_title in ("pooled", "pool-unsupported"):
+        if auxiliary_mode in ("pooled", "pool-unsupported"):
             account = manage("PUT", f"accounts/{identifier}", {
                 "upstream_session_pool_enabled": True, "upstream_session_pool_size": 1,
             })
@@ -597,7 +616,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                "request_backend_revision": account["request_backend_revision"]})
         token, foreign = (manage("POST", "tokens", {"name": name, "allowed_accounts": str(identifier)})["token"]
                           for name in ("cold-history-owner", "cold-history-foreign"))
-        headers = {"x-session-id": str(uuid4()), "User-Agent": "flower2api-cold-history-fixture/1"}
+        session_id = auxiliary_sample["headers"]["x-claude-code-session-id"] if auxiliary_sample else str(uuid4())
+        headers = {"x-session-id": session_id, "User-Agent": "flower2api-cold-history-fixture/1"}
         messages = [{"role": role, "content": text} for role, text in HISTORY]
         if thinking_display_model:
             return verify_thinking_display_contract(manage, token, identifier, received, thinking_display_model,
@@ -803,9 +823,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 assert signed_tool_models == expected_models, signed_tool_models
         follow = {**body, "stream": reconnect_tool_stream,
                   "messages": [*messages, {"role": "assistant", "content": offered}, result]}
-        if interleaved_title:
-            title_proof = verify_pending_title(manage, token, headers, received, title_received,
-                                               temporary / "gateway.db", title_sample, mode=interleaved_title)
+        if auxiliary_mode:
+            auxiliary_proof = verify_pending_auxiliary(
+                manage, token, headers, received, auxiliary_received, temporary / "gateway.db",
+                auxiliary_sample, kind=auxiliary_kind, mode=auxiliary_mode, reply=auxiliary_reply,
+            )
         wrong_subject, _ = call(18090, "POST", "/v1/messages", foreign, follow, headers)
         wrong_session, _ = call(18090, "POST", "/v1/messages", token, follow,
                                 {**headers, "x-session-id": str(uuid4())})
@@ -1090,17 +1112,19 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                  "changed_tool_arguments_status": wrong_arguments,
                  "duplicate_receipt_status": duplicate, "tls_versions": [tls for _, _, tls in received],
                  "proxy_connections": len(proxy_targets), "attempts": captures}
-        if interleaved_title:
-            title_model = title_sample["body"]["model"] if title_received else None
-            rows = wait_for(lambda: title_usage_rows(temporary / "gateway.db", title_model))
-            assert all(TITLE_TEXT not in json.dumps(native, ensure_ascii=False) for _, native, _ in received)
-            assert title_proof["title_request_id"] not in {item["request_id"] for item in captures}
-            if interleaved_title == "pooled":
-                assert title_provider_sessions == [headers["x-session-id"]]
+        if auxiliary_mode:
+            auxiliary_model = auxiliary_sample["body"]["model"] if auxiliary_received else None
+            rows = wait_for(lambda: auxiliary_usage_rows(
+                temporary / "gateway.db", auxiliary_model, tool_output=auxiliary_mode == "tool-output",
+            ))
+            assert all(auxiliary_text not in json.dumps(native, ensure_ascii=False) for _, native, _ in received)
+            assert auxiliary_proof[f"{auxiliary_kind}_request_id"] not in {item["request_id"] for item in captures}
+            if auxiliary_mode == "pooled":
+                assert auxiliary_provider_sessions == [headers["x-session-id"]]
                 account, = [account for account in manage("GET", "accounts")["data"] if account["id"] == identifier]
                 assert account["upstream_session_pool_active_count"] == 1
-                title_proof["title_upstream_session_id"] = title_provider_sessions[0]
-            proof["interleaved_title"] = {**title_proof, "usage_records": rows}
+                auxiliary_proof[f"{auxiliary_kind}_upstream_session_id"] = auxiliary_provider_sessions[0]
+            proof[f"interleaved_{auxiliary_kind}"] = {**auxiliary_proof, "usage_records": rows}
         if initial_idle_model_connection:
             proof["initial_idle_model_connection"] = {"http_status": initial_status, "model_posts": 1}
         if history_tool_blocks:
@@ -1817,26 +1841,29 @@ def verify_thinking_display_contract(manage, token, identifier, received, model,
             "wire_final": "unavailable", "cases": proof, "model_posts": len(received)}
 
 
-def title_usage_rows(database, title_model):
-    """等待主轮与公开标题分别落账。@param database 隔离库。@param title_model 实际模型或本地拦截的空值。@return 用量行。"""
-    expected = [(MODEL, 10, 8)] * 2
-    if title_model is not None:
-        expected.append((title_model, *TITLE_USAGE))
+def auxiliary_usage_rows(database, model, *, tool_output=False):
+    """等待主轮与辅助轮分别落账。@param database 隔离库。@param model 辅助模型。
+    @param tool_output 合成模型是否返回超出建议范围的工具。@return 用量行。
+    """
+    expected = [(MODEL, 10, 8, 0)] * 2
+    if model is not None:
+        expected.append((model, AUXILIARY_USAGE[0], 0, 1) if tool_output else (model, *AUXILIARY_USAGE, 0))
     with closing(connect(database)) as connection:
         rows = connection.execute(
-            "SELECT model,input_tokens,output_tokens FROM usage_records WHERE account_id=1"
+            "SELECT model,input_tokens,output_tokens,partial FROM usage_records WHERE account_id=1"
         ).fetchall()
     if len(rows) < len(expected):
         return None
     assert sorted(rows) == sorted(expected), rows
-    return rows
+    return rows if tool_output else [row[:3] for row in rows]
 
 
-def verify_pending_title(manage, token, headers, received, title_received, database, title_sample, *, mode):
-    """在真实 CLI 等待原回执时提交固定画像的公开标题。
+def verify_pending_auxiliary(manage, token, headers, received, auxiliary_received, database, sample, *, kind, mode, reply):
+    """在真实 CLI 等待原回执时提交真实公开辅助轮。
     @param manage 管理入口。@param token 调用方。@param headers 主轮会话。@param received 主轮模型实收。
-    @param title_received 标题模型实收。@param database 隔离库。@param title_sample 官方实际标题请求。
-    @param mode 转发、拦截或混合版本对照。@return 脱敏证据。
+    @param auxiliary_received 辅助轮模型实收。@param database 隔离库。@param sample 官方实际请求。
+    @param kind 标题或建议。@param mode 转发、拦截或混合版本对照。@param reply 隔离模型的独立回复。
+    @return 脱敏证据。
     """
     def waiting_rows():
         with closing(connect(database)) as connection:
@@ -1851,51 +1878,55 @@ def verify_pending_title(manage, token, headers, received, title_received, datab
     archive, = projects.glob("*/" + native_id + ".jsonl")
     snapshot = wait_for(lambda: (raw if NEW_ID.encode() in (raw := archive.read_bytes()) else None))
     session = headers["x-session-id"]
-    body = deepcopy(title_sample["body"])
-    metadata = json.loads(body["metadata"]["user_id"])
-    metadata["session_id"] = session
-    body["metadata"]["user_id"] = encoded(metadata).decode()
-    incoming = {**title_sample["headers"], "x-session-id": session, "x-claude-code-session-id": session}
+    body = sample["body"]
+    assert json.loads(body["metadata"]["user_id"])["session_id"] == session
+    incoming = {**sample["headers"], "x-session-id": session}
     status, raw, request_id = checked_messages(
-        manage, token, body, incoming, title_received, "title_during_tool_wait",
+        manage, token, body, incoming, auxiliary_received, f"{kind}_during_tool_wait",
         expected_status=503 if mode == "pool-unsupported" else 200, trace_startup=True,
     )
     assert len(received) == 1
     after = archive.read_bytes()
-    assert after == snapshot and TITLE_TEXT.encode() not in after
+    assert after == snapshot
     assert waiting_rows() == [waiting] and binding.read_bytes() == bound_bytes
     detail = manage("GET", "request-diagnostics/" + request_id)
     root, attempts = detail["request"], detail["attempts"]
     assert root["original_session_id"] == session
-    proof = {"title_request_id": request_id, "title_status": status, "title_model_posts": len(title_received),
+    proof = {f"{kind}_request_id": request_id, f"{kind}_status": status, f"{kind}_model_posts": len(auxiliary_received),
              "main_archive_unchanged": after == snapshot,
-             "title_attempt_count": len(attempts), "tool_history_preserved": True}
+             f"{kind}_attempt_count": len(attempts), "tool_history_preserved": True}
     if mode == "pool-unsupported":
-        assert not title_received and not attempts and root["error_stage"] == "tui_prepare_exchange"
-        proof["title_error_stage"] = root["error_stage"]
+        assert not auxiliary_received and not attempts and root["error_stage"] == "tui_prepare_exchange"
+        proof[f"{kind}_error_stage"] = root["error_stage"]
         return proof
     events = [json.loads(line[5:]) for line in raw.splitlines() if line.startswith(b"data:")]
-    assert events[-1]["type"] == "message_stop"
+    if mode == "tool-output":
+        assert events[-1] == {"type": "error", "error": {"type": "api_error", "message": "建议回复包含工具调用"}}
+        assert b"toolu_unexpected_suggestion" not in raw
+        proof["unexpected_tool_rejected"] = True
+    else:
+        assert events[-1]["type"] == "message_stop"
     text = "".join(event["delta"]["text"] for event in events if event["type"] == "content_block_delta")
     if mode == "mock":
-        assert json.loads(text) == {"title": "New Conversation"}
-        assert not title_received and not attempts and root["outcome"] == "mock"
+        assert text == ("" if kind == "suggestion" else '{"title":"New Conversation"}')
+        assert not auxiliary_received and not attempts and root["outcome"] == "mock"
     else:
-        (digest, native, _), = title_received
+        (digest, native, _), = auxiliary_received
         (attempt,) = attempts
         assert attempt["request_id"] == request_id and attempt["attempt_id"] == root["context"]["tui_reservation_id"]
-        assert text == TITLE_REPLY and native["output_config"] == body["output_config"]
-        assert native["messages"] == body["messages"] and native["system"] == body["system"]
-        assert native["metadata"] == body["metadata"] and not native.get("tools")
+        assert text == ("" if mode == "tool-output" else reply)
+        assert native == body, (kind, sorted(key for key in native.keys() | body.keys() if native.get(key) != body.get(key)))
         snapshot = wait_for(lambda: manage(
             "GET", f"request-diagnostics/{request_id}/captures/{attempt['attempt_id']}"
         ).get("snapshot"))
         stages = {stage["stage"]: stage for stage in snapshot["stages"]}
         assert stages["wire_final"]["status"] == "unavailable", stages["wire_final"]
-        proof.update(title_attempt_id=attempt["attempt_id"], title_model_body_sha256=digest,
-                     title_response_id=events[0]["message"]["id"],
-                     title_capture_representation=stages["tui_provider_request"]["representation"],
-                     final_tls_capture="unavailable")
+        proof.update({
+            f"{kind}_attempt_id": attempt["attempt_id"], f"{kind}_model_body_sha256": digest,
+            f"{kind}_response_id": events[0]["message"]["id"],
+            f"{kind}_capture_representation": stages["tui_provider_request"]["representation"],
+            "final_tls_capture": "unavailable",
+        })
     return proof
 
 
@@ -2820,6 +2851,8 @@ def main():
     scenario.add_argument("--no-tool-choice-contract", action="store_true")
     scenario.add_argument("--interleaved-title", choices=("forward", "mock", "pooled", "pool-unsupported"))
     parser.add_argument("--title-request", type=Path, help="官方 CLI 隔离模型导出的标题请求")
+    scenario.add_argument("--interleaved-suggestion", choices=("forward", "mock", "pooled", "pool-unsupported", "tool-output"))
+    parser.add_argument("--suggestion-request", type=Path, help="官方 CLI 隔离模型导出的建议请求")
     scenario.add_argument("--thinking-display-contract", choices=tuple(THINKING_DISPLAY_DEFAULTS))
     scenario.add_argument("--history-png", action="store_true")
     scenario.add_argument("--history-images", action="store_true")
@@ -2835,6 +2868,10 @@ def main():
     args = parser.parse_args()
     if bool(args.interleaved_title) != bool(args.title_request):
         parser.error("--interleaved-title 与 --title-request 需要一起使用")
+    if bool(args.interleaved_suggestion) != bool(args.suggestion_request):
+        parser.error("--interleaved-suggestion 与 --suggestion-request 需要一起使用")
+    auxiliary_mode = args.interleaved_title or args.interleaved_suggestion
+    auxiliary_path = args.title_request or args.suggestion_request
     if args.adaptive_thinking_display != "updates" and args.adaptive_thinking_model is None:
         parser.error("--adaptive-thinking-display 需要同用 --adaptive-thinking-model")
     if args.signed_tool_response and not args.signed_tool_history:
@@ -2858,7 +2895,7 @@ def main():
     cache_markers = args.cache_markers or args.cache_marker_capabilities is not None
     trace_startup = (args.initial_idle_model_connection or args.trace_initial_startup or cache_markers
                      or args.structured_output_contract or bool(args.forced_tool_choice_contract) or args.no_tool_choice_contract
-                     or bool(args.interleaved_title)
+                     or bool(auxiliary_mode)
                      or bool(args.thinking_display_contract)
                      or (bool(args.message_system_roles) and args.v1_runtime is None))
     if trace_startup and (previous or args.mixed_image_peers or args.v1_runtime):
@@ -2900,8 +2937,9 @@ def main():
                        cache_capability=args.cache_marker_capabilities,
                        message_system_roles=args.message_system_roles, structured_output=args.structured_output_contract,
                        forced_tool_choice=args.forced_tool_choice_contract, no_tool_choice=args.no_tool_choice_contract,
-                       interleaved_title=args.interleaved_title,
-                       title_sample=json.loads(args.title_request.read_bytes()) if args.title_request else None)
+                       auxiliary_mode=auxiliary_mode,
+                       auxiliary_kind="suggestion" if args.interleaved_suggestion else "title",
+                       auxiliary_sample=json.loads(auxiliary_path.read_bytes()) if auxiliary_path else None)
         print(json.dumps(proof, ensure_ascii=False))
 
 
