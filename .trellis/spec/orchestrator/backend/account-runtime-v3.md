@@ -2554,7 +2554,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 普通 Messages 在原公开会话中提交分叉的确认历史。启动器的显式恢复与自动恢复均可根据同一导入计划定位该分叉。单独按已登记 UUID 恢复时，选择原绑定的历史。普通历史分叉共享原会话的绑定文件与私有配置目录。
 - 普通单文本首轮和已闭合的纯文本历史也使用该原生入口。无外部历史时由 CLI 自行创建会话记录。公开会话已有主链但本轮提交空前缀时，启动新的独立原生会话。普通顶层 `system` 省略、空串和空数组均保留原生默认工作正文。多个文本块按原顺序作为本轮追加指令。
 - 当前用户消息的多个纯文本块在 `session.append` 阶段按原顺序替换本会话的提交标记，CLI 按原生方式保存并组装。派发前核对本轮标记和实际文本块。原工具回执冻结文本块边界。原进程丢失后，已提交的块随核对过的历史载入，继续提示单独提交。
-- 已确认的用户历史可保留内嵌 Base64 PNG。恢复时按原角色和内容块顺序交给 CLI，用户提醒可附在同一条历史消息。URL 图像和本轮多块媒体沿各自既有输入合同。
+- 已确认的用户历史可保留内嵌 Base64 PNG、JPEG、GIF 和 WebP。恢复时按原角色和内容块顺序交给 CLI，用户提醒可附在同一条历史消息。事件源核对格式标识，固定 CLI 与模型沿用原数据。URL 图像和本轮多块媒体沿各自既有输入合同。
 - 已闭合的旧工具结果可保留非空有序 `text` 块数组和原工具 ID。带扩展字段的结果块沿现有输入合同，先前完成的工具保持已完成。
 - V2 管理端可选择 `append`、`replace`、`user_reminder`。已核验发送器通过私有预留传递非默认动作。替换以启动文件承载系统正文，省略保留默认正文，显式空串或空数组仅保留身份和计费块。提醒保留默认系统正文，附到首条不含工具回执的用户消息。纯新轮的提醒随原问题提交。完整 CC 原生请求沿原输入合同。已登记等待工具的进程沿用其启动动作。
 - 普通原生输入的 `output_config.effort` 支持 `low`、`medium`、`high`、`max`，由 2.1.293 的 `--effort` 组装。模型出站前核对实际字段。等待和冷恢复沿用根轮冻结的强度。交互 `--json-schema` 的组件探针未生成 `output_config.format`，此字段沿现有输入合同处理。
@@ -2593,5 +2593,6 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `verify_tui_cold_history.py --recover-pending-tool` 结束唯一等待中的真实 CLI 并重启其账号发送器。修改账号动作和客户端指令后，原回执仅继续其冻结策略，恢复模型步骤的正文来自真实 CLI。
 - `verify_tui_cold_history.py --output-effort` 核对四档强度、显式禁用思考及不同 `max_tokens` 的公开入口实收。`--recover-pending-tool` 核对原轮强度与拒绝改写。
 - `verify_tui_cold_history.py --history-png` 核对追加、用户提醒两种动作下的原角色、历史图像字节和单次当前问题。
+- `verify_tui_cold_history.py --history-images` 在同一旧用户消息中核对 PNG、JPEG、GIF、WebP 的顺序和原始数据。
 - `verify_tui_cold_history.py --history-tool-blocks` 核对已闭合的两个文本结果块、顺序及原 ID，并完成一次新工具回执。
 - `verify_tui_cold_history.py --current-text-blocks` 核对本轮两个独立文本块的模型实收，合并边界的回执返回 422。与 `--recover-pending-tool` 组合时，另核对重启后原始文本块、记录和工具结果仍被保留。

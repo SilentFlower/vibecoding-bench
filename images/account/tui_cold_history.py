@@ -20,6 +20,12 @@ MCP_SERVER = "flower"
 MCP_PREFIX = f"mcp__{MCP_SERVER}__"
 RESUME_PROMPT = "Continue from where you left off."
 IMPORT_BOUNDARY = "flower2apiImportBoundary"
+_IMAGE_HEADERS = {
+    "image/png": (b"\x89PNG\r\n\x1a\n",),
+    "image/jpeg": (b"\xff\xd8\xff",),
+    "image/gif": (b"GIF87a", b"GIF89a"),
+    "image/webp": (b"RIFF",),
+}
 
 
 def _blocks(row):
@@ -32,18 +38,21 @@ def _plain_text(block):
             and isinstance(block["text"], str) and bool(block["text"]))
 
 
-def _inline_png(block):
+def _inline_image(block):
     if block.keys() != {"type", "source"} or block["type"] != "image":
         return False
     source = block["source"]
     if (not isinstance(source, dict) or source.keys() != {"type", "media_type", "data"}
-            or source["type"] != "base64" or source["media_type"] != "image/png"
+            or source["type"] != "base64" or not isinstance(source["media_type"], str)
+            or source["media_type"] not in _IMAGE_HEADERS
             or not isinstance(source["data"], str)):
         return False
     try:
-        return b64decode(source["data"], validate=True).startswith(b"\x89PNG\r\n\x1a\n")
+        decoded = b64decode(source["data"], validate=True)
     except ValueError:
         return False
+    media_type = source["media_type"]
+    return decoded.startswith(_IMAGE_HEADERS[media_type]) and (media_type != "image/webp" or decoded[8:12] == b"WEBP")
 
 
 def _text_result_blocks(content):
@@ -57,7 +66,7 @@ def _closed_history(rows, *, result_types=(str,)):
     for row in rows:
         results = set()
         for block in _blocks(row):
-            if _plain_text(block) or (row["role"] == "user" and _inline_png(block)):
+            if _plain_text(block) or (row["role"] == "user" and _inline_image(block)):
                 continue
             if (row["role"] == "assistant" and block.get("type") == "tool_use"
                     and block.keys() == {"type", "id", "name", "input"}

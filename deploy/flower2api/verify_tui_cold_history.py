@@ -102,7 +102,7 @@ def build_cutover_record(temporary, old, deployment, release):
 
 def verify(gateway, sender, temporary, *, restart_history=False, text_input=False, system_policy=False,
            toggle_pending_policy=False, tool_policy=None, recover_pending=False, output_effort=False,
-           history_png=False, history_tool_blocks=False, previous=None, failure_boundaries=False,
+           history_png=False, history_images=False, history_tool_blocks=False, previous=None, failure_boundaries=False,
            current_text_blocks=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
@@ -113,6 +113,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param recover_pending 是否结束等待进程并在发送器重启后恢复真实工具回执。
     @param output_effort 是否核对 CLI 实际生成的推理强度和 Token 上限。
     @param history_png 是否核对用户历史里的内嵌 PNG。
+    @param history_images 是否核对用户历史里四种内嵌图像。
     @param history_tool_blocks 是否核对已完成工具结果的原始文本块。
     @param previous 可选，旧发行源码、网关、发送器三个离线制品。
     @param failure_boundaries 是否分别在模型收件前后切断隔离连接。
@@ -316,8 +317,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                       current_text_blocks=current_text_blocks)
         if output_effort:
             return verify_output_effort(manage, token, account_token, headers, received)
-        if history_png:
-            return verify_history_png(manage, token, account_token, identifier, headers, received)
+        if history_png or history_images:
+            return verify_history_images(manage, token, account_token, identifier, headers, received,
+                                         all_formats=history_images)
         if system_policy:
             account_path = f"accounts/{identifier}"
             first = manage("GET", account_path)
@@ -696,14 +698,24 @@ def verify_output_effort(manage, token, account_token, headers, received):
     return {"output_effort": outcomes, "model_posts": len(received)}
 
 
-def verify_history_png(manage, token, account_token, account_id, headers, received):
-    """核对历史用户 PNG 与新问题的真实出站。
+def verify_history_images(manage, token, account_token, account_id, headers, received, *, all_formats):
+    """核对历史用户图像与新问题的真实出站。
     @param manage 管理接口。@param token 公共令牌。@param account_token 合成账号凭据。
-    @param account_id 当前账号。@param headers 固定公开会话。@param received 模型实收。@return 测试摘要。
+    @param account_id 当前账号。@param headers 固定公开会话。@param received 模型实收。
+    @param all_formats 是否同时校验 JPEG、GIF、WebP。@return 测试摘要。
     """
-    image = {"type": "image", "source": {"type": "base64", "media_type": "image/png",
-             "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j4uoAAAAASUVORK5CYII="}}
-    history = [{"role": "user", "content": [{"type": "text", "text": HISTORY[0][1]}, image]},
+    images = {"image/png": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j4uoAAAAASUVORK5CYII="}
+    if all_formats:
+        images.update({
+            "image/jpeg": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwc"
+                          "KDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAACAAIBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAABv/EABQQAQAAAAAAAA"
+                          "AAAAAAAAAAAAD/2gAIAQEAAD8AQP/Z",
+            "image/gif": "R0lGODdhAgACAIEAAKCgoAAAAAAAAAAAACwAAAAAAgACAAAIBgABCAQQEAA7",
+            "image/webp": "UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoCAAIAAUAmJaQAA3AA/u2oAAA=",
+        })
+    image_blocks = [{"type": "image", "source": {"type": "base64", "media_type": media_type, "data": data}}
+                    for media_type, data in images.items()]
+    history = [{"role": "user", "content": [{"type": "text", "text": HISTORY[0][1]}, *image_blocks]},
                {"role": "assistant", "content": HISTORY[1][1]}]
     cases = []
     for index, policy in enumerate(("append", "user_reminder"), 1):
@@ -716,7 +728,7 @@ def verify_history_png(manage, token, account_token, account_id, headers, receiv
         _, native, _ = received[-1]
         rows = native["messages"]
         row, = [row for row in rows if any(block["type"] == "image" for block in blocks(row))]
-        assert row["role"] == "user" and [block for block in blocks(row) if block["type"] == "image"] == [image]
+        assert row["role"] == "user" and [block for block in blocks(row) if block["type"] == "image"] == image_blocks
         assert blocks(row)[0] == history[0]["content"][0]
         texts = [(message["role"], block.get("text")) for message in rows for block in blocks(message)]
         assert texts.count(("assistant", HISTORY[1][1])) == 1 and texts.count(("user", question)) == 1
@@ -727,7 +739,8 @@ def verify_history_png(manage, token, account_token, account_id, headers, receiv
     for case, capture in zip(cases, verify_captures(manage, received, account_token), strict=True):
         assert case["body_sha256"] == capture["ingress_body_sha256"]
         case.update(capture)
-    return {"history_png": cases, "model_posts": len(received)}
+    return {"history_images" if all_formats else "history_png": cases,
+            "formats": list(images), "model_posts": len(received)}
 
 
 def fixture_command_has(path, argument):
@@ -833,6 +846,7 @@ def main():
     scenario.add_argument("--recover-pending-tool", action="store_true")
     scenario.add_argument("--output-effort", action="store_true")
     scenario.add_argument("--history-png", action="store_true")
+    scenario.add_argument("--history-images", action="store_true")
     scenario.add_argument("--history-tool-blocks", action="store_true")
     scenario.add_argument("--mixed-release", nargs=3, type=Path,
                           metavar=("OLD_SOURCE", "OLD_GATEWAY", "OLD_SENDER"))
@@ -848,7 +862,8 @@ def main():
                        system_policy=args.system_policy, toggle_pending_policy=args.toggle_pending_policy,
                        tool_policy=args.tool_policy, recover_pending=args.recover_pending_tool,
                        output_effort=args.output_effort, history_png=args.history_png,
-                       history_tool_blocks=args.history_tool_blocks, previous=args.mixed_release,
+                       history_images=args.history_images, history_tool_blocks=args.history_tool_blocks,
+                       previous=args.mixed_release,
                        failure_boundaries=args.failure_boundaries, current_text_blocks=args.current_text_blocks)
         print(json.dumps(proof, ensure_ascii=False))
 

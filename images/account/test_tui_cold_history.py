@@ -420,8 +420,8 @@ class ColdHistoryTests(TestCase):
         for output in ({"effort": "unknown"}, {"format": {"type": "json_schema", "schema": {}}}):
             self.assertIsNone(ColdHistory.from_request({**self.body, "output_config": output}))
 
-    def test_only_confirmed_inline_png_enters_native_history(self):
-        """闭合的用户记录可以保留内嵌 PNG。@return 无。"""
+    def test_only_matching_inline_image_enters_native_history(self):
+        """闭合用户记录的内嵌图像须匹配声明格式。@return 无。"""
         picture = {"type": "image", "source": {"type": "base64", "media_type": "image/png",
                   "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j4uoAAAAASUVORK5CYII="}}
         raw = deepcopy(self.body)
@@ -429,7 +429,10 @@ class ColdHistoryTests(TestCase):
         self.assertEqual(ColdHistory.from_request(raw).history[0]["content"][-1], picture)
         self.assertIsNone(ColdHistory.from_request({**raw, "messages": raw["messages"][:1]}))
         for source in ({"type": "url", "url": "https://example.invalid/picture.png"},
-                       {**picture["source"], "data": "invalid base64"}):
+                       {**picture["source"], "data": "invalid base64"},
+                       {**picture["source"], "media_type": "image/jpeg"},
+                       {**picture["source"], "media_type": []},
+                       {**picture["source"], "media_type": "image/webp", "data": "UklGRiQAAABXQVZF"}):
             with self.subTest(source=source):
                 raw["messages"][0]["content"][-1] = {"type": "image", "source": source}
                 self.assertIsNone(ColdHistory.from_request(raw))
