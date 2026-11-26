@@ -431,6 +431,29 @@ class ColdHistoryTests(TestCase):
         result["content"][1]["cache_control"]["ttl"] = "unsupported"
         self.assertIsNone(ColdHistory.from_request(body))
 
+    def test_forced_ttl_preserves_nested_history_and_validates_effective_order(self):
+        """平台强制 TTL 沿旧合同只改直接断点，按出站顺序校验混合前缀。@return 无。"""
+        body = deepcopy(self.body)
+        result = body["messages"][2]["content"][0]
+        result["content"] = [{"type": "text", "text": "旧工具结果", "cache_control": {"type": "ephemeral"}}]
+        for ttl in ("5m", "1h"):
+            nested = ColdHistory.from_request(body, cache_ttl=ttl)
+            self.assertTrue(nested.matches_history_cache_markers(body))
+            self.assertEqual(ColdHistory.from_receipt_boundary(body, nested.receipt_boundary()), nested)
+
+        body["messages"][0]["content"] = [{"type": "text", "text": "旧用户",
+                                           "cache_control": {"type": "ephemeral", "ttl": "1h"}}]
+        plan = ColdHistory.from_request(body, cache_ttl="5m")
+        effective = deepcopy(body)
+        effective["messages"][0]["content"][0]["cache_control"]["ttl"] = "5m"
+        self.assertTrue(plan.matches_history_cache_markers(effective))
+        effective["messages"][2]["content"][0]["content"][0]["cache_control"]["ttl"] = "5m"
+        self.assertFalse(plan.matches_history_cache_markers(effective))
+        self.assertIsNone(ColdHistory.from_receipt_boundary(effective, plan.receipt_boundary()))
+        result["content"][0]["cache_control"]["ttl"] = "1h"
+        self.assertIsNone(ColdHistory.from_request(body, cache_ttl="5m"))
+        self.assertIsNotNone(ColdHistory.from_request(body, cache_ttl="1h"))
+
     def test_split_assistant_and_user_rows_preserve_the_closed_tool_group(self):
         """相邻同角色历史保留原始内容，整组回执须在下一助理轮之前闭合。@return 无。"""
         body = deepcopy(self.body)

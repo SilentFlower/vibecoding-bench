@@ -134,6 +134,14 @@ def _marked_blocks(content):
                     yield index, offset, block.get("tool_use_id"), inner
 
 
+def _history_with_ttl(history, cache_ttl):
+    if cache_ttl == "off":
+        return history
+    # 账号 TTL 只重写直接标记。工具结果内层标记沿原发送策略保留。
+    return model_body({"messages": history}, {"sub2api": False, "ttl": cache_ttl, "adaptive": False},
+                      native=False)["messages"]
+
+
 def _automatic_tools(choice):
     return (isinstance(choice, dict) and choice.get("type") == "auto"
             and choice.keys() <= {"type", "disable_parallel_tool_use"}
@@ -203,7 +211,7 @@ class ColdHistory:
     def from_request(cls, body, system_policy="append", *, cache_ttl="off"):
         """识别普通文本、内嵌图像及受支持的闭合历史。
         @param body 已校验的请求。@param system_policy 本轮冻结的账号系统指令动作。
-        @param cache_ttl 经账号预留核对的平台 TTL。仅承接有直接历史断点的强制模式。
+        @param cache_ttl 经账号预留核对的平台 TTL。强制模式仅承接已有历史断点。
         @return 原生输入计划或空。
         """
         if body.keys() - {"model", "max_tokens", "thinking", "system", "messages", "tools", "stream", "output_config",
@@ -230,14 +238,15 @@ class ColdHistory:
         content = _blocks(current)
         if not content or not all(_plain_text(block) or _inline_image(block, for_paste=True) for block in content):
             return None
-        cache_blocks = [(inner, block) for row in history for _, inner, _, block in _marked_blocks(_blocks(row))]
-        if cache_ttl != "off" and (not cache_blocks or any(inner is not None for inner, _ in cache_blocks)):
+        effective_history = _history_with_ttl(history, cache_ttl)
+        cache_blocks = [block for row in effective_history for _, _, _, block in _marked_blocks(_blocks(row))]
+        if cache_ttl != "off" and not cache_blocks:
             return None
         if cache_blocks:
             # 原生路径仅承接已验证的历史文本。保留默认 TTL，并限制断点数量和前缀的时长顺序。
             if len(cache_blocks) > 4 or not all(_plain_text(b) for b in content):
                 return None
-            ttls = [block["cache_control"].get("ttl", "5m") for _, block in cache_blocks]
+            ttls = [block["cache_control"].get("ttl", "5m") for block in cache_blocks]
             if ttls != sorted(ttls, key=lambda ttl: ttl != "1h"):
                 return None
         declared = body.get("tools", [])
@@ -411,13 +420,8 @@ class ColdHistory:
 
     def _grouped_history(self):
         reminder_index = self._reminder_index()
-        source = self.history
-        if self.cache_ttl != "off":
-            # 复用账号的 TTL 政策。原输入保留供工具回执核对，有效值在导入前生效。
-            source = model_body({"messages": source}, {"sub2api": False, "ttl": self.cache_ttl, "adaptive": False},
-                                native=False)["messages"]
         history = []
-        for index, row in enumerate(source):
+        for index, row in enumerate(_history_with_ttl(self.history, self.cache_ttl)):
             blocks = _blocks(row)
             if index == reminder_index:
                 blocks = [*blocks, {"type": "text", "text": self._reminder()}]
