@@ -434,6 +434,9 @@ native('可选最终 TLS 写出：实际原版与独立 OpenSSL 对照', () => {
       const call = report.calls.at(-1)!;
       const received = JSON.parse(await readFile(call.file, 'utf8'));
       const sent = JSON.parse(received.body);
+      const headers = new Headers(received.headers);
+      expect(headers.has('x-claude-code-prompt-id')).toBe(!baseUrl);
+      expect(headers.has('x-claude-code-request-class')).toBe(!baseUrl);
       expect(sent.model).toBe(model ? 'fixture-selected-model' : 'claude-sonnet-4-6');
       expect(result.record.context?.modelSelection).toEqual({ requested: 'claude-sonnet-4-6', effective: sent.model, source: model ? 'startup_override' : 'request' });
       const billing = sent.system.find((block: { text?: string }) => block.text?.startsWith('x-anthropic-billing-header:')).text as string;

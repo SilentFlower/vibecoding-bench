@@ -866,7 +866,6 @@ impl Worker {
                 .env("CCRB_NATIVE_INGRESS_POLICY", "local_base_url")
                 .env("CLAUDE_CODE_ENTRYPOINT", "cli")
                 .env("DISABLE_AUTO_COMPACT", "1")
-                .env("CLAUDE_CODE_GATEWAY_HINT_HEADERS", "1")
                 .env("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", "1")
                 .env("DISABLE_AUTOUPDATER", "1")
                 .env("DISABLE_TELEMETRY", "1")

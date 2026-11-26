@@ -246,7 +246,7 @@ export class NativeEngine implements Engine {
       const env: Record<string, string> = {
         HOME: config.home!, CLAUDE_CONFIG_DIR: config.configDir!, PATH: process.env.PATH ?? '/usr/bin:/bin', LANG: 'C.UTF-8',
         CCRB_WORKER_ID: id, CCRB_CACHE_POLICY: config.cachePolicy!, CCRB_TELEMETRY: config.telemetryPolicy!, CLAUDE_CODE_ENTRYPOINT: 'cli', DISABLE_AUTO_COMPACT: '1',
-        CLAUDE_CODE_GATEWAY_HINT_HEADERS: '1', CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
+        CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
         DISABLE_AUTOUPDATER: '1', DISABLE_TELEMETRY: '1', DISABLE_ERROR_REPORTING: '1',
       };
       if (verified.identity.kind === 'original') env.BUN_OPTIONS = '--preload ' + resolve(this.config.preloadPath);
