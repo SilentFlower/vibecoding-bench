@@ -2286,8 +2286,10 @@ def verify_reliability(request, wait_idle, base):
 
 def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,kernel_selection=False,tool_deadlines=False,parallel_tools=False,
            *, shared_models=False, live_capacity=False, messages_search=False, continuation_modes=False,
-           tool_receipts=False, system_reminder=False, reliability=False):
-    """执行真实公共业务。@param homoglyph 检验系统策略。@param capture_off 验证关闭采集。@param png 核对图片与工具历史。@param installed_adapter 使用镜像内适配器。@param kernel_selection 验证内核切换。@param tool_deadlines 验证跨首轮期限的工具链。@param parallel_tools 验证同名工具。@return 脱敏验证摘要。"""
+           tool_receipts=False, system_reminder=False, reliability=False, candidate_runtime=False):
+    """执行真实公共业务。@param homoglyph 检验系统策略。@param capture_off 验证关闭采集。@param png 核对图片与工具历史。@param installed_adapter 使用镜像内适配器。@param kernel_selection 验证内核切换。@param tool_deadlines 验证跨首轮期限的工具链。@param parallel_tools 验证同名工具。
+    @param candidate_runtime 使用候选镜像内置发送器及同批控制网关。@return 脱敏验证摘要。
+    """
     require(os.geteuid()==1001,'原生业务探针必须使用UID1001')
     os.umask(0o077)
     Upstream.png_support=png
@@ -2317,7 +2319,8 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
         os.environ['V3_UPDATE_GATE_DIR']='/state/receipt-gate'
         os.environ['V3_ACCOUNT_RELEASE']=os.environ['V3_RELEASE']
     outputs=[];children=[]
-    for executable,name in [('/opt/sender','sender'),('/opt/gateway','gateway')]:
+    sender_path = '/usr/local/bin/account-sender' if candidate_runtime else '/opt/sender'
+    for executable,name in [(sender_path,'sender'),('/opt/gateway','gateway')]:
         output=open('/state/'+name+'.log','wb');outputs.append(output)
         command=[executable]
         if Path('/opt/verify-lib/ld-linux-x86-64.so.2').is_file():
@@ -2613,10 +2616,35 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
         for server in [proxy,binding]:server.shutdown();server.server_close()
 
 
+def candidate_gateway(client, account_ref, control_ref, output):
+    """从同批候选取出网关，在账号容器中保留内置 sender 和 Python 运行时。
+    @param client 本机 Docker 客户端。@param account_ref 候选账号镜像。
+    @param control_ref 同批候选控制镜像。@param output 临时网关二进制路径。
+    @return 两个本机镜像 ID。
+    """
+    images = {}
+    labels = {}
+    for role, reference in (('account', account_ref), ('control', control_ref)):
+        image = client.images.get(reference)
+        images[role] = image.id
+        labels[role] = image.attrs['Config'].get('Labels') or {}
+        require(labels[role].get('vibebench.role') == role, '候选镜像角色不匹配')
+    for key in ('vibebench.release', 'vibebench.parent-revision', 'vibebench.gateway-revision'):
+        require(labels['account'].get(key) and labels['account'][key] == labels['control'].get(key),
+                '候选控制和账号镜像必须来自同一批源码')
+    control = client.containers.create(images['control'])
+    try:
+        subprocess.run(['docker', 'cp', f'{control.id}:/app/claude-code-gateway', str(output)], check=True)
+    finally:
+        control.remove()
+    return images
+
+
 def main():
     """创建一次性CA并启动明确镜像，正式运行配置保持正常信任规则。@return 无。"""
     parser=argparse.ArgumentParser()
     parser.add_argument('--image')
+    parser.add_argument('--control-image', help='使用同批候选的控制网关与账号内置发送器')
     parser.add_argument('--loader-root',type=Path)
     parser.add_argument('--inside',action='store_true')
     parser.add_argument('--homoglyph',action='store_true')
@@ -2636,11 +2664,13 @@ def main():
     parser.add_argument('--claude-code', type=Path)
     args=parser.parse_args()
     installed_adapter=args.installed_adapter or args.png or args.kernel_selection
+    if args.control_image:
+        require(args.installed_adapter and not args.loader_root, '候选整包验证需要镜像适配器和系统加载器')
     if args.inside:
         result = inside(args.homoglyph,args.capture_off,args.png,installed_adapter,args.kernel_selection,args.tool_deadlines,args.parallel_tools,
             shared_models=args.shared_models,live_capacity=args.live_capacity,messages_search=args.messages_search,
             continuation_modes=args.continuation_modes,tool_receipts=args.tool_receipts,
-            system_reminder=args.system_reminder,reliability=args.reliability)
+            system_reminder=args.system_reminder,reliability=args.reliability,candidate_runtime=bool(args.control_image))
         print(json.dumps(result, ensure_ascii=False))
         return
     require(bool(args.image),'需要明确的固定原版测试镜像')
@@ -2649,6 +2679,8 @@ def main():
     package=source_path(root,'orchestrator')
     folder=Path(tempfile.mkdtemp(prefix='agy-native-tls-'))
     client=docker.from_env(timeout=60);container=None;receipt_adapter=None
+    candidate_assets = None
+    candidate_images = None
     try:
         subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-days','1','-subj','/CN=AGY local verification',
             '-addext','subjectAltName=DNS:*.googleapis.com','-keyout',str(folder/'server.key'),'-out',str(folder/'server.crt')],
@@ -2681,6 +2713,14 @@ def main():
             str(folder/'trust.pem'):{'bind':'/etc/ssl/certs/ca-certificates.crt','mode':'ro'}}
         if installed_adapter:
             del volumes[str(package/'agy_runtime')]
+        if args.control_image:
+            candidate_assets = tempfile.TemporaryDirectory(prefix='agy-candidate-gateway-')
+            gateway = Path(candidate_assets.name) / 'claude-code-gateway'
+            candidate_images = candidate_gateway(client, args.image, args.control_image, gateway)
+            del volumes[str(root/'services/gateway/target/debug/claude-code-gateway')]
+            del volumes[str(root/'services/gateway/target/debug/account-sender')]
+            del volumes[str(package/'runtime_files.py')]
+            volumes[str(gateway)] = {'bind': '/opt/gateway', 'mode': 'ro'}
         if args.tool_receipts:
             require(not installed_adapter,'回填回执夹具需要本地构建的观察器')
             receipt_adapter=Path(tempfile.mkdtemp(prefix='agy-tool-receipt-adapter-'))
@@ -2704,6 +2744,8 @@ def main():
                 library=(args.loader_root/name).resolve(strict=True)
                 volumes[str(library)]={'bind':'/opt/verify-lib/'+name,'mode':'ro'}
         probe=['/opt/probe.py','--inside']
+        if args.control_image:
+            probe += ['--control-image', args.control_image]
         for flag,enabled in (('--homoglyph',args.homoglyph),('--capture-off',args.capture_off),('--png',args.png),
                 ('--installed-adapter',installed_adapter),('--kernel-selection',args.kernel_selection),('--parallel-tools',args.parallel_tools),
                 ('--tool-deadlines',args.tool_deadlines),('--shared-models',args.shared_models),
@@ -2711,7 +2753,8 @@ def main():
                 ('--continuation-modes',args.continuation_modes),('--tool-receipts',args.tool_receipts),
                 ('--system-reminder', args.system_reminder),('--reliability',args.reliability)):
             if enabled:probe.append(flag)
-        container=client.containers.run(args.image,probe,entrypoint=['python3'],detach=True,
+        account_image = candidate_images['account'] if candidate_images else args.image
+        container=client.containers.run(account_image,probe,entrypoint=['python3'],detach=True,
             user='1001:1001',network_mode='none',read_only=True,cap_drop=['ALL'],security_opt=['no-new-privileges:true'],
             mem_limit='1536m' if args.png or args.live_capacity or args.claude_code else '768m',pids_limit=512,extra_hosts={host:'127.0.0.1'},tmpfs={'/tmp':'rw,nosuid,nodev,size=128m'},
             volumes=volumes,environment={'PYTHONPATH':python_package+':/usr/local/bin','DATABASE_DRIVER':'sqlite',
@@ -2725,14 +2768,21 @@ def main():
         if args.tool_receipts:evidence=root/'.trellis/.runtime/agy-tool-receipts-private'
         if args.reliability:evidence=root/'.trellis/.runtime/agy-tool-reliability-private'
         if args.system_reminder:evidence=root/'.trellis/.runtime/agy-system-reminder-private'
+        if candidate_images:
+            evidence = evidence.with_name(evidence.name + '-candidate')
         if evidence.exists():shutil.rmtree(evidence)
         shutil.copytree(folder,evidence,ignore=lambda directory,names:[name for name in names
             if not (Path(directory)/name).is_file() and not (Path(directory)/name).is_dir()])
         require(result['StatusCode']==0,logs)
-        print(logs.strip())
+        if candidate_images:
+            print(json.dumps({**json.loads(logs), 'candidate_images': candidate_images}, ensure_ascii=False))
+        else:
+            print(logs.strip())
     finally:
         if container:container.remove(force=True)
         if receipt_adapter:shutil.rmtree(receipt_adapter)
+        if candidate_assets:
+            candidate_assets.cleanup()
         shutil.rmtree(folder)
 
 

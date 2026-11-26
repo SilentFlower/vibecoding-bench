@@ -2117,6 +2117,7 @@ transport.submit(prepared, body, ttfb_timeout).await
 
 - 真实管理 HTTP、SQLite 和浏览器覆盖两个账号独立保存、旧账号默认关闭、非 AGY 约束、重新编辑与 390px 布局。迁移核对旧版本台账、重跑幂等与原数据。
 - `verify_agy_native_loopback.py --system-reminder` 在断网容器核对四种组合的实际原生 TLS 体和回执来源。覆盖领取、历史续轮、历史兜底、待回填切换、签名及单次回填。
+- 候选镜像同一用例使用 `--image <账号镜像> --installed-adapter --control-image <控制镜像> --system-reminder`。账号容器使用内置适配器、发送器和运行文件。网关取自同批控制镜像，验收报告记录两个镜像 ID。默认挂载源码的结果单独记录。
 - `verify_agy_gemini.py` 覆盖两个账号的私有快照、首次冻结及认证恢复。Python 单测覆盖已存在提醒、工具历史、非法索引及快照读回。
 
 ## Scenario: 反重力工具续轮与开流失败边界
