@@ -30,6 +30,7 @@ HISTORY = [
     ("user", "H3：订单号是 123。"), ("assistant", "H4：订单号已记录。"),
 ]
 QUESTION = "NOW：查询新便签并回答。"
+AFTER_RESTART = "RESTART：从已确认的旧问答开启另一轮。"
 SYSTEM = ["RULE1：你是便签助手。", "RULE2：请只使用已声明的工具。"]
 PAST_ID = "toolu_past_fixture"
 NEW_ID = "toolu_cold_fixture"
@@ -68,9 +69,10 @@ def install_source():
         copy2(ROOT / "services/orchestrator" / name, target / name)
 
 
-def verify(gateway, sender, temporary):
+def verify(gateway, sender, temporary, *, restart_history=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
-    @param temporary 本次测试私有目录。@return 脱敏证据。
+    @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
+    @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
     nonce = uuid4().hex
@@ -104,7 +106,8 @@ def verify(gateway, sender, temporary):
             received.append((sha256(raw).hexdigest(), body, self.connection.version()))
             tool = next((t for t in body.get("tools", []) if t.get("description") == TOOL["description"]), None)
             results = find_blocks(body, "tool_use_id", NEW_ID)
-            if not results and tool:
+            restart = any(b.get("text") == AFTER_RESTART for row in body["messages"] for b in blocks(row))
+            if not results and tool and not restart:
                 content = {"type": "tool_use", "id": NEW_ID, "name": tool["name"], "input": ARGS}
                 wire = message_sse(content, "tool_use", "msg_cold_tool")
             else:
@@ -161,11 +164,15 @@ def verify(gateway, sender, temporary):
         config.chmod(0o640)
         os.chown(config, 0, 1001)
         common = {"PATH": os.defpath, "LANG": "C.UTF-8", "HOME": "/tmp", "TOKIO_WORKER_THREADS": "2"}
-        source = Popen([sender], user=1001, group=1001, extra_groups=[], env={
-            **common, "RUST_LOG": "warn", "V3_SENDER_CONFIG": str(config),
-            "V3_TUI_SESSION_HOST": "1", "V3_TUI_MANAGED_OAUTH": "1",
-        })
-        stack.callback(stop, source)
+        def start_sender():
+            process = Popen([sender], user=1001, group=1001, extra_groups=[], env={
+                **common, "RUST_LOG": "warn", "V3_SENDER_CONFIG": str(config),
+                "V3_TUI_SESSION_HOST": "1", "V3_TUI_MANAGED_OAUTH": "1",
+            })
+            stack.callback(stop, process)
+            return process
+
+        source = start_sender()
         control = Popen([gateway], cwd=temporary, env={
             **common, "SERVER_PORT": "18090", "SERVER_HOST": "127.0.0.1", "DATABASE_DRIVER": "sqlite",
             "DATABASE_DSN": str(temporary / "gateway.db"), "ADMIN_PASSWORD": admin,
@@ -175,7 +182,10 @@ def verify(gateway, sender, temporary):
         })
         stack.callback(stop, control)
         wait_for(lambda: call(18090, "GET", "/admin/accounts", admin)[0] == 200)
-        wait_for(lambda: json.loads(call(8091, "GET", "/internal/status", secret)[1]).get("tui_v2", {}).get("ready"))
+        def sender_state():
+            return json.loads(call(8091, "GET", "/internal/status", secret)[1]).get("tui_v2", {})
+
+        wait_for(lambda: sender_state().get("ready"))
 
         def manage(method, path, body=None):
             status, raw = call(18090, method, "/admin/" + path, admin, body)
@@ -251,12 +261,45 @@ def verify(gateway, sender, temporary):
             assert attempt["ingress_body_sha256"] == sha256(encoded(request_body)).hexdigest()
             assert attempt["cli_and_https_body_sha256"] != attempt["ingress_body_sha256"]
             attempt.update(client_message_id=reply_id, model_message_id=model_id)
-        return {"model_posts": len(received), "client_tool_calls": callbacks, "old_tool_calls": 0,
-                "current_question_count": 1, "old_question_roles": [role for role, _ in HISTORY],
-                "foreign_receipt_status": wrong_subject, "wrong_session_status": wrong_session,
-                "changed_tool_arguments_status": wrong_arguments,
-                "duplicate_receipt_status": duplicate, "tls_versions": [tls for _, _, tls in received],
-                "proxy_connections": len(proxy_targets), "attempts": captures}
+        proof = {"model_posts": len(received), "client_tool_calls": callbacks, "old_tool_calls": 0,
+                 "current_question_count": 1, "old_question_roles": [role for role, _ in HISTORY],
+                 "foreign_receipt_status": wrong_subject, "wrong_session_status": wrong_session,
+                 "changed_tool_arguments_status": wrong_arguments,
+                 "duplicate_receipt_status": duplicate, "tls_versions": [tls for _, _, tls in received],
+                 "proxy_connections": len(proxy_targets), "attempts": captures}
+        if restart_history:
+            wait_for(lambda: sender_state().get("idle"))
+            (binding_file,) = Path("/native/tui-workspaces").glob("*.json")
+            native_id = json.loads(binding_file.read_text())["native_session_id"]
+            assert all(json.loads(document["metadata"]["user_id"])["session_id"] == native_id
+                       for _, document, _ in received)
+            projects = Path("/native/tui-sessions") / native_id / "home/.claude/projects"
+            (history_file,) = projects.glob("*/" + native_id + ".jsonl")
+            original = history_file.read_bytes()
+            stop(source)
+            restarted = start_sender()
+            try:
+                wait_for(lambda: sender_state().get("ready") and sender_state().get("idle"))
+            except AssertionError as error:
+                raise AssertionError(("账号发送器重启后未就绪", restarted.poll(), sender_state())) from error
+            branch = {**body, "stream": False,
+                      "messages": [*messages[:-1], {"role": "user", "content": AFTER_RESTART}]}
+            status, raw = call(18090, "POST", "/v1/messages", token, branch, headers)
+            assert status == 200 and len(received) == 3, (status, raw, len(received))
+            assert json.loads(raw)["content"] == [{"type": "text", "text": FINAL}]
+            model_body = received[-1][1]
+            texts = [(row["role"], b.get("text")) for row in model_body["messages"] for b in blocks(row)]
+            history_texts = {text for _, text in HISTORY}
+            assert [(role, text) for role, text in texts if text in history_texts] == HISTORY
+            assert texts.count(("user", AFTER_RESTART)) == 1 and ("user", QUESTION) not in texts
+            assert find_blocks(model_body, "id", PAST_ID) and find_blocks(model_body, "tool_use_id", PAST_ID)
+            assert history_file.read_bytes() == original
+            branch_id = json.loads(model_body["metadata"]["user_id"])["session_id"]
+            assert branch_id != native_id and (history_file.parent / (branch_id + ".jsonl")).is_file()
+            proof["restart"] = {"bound_session_id": native_id, "branch_session_id": branch_id,
+                                "preserved_bytes": len(original), "additional_model_posts": 1,
+                                "attempt": verify_captures(manage, received[-1:], account_token)[0]}
+        return proof
 
 
 def blocks(row):
@@ -332,13 +375,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--gateway", type=Path, required=True)
     parser.add_argument("--sender", type=Path, required=True)
+    parser.add_argument("--restart-history", action="store_true")
     args = parser.parse_args()
     if (not Path("/.dockerenv").exists() or {name for _, name in if_nameindex()} != {"lo"}
             or Path("/run/v3/sender.json").exists() or any(Path("/native").glob("*"))):
         raise RuntimeError("请在空白的 docker --network none 账号容器中运行")
     install_source()
     with TemporaryDirectory(prefix="cold-history-") as directory:
-        print(json.dumps(verify(args.gateway, args.sender, Path(directory)), ensure_ascii=False))
+        proof = verify(args.gateway, args.sender, Path(directory), restart_history=args.restart_history)
+        print(json.dumps(proof, ensure_ascii=False))
 
 
 if __name__ == "__main__":

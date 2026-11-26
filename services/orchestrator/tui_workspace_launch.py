@@ -1,16 +1,18 @@
 """账号 TUI 事件源依照本次发送器提交的绑定启动或恢复官方进程。"""
 
+from collections.abc import Callable, Iterator
 from contextlib import ExitStack
-from collections.abc import Callable
+from fcntl import LOCK_EX, flock
 from hashlib import sha256
 import json
 import os
 from pathlib import Path
+import re
 from stat import S_IMODE, S_ISREG
 from subprocess import Popen
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from runtime_files import directory_fd
+from runtime_files import atomic_text, directory_fd, private_directory
 
 
 def _key(fields) -> str:
@@ -43,9 +45,26 @@ def _owned_file(directory: int, name: str):
     return stream
 
 
+def _project_history_dir(config: Path, work: Path) -> Path:
+    return config / "projects" / re.sub(r"[^a-zA-Z0-9]", "-", str(work))
+
+
+def _main_history(stream, work: Path, native_id: str) -> Iterator[dict]:
+    main = False
+    for line in stream:
+        row = json.loads(line)
+        if row.get("type") in ("user", "assistant") and not row.get("isSidechain"):
+            if row.get("sessionId") != native_id or row.get("cwd") != str(work):
+                raise ValueError("V2 恢复历史与当前会话工作区不匹配")
+            main = True
+            yield row
+    if not main:
+        raise ValueError("V2 恢复历史缺少原生主轮")
+
+
 def _resume_path(stack: ExitStack, config: Path, work: Path, native_id: str, required: bool):
     # 只对确实不存在的记录允许初次启动。链接、损坏记录和错误归属必须由原检查明确拒绝。
-    project = config / "projects" / str(work).replace("/", "-")
+    project = _project_history_dir(config, work)
     name = native_id + ".jsonl"
     try:
         directory = directory_fd(project)
@@ -56,16 +75,46 @@ def _resume_path(stack: ExitStack, config: Path, work: Path, native_id: str, req
             raise
         return None
     with stream:
-        main = False
-        for line in stream:
-            row = json.loads(line)
-            if row.get("type") in ("user", "assistant") and not row.get("isSidechain"):
-                if row.get("sessionId") != native_id or row.get("cwd") != str(work):
-                    raise ValueError("V2 恢复历史与当前会话工作区不匹配")
-                main = True
-        if not main:
-            raise ValueError("V2 恢复历史缺少原生主轮")
+        for _ in _main_history(stream, work, native_id):
+            pass
     return project / name
+
+
+def publish_workspace_history(
+    config: Path, work: Path, native_id: str,
+    matches: Callable[[Iterator[dict]], bool],
+    render: Callable[[str], str],
+) -> str:
+    """按工作区绑定发布已核对的会话历史。
+
+    @param config 账号内原生会话的私有配置目录。
+    @param work 启动器已核验的工作目录。
+    @param native_id 发送器工作区绑定中的会话 UUID。
+    @param matches 比较已有全部主链与本次确认边界。
+    @param render 以选中的原生 UUID 组装完整 JSONL。
+    @return 可经原生启动入口核验的会话 UUID。
+    """
+    if str(UUID(native_id)) != native_id or UUID(native_id).version != 4:
+        raise ValueError("冷导入需要已绑定的原生会话 UUID")
+    project = _project_history_dir(config, work)
+    private_directory(project.parent)
+    private_directory(project)
+    with ExitStack() as stack:
+        directory = _owned_dir(stack, project)
+        # 所有导入者在同一个目录内完成比较和原子发布。原有会话记录可能仍是恢复或分支的依据。
+        flock(directory, LOCK_EX)
+        name = native_id + ".jsonl"
+        try:
+            stream = _owned_file(directory, name)
+        except FileNotFoundError:
+            pass
+        else:
+            with stream:
+                if matches(_main_history(stream, work, native_id)):
+                    return native_id
+            native_id = str(uuid4())
+        atomic_text(project / (native_id + ".jsonl"), render(native_id), replace=False)
+        return native_id
 
 
 def launch_workspace_cli(
@@ -82,7 +131,7 @@ def launch_workspace_cli(
     program_fd: int | None = None,
     inherited_fds: tuple[int, ...] = (),
     initialize_profile: Callable[[Path], None] | None = None,
-    prepare_history: Callable[[Path, Path], Path] | None = None,
+    prepare_history: Callable[[Path, Path, str], str] | None = None,
 ) -> Popen:
     """在该账号发送器绑定的目录启动交互 CLI，继承事件源已分配的 PTY。
 
@@ -98,7 +147,7 @@ def launch_workspace_cli(
     @param program_fd 可选的已核验程序描述符，由同容器隔离入口在执行时关闭。
     @param inherited_fds 受信启动器额外传入的同会话描述符。
     @param initialize_profile 可选，新会话由受信控制端为已核验目录初始化独立配置。
-    @param prepare_history 可选，由本轮受信驱动在已核验工作区导入历史。
+    @param prepare_history 可选，在已核验工作区导入历史并返回本次可恢复的会话 UUID。
     @return 由事件源负责监督与回收的官方进程。
     """
     if (
@@ -140,11 +189,13 @@ def launch_workspace_cli(
         if str(work) != launch["work_dir"]:
             raise ValueError("V2 提交工作目录不属于当前绑定")
         cwd = _owned_dir(stack, work)
-        session_args = ["--session-id", native_id]
         if prepare_history is not None:
-            history = prepare_history(config_dir, work)
-        else:
-            history = None if resume is False else _resume_path(stack, config_dir, work, native_id, required=resume is True)
+            native_id = prepare_history(config_dir, work, native_id)
+            if str(UUID(native_id)) != native_id or UUID(native_id).version != 4:
+                raise ValueError("V2 导入历史未返回原生会话 UUID")
+            resume = True
+        session_args = ["--session-id", native_id]
+        history = None if resume is False else _resume_path(stack, config_dir, work, native_id, required=resume is True)
         if history is not None:
             session_args = ["--resume", str(history)]
         if initialize_profile is not None:

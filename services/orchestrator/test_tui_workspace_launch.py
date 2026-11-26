@@ -7,7 +7,7 @@ from unittest import TestCase
 from unittest.mock import patch
 from uuid import uuid4
 
-from tui_workspace_launch import _key, launch_workspace_cli
+from tui_workspace_launch import _key, _project_history_dir, launch_workspace_cli, publish_workspace_history
 
 
 class BoundLaunchTests(TestCase):
@@ -51,14 +51,12 @@ class BoundLaunchTests(TestCase):
         }
         self.config = self.root / "config"
         self.history = (
-            self.config
-            / "projects"
-            / str(self.cwd).replace("/", "-")
+            _project_history_dir(self.config, self.cwd)
             / (self.native + ".jsonl")
         )
         self.history.parent.mkdir(parents=True)
 
-    def _start(self, *, resume=False, who=None, launch=None):
+    def _start(self, *, resume=False, who=None, launch=None, prepare_history=None):
         command = {
             "action": "send",
             "reservation_id": self.who["reservation_id"],
@@ -74,6 +72,7 @@ class BoundLaunchTests(TestCase):
             resume=resume,
             terminal_fd=0,
             storage=self.root,
+            prepare_history=prepare_history,
         )
 
     def test_wrong_subject_session_and_workspace_never_reach_spawn(self):
@@ -164,3 +163,25 @@ class BoundLaunchTests(TestCase):
             with self.assertRaises(OSError):
                 self._start(resume=None)
             self.assertEqual(spawn.call_count, 2)
+
+    def test_import_returns_bound_session_for_standard_restart(self):
+        """首次发布和再次启动均使用经过归属校验的原生记录。@return 无。"""
+        # 真实账号进程继承 0077 umask，历史项目目录须为当前服务私有。
+        self.history.parent.chmod(0o700)
+        self.history.parent.parent.chmod(0o700)
+
+        def prepare(config, work, native_id):
+            self.assertEqual(native_id, self.native)
+            return publish_workspace_history(config, work, native_id, lambda rows: bool(list(rows)), lambda sid: json.dumps(
+                {"type": "user", "cwd": str(work), "sessionId": sid, "message": {"role": "user", "content": "合成历史"}}
+            ) + "\n")
+
+        with patch("tui_workspace_launch.Popen") as spawn:
+            self._start(prepare_history=prepare)
+            snapshot = self.history.read_bytes()
+            self.assertEqual(spawn.call_args.args[0][-2:], ["--resume", str(self.history)])
+            self._start(prepare_history=prepare)
+            self._start(resume=True)
+            self.assertEqual(spawn.call_count, 3)
+            self.assertEqual(spawn.call_args.args[0][-2:], ["--resume", str(self.history)])
+            self.assertEqual(self.history.read_bytes(), snapshot)

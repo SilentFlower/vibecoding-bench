@@ -2,11 +2,12 @@
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from itertools import zip_longest
 import re
 from uuid import uuid4
 
-from runtime_files import atomic_text, private_directory
 from tui_messages import encode
+from tui_workspace_launch import publish_workspace_history
 
 
 MCP_SERVER = "flower"
@@ -100,13 +101,32 @@ class ColdHistory:
         tools = {MCP_PREFIX + tool["name"]: tool for tool in declared}
         return cls(history, body["model"], content[0]["text"], system, tools, body["max_tokens"], body.get("thinking"))
 
-    def import_session(self, config, work):
-        """在本会话配置目录发布已完成的外部历史。@param config 私有配置。@param work 已核验工作目录。@return 导入的会话记录。"""
-        session_id = str(uuid4())
-        project = config / "projects" / re.sub(r"[^a-zA-Z0-9]", "-", str(work))
-        private_directory(project.parent)
-        private_directory(project)
-        path = project / (session_id + ".jsonl")
+    def import_session(self, config, work, native_id):
+        """在已绑定的工作区发布或匹配已完成的外部历史。
+        @param config 私有配置。@param work 已核验工作目录。@param native_id 绑定的原生会话。
+        @return 本次可恢复的原生会话 UUID。
+        """
+        return publish_workspace_history(
+            config, work, native_id, self._matches_history, lambda session_id: self._transcript(work, session_id),
+        )
+
+    def _matches_history(self, rows):
+        matches = True
+        parent = None
+        for row, expected in zip_longest(rows, self.history):
+            # 当前问题由新轮提交。已经追加过的真实原生对话只能作为独立分支的依据。
+            if row is None or expected is None or row["type"] != expected["role"]:
+                matches = False
+                continue
+            message = row.get("message", {})
+            if (row.get("parentUuid") != parent or not isinstance(row.get("uuid"), str)
+                    or message.get("role") != expected["role"] or message.get("content") != _blocks(expected)
+                    or row["type"] == "assistant" and message.get("model") != self.model):
+                matches = False
+            parent = row.get("uuid")
+        return matches
+
+    def _transcript(self, work, session_id):
         timestamp = datetime.now(timezone.utc).isoformat()
         parent = None
         rows = []
@@ -126,8 +146,7 @@ class ColdHistory:
                 "userType": "external", "timestamp": timestamp,
             }).decode())
             parent = uid
-        atomic_text(path, "\n".join(rows) + "\n")
-        return path
+        return "\n".join(rows) + "\n"
 
     def mcp(self, data):
         """应答已授权 CLI 的 MCP 握手和工具声明。@param data MCP 请求。@return 响应对象或通知的空值。"""

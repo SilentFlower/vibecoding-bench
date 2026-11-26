@@ -2548,6 +2548,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 ### 3. Contracts
 
 - 普通 Messages 的已闭合文本与工具历史、当前单文本问题和支持的客户端工具声明共用当前账号作用域。工作区归属核验后，事件源原子发布固定 2.1.293 格式的私有会话记录。CLI 恢复该历史并提交当前问题。顶层追加指令保持输入顺序。
+- 冷导入使用发送器已登记的 `native_session_id`。同一工作区的主链、消息及模型与确认历史一致时，保留文件和 UUID。已有合法主链超出本轮确认边界或历史分歧时，向同一私有工作区发布独立分支。发布使用目录锁与原子不覆盖操作。启动统一经 `_resume_path` 核对目标文件身份、权限、cwd 和原生 UUID。
 - 工具声明由会话私有 HTTP MCP 返回。公开调用块恢复原名，ID 与参数增量仍对应原模型事件。工具结果通过原进程的回执账本交付，接收方、历史、原调用和本轮生效设置均需匹配。
 - CLI 回环模型请求沿原账号 sender 授权路径送到固定供应商。该次请求交付 CLI 实际生成的 JSON 实体。调试快照的正文摘要取自这一实体，`wire_final.status` 为 `unavailable`。
 - 账户、会话、模型、替代的调用方参数或连接归属变更均沿原预留和回执门槛处理。冷导入只协商当前支持的普通输入形状。其他形状继续沿该发行既有入口合同。
@@ -2559,6 +2560,8 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 | 主体或公开会话与等待工具组不匹配 | 400，零新增模型提交 |
 | 原工具参数被改写 | 422。准备阶段先归还回执，合法新请求可立即认领 |
 | 同组合法回执已交付后再次提交 | 原回执规则拒绝重放 |
+| 同绑定并发导入相同历史 | 使用同一原生 UUID，已有文件保持原字节 |
+| 文件归属错误或包含其他工作区的主链 | 拒绝恢复，保留原文件 |
 | 仅开启该路径的调试采集 | 保存 CLI 实际实体证据，最终 TLS 写出未采集 |
 
 ### 5. Scenarios and Examples
@@ -2568,5 +2571,6 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 
 ### 6. Tests Required
 
-- `test_tui_cold_history.py` 核对闭合边界、私有 JSONL 父链和 MCP 声明范围。
+- `test_tui_cold_history.py` 核对闭合边界、私有 JSONL 父链、同绑定并发与 MCP 声明范围。`test_tui_workspace_launch.py` 核对首次导入、重复导入和正式恢复入口使用同一文件。
 - `verify_tui_cold_history.py` 使用公开入口、生产事件源、真实 2.1.293 CLI 和账号代理，对照 HTTPS 实收、公开流式调用、JSON 续轮及拒绝路径。
+- `verify_tui_cold_history.py --restart-history` 在原工具续轮收口后重启发送器，以不同当前问题提交历史分支，核对原文件字节、模型历史及本轮原生正文。
