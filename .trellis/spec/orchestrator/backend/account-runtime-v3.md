@@ -171,6 +171,8 @@ Bash 在第 43 秒结束时跨过两次分段等待，第三次查询立即获�
 
 `reconnect_preserves_completed_reply_for_slow_reader` 和 `rejected_reconnect_preserves_idle_deadline` 分别核对慢读与无效订阅。用隔离公开路由验证首包前 JSON、SSE、网关重启、并发恢复、旧发送器提示和撤权。对照原消息 ID、旧工具的实际执行次数、下一轮工具结果和两次生成各自的用量记录。
 
+`verify_tui_cold_history.py --reconnect-tool-stream` 在公开工具续轮交付半段参数后断开。等 6 秒后接回，逐字节核对前六个 SSE `data` 行，再放行余下参数。第二个读者收到第七个 `data` 行并断开后才放行终帧。第三个读者从缓存收到共十帧并逐字节保留已有七帧。以公开请求 ID 核对三个读者的尝试数为 1、0、0，模型累计收件保持为 2。下一合法工具回执再投递一次，过期回执返回 400。
+
 ## V2 直接工具调用的客户端回执
 
 - `tool_receipts(messages, previous, expected)` 在原会话的历史和完整工具组匹配后，按工具 ID 交付结果。

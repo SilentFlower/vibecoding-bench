@@ -229,7 +229,9 @@ def fixture_parallel_results(calls, callbacks):
 
 
 def fixture_reconnect_sse(name):
-    """构造可在中间断开的同一模型流。@param name 模型收到的原生工具名。@return 首段与余下 SSE。"""
+    """构造可分阶段放行的同一模型流。
+    @param name 模型收到的原生工具名。@return 含半段参数的前缀、余下参数及终帧。
+    """
     message_id = "msg_cold_reconnect"
     text = message_sse({"type": "text", "text": RECONNECT_PREFIX}, "end_turn", message_id)
     tool = message_sse({"type": "tool_use", "id": RECONNECT_ID, "name": name, "input": SECOND_ARGS},
@@ -239,7 +241,12 @@ def fixture_reconnect_sse(name):
     for event in tail:
         if "index" in event:
             event["index"] += 1
-    return b"".join(map(frame, prefix)), b"".join(map(frame, tail))
+    start, delta, *terminal = tail
+    partial = delta["delta"]["partial_json"]
+    split_at = len(partial) // 2
+    head = {**delta, "delta": {**delta["delta"], "partial_json": partial[:split_at]}}
+    rest = {**delta, "delta": {**delta["delta"], "partial_json": partial[split_at:]}}
+    return b"".join(map(frame, [*prefix, start, head])), frame(rest), b"".join(map(frame, terminal))
 
 
 def fixture_cancelled_tool_sse(name):
@@ -379,6 +386,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     lookups = []
     deny_proxy = False
     denied_tunnels = []
+    continue_tool_stream = Event()
     finish_stream = Event()
     stock_homes = tuple(temporary / f"stock-{policy}" for policy in STOCK_POLICIES) if stock_client else ()
 
@@ -436,6 +444,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 b.get("text") == CANCELLED_QUESTION for row in body["messages"] for b in blocks(row)
             )
             prefix = b""
+            middle = b""
             if stock_client:
                 wire = stock_model_reply(body, stock_homes, FINAL)
             elif agent_progress:
@@ -474,7 +483,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 wire = fixture_tool_sse(content, with_signature=signed_tool_history, second=second,
                                         model=response_model, thinking_text=signed_thinking_text)
             elif reconnect_tool_stream and results and not find_blocks(body, "tool_use_id", RECONNECT_ID):
-                prefix, wire = fixture_reconnect_sse(tool["name"])
+                prefix, middle, wire = fixture_reconnect_sse(tool["name"])
             elif thinking_display_model:
                 wire = fixture_thinking_display_sse(body)
             elif summarized_thinking:
@@ -486,11 +495,17 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 wire = message_sse({"type": "text", "text": text}, "end_turn", "msg_cold_reply")
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
-            self.send_header("Content-Length", str(len(prefix) + len(wire)))
+            self.send_header("Content-Length", str(len(prefix) + len(middle) + len(wire)))
             self.end_headers()
             if prefix:
                 self.wfile.write(prefix)
                 self.wfile.flush()
+                if middle:
+                    if not continue_tool_stream.wait(30):
+                        self.close_connection = True
+                        return
+                    self.wfile.write(middle)
+                    self.wfile.flush()
                 # 公开读者须实际读到首段并在模型结束前断开。夹具结束时也会释放模型。
                 if not finish_stream.wait(30) or paused_question:
                     self.close_connection = True
@@ -1048,8 +1063,12 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             changed_signature, response = call(18090, "POST", "/v1/messages", token, changed, headers)
             assert changed_signature == 422 and len(received) == 1, (changed_signature, response, len(received))
         if reconnect_tool_stream:
-            proof = verify_tool_stream_reconnect(manage, temporary, token, account_token, headers, follow,
-                                                 received, finish_stream, callbacks)
+            try:
+                proof = verify_tool_stream_reconnect(manage, temporary, token, account_token, headers, follow,
+                                                     received, continue_tool_stream, finish_stream, callbacks)
+            finally:
+                continue_tool_stream.set()
+                finish_stream.set()
             verify_model(received[:2], policy="append", old_content=old_result, current_text_blocks=current_text_blocks)
             return proof
         if recovery_ledger_contention:
@@ -1729,13 +1748,22 @@ def verify_cancelled_question(manage, token, headers, history, received, release
 
 
 def verify_tool_stream_reconnect(manage, temporary, token, account_token, headers, follow,
-                                 received, finish_stream, callbacks):
+                                 received, continue_tool_stream, finish_stream, callbacks):
     """断开真实续轮读者，再读取同一次交付。@param manage 管理入口。@param temporary 本次私有数据库目录。
     @param token 合成调用方。@param account_token 合成模型凭据。@param headers 原请求会话。
-    @param follow 同一公开工具回执。@param received 模型实收。@param finish_stream 模型尾段放行。
+    @param follow 同一公开工具回执。@param received 模型实收。
+    @param continue_tool_stream 放行余下参数。@param finish_stream 放行终帧。
     @param callbacks 客户端已执行的合成工具。@return 实测证据。
     """
-    def disconnect_after_prefix():
+    def read_data_lines(response, count):
+        lines = []
+        while len(lines) < count and (line := response.readline()):
+            if line.startswith(b"data:"):
+                lines.append(line)
+        assert len(lines) == count, (count, lines)
+        return lines
+
+    def disconnect_after_prefix(previous=None):
         with closing(HTTPConnection("127.0.0.1", 18090, timeout=30)) as connection:
             connection.request("POST", "/v1/messages", encoded(follow), {
                 "Authorization": "Bearer " + token, "Content-Type": "application/json",
@@ -1743,42 +1771,60 @@ def verify_tool_stream_reconnect(manage, temporary, token, account_token, header
             })
             with closing(connection.getresponse()) as response:
                 assert response.status == 200, response.status
-                prefix = []
-                while line := response.readline():
-                    if not line.startswith(b"data:"):
-                        continue
-                    event = json.loads(line[5:])
-                    prefix.append(event)
-                    if event.get("delta", {}).get("text") == RECONNECT_PREFIX:
-                        break
-                assert [event["type"] for event in prefix] == [
-                    "message_start", "content_block_start", "content_block_delta",
-                ]
-                assert prefix[-1]["delta"]["text"] == RECONNECT_PREFIX
+                lines = read_data_lines(response, 6)
+                assert len(received) == 2 and not continue_tool_stream.is_set() and not finish_stream.is_set()
+                if previous is not None:
+                    # 第二个读者先收到原始前缀，再允许模型向同一条打开的连接交付新参数。
+                    assert lines == previous
+                    continue_tool_stream.set()
+                    lines.extend(read_data_lines(response, 1))
+                    assert not finish_stream.is_set()
                 connection.sock.shutdown(SHUT_RDWR)
-                return prefix, response.getheader("x-cc2api-request-id")
+                return lines, response.getheader("x-cc2api-request-id")
 
-    original, original_request_id = disconnect_after_prefix()
-    assert len(received) == 2 and not finish_stream.is_set()
-    # 六秒后在原模型仍在生成时接回。第二个读取者再次断开后，才放行同一响应的尾段。
+    original_lines, original_request_id = disconnect_after_prefix()
+    original_model_posts = len(received)
+    original = [json.loads(line[5:]) for line in original_lines]
+    assert [event["type"] for event in original] == [
+        "message_start", "content_block_start", "content_block_delta", "content_block_stop",
+        "content_block_start", "content_block_delta",
+    ]
+    assert original[2]["delta"]["text"] == RECONNECT_PREFIX
+    tool_start, first_delta = original[-2:]
+    assert tool_start["index"] == first_delta["index"] == 1
+    assert tool_start["content_block"] == {"type": "tool_use", "id": RECONNECT_ID, "name": TOOL["name"], "input": {}}
+    assert first_delta["delta"]["type"] == "input_json_delta"
+    partial = first_delta["delta"]["partial_json"]
+    assert partial and not partial.endswith("}")
+
+    disconnected_at = monotonic()
     sleep(6)
-    live_prefix, live_request_id = disconnect_after_prefix()
-    assert live_prefix == original and len(received) == 2
-    assert original_request_id and live_request_id and original_request_id != live_request_id
+    live_lines, live_request_id = disconnect_after_prefix(original_lines)
+    live_wait_and_read_ms = round((monotonic() - disconnected_at) * 1000)
+    live_model_posts = len(received)
+    assert live_model_posts == 2
+    second_delta = json.loads(live_lines[-1][5:])
+    assert second_delta["type"] == "content_block_delta" and second_delta["index"] == tool_start["index"]
+    assert second_delta["delta"]["type"] == "input_json_delta"
+    remaining = second_delta["delta"]["partial_json"]
+    assert remaining
+    tool = {**tool_start["content_block"], "input": json.loads(partial + remaining)}
+    assert tool["input"] == SECOND_ARGS
+    # 终帧只在打开的第二条连接读到新增参数并断开后放行，第三个读者从缓存接回。
     finish_stream.set()
     with closing(connect(temporary / "gateway.db")) as database:
         wait_for(lambda: database.execute("SELECT count(*) FROM tui_native_turns WHERE tools=?",
                                          (encoded([RECONNECT_ID]).decode(),)).fetchone()[0] == 1)
-    status, wire = call(18090, "POST", "/v1/messages", token, follow, headers)
-    assert status == 200 and len(received) == 2, (status, wire, len(received))
-    replay = [json.loads(line[5:]) for line in wire.splitlines() if line.startswith(b"data:")]
-    assert replay[:len(original)] == original and replay[-1]["type"] == "message_stop"
-    (item,) = [event for event in replay if event["type"] == "content_block_start"
-               and event["content_block"]["type"] == "tool_use"]
-    tool = item["content_block"]
-    tool["input"] = json.loads("".join(event["delta"]["partial_json"] for event in replay
-        if event["type"] == "content_block_delta" and event["index"] == item["index"]))
-    assert tool == {"type": "tool_use", "id": RECONNECT_ID, "name": TOOL["name"], "input": SECOND_ARGS}
+    _, wire, cached_request_id = checked_messages(manage, token, follow, headers, received, "reconnect_cached")
+    cached_model_posts = len(received)
+    assert cached_model_posts == 2, cached_model_posts
+    reader_ids = [original_request_id, live_request_id, cached_request_id]
+    assert all(reader_ids) and len(set(reader_ids)) == 3
+    cached_lines = [line for line in wire.splitlines(keepends=True) if line.startswith(b"data:")]
+    assert len(cached_lines) == 10 and cached_lines[:len(live_lines)] == live_lines
+    assert [json.loads(line[5:])["type"] for line in cached_lines[len(live_lines):]] == [
+        "content_block_stop", "message_delta", "message_stop",
+    ]
     callbacks.append(RECONNECT_ID)
     assert callbacks == [NEW_ID, RECONNECT_ID]
 
@@ -1796,17 +1842,22 @@ def verify_tool_stream_reconnect(manage, temporary, token, account_token, header
     assert duplicate == 400 and len(received) == 3, (duplicate, response, len(received))
 
     def replay_diagnostics():
-        rows = manage("GET", "request-diagnostics")["items"]
-        readers = {row["request_id"]: row for row in rows if row.get("outcome") == "cancelled"}
-        cached = [row for row in rows if row.get("outcome") == "tui_reconnect_cached"]
-        if original_request_id in readers and live_request_id in readers and cached:
-            return readers[original_request_id], readers[live_request_id], cached
+        rows = {row["request_id"]: row for row in manage("GET", "request-diagnostics")["items"]}
+        if all(request_id in rows for request_id in reader_ids):
+            readers = [rows[request_id] for request_id in reader_ids]
+            if [row.get("outcome") for row in readers] == ["cancelled", "cancelled", "tui_reconnect_cached"]:
+                return readers
 
-    original_record, live_record, (cached_record,) = wait_for(replay_diagnostics)
-    assert original_record["attempt_count"] == 1 and live_record["attempt_count"] == cached_record["attempt_count"] == 0
+    attempt_counts = [row["attempt_count"] for row in wait_for(replay_diagnostics)]
+    assert attempt_counts == [1, 0, 0], attempt_counts
     return {"disconnect_before_model_finished": True, "retry_after_seconds": 6,
             "replayed_message_id": original[0]["message"]["id"], "replayed_tool_id": RECONNECT_ID,
-            "live_replay_disconnected": True, "cached_replay_request_id": cached_record["request_id"],
+            "live_replay_disconnected": True, "cached_replay_request_id": cached_request_id,
+            "reader_data_frames": [len(original_lines), len(live_lines), len(cached_lines)],
+            "reader_request_ids": reader_ids, "reader_attempt_counts": attempt_counts,
+            "model_posts_after_each_reader": [original_model_posts, live_model_posts, cached_model_posts],
+            "live_wait_and_read_ms": live_wait_and_read_ms,
+            "live_prefix_data_sha256": sha256(b"".join(live_lines)).hexdigest(), "next_receipt_status": status,
             "replay_new_model_posts": 0, "model_posts": len(received),
             "client_tool_calls": callbacks, "old_tool_calls": 0, "stale_receipt_status": duplicate,
             "attempts": verify_captures(manage, received, account_token)}
