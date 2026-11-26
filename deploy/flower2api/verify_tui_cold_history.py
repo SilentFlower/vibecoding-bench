@@ -1246,13 +1246,21 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             assert changed_effort == 422 and len(received) == 1, (changed_effort, response, len(received))
         if tool_receipt_images:
             rejected = deepcopy(follow)
-            rejected["messages"][-1]["content"][0]["is_error"] = True
-            receipt_error_status, raw, receipt_error_request = checked_messages(
-                manage, token, rejected, headers, received, "error_tool_receipt_images", expected_status=422,
-                trace_startup=True, sender_status=sender_state_after_failure,
-            )
-            assert json.loads(raw)["error"]["code"] == "unsupported_parameter" and len(received) == 1
-            assert manage("GET", "request-diagnostics/" + receipt_error_request)["attempts"] == []
+            failed_result = rejected["messages"][-1]["content"][0]
+            failed_result["is_error"] = True
+            failed_content = failed_result["content"]
+            first_image = next(block for block in failed_content if block["type"] == "image")
+            error_receipts = {}
+            for phase, content in (("error_tool_receipt_images", failed_content),
+                                   ("error_tool_receipt_image_only", [first_image])):
+                failed_result["content"] = content
+                error_status, raw, error_request = checked_messages(
+                    manage, token, rejected, headers, received, phase, expected_status=422,
+                    trace_startup=True, sender_status=sender_state_after_failure,
+                )
+                assert json.loads(raw)["error"]["code"] == "unsupported_parameter" and len(received) == 1
+                assert manage("GET", "request-diagnostics/" + error_request)["attempts"] == []
+                error_receipts[phase] = (error_status, error_request)
             if not recover_pending:
                 assert fixture_command_has(Path(f"/proc/{original}/cmdline"), marker)
                 original_history = original_file.read_bytes()
@@ -1664,8 +1672,12 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                    "is_error": block.get("is_error"),
                                    "formats": [item["source"]["media_type"] for item in block["content"]
                                                if item["type"] == "image"]}
-            proof["tool_receipt_images"] = {**recovery_proof, "records": actual, "error_http": receipt_error_status,
-                                           "error_request_id": receipt_error_request}
+            error_status, error_request = error_receipts["error_tool_receipt_images"]
+            image_only_status, image_only_request = error_receipts["error_tool_receipt_image_only"]
+            proof["tool_receipt_images"] = {**recovery_proof, "records": actual,
+                                           "error_http": error_status, "error_request_id": error_request,
+                                           "image_only_error_http": image_only_status,
+                                           "image_only_error_request_id": image_only_request}
         if model_connection_contract:
             count = 1 if model_connection_contract == "live" else 2
             ports = {port for port, _ in model_connection_posts}
