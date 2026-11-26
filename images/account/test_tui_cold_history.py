@@ -554,7 +554,7 @@ class ColdHistoryTests(TestCase):
     def test_only_matching_inline_image_enters_native_input(self):
         """历史和本轮的内嵌图像须匹配声明格式。@return 无。"""
         picture = {"type": "image", "source": {"type": "base64", "media_type": "image/png",
-                  "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j4uoAAAAASUVORK5CYII="}}
+                  "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII="}}
         raw = deepcopy(self.body)
         raw["messages"][0]["content"] = [{"type": "text", "text": "历史图像"}, picture]
         self.assertEqual(ColdHistory.from_request(raw).history[0]["content"][-1], picture)

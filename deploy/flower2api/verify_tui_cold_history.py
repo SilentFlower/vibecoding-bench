@@ -2058,7 +2058,7 @@ def verify_output_effort(manage, token, account_token, headers, received):
 
 def fixture_image_blocks(*, all_formats):
     """构造内嵌图像块。@param all_formats 是否加入 JPEG、GIF、WebP。@return 合成图像块。"""
-    images = {"image/png": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j4uoAAAAASUVORK5CYII="}
+    images = {"image/png": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII="}
     if all_formats:
         images.update({
             "image/jpeg": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwc"
