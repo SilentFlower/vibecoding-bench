@@ -24,12 +24,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tui_input_policy import InputRejection
 from tui_message_json import MessageJSON
 from tui_messages import (
+    MODEL_PROTOCOL_HEADERS,
+    MODEL_VERSION_HEADERS,
     ModelResponseError,
     OAUTH_FILE_LIMIT,
     SubagentAmbiguousError,
     SubagentBindingError,
     SubagentCapacityError,
     encode as json_bytes,
+    valid_model_header_value,
     wire_events,
 )
 
@@ -162,6 +165,7 @@ class AccountSource:
             "ready": ready,
             "idle": ready and driver.idle(),
             "model_headers_protocol": 1,
+            "model_header_policy_protocol": 1,
             "body_policy_protocol": 1,
             "input_policy_protocol": 1,
             "capture_http_protocol": 1,
@@ -204,6 +208,11 @@ class AccountSource:
             if prepared["input_format"] not in ("claude_code", "claude_code_280"):
                 return
             reservation = {**reservation, "input_format": prepared["input_format"]}
+        model_header_policy = prepared.get("model_header_policy")
+        if model_header_policy is not None:
+            if type(model_header_policy) is not int or model_header_policy != 1:
+                return
+            reservation = {**reservation, "model_header_policy": 1}
         if "body_policy" in prepared:
             policy = prepared["body_policy"]
             if (
@@ -232,13 +241,13 @@ class AccountSource:
             if len(raw_headers) != header_size:
                 return
             headers = json.loads(raw_headers)
+            allowed = MODEL_PROTOCOL_HEADERS if model_header_policy else MODEL_VERSION_HEADERS
             if (
                 not isinstance(headers, dict)
-                or headers.keys() - {"anthropic-version", "anthropic-beta"}
-                or any(
-                    not isinstance(v, str) or not all(" " <= c <= "~" for c in v)
-                    for v in headers.values()
-                )
+                or headers.keys() - allowed
+                or any(not valid_model_header_value(value) for value in headers.values())
+                or not model_header_policy
+                and any(not all(" " <= char <= "~" for char in value) for value in headers.values())
             ):
                 return
             reservation = {**reservation, "model_headers": headers}

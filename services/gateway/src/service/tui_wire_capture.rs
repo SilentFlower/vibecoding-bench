@@ -117,9 +117,13 @@ impl WireEntity {
             };
             let end = start + pos + 4;
             self.head.truncate(end);
-            let mut lines = std::str::from_utf8(&self.head[..end - 4])
-                .map_err(|_| "HTTP_INVALID")?
-                .split("\r\n");
+            // 请求头按 HTTP 字节表示读取，正文继续按 UTF-8 校验。
+            let head: String = self.head[..end - 4]
+                .iter()
+                .copied()
+                .map(char::from)
+                .collect();
+            let mut lines = head.split("\r\n");
             if lines.next() != Some("POST /v1/messages HTTP/1.1") {
                 return Err("HTTP_UNSUPPORTED");
             }
@@ -217,7 +221,7 @@ mod tests {
     /// 每个字节都可成为一次短写，完整报文以独立构造的 HTTP 摘要核对。
     #[test]
     fn split_headers_and_duplicate_fields() {
-        let http = b"POST /v1/messages HTTP/1.1\r\nx-test: first\r\nX-Test: second\r\nContent-Length: 2\r\n\r\n{}";
+        let http = b"POST /v1/messages HTTP/1.1\r\nx-test: first\r\nX-Test: second\r\nAccept-Language: caf\xe9\r\nContent-Length: 2\r\n\r\n{}";
         for width in [1, 3, 64, http.len()] {
             let mut entity = WireEntity::default();
             for part in http.chunks(width) {
@@ -229,6 +233,7 @@ mod tests {
             assert_eq!(wire["observed_http_bytes"], http.len());
             assert_eq!(wire["headers"][0], json!(["x-test", "first"]));
             assert_eq!(wire["headers"][1], json!(["X-Test", "second"]));
+            assert_eq!(wire["headers"][2], json!(["Accept-Language", "café"]));
         }
     }
 

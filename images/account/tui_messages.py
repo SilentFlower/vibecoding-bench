@@ -12,6 +12,16 @@ from tui_input_policy import InputRejection, native_input, validate_api, validat
 
 BODY_LIMIT = 10 * 1024 * 1024
 OAUTH_FILE_LIMIT = 8192
+MODEL_VERSION_HEADERS = frozenset({"anthropic-version", "anthropic-beta"})
+MODEL_PROTOCOL_HEADERS = MODEL_VERSION_HEADERS | {
+    "accept",
+    "accept-language",
+    "cache-control",
+    "anthropic-dangerous-direct-browser-access",
+    "x-claude-code-prev-tool-durations",
+    "x-claude-code-compaction",
+    "x-claude-code-context-compacted",
+}
 # 这三项与 V1 parseInput 一致，客户端设置永远不进入受管进程或本机提供方。
 _CLIENT_SETTINGS = {"settings", "env", "claude_settings"}
 _HOST_FIELDS = {
@@ -38,6 +48,11 @@ def encode(value):
     return json.dumps(
         value, ensure_ascii=False, separators=(",", ":"), allow_nan=False
     ).encode()
+
+
+def valid_model_header_value(value):
+    """校验私有帧中的 HTTP 字节表示。@param value 协议头值。@return 是否可无损发送。"""
+    return isinstance(value, str) and all(c == "\t" or 32 <= ord(c) <= 255 and ord(c) != 127 for c in value)
 
 
 _JSON_SPACE = re.compile(r"[ \t\r\n]*")

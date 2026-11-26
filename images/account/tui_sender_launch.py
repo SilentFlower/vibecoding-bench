@@ -22,7 +22,10 @@ from urllib.parse import urlsplit
 from uuid import UUID
 
 from runtime_files import atomic_json, atomic_text, directory_fd, private_directory
-from tui_messages import BODY_LIMIT, OAUTH_FILE_LIMIT, ModelResponseError, encode
+from tui_messages import (
+    BODY_LIMIT, MODEL_PROTOCOL_HEADERS, MODEL_VERSION_HEADERS, OAUTH_FILE_LIMIT,
+    ModelResponseError, encode, valid_model_header_value,
+)
 from tui_workspace_launch import launch_workspace_cli
 
 
@@ -193,14 +196,15 @@ def local_model_response(raw: bytes, *, headers: dict[str, str] | None = None, c
     """将已认领的一轮业务正文投递给本账号显式配置的独立回环模型。
 
     @param raw 输入校验后的 Messages 正文；调用者负责本轮的单次认领。
-    @param headers 原请求的版本、可选功能和受信出站会话。@param capture 当前私有采集的结果容器。
+    @param headers 已准入协议选项和受信 SDK 字段。@param capture 当前私有采集的结果容器。
     @return 可逐段读取的原 HTTP 响应，退出时关闭连接。
     """
     provider = _loopback_provider()
     _, bearer, host, port = provider
     headers = headers or {}
-    if any(name not in ("anthropic-version", "anthropic-beta", "x-claude-code-session-id") or not isinstance(value, str)
-           or any(ord(c) < 32 or ord(c) > 126 for c in value) for name, value in headers.items()):
+    if any((name not in MODEL_PROTOCOL_HEADERS and name != "x-claude-code-session-id"
+            and not name.startswith("x-stainless-")) or not valid_model_header_value(value)
+           for name, value in headers.items()):
         raise ValueError("本机模型的版本或功能声明无效")
     # 与 sender 的源数据空闲预算一致。HTTPConnection 不跟随重定向、不重试模型 POST。
     _check_wait(provider)
@@ -211,7 +215,7 @@ def local_model_response(raw: bytes, *, headers: dict[str, str] | None = None, c
         connection.request("POST", "/v1/messages", body=raw, headers={
             "Authorization": "Bearer " + bearer,
             "Content-Type": "application/json",
-            "Accept": "text/event-stream",
+            "accept": "text/event-stream",
             "anthropic-version": "2023-06-01",
             **headers,
         })
@@ -249,21 +253,27 @@ def managed_model_response(raw, *, account_token, reservation, headers, capture=
     identity = {name: reservation[name] for name in ("account_id", "environment_id", "generation")}
     if any(binding[name] != value for name, value in identity.items()) or config.get("allowed_origin") != ACCOUNT_ORIGIN:
         raise ValueError("V2 模型投递的账号绑定已变化")
-    beta = dict.fromkeys(
-        [part.strip() for part in headers.get("anthropic-beta", "").split(",") if part.strip()]
-        + ["oauth-2025-04-20"]
-    )
+    beta = headers.get("anthropic-beta", "")
+    tokens = [part.strip() for part in beta.split(",") if part.strip()]
+    if reservation.get("model_header_policy") == 1:
+        # 扩展协议保留原生声明的顺序及表示，账号 OAuth 能力仍由发送器声明。
+        if "oauth-2025-04-20" not in tokens:
+            beta = ",".join(filter(None, (beta, "oauth-2025-04-20")))
+    else:
+        beta = ",".join(dict.fromkeys(tokens + ["oauth-2025-04-20"]))
     model_headers = {
         "authorization": "Bearer " + account_token,
         "content-type": "application/json",
         "accept": "text/event-stream",
         "accept-encoding": "identity",
         "anthropic-version": headers.get("anthropic-version", "2023-06-01"),
-        "anthropic-beta": ",".join(beta),
+        "anthropic-beta": beta,
     }
-    for name in ("user-agent", "x-app", "x-claude-code-session-id"):
-        if name in headers:
-            model_headers[name] = headers[name]
+    for name, value in headers.items():
+        if (name in MODEL_PROTOCOL_HEADERS - MODEL_VERSION_HEADERS
+                or name in ("user-agent", "x-app", "x-claude-code-session-id")
+                or name.startswith("x-stainless-")):
+            model_headers[name] = value
     metadata = {
         **identity, "request_id": reservation["reservation_id"],
         "deadline_unix_ms": reservation["deadline_unix_ms"],

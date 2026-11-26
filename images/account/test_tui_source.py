@@ -118,13 +118,15 @@ class SourceTests(unittest.TestCase):
         stream.write(json.dumps(fields).encode() + b"\n")
         stream.flush()
 
-    def _prepare(self, proof, stream, body, *, headers=None, input_format=None, body_policy=None, send_body=True, oauth_file=False):
+    def _prepare(self, proof, stream, body, *, headers=None, input_format=None, body_policy=None,
+                 send_body=True, oauth_file=False, model_header_policy=False):
         self.assertTrue(json.loads(stream.readline())["ready"])
         identity = {**self.binding, "reservation_id": str(uuid4()), "continuation_only": False,
                     "deadline_unix_ms": int(time.time() * 1000) + 5000}
         self._write(stream, {**proof, "action": "prepare", "reservation": identity,
                              "body_sha256": hashlib.sha256(body).hexdigest(), "body_len": len(body),
                              **({"model_headers_len": len(headers)} if headers is not None else {}),
+                             **({"model_header_policy": 1} if model_header_policy else {}),
                              **({"input_format": input_format} if input_format is not None else {}),
                              **({"oauth_file_protocol": 1} if oauth_file else {}),
                              **({"body_policy": body_policy} if body_policy is not None else {})})
@@ -237,6 +239,16 @@ class SourceTests(unittest.TestCase):
             self._prepare(proof, stream, b"unused", input_format="unexpected", send_body=False)
             self.assertEqual(stream.readline(), b"")
             self.assertEqual(self.driver.body, b"original")
+        extended = {**headers, "accept-language": "café", "anthropic-dangerous-direct-browser-access": "false"}
+        with self._connect() as (proof, stream):
+            self._prepare(proof, stream, b"unused", headers=json.dumps(extended).encode())
+            self.assertEqual(stream.readline(), b"")
+        with self._connect() as (proof, stream):
+            self._prepare(proof, stream, b"extended", headers=json.dumps(extended).encode(),
+                          model_header_policy=True)
+            self.assertEqual(json.loads(stream.readline())["model_header_policy_protocol"], 1)
+            self.assertEqual(self.driver.reservation["model_headers"], extended)
+            self.assertEqual(self.driver.body, b"extended")
 
     def test_policy_arrives_only_in_verified_prepare(self):
         """源端仅接收完整合法的本轮设置，仍向驱动交付原字节。@return 无。"""
