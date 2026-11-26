@@ -2087,12 +2087,12 @@ transport.submit(prepared, body, ttfb_timeout).await
 
 ### 2. Signatures
 
-- `POST /admin/accounts`、`PUT /admin/accounts/{id}` 和账号读回使用 `agy_system_prompt_as_user_reminder: boolean`。账号表存为 `INTEGER NOT NULL DEFAULT 0`。SQLite 由 `gateway.agy-system-reminder.10` 追加，PostgreSQL 初始化沿同名列。
+- `POST /admin/accounts`、`PUT /admin/accounts/{id}`、账号详情和列表使用 `client_system_prompt_policy`。AGY 的值为 `independent` 或 `user_reminder`。兼容旧管理字段 `agy_system_prompt_as_user_reminder: boolean`。同次保存同时传两个字段时，显式动作优先。账号表继续使用 `gateway.agy-system-reminder.10` 登记的布尔列，旧值 0 对应独立系统段，旧值 1 对应用户提醒。
 - `AgySubmission.system_prompt_policy` 的 `schema_version=1` 增加可选 `user_reminder_index`，为 `contents` 的非负下标。启用同形体仍由 `enabled` 表示。原生回执沿现有字段，用户提醒落点使用 `source="cortex_user_reminder"`。
 
 ### 3. Contracts
 
-- 账号管理页独立保存两个布尔值，新旧账号的位置开关默认关闭。网关按实际选中的 AGY 账号冻结设置。普通 Messages 生成有独立系统文本时选择第一条不含函数结果的用户内容，公开请求正文不提供策略索引。
+- 账号管理页提供一个客户端系统提示词选择，默认独立系统段。同形体、GIF 和安全选项独立保存。网关按实际选中的 AGY 账号冻结设置。普通 Messages 生成有独立系统文本时选择第一条不含函数结果的用户内容，公开请求正文不提供策略索引。
 - 原生入口以换行合并系统文本，先执行现有 `transform_system`，再按可选索引追加一个 `<system-reminder>` 文本块。此时独立系统段使用 `REMINDER_SYSTEM_INSTRUCTION`。字符映射只处理原系统文本。标签、固定英文指令和已有消息逐字保留。Gemini 原生直连沿独立系统段。
 - `REMINDER_SYSTEM_INSTRUCTION` 为 `Use the provided context to answer the user's request. When working on multi-step tasks or calling tools, briefly share your progress and explain what you are doing and why. For strict-format requests such as JSON-only output, or auxiliary tasks such as compaction, summaries, titles, and classification, return only the requested output.`
 - 领取和历史续轮依据投影前正文及原有工具签名、调用 ID 和结果定位。新生成采用当前账号值。同一 HTTP 的认证恢复复用首次策略。开启位置或同形体时，网关先核对实际落点和转换回执再交付源帧。
@@ -2103,7 +2103,7 @@ transport.submit(prepared, body, ttfb_timeout).await
 | --- | --- |
 | 省略位置字段或保存关闭 | 私有信封省略索引。两个策略均关闭时省略策略扩展 |
 | 系统文本为空或缺少普通用户内容 | 沿独立系统段，保留同形体开关语义 |
-| 非 AGY 账号启用或更新字段类型无效 | 管理请求受控拒绝 |
+| 当前账号不支持提交的动作，或更新字段类型无效 | 管理请求受控拒绝 |
 | 私有索引畸形、越界或指向工具结果 | 原生组装前拒绝 |
 | 运行组件缺少位置策略支持或回执不符 | 受控失败，公开响应不交付未经验证的源帧 |
 

@@ -370,7 +370,8 @@ class Binding(BaseHTTPRequestHandler):
 
     def do_GET(self):
         """返回真实发送器的固定绑定或合成请求快照。@return 无。"""
-        if self.path=='/internal/v3/transport/1':
+        route, _, query = self.path.partition('?')
+        if route == '/internal/v3/transport/1' and query in ('', 'tui_oauth_profile=false', 'wake=false&tui_oauth_profile=false'):
             barrier = type(self).hold_preparation
             if barrier is not None:
                 type(self).hold_preparation = None
@@ -387,7 +388,6 @@ class Binding(BaseHTTPRequestHandler):
         else:
             from agy_runtime.capture import read_snapshot
             require(self.headers.get('authorization')=='Bearer '+SECRET,'合成快照鉴权错误')
-            route,_,query=self.path.partition('?')
             parts=route.split('/')
             require(len(parts)==6 and parts[1:5]==['internal','v3','native-captures','1']
                 and query=='platform=antigravity','合成快照路径错误')
@@ -1898,7 +1898,8 @@ Bad (branch name): "Analyzed adam/background-summary branch diff"'''
 
 def verify_system_reminder(request, wait_idle, database, request_ids):
     """比较账号开关的原生出站与续轮。@param request 网关入口。@param wait_idle 原生收口。@param database 合成库。@param request_ids 请求根。@return 脱敏结果。"""
-    option = 'agy_system_prompt_as_user_reminder'
+    option = 'client_system_prompt_policy'
+    legacy_option = 'agy_system_prompt_as_user_reminder'
     homoglyph = 'agy_system_prompt_homoglyph_enabled'
     account_path = '/admin/accounts/1'
     messages_path = '/v1/messages'
@@ -1914,9 +1915,11 @@ def verify_system_reminder(request, wait_idle, database, request_ids):
     result_text = 'SYNTHETIC_RECORD_OK'
 
     def save(enabled, glyphs):
-        status, raw = request(account_path, {option: enabled, homoglyph: glyphs}, admin=True)
-        require(status == 200 and json.loads(raw)[option] is enabled
-            and json.loads(raw)[homoglyph] is glyphs, '账号开关未保存')
+        action = 'user_reminder' if enabled else 'independent'
+        status, raw = request(account_path, {option: action, homoglyph: glyphs}, admin=True)
+        require(status == 200 and json.loads(raw)[option] == action
+            and json.loads(raw)[legacy_option] is enabled
+            and json.loads(raw)[homoglyph] is glyphs, '账号提示词动作未保存')
 
     def verify_wire(body, texts, moved):
         sys_text = '\n'.join(part.get('text', '') for part in body['systemInstruction']['parts'])
@@ -1928,7 +1931,8 @@ def verify_system_reminder(request, wait_idle, database, request_ids):
             and user_text.count(wrapped) == int(moved), '实际 TLS 的系统文本及提醒位置异常')
 
     status, raw = request(account_path, admin=True)
-    require(status == 200 and json.loads(raw)[option] is False, '已创建账号的试验开关默认值错误')
+    require(status == 200 and json.loads(raw)[option] == 'independent'
+        and json.loads(raw)[legacy_option] is False, '独立系统段默认值错误')
     declarations = []
     observed = {}
     configured = (False, False)

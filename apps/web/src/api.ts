@@ -72,12 +72,14 @@ export interface OverallWorkStatus {
 }
 
 export type RequestBackend = 'legacy' | 'native293' | 'tui_v2'
+export type ClientSystemPromptPolicy = 'independent' | 'user_reminder'
 
 export interface Account {
   id: number
   platform?: string
   agy_system_prompt_homoglyph_enabled?: boolean
   agy_system_prompt_as_user_reminder?: boolean
+  client_system_prompt_policy?: ClientSystemPromptPolicy
   agy_gif_frames_enabled?: boolean
   agy_disable_safety_filtering?: boolean
   credential_state?: { generation: number; phase: string; operation_id?: string | null; first_failure?: string; recovery_status?: string }

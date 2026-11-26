@@ -271,7 +271,7 @@ const backendSaveIssue = ref<{ otherSaved: boolean; detail: string } | null>(nul
 const form = ref({
   platform: 'claude_code',
   agy_system_prompt_homoglyph_enabled: false,
-  agy_system_prompt_as_user_reminder: false,
+  client_system_prompt_policy: 'independent',
   agy_gif_frames_enabled: false,
   agy_disable_safety_filtering: false,
   name: '',
@@ -310,7 +310,7 @@ function selectAccountPlatform(value:string): void {
   form.value.auth_type=value==='antigravity'?'oauth':'setup_token';
   form.value.setup_token=''; form.value.access_token=''; form.value.refresh_token=''; form.value.expires_at='';
   form.value.agy_system_prompt_homoglyph_enabled=false;
-  form.value.agy_system_prompt_as_user_reminder=false;
+  form.value.client_system_prompt_policy='independent';
   form.value.agy_gif_frames_enabled=false;
   form.value.agy_disable_safety_filtering=false;
 }
@@ -549,7 +549,7 @@ function openCreate() {
   form.value = {
     platform: 'claude_code',
     agy_system_prompt_homoglyph_enabled: false,
-    agy_system_prompt_as_user_reminder: false,
+    client_system_prompt_policy: 'independent',
     agy_gif_frames_enabled: false,
     agy_disable_safety_filtering: false,
     name: '',
@@ -598,7 +598,8 @@ function openEdit(a: Account) {
   form.value = {
     platform: a.platform ?? 'claude_code',
     agy_system_prompt_homoglyph_enabled: a.agy_system_prompt_homoglyph_enabled ?? false,
-    agy_system_prompt_as_user_reminder: a.agy_system_prompt_as_user_reminder ?? false,
+    client_system_prompt_policy: a.client_system_prompt_policy
+      ?? (a.agy_system_prompt_as_user_reminder ? 'user_reminder' : 'independent'),
     agy_gif_frames_enabled: a.agy_gif_frames_enabled ?? false,
     agy_disable_safety_filtering: a.agy_disable_safety_filtering ?? false,
     name: a.name,
@@ -727,7 +728,7 @@ function usageLimitInput(value: unknown, label: string): number {
   return number;
 }
 
-const agyFormKeys = ['platform','agy_system_prompt_homoglyph_enabled','agy_system_prompt_as_user_reminder','agy_gif_frames_enabled','agy_disable_safety_filtering','name','email','auth_type','access_token','refresh_token','expires_at','proxy_url','proxy_id','proxy_revision','concurrency','priority','rpm_limit'];
+const agyFormKeys = ['platform','agy_system_prompt_homoglyph_enabled','client_system_prompt_policy','agy_gif_frames_enabled','agy_disable_safety_filtering','name','email','auth_type','access_token','refresh_token','expires_at','proxy_url','proxy_id','proxy_revision','concurrency','priority','rpm_limit'];
 
 /** 保存账号（新建或更新）。@return 保存完成后的空结果。 */
 async function save() {
@@ -803,7 +804,6 @@ async function save() {
       const payload: Record<string, unknown> = {
         platform: form.value.platform,
         agy_system_prompt_homoglyph_enabled: form.value.agy_system_prompt_homoglyph_enabled,
-        agy_system_prompt_as_user_reminder: form.value.agy_system_prompt_as_user_reminder,
         agy_gif_frames_enabled: form.value.agy_gif_frames_enabled,
         agy_disable_safety_filtering: form.value.agy_disable_safety_filtering,
         name: form.value.name,
@@ -833,6 +833,7 @@ async function save() {
         upstream_session_ttl_minutes: form.value.upstream_session_ttl_minutes,
         upstream_session_refresh_policy: form.value.upstream_session_refresh_policy,
       };
+      if (isAgyForm.value) payload.client_system_prompt_policy = form.value.client_system_prompt_policy;
       if (expiresAt) payload.expires_at = Number(expiresAt);
       applyProxyChoice(payload);
       if (isAgyForm.value) for (const key of Object.keys(payload)) if (!agyFormKeys.includes(key)) delete payload[key];
@@ -1413,7 +1414,7 @@ function applyOAuthResult() {
   form.value = {
     platform: oauthPlatform.value,
     agy_system_prompt_homoglyph_enabled: false,
-    agy_system_prompt_as_user_reminder: false,
+    client_system_prompt_policy: 'independent',
     agy_gif_frames_enabled: false,
     agy_disable_safety_filtering: false,
     name: '',
@@ -1693,7 +1694,11 @@ async function copyText(text: string) {
           <section v-if="isAgyForm" class="account-form-section">
             <h3>Antigravity 配置</h3><p class="form-help">账号能力来自最近的原生观测。模型服务等待运行环境接入。</p>
             <Checkbox v-model="form.agy_system_prompt_homoglyph_enabled" class="account-check"><strong>系统提示词同形体转换</strong><small>按当前账号保存，开启后转换系统提示词文本。</small></Checkbox>
-            <Checkbox v-model="form.agy_system_prompt_as_user_reminder" class="account-check"><strong>系统提示词移入用户消息（试验）</strong><small>用于 Messages。与同形体转换同时开启时，先转换原系统提示词，再移入用户消息。</small></Checkbox>
+            <ChoiceSelect v-model="form.client_system_prompt_policy" label="客户端系统提示词" :options="[
+              {value:'independent',label:'作为独立系统指令发送（默认）'},
+              {value:'user_reminder',label:'放入用户提醒'},
+            ]" />
+            <p class="form-help">Messages 的非空指令可移入首条适合的用户消息。省略或传空时使用独立系统段。Gemini 原生请求沿用独立系统段。</p>
             <Checkbox v-model="form.agy_gif_frames_enabled" class="account-check"><strong>GIF 抽帧兼容</strong><small>开启后每张 GIF 最多抽取 8 帧 PNG。</small></Checkbox>
             <Checkbox v-model="form.agy_disable_safety_filtering" class="account-check"><strong>使用 AGY 原生安全开关</strong><small>启用 disableSafetyFiltering，由 AGY 生成安全字段。客户端逐类阈值在关闭时应用。</small></Checkbox>
             <div class="account-edit-grid three"><NumberInput v-model="numberDrafts.concurrency" label="并发上限" :min="1" required /><NumberInput v-model="numberDrafts.rpm_limit" label="RPM 上限" :min="0" required /><NumberInput v-model="numberDrafts.priority" label="调度优先级" :min="1" required /></div>

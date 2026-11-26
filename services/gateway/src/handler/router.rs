@@ -574,7 +574,7 @@ async fn list_accounts(
         .map(|account| {
             let service = state.account_svc.clone();
             async move {
-                let mut value = serde_json::to_value(&account).unwrap_or_default();
+                let mut value = account_api_value(&account);
                 crate::service::tui_backend::append_view(&service, &account, &mut value).await?;
                 Ok::<_, AppError>(value)
             }
@@ -672,12 +672,41 @@ async fn list_accounts(
     })))
 }
 
+/// 管理端的客户端系统提示词动作，按已验证的内核能力提供。
+#[derive(Clone, Copy, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum ClientSystemPromptPolicy {
+    Independent,
+    UserReminder,
+}
+
+impl ClientSystemPromptPolicy {
+    /// 转换为 AGY 原生配置可读取的历史账号选项。@return 是否写入用户提醒。
+    fn agy_user_reminder(self) -> bool {
+        matches!(self, Self::UserReminder)
+    }
+}
+
+fn account_api_value(account: &Account) -> Value {
+    let mut value = json!(account);
+    if account.is_antigravity() {
+        let policy = if account.agy_system_prompt_as_user_reminder {
+            ClientSystemPromptPolicy::UserReminder
+        } else {
+            ClientSystemPromptPolicy::Independent
+        };
+        value["client_system_prompt_policy"] = json!(policy);
+    }
+    value
+}
+
 /// 管理端创建账号载荷，省略账号用量控制线时默认关闭。
 #[derive(Deserialize)]
 struct CreateAccountRequest {
     platform: Option<String>,
     agy_system_prompt_homoglyph_enabled: Option<bool>,
     agy_system_prompt_as_user_reminder: Option<bool>,
+    client_system_prompt_policy: Option<ClientSystemPromptPolicy>,
     agy_gif_frames_enabled: Option<bool>,
     agy_disable_safety_filtering: Option<bool>,
     cli_identity: Option<CliIdentityImport>,
@@ -1163,7 +1192,7 @@ async fn get_account(
     Path(id): Path<i64>,
 ) -> Result<Json<Value>, AppError> {
     let account = state.account_svc.get_account(id).await?;
-    let mut value = json!(account);
+    let mut value = account_api_value(&account);
     crate::service::tui_backend::append_view(&state.account_svc, &account, &mut value).await?;
     if account.is_antigravity() {
         value["credential_state"] = state.account_svc.agy_state(id).await?;
@@ -1209,7 +1238,7 @@ async fn create_account(
     State(state): State<AppState>,
     headers: HeaderMap,
     Json(req): Json<CreateAccountRequest>,
-) -> Result<(StatusCode, Json<Account>), AppError> {
+) -> Result<(StatusCode, Json<Value>), AppError> {
     let _proxy_guard = state.proxy_svc.mutations.lock().await;
     let selected_proxy = if let Some(id) = req.proxy_id.as_deref() {
         if req.proxy_url.is_some() {
@@ -1241,7 +1270,10 @@ async fn create_account(
     if platform == "claude_code" && req.agy_system_prompt_homoglyph_enabled == Some(true) {
         return Err(AppError::BadRequest("同形体开关仅适用于 AGY 账号".into()));
     }
-    if platform != "antigravity" && req.agy_system_prompt_as_user_reminder == Some(true) {
+    if platform != "antigravity"
+        && (req.agy_system_prompt_as_user_reminder == Some(true)
+            || req.client_system_prompt_policy.is_some())
+    {
         return Err(AppError::BadRequest(
             "提示词位置试验仅适用于 AGY 账号".into(),
         ));
@@ -1276,7 +1308,9 @@ async fn create_account(
             .agy_system_prompt_homoglyph_enabled
             .unwrap_or(false),
         agy_system_prompt_as_user_reminder: req
-            .agy_system_prompt_as_user_reminder
+            .client_system_prompt_policy
+            .map(ClientSystemPromptPolicy::agy_user_reminder)
+            .or(req.agy_system_prompt_as_user_reminder)
             .unwrap_or_default(),
         agy_gif_frames_enabled: req.agy_gif_frames_enabled.unwrap_or_default(),
         agy_disable_safety_filtering: req.agy_disable_safety_filtering.unwrap_or_default(),
@@ -1380,7 +1414,7 @@ async fn create_account(
     } else {
         state.account_svc.create_account(&mut account).await?;
     }
-    Ok((StatusCode::CREATED, Json(account)))
+    Ok((StatusCode::CREATED, Json(account_api_value(&account))))
 }
 
 /// 仅导入已绑定账号的进程实测值，不调用凭据解析或停止发送器。
@@ -1557,6 +1591,17 @@ async fn update_account(
         return Err(AppError::BadRequest("未知账号平台，请核对原记录".into()));
     }
     if existing.is_antigravity() {
+        if let Some(fields) = updates.as_object_mut()
+            && let Some(value) = fields.remove("client_system_prompt_policy")
+        {
+            let policy: ClientSystemPromptPolicy = serde_json::from_value(value)
+                .map_err(|_| AppError::BadRequest("当前账号的客户端系统提示词动作无效".into()))?;
+            // 新管理动作覆盖同一请求中的旧兼容字段，持久化仍只有一个账号值。
+            fields.insert(
+                "agy_system_prompt_as_user_reminder".into(),
+                json!(policy.agy_user_reminder()),
+            );
+        }
         let proxy_changed = updates
             .get("proxy_url")
             .is_some_and(|value| value.as_str() != Some(existing.proxy_url.as_str()));
@@ -1573,9 +1618,12 @@ async fn update_account(
         } else {
             None
         };
-        return Ok(Json(json!(
-            state.account_svc.update_agy_fields(id, &updates).await?
-        )));
+        let saved = state.account_svc.update_agy_fields(id, &updates).await?;
+        return Ok(Json(account_api_value(&saved)));
+    }
+
+    if updates.get("client_system_prompt_policy").is_some() {
+        return Err(AppError::BadRequest("当前账号内核未提供可保存的提示词动作".into()));
     }
 
     if updates
@@ -4224,6 +4272,110 @@ mod tests {
             assert_eq!(summary["config"]["weights"][1], 0.0);
             assert_eq!(summary["config"]["reset_weight"], 0.0);
         }
+    }
+
+    /// 旧 AGY 值经统一动作读回，两账号各自保存，位置更新只写入同一个持久字段。@return 无。
+    #[tokio::test]
+    async fn agy_client_system_prompt_policy_preserves_legacy_values_and_other_options() {
+        let (app, _, _, pool, service) = test_router_with_scheduling(true).await;
+        let mut ids = Vec::new();
+        for legacy in [false, true] {
+            let (status, saved) = account_admin_json(
+                &app,
+                Method::POST,
+                "/admin/accounts",
+                json!({"email":format!("agy-{legacy}@example.invalid"),"setup_token":"synthetic"}),
+            )
+            .await;
+            assert_eq!(status, StatusCode::CREATED);
+            let id = saved["id"].as_i64().unwrap();
+            sqlx::query(
+                "UPDATE accounts SET platform='antigravity',auth_type='oauth',
+                 agy_system_prompt_as_user_reminder=$2,agy_system_prompt_homoglyph_enabled=1,
+                 agy_gif_frames_enabled=1,agy_disable_safety_filtering=1 WHERE id=$1",
+            )
+            .bind(id)
+            .bind(i32::from(legacy))
+            .execute(&pool)
+            .await
+            .unwrap();
+            sqlx::query("INSERT INTO account_credential_states(account_id,generation,phase,updated_at_ms) VALUES($1,1,'ready',0)")
+                .bind(id).execute(&pool).await.unwrap();
+            let (status, detail) = account_admin_json(
+                &app,
+                Method::GET,
+                &format!("/admin/accounts/{id}"),
+                Value::Null,
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK);
+            let expected = if legacy {
+                "user_reminder"
+            } else {
+                "independent"
+            };
+            assert_eq!(detail["client_system_prompt_policy"], expected);
+            ids.push(id);
+        }
+
+        let path = format!("/admin/accounts/{}", ids[0]);
+        let (status, _) = account_admin_json(
+            &app,
+            Method::PUT,
+            &path,
+            json!({"client_system_prompt_policy":"unsupported"}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        let (status, saved) = account_admin_json(
+            &app, Method::PUT, &path, json!({
+                "client_system_prompt_policy":"user_reminder","agy_system_prompt_as_user_reminder":false
+            }),
+        ).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(saved["client_system_prompt_policy"], "user_reminder");
+
+        let (status, saved) = account_admin_json(
+            &app,
+            Method::PUT,
+            &format!("/admin/accounts/{}", ids[1]),
+            json!({"agy_system_prompt_as_user_reminder":false}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(saved["client_system_prompt_policy"], "independent");
+        let (status, listed) = account_admin_json(
+            &app,
+            Method::GET,
+            "/admin/accounts?platform=antigravity",
+            Value::Null,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        for (id, reminder) in ids.into_iter().zip([true, false]) {
+            let account = service.get_account(id).await.unwrap();
+            assert_eq!(account.agy_system_prompt_as_user_reminder, reminder);
+            assert!(account.agy_system_prompt_homoglyph_enabled);
+            assert!(account.agy_gif_frames_enabled);
+            assert!(account.agy_disable_safety_filtering);
+            let view = listed["data"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|row| row["id"] == id)
+                .unwrap();
+            let expected = if reminder {
+                "user_reminder"
+            } else {
+                "independent"
+            };
+            assert_eq!(view["client_system_prompt_policy"], expected);
+        }
+        let (status, _) = account_admin_json(
+            &app, Method::POST, "/admin/accounts",
+            json!({"email":"cc-policy@example.invalid","setup_token":"synthetic","client_system_prompt_policy":"user_reminder"}),
+        ).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
     }
 
     /// 已验证字段映射必须与精确版本绑定，旧请求观察继续兼容。
