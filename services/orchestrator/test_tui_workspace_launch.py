@@ -177,10 +177,10 @@ class BoundLaunchTests(TestCase):
             ) + "\n")
 
         with patch("tui_workspace_launch.Popen") as spawn:
-            self._start(prepare_history=prepare)
+            self._start(prepare_history=prepare, resume=None)
             snapshot = self.history.read_bytes()
             self.assertEqual(spawn.call_args.args[0][-2:], ["--resume", str(self.history)])
-            self._start(prepare_history=prepare)
+            self._start(prepare_history=prepare, resume=None)
             self._start(resume=True)
             self.assertEqual(spawn.call_count, 3)
             self.assertEqual(spawn.call_args.args[0][-2:], ["--resume", str(self.history)])

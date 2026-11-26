@@ -411,20 +411,23 @@ class _Actor:
                         str(plugin),
                     ]
                     launch_options = {}
+                    resume = None
                     if self.cold_history is not None:
                         plan = self.cold_history
                         instructions = plugin / "instructions.md"
                         if plan.system:
                             atomic_text(instructions, plan.system)
                             opts.extend(["--append-system-prompt-file", str(instructions)])
-                        mcp = plugin / "mcp.json"
-                        atomic_text(mcp, _json({"mcpServers": {MCP_SERVER: {
-                            "type": "http", "url": endpoint + "/mcp", "headers": {
-                                "Authorization": "Bearer " + self.bearer,
-                            },
-                        }}}))
-                        opts.extend(["--mcp-config", str(mcp)])
+                        if plan.tools:
+                            mcp = plugin / "mcp.json"
+                            atomic_text(mcp, _json({"mcpServers": {MCP_SERVER: {
+                                "type": "http", "url": endpoint + "/mcp", "headers": {
+                                    "Authorization": "Bearer " + self.bearer,
+                                },
+                            }}}))
+                            opts.extend(["--mcp-config", str(mcp)])
                         launch_options["prepare_history"] = plan.import_session
+                        resume = bool(plan.history)
                     master, slave = os.openpty()
                     self.master = master
                     fcntl.ioctl(
@@ -446,7 +449,7 @@ class _Actor:
                         arguments=opts,
                         config_dir=home / ".claude",
                         environment=env,
-                        resume=None,
+                        resume=resume,
                         terminal_fd=slave,
                         mod_dir=plugin,
                         model_endpoint=(endpoint + self.model_path, self.launch_token or self.model_bearer),

@@ -69,9 +69,10 @@ def install_source():
         copy2(ROOT / "services/orchestrator" / name, target / name)
 
 
-def verify(gateway, sender, temporary, *, restart_history=False):
+def verify(gateway, sender, temporary, *, restart_history=False, text_input=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
+    @param text_input 是否验证四种文本系统提示词形状。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -208,6 +209,8 @@ def verify(gateway, sender, temporary, *, restart_history=False):
                           for name in ("cold-history-owner", "cold-history-foreign"))
         headers = {"x-session-id": str(uuid4()), "User-Agent": "flower2api-cold-history-fixture/1"}
         messages = [{"role": role, "content": text} for role, text in HISTORY]
+        if text_input:
+            return verify_text_inputs(manage, token, account_token, headers, messages, received)
         messages[3:3] = [
             {"role": "assistant", "content": [{"type": "tool_use", "name": "OldNote", "id": PAST_ID, "input": ARGS}]},
             {"role": "user", "content": [{"type": "tool_result", "tool_use_id": PAST_ID, "content": "已完成的旧工具结果。"}]},
@@ -302,6 +305,51 @@ def verify(gateway, sender, temporary, *, restart_history=False):
         return proof
 
 
+def verify_text_inputs(manage, token, account_token, headers, history, received):
+    """核对模型端的默认原生指令及用户提供的文本。
+    @param manage 临时管理接口。@param token 合成客户端。@param account_token 合成账号授权。
+    @param headers 同一个客户端会话。@param history 合成的已确认旧问答。@param received 独立 HTTPS 实收。
+    @return 各输入形状的复跑证据。
+    """
+    cases = (
+        ("omitted", None, []),
+        ("empty_string", "", []),
+        ("empty_array", [], history),
+        ("multiple_blocks", [{"type": "text", "text": part} for part in SYSTEM], history),
+    )
+    requests = []
+    native_ids = set()
+    for index, (name, system, earlier) in enumerate(cases):
+        question = "纯文本首轮问题 " + str(index)
+        body = {"model": MODEL, "max_tokens": 128, "stream": False,
+                "messages": [*earlier, {"role": "user", "content": question}]}
+        if system is not None:
+            body["system"] = system
+        status, raw = call(18090, "POST", "/v1/messages", token, body, headers)
+        assert status == 200 and len(received) == index + 1, (name, status, raw, len(received))
+        reply = json.loads(raw)
+        _, native, _ = received[index]
+        assert reply["content"] == [{"type": "text", "text": FINAL}]
+        joined = "\n".join(b["text"] for b in native["system"])
+        assert "You are Claude Code" in joined and len(native["system"]) > 2
+        assert all(joined.count(part) == int(name == "multiple_blocks") for part in SYSTEM)
+        if name == "multiple_blocks":
+            assert joined.index(SYSTEM[0]) < joined.index(SYSTEM[1])
+        texts = [(row["role"], b.get("text")) for row in native["messages"] for b in blocks(row)]
+        assert texts.count(("user", question)) == 1 and not native.get("tools"), name
+        earlier_texts = {text for _, text in HISTORY}
+        assert [(role, text) for role, text in texts if text in earlier_texts] == (HISTORY if earlier else []), name
+        assert [text for _, text in texts if isinstance(text, str) and text.startswith("纯文本首轮问题 ")] == [question]
+        native_id = json.loads(native["metadata"]["user_id"])["session_id"]
+        assert native_id not in native_ids
+        native_ids.add(native_id)
+        requests.append({"case": name, "body_sha256": sha256(encoded(body)).hexdigest(), "client_message_id": reply["id"]})
+    for info, attempt in zip(requests, verify_captures(manage, received, account_token), strict=True):
+        assert info["body_sha256"] == attempt["ingress_body_sha256"]
+        info.update(attempt)
+    return {"text_inputs": requests, "model_posts": len(received)}
+
+
 def blocks(row):
     """读取模型端实际内容块。@param row 模型消息。@return 内容块序列。"""
     return row["content"] if isinstance(row["content"], list) else [{"type": "text", "text": row["content"]}]
@@ -375,14 +423,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--gateway", type=Path, required=True)
     parser.add_argument("--sender", type=Path, required=True)
-    parser.add_argument("--restart-history", action="store_true")
+    scenario = parser.add_mutually_exclusive_group()
+    scenario.add_argument("--restart-history", action="store_true")
+    scenario.add_argument("--text-input", action="store_true")
     args = parser.parse_args()
     if (not Path("/.dockerenv").exists() or {name for _, name in if_nameindex()} != {"lo"}
             or Path("/run/v3/sender.json").exists() or any(Path("/native").glob("*"))):
         raise RuntimeError("请在空白的 docker --network none 账号容器中运行")
     install_source()
     with TemporaryDirectory(prefix="cold-history-") as directory:
-        proof = verify(args.gateway, args.sender, Path(directory), restart_history=args.restart_history)
+        proof = verify(args.gateway, args.sender, Path(directory),
+                       restart_history=args.restart_history, text_input=args.text_input)
         print(json.dumps(proof, ensure_ascii=False))
 
 

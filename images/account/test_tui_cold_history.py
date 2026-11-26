@@ -104,6 +104,28 @@ class ColdHistoryTests(TestCase):
                 plan.import_session(config, work, session)
             self.assertEqual(path.read_text(), payload)
 
+    def test_plain_first_turn_leaves_creation_to_cli_and_isolates_old_history(self):
+        """纯新轮复用登记身份或另开无历史的会话，已有对话保留原字节。@return 无。"""
+        previous = ColdHistory.from_request(self.body)
+        fresh = ColdHistory.from_request({
+            "model": self.body["model"], "max_tokens": 128,
+            "messages": [{"role": "user", "content": "新问题"}],
+        })
+        self.assertEqual((fresh.history, fresh.system, fresh.tools), ([], "", {}))
+        work = Path("/native/workspace")
+        session = str(uuid4())
+        with TemporaryDirectory() as directory, ExitStack() as stack:
+            config = Path(directory)
+            self.assertEqual(fresh.import_session(config, work, session), session)
+            self.assertIsNone(_resume_path(stack, config, work, session, required=False))
+            previous.import_session(config, work, session)
+            original = _resume_path(stack, config, work, session, required=True)
+            payload = original.read_bytes()
+            branch = fresh.import_session(config, work, session)
+            self.assertNotEqual(branch, session)
+            self.assertIsNone(_resume_path(stack, config, work, branch, required=False))
+            self.assertEqual(original.read_bytes(), payload)
+
     def test_unpaired_and_unsupported_inputs_use_existing_contract(self):
         """检查缺配对及扩展字段按原入口合同准入。@return 无。"""
         missing = deepcopy(self.body)

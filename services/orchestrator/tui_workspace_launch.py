@@ -83,16 +83,16 @@ def _resume_path(stack: ExitStack, config: Path, work: Path, native_id: str, req
 def publish_workspace_history(
     config: Path, work: Path, native_id: str,
     matches: Callable[[Iterator[dict]], bool],
-    render: Callable[[str], str],
+    render: Callable[[str], str] | None,
 ) -> str:
-    """按工作区绑定发布已核对的会话历史。
+    """按工作区绑定选择新会话或发布已核对的历史。
 
     @param config 账号内原生会话的私有配置目录。
     @param work 启动器已核验的工作目录。
     @param native_id 发送器工作区绑定中的会话 UUID。
     @param matches 比较已有全部主链与本次确认边界。
-    @param render 以选中的原生 UUID 组装完整 JSONL。
-    @return 可经原生启动入口核验的会话 UUID。
+    @param render 以选中的原生 UUID 组装完整 JSONL。纯新轮传 None，CLI 自行创建对话记录。
+    @return 本次新建或恢复的会话 UUID。
     """
     if str(UUID(native_id)) != native_id or UUID(native_id).version != 4:
         raise ValueError("冷导入需要已绑定的原生会话 UUID")
@@ -113,7 +113,8 @@ def publish_workspace_history(
                 if matches(_main_history(stream, work, native_id)):
                     return native_id
             native_id = str(uuid4())
-        atomic_text(project / (native_id + ".jsonl"), render(native_id), replace=False)
+        if render is not None:
+            atomic_text(project / (native_id + ".jsonl"), render(native_id), replace=False)
         return native_id
 
 
@@ -147,7 +148,7 @@ def launch_workspace_cli(
     @param program_fd 可选的已核验程序描述符，由同容器隔离入口在执行时关闭。
     @param inherited_fds 受信启动器额外传入的同会话描述符。
     @param initialize_profile 可选，新会话由受信控制端为已核验目录初始化独立配置。
-    @param prepare_history 可选，在已核验工作区导入历史并返回本次可恢复的会话 UUID。
+    @param prepare_history 可选，在已核验工作区确定本次会话 UUID。非纯新轮须已有可恢复历史。
     @return 由事件源负责监督与回收的官方进程。
     """
     if (
@@ -193,7 +194,8 @@ def launch_workspace_cli(
             native_id = prepare_history(config_dir, work, native_id)
             if str(UUID(native_id)) != native_id or UUID(native_id).version != 4:
                 raise ValueError("V2 导入历史未返回原生会话 UUID")
-            resume = True
+            if resume is None:
+                resume = True
         session_args = ["--session-id", native_id]
         history = None if resume is False else _resume_path(stack, config_dir, work, native_id, required=resume is True)
         if history is not None:

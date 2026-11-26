@@ -51,12 +51,12 @@ def _closed_history(rows):
             if results != pending:
                 return False
             pending.clear()
-    return bool(seen) and not pending
+    return not pending
 
 
 @dataclass(frozen=True)
 class ColdHistory:
-    """记录已确认的可导入边界、当前文本以及该会话的 MCP 工具映射。"""
+    """记录已确认的普通输入、当前文本以及该会话的 MCP 工具映射。"""
 
     history: list
     model: str
@@ -68,7 +68,7 @@ class ColdHistory:
 
     @classmethod
     def from_request(cls, body):
-        """识别本切片已支持的封闭工具历史。@param body 已校验的请求。@return 原生输入计划或空。"""
+        """识别普通文本首轮及受支持的闭合历史。@param body 已校验的请求。@return 原生输入计划或空。"""
         if body.keys() - {"model", "max_tokens", "thinking", "system", "messages", "tools", "stream"}:
             return None
         if type(body.get("max_tokens")) is not int or body["max_tokens"] <= 0:
@@ -76,7 +76,7 @@ class ColdHistory:
         if body.get("thinking") not in (None, {"type": "disabled"}):
             return None
         *history, current = body["messages"]
-        if (not history or current["role"] != "user" or any(
+        if (current["role"] != "user" or any(
                 row["role"] != ("user" if i % 2 == 0 else "assistant") or not _blocks(row)
                 for i, row in enumerate(history))
                 or not _closed_history(history)):
@@ -91,8 +91,6 @@ class ColdHistory:
                     or not isinstance(tool.get("description", ""), str)
                     or "input_schema" not in tool):
                 return None
-        if not declared:
-            return None
         system = body.get("system", "")
         if isinstance(system, list):
             if any(block.keys() != {"type", "text"} for block in system):
@@ -102,12 +100,15 @@ class ColdHistory:
         return cls(history, body["model"], content[0]["text"], system, tools, body["max_tokens"], body.get("thinking"))
 
     def import_session(self, config, work, native_id):
-        """在已绑定的工作区发布或匹配已完成的外部历史。
+        """在已绑定的工作区选择新会话或发布已完成的外部历史。
         @param config 私有配置。@param work 已核验工作目录。@param native_id 绑定的原生会话。
-        @return 本次可恢复的原生会话 UUID。
+        @return 本次启动的原生会话 UUID。
         """
+        def render(session_id):
+            return self._transcript(work, session_id)
+
         return publish_workspace_history(
-            config, work, native_id, self._matches_history, lambda session_id: self._transcript(work, session_id),
+            config, work, native_id, self._matches_history, render if self.history else None,
         )
 
     def _matches_history(self, rows):
