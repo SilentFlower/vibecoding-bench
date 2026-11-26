@@ -10,6 +10,7 @@ from time import monotonic_ns
 
 
 MODEL_BODY_TRACE = Path("/run/v3/tui-v2/.fixture-model-body.jsonl")
+THINKING_SUMMARIES_SETTING = ".fixture-show-thinking-summaries.json"
 
 
 def startup_event(stage, **fields):
@@ -47,6 +48,8 @@ def main():
     callback = _Actor.callback
     serve_model = _Actor.serve_model
     claim_model = _Actor._claim_model
+    summary_setting = Path(__file__).with_name(THINKING_SUMMARIES_SETTING)
+    thinking_summaries = json.loads(summary_setting.read_text()) if summary_setting.is_file() else None
 
     def trace_send(self, writer, connection, handle, command):
         startup_event("source_send", reservation_id=handle.reservation["reservation_id"])
@@ -54,6 +57,15 @@ def main():
 
     def trace_launch(reservation, command, **options):
         ident = reservation["reservation_id"]
+        if thinking_summaries is not None:
+            # 只给隔离测试 CLI 的正式启动参数增加受支持设置，保留原有会话钩子。
+            arguments = options["arguments"].copy()
+            position = arguments.index("--settings") + 1
+            settings = json.loads(arguments[position])
+            settings["showThinkingSummaries"] = thinking_summaries
+            arguments[position] = json.dumps(settings)
+            options["arguments"] = arguments
+            startup_event("cli_thinking_summaries_setting", reservation_id=ident, enabled=thinking_summaries)
         startup_event("cli_launch", reservation_id=ident)
         process = launch_session(reservation, command, **options)
         startup_event("cli_spawned", reservation_id=ident)
@@ -77,6 +89,7 @@ def main():
             native_raw = args[0] if args else options.get("native_raw")
             # 摘要取自已认领的提交，不能用 CLI 回调的存在推断出站正文来自 CLI。
             evidence = {"reservation_id": submission.handle.reservation["reservation_id"],
+                        "uses_native_history": actor.cold_history is not None,
                         "from_interactive_cli": submission.body == native_raw,
                         "sha256": sha256(submission.body).hexdigest()}
             with suppress(OSError), MODEL_BODY_TRACE.open("ab", buffering=0) as stream:

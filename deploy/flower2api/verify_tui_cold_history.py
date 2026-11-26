@@ -31,7 +31,7 @@ from uuid import UUID, uuid4
 from zlib import compress, crc32
 
 from fixtures.native_model_send.fixture_tunnel import _relay
-from fixtures.native_model_send.tui_startup_trace import MODEL_BODY_TRACE, startup_event
+from fixtures.native_model_send.tui_startup_trace import MODEL_BODY_TRACE, THINKING_SUMMARIES_SETTING, startup_event
 from verify_tui_concurrency import frame
 from verify_tui_final_tls import call, encoded, serve, stop, wait_for
 from verify_tui_http_handoff import MODEL, message_sse
@@ -59,6 +59,7 @@ RECONNECT_ID = "toolu_reconnect_cold_fixture"
 SIGNED_THINKING = {"type": "thinking", "thinking": "隔离模型的合成思考段。", "signature": "c2lnbmF0dXJlLWZpeHR1cmU="}
 ADAPTIVE_THINKING = {"type": "adaptive", "display": "updates"}
 THINKING_UPDATES_BETA = "thinking-display-updates-2026-08-18"
+THINKING_DISPLAY_DEFAULTS = {MODEL: "summarized", "claude-opus-5-5": "omitted"}
 V1_RUNTIME_SHA256 = "017ec892b9dfbf08bf4cb2e5bf59048cb41a0ecfc21b1ad518751a23a911b9b7"
 TOOL = {"name": "Lookup-Note", "description": "读取合成便签", "input_schema": {
     "type": "object", "required": ["key", "options"], "additionalProperties": False,
@@ -95,9 +96,10 @@ class QuietHandler(BaseHTTPRequestHandler):
         """省略验收请求日志。@return 无。"""
 
 
-def install_source(root=ROOT, *, trace_startup=False, cache_capability=None):
+def install_source(root=ROOT, *, trace_startup=False, cache_capability=None, thinking_cli_summaries=None):
     """安装配套事件源。@param root 检出目录。@param trace_startup 是否启用隔离观测。
-    @param cache_capability 可选的 CLI 缓存探针模式。@return 无。
+    @param cache_capability 可选的 CLI 缓存探针模式。@param thinking_cli_summaries 可选的 CLI 摘要设置。
+    @return 无。
     """
     target = Path("/opt/flower/tui")
     for file in (root / "images/account").glob("tui_*.py"):
@@ -109,6 +111,8 @@ def install_source(root=ROOT, *, trace_startup=False, cache_capability=None):
         (target / "tui_source.py").rename(target / "fixture_tui_source.py")
         fixtures = ROOT / "deploy/flower2api/fixtures/native_model_send"
         copy2(fixtures / "tui_startup_trace.py", target / "tui_source.py")
+        if thinking_cli_summaries is not None:
+            (target / THINKING_SUMMARIES_SETTING).write_text(json.dumps(thinking_cli_summaries))
         if cache_capability in ("native-default", "native-no-auto"):
             (target / "tui_source.py").rename(target / "fixture_startup_trace.py")
             copy2(fixtures / "tui_cache_capability_probe.py", target / "tui_source.py")
@@ -177,12 +181,35 @@ def fixture_reconnect_sse(name):
     return b"".join(map(frame, prefix)), b"".join(map(frame, tail))
 
 
+def fixture_thinking_display_sse(body):
+    """按实收的思考设置与模型默认值生成合成流。@param body 隔离模型实收。@return SSE 字节。"""
+    model = body["model"]
+    display = body["thinking"].get("display", THINKING_DISPLAY_DEFAULTS[model])
+    wire = message_sse({"type": "text", "text": FINAL}, "end_turn", "msg_cold_thinking_display")
+    events = [json.loads(line[5:]) for line in wire.splitlines() if line.startswith(b"data:")]
+    events[0]["message"]["model"] = model
+    for event in events:
+        if "index" in event:
+            event["index"] += 1
+    thinking = [{"type": "content_block_start", "index": 0, "content_block": {"type": "thinking", "thinking": ""}}]
+    if display == "summarized":
+        thinking.append({"type": "content_block_delta", "index": 0,
+                         "delta": {"type": "thinking_delta", "thinking": SIGNED_THINKING["thinking"]}})
+    thinking.extend([
+        {"type": "content_block_delta", "index": 0,
+         "delta": {"type": "signature_delta", "signature": SIGNED_THINKING["signature"]}},
+        {"type": "content_block_stop", "index": 0},
+    ])
+    events[1:1] = thinking
+    return b"".join(map(frame, events))
+
+
 def verify(gateway, sender, temporary, *, restart_history=False, text_input=False, system_policy=False,
            toggle_pending_policy=False, tool_policy=None, recover_pending=False, output_effort=False,
            history_png=False, history_images=False, history_tool_blocks=False, previous=None, failure_boundaries=False,
            current_text_blocks=False, signed_tool_history=False, split_history_tools=False, v1_runtime=None,
            parallel_tools=False, reconnect_tool_stream=False, current_images=False, auto_tool_choice=False,
-           adaptive_thinking_model=None,
+           adaptive_thinking_model=None, thinking_display_model=None, thinking_cli_summaries=None,
            recovery_ledger_contention=False, recovery_ledger_deadline=False, recovery_workspace_rejection=False,
            recovery_slow_model=False, initial_idle_model_connection=False, trace_startup=False, cache_markers=False,
            history_cache_markers=False, history_cache_ttl=None, cache_capability=None, message_system_roles=False):
@@ -208,6 +235,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param current_images 是否用本轮原生图文替换纯文本问题。
     @param auto_tool_choice 是否核对显式自动选择和并行工具。
     @param adaptive_thinking_model 可选，核对显式 adaptive/updates 的固定模型。
+    @param thinking_display_model 可选，核对普通 API 思考显示及客户端响应的固定模型。
+    @param thinking_cli_summaries 可选，核对正式 CLI 摘要设置的隔离对照。
     @param recovery_ledger_contention 是否在提交原回执时短暂占用账号账本锁。
     @param recovery_ledger_deadline 是否持续持锁直至回执触发准入截止，然后重交。
     @param recovery_workspace_rejection 是否核对工作区绑定拒绝及原回执再次认领。
@@ -233,7 +262,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     for directory in (Path("/run/v3/tui-v2"), Path("/native"), Path("/flows/api")):
         directory.mkdir(mode=0o700, parents=True, exist_ok=True)
         os.chown(directory, 1001, 1001)
-    inspect_model_body = cache_markers or message_system_roles
+    inspect_model_body = cache_markers or message_system_roles or thinking_display_model
     if inspect_model_body and v1_runtime is None:
         MODEL_BODY_TRACE.touch(mode=0o600, exist_ok=False)
         os.chown(MODEL_BODY_TRACE, 1001, 1001)
@@ -292,6 +321,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 wire = fixture_tool_sse(content, with_signature=signed_tool_history, second=second)
             elif reconnect_tool_stream and results and not find_blocks(body, "tool_use_id", RECONNECT_ID):
                 prefix, wire = fixture_reconnect_sse(tool["name"])
+            elif thinking_display_model:
+                wire = fixture_thinking_display_sse(body)
             else:
                 wire = message_sse({"type": "text", "text": FINAL}, "end_turn", "msg_cold_reply")
             self.send_response(200)
@@ -494,6 +525,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                           for name in ("cold-history-owner", "cold-history-foreign"))
         headers = {"x-session-id": str(uuid4()), "User-Agent": "flower2api-cold-history-fixture/1"}
         messages = [{"role": role, "content": text} for role, text in HISTORY]
+        if thinking_display_model:
+            return verify_thinking_display_contract(manage, token, identifier, received, thinking_display_model,
+                                                    thinking_cli_summaries)
         if message_system_roles:
             account = manage("GET", f"accounts/{identifier}")
             return verify_message_system_roles(manage, token, account, received, model_betas,
@@ -1504,6 +1538,112 @@ def verify_message_system_roles(manage, token, account, received, model_betas, *
     return {"backend": backend, "cases": proof, "model_posts": len(received), "wire_final": "unavailable"}
 
 
+def verify_client_thinking_reply(raw, stream, model, summary):
+    """验证公开 SSE 或 JSON 保留合成摘要及签名。@param raw 公开回复。@param stream 是否流式。
+    @param model 请求模型。@param summary 预期显示的文字。@return 客户端实际语义。
+    """
+    content = [{**SIGNED_THINKING, "thinking": summary}, {"type": "text", "text": FINAL}]
+    if not stream:
+        reply = json.loads(raw)
+        assert (reply["model"], reply["stop_reason"], reply["content"]) == (model, "end_turn", content), reply
+        return {"format": "json", "content": reply["content"]}
+
+    frames = [json.loads(line[5:]) for line in raw.splitlines() if line.startswith(b"data:")]
+    assert frames[0]["message"]["model"] == model and frames[-1]["type"] == "message_stop", frames
+    starts = [(event["index"], event["content_block"]) for event in frames if event["type"] == "content_block_start"]
+    assert starts == [(0, {"type": "thinking", "thinking": ""}), (1, {"type": "text", "text": ""})], starts
+    deltas = [(event["index"], event["delta"]) for event in frames if event["type"] == "content_block_delta"]
+    expected = [(0, {"type": "thinking_delta", "thinking": summary})] if summary else []
+    expected.extend([(0, {"type": "signature_delta", "signature": SIGNED_THINKING["signature"]}),
+                     (1, {"type": "text_delta", "text": FINAL})])
+    assert deltas == expected, deltas
+    (terminal,) = [event["delta"] for event in frames if event["type"] == "message_delta"]
+    assert terminal["stop_reason"] == "end_turn", terminal
+    return {"format": "sse", "deltas": deltas, "stop_reason": terminal["stop_reason"]}
+
+
+def verify_thinking_display_contract(manage, token, identifier, received, model, thinking_cli_summaries):
+    """对照公开入口 display 缺省和显式模式。@param manage 管理入口。@param token 合成令牌。
+    @param identifier 账号 ID。@param received 模型实收列表。@param model 固定模型。
+    @param thinking_cli_summaries 隔离 CLI 摘要设置。@return 逐例证据。
+    """
+    configurations = {
+        "no_thinking": None,
+        "default_display": {"type": "adaptive"},
+        "omitted": {"type": "adaptive", "display": "omitted"},
+        "summarized": {"type": "adaptive", "display": "summarized"},
+    }
+    policies = ("append", "replace", "user_reminder")
+    native_default = {**ADAPTIVE_THINKING, "display": "summarized"} if thinking_cli_summaries else ADAPTIVE_THINKING
+    if thinking_cli_summaries is not None:
+        configurations = {"no_thinking": None}
+        policies = ("append",)
+    proof = {}
+    for policy in policies:
+        account = manage("PUT", f"accounts/{identifier}", {"client_system_prompt_policy": policy})
+        assert account["client_system_prompt_policy"] == policy
+        for label, thinking in configurations.items():
+            for stream in (True, False):
+                output = "sse" if stream else "json"
+                phase = f"{policy}_{label}_{output}"
+                question = f"合成思考显示用例 {phase}"
+                headers = {"x-session-id": str(uuid4()), "User-Agent": "flower2api-thinking-display-fixture/1"}
+                body = {"model": model, "max_tokens": 128, "stream": stream,
+                        "messages": [{"role": "user", "content": question}]}
+                if thinking is not None:
+                    body["thinking"] = thinking
+                before = len(received)
+                before_claims = len(MODEL_BODY_TRACE.read_text().splitlines())
+                status, raw, request_id = checked_messages(
+                    manage, token, body, headers, received, phase,
+                    expected_status=200 if thinking is None or policy == "append" else 422, trace_startup=True,
+                )
+                diagnostic_path = "request-diagnostics/" + request_id
+
+                def finished_diagnostics():
+                    detail = manage("GET", diagnostic_path)
+                    return detail if detail["request"].get("finished_at") else None
+
+                detail = wait_for(finished_diagnostics)
+                request, attempts = detail["request"], detail["attempts"]
+                assert request["request_id"] == request_id
+                reservation = (request.get("context") or {}).get("tui_reservation_id")
+                claims = MODEL_BODY_TRACE.read_text().splitlines()[before_claims:]
+                result = {"status": status, "policy": policy, "format": output, "request_id": request_id,
+                          "reservation_id": reservation, "attempt_count": len(attempts),
+                          "model_posts": len(received) - before}
+                if thinking is not None:
+                    result["input_thinking"] = thinking
+                if status == 422:
+                    assert before == len(received) and not (attempts or claims), (phase, result)
+                    result["error_code"] = json.loads(raw)["error"]["code"]
+                    assert result["error_code"] == "unsupported_parameter", (phase, result)
+                else:
+                    ((body_hash, model_body, _),) = received[before:]
+                    (raw_claim,), (attempt,) = claims, attempts
+                    claim = json.loads(raw_claim)
+                    assert claim["sha256"] == body_hash and claim["reservation_id"] == reservation, (phase, claim)
+                    assert attempt["request_id"] == request_id and attempt["attempt_id"] == reservation, (phase, attempt)
+                    from_cli = claim["uses_native_history"]
+                    assert from_cli is (thinking is None) and claim["from_interactive_cli"] is from_cli, (phase, claim)
+                    assert model_body["model"] == model and model_body["thinking"] == (thinking or native_default), (
+                        phase, model_body["thinking"],
+                    )
+                    assert sum(block.get("text") == question for row in model_body["messages"] if row["role"] == "user"
+                               for block in blocks(row)) == 1, phase
+                    display = thinking.get("display", THINKING_DISPLAY_DEFAULTS[model]) if thinking else native_default["display"]
+                    summary = SIGNED_THINKING["thinking"] if display == "summarized" else ""
+                    result.update(provider_path="interactive_cli" if from_cli else "account_sender", attempt_id=reservation,
+                                  uses_native_history=from_cli,
+                                  model_thinking=model_body["thinking"], model_body_sha256=body_hash,
+                                  simulated_model_display=display,
+                                  client=verify_client_thinking_reply(raw, stream, model, summary))
+                proof[phase] = result
+    assert not any(path.is_file() for path in Path("/flows/api").rglob("*"))
+    return {"model": model, "cli_show_thinking_summaries": thinking_cli_summaries,
+            "wire_final": "unavailable", "cases": proof, "model_posts": len(received)}
+
+
 def verify_v1_prompt_policy(token, received, model_betas):
     """从公开入口核对 V1 固定策略与输入合同。
     @param token 合成调用方令牌。@param received 模型实收。@param model_betas 模型实收功能头。@return 证据。
@@ -2137,6 +2277,7 @@ def main():
                               const="ordinary-contract")
     parser.add_argument("--auto-tool-choice", action="store_true")
     parser.add_argument("--adaptive-thinking-model", choices=(MODEL, "claude-opus-5-5"))
+    parser.add_argument("--thinking-cli-summaries", choices=("on", "off"))
     parser.add_argument("--signed-tool-history", action="store_true")
     parser.add_argument("--trace-initial-startup", action="store_true", help="记录源码 V2 夹具的启动阶段")
     fault = parser.add_mutually_exclusive_group()
@@ -2155,6 +2296,7 @@ def main():
     scenario.add_argument("--recover-pending-tool", action="store_true")
     scenario.add_argument("--initial-idle-model-connection", action="store_true")
     scenario.add_argument("--output-effort", action="store_true")
+    scenario.add_argument("--thinking-display-contract", choices=tuple(THINKING_DISPLAY_DEFAULTS))
     scenario.add_argument("--history-png", action="store_true")
     scenario.add_argument("--history-images", action="store_true")
     scenario.add_argument("--history-tool-blocks", action="store_true")
@@ -2167,6 +2309,9 @@ def main():
     scenario.add_argument("--failure-boundaries", action="store_true")
     scenario.add_argument("--v1-runtime", type=Path)
     args = parser.parse_args()
+    if args.thinking_cli_summaries is not None and not args.thinking_display_contract:
+        parser.error("--thinking-cli-summaries 需要同用 --thinking-display-contract")
+    thinking_cli_summaries = {"on": True, "off": False}.get(args.thinking_cli_summaries)
     if args.history_cache_ttl and not args.history_cache_markers:
         parser.error("--history-cache-ttl 需要同用 --history-cache-markers")
     if (args.recovery_ledger_contention or args.recovery_ledger_deadline or args.recovery_workspace_rejection
@@ -2180,6 +2325,7 @@ def main():
     previous = args.mixed_release
     cache_markers = args.cache_markers or args.cache_marker_capabilities is not None
     trace_startup = (args.initial_idle_model_connection or args.trace_initial_startup or cache_markers
+                     or bool(args.thinking_display_contract)
                      or (bool(args.message_system_roles) and args.v1_runtime is None))
     if trace_startup and (previous or args.mixed_image_peers or args.v1_runtime):
         parser.error("启动观测需要当前 V2 源码夹具")
@@ -2189,7 +2335,7 @@ def main():
         previous = (None, *args.mixed_image_peers)
     elif args.v1_runtime is None:
         install_source(previous[0] if previous else ROOT, trace_startup=trace_startup,
-                       cache_capability=args.cache_marker_capabilities)
+                       cache_capability=args.cache_marker_capabilities, thinking_cli_summaries=thinking_cli_summaries)
     elif sha256(args.v1_runtime.read_bytes()).hexdigest() != V1_RUNTIME_SHA256:
         parser.error("V1 启动器摘要与固定版不符")
     with TemporaryDirectory(prefix="cold-history-", dir=args.shared_state) as directory:
@@ -2206,6 +2352,8 @@ def main():
                        reconnect_tool_stream=args.reconnect_tool_stream, current_images=args.current_images,
                        auto_tool_choice=args.auto_tool_choice,
                        adaptive_thinking_model=args.adaptive_thinking_model,
+                       thinking_display_model=args.thinking_display_contract,
+                       thinking_cli_summaries=thinking_cli_summaries,
                        recovery_ledger_contention=args.recovery_ledger_contention,
                        recovery_ledger_deadline=args.recovery_ledger_deadline,
                        recovery_workspace_rejection=args.recovery_workspace_rejection,
