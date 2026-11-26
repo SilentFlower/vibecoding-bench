@@ -62,9 +62,8 @@ def _text_result_blocks(content):
 
 
 def _closed_history(rows, *, result_types=(str,)):
-    pending, seen = set(), set()
-    for row in rows:
-        results = set()
+    pending, seen, results = set(), set(), set()
+    for index, row in enumerate(rows):
         for block in _blocks(row):
             if _plain_text(block) or (row["role"] == "user" and _inline_image(block)):
                 continue
@@ -85,10 +84,12 @@ def _closed_history(rows, *, result_types=(str,)):
                 results.add(block["tool_use_id"])
             else:
                 return False
-        if row["role"] == "user":
+        if row["role"] == "user" and (index + 1 == len(rows) or rows[index + 1]["role"] != "user"):
+            # Messages 将相邻同角色消息视为同一轮。整组历史回传闭合后才推进到下一助理轮。
             if results != pending:
                 return False
             pending.clear()
+            results.clear()
     return not pending
 
 
@@ -124,9 +125,8 @@ class ColdHistory:
                 output.keys() != {"effort"} or output["effort"] not in ("low", "medium", "high", "max")):
             return None
         *history, current = body["messages"]
-        if (current["role"] != "user" or any(
-                row["role"] != ("user" if i % 2 == 0 else "assistant") or not _blocks(row)
-                for i, row in enumerate(history))
+        if (current["role"] != "user" or (history and history[0]["role"] != "user")
+                or any(row["role"] not in ("user", "assistant") or not _blocks(row) for row in history)
                 or not _closed_history(history)):
             return None
         content = _blocks(current)
@@ -242,7 +242,11 @@ class ColdHistory:
             blocks = _blocks(row)
             if index == reminder_index:
                 blocks = [*blocks, {"type": "text", "text": self._reminder()}]
-            history.append((row["role"], blocks))
+            if history and history[-1][0] == row["role"]:
+                # 固定 CLI 逐行检查工具配对。同一完整工具组必须在原生一轮中载入。
+                history[-1][1].extend(blocks)
+            else:
+                history.append((row["role"], list(blocks)))
 
         boundary = digest((*self._scope(), history))
 

@@ -39,6 +39,7 @@ AFTER_RESTART = "RESTART：从已确认的旧问答开启另一轮。"
 DROP_REPLY = "FAILURE：模型收到正文后关闭响应连接。"
 SYSTEM = ["RULE1：你是便签助手。", "RULE2：请只使用已声明的工具。"]
 PAST_ID = "toolu_past_fixture"
+PAST_SECOND_ID = "toolu_past_second_fixture"
 NEW_ID = "toolu_cold_fixture"
 SIGNED_THINKING = {"type": "thinking", "thinking": "隔离模型的合成思考段。", "signature": "c2lnbmF0dXJlLWZpeHR1cmU="}
 TOOL = {"name": "Lookup-Note", "description": "读取合成便签", "input_schema": {
@@ -123,7 +124,7 @@ def fixture_tool_sse(tool, *, with_signature):
 def verify(gateway, sender, temporary, *, restart_history=False, text_input=False, system_policy=False,
            toggle_pending_policy=False, tool_policy=None, recover_pending=False, output_effort=False,
            history_png=False, history_images=False, history_tool_blocks=False, previous=None, failure_boundaries=False,
-           current_text_blocks=False, signed_tool_history=False):
+           current_text_blocks=False, signed_tool_history=False, split_history_tools=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -139,6 +140,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param failure_boundaries 是否分别在模型收件前后切断隔离连接。
     @param current_text_blocks 是否验证本轮文本块顺序及边界归属。
     @param signed_tool_history 是否核对隔离模型原工具轮的签名块。
+    @param split_history_tools 是否将已闭合的旧工具组分为相邻消息。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -367,6 +369,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             {"role": "assistant", "content": [{"type": "tool_use", "name": "OldNote", "id": PAST_ID, "input": ARGS}]},
             {"role": "user", "content": [{"type": "tool_result", "tool_use_id": PAST_ID, "content": old_result}]},
         ]
+        if split_history_tools:
+            messages.insert(4, {"role": "assistant", "content": [
+                {"type": "tool_use", "id": PAST_SECOND_ID, "name": "OtherOldNote", "input": ARGS}]})
+            messages.insert(6, {"role": "user", "content": [
+                {"type": "tool_result", "tool_use_id": PAST_SECOND_ID, "content": "第二个已完成的旧工具结果。"}]})
         current = ([{"type": "text", "text": part} for part in (QUESTION, QUESTION_TAIL)]
                    if current_text_blocks else QUESTION)
         messages.append({"role": "user", "content": current})
@@ -521,6 +528,18 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                  "proxy_connections": len(proxy_targets), "attempts": captures}
         if history_tool_blocks:
             proof["historical_tool_result_blocks"] = len(old_result)
+        if split_history_tools:
+            for _, native, _ in received:
+                assert find_blocks(native, "id", PAST_SECOND_ID) == [("assistant", {
+                    "type": "tool_use", "id": PAST_SECOND_ID, "name": "OtherOldNote", "input": ARGS})]
+                assert find_blocks(native, "tool_use_id", PAST_SECOND_ID) == [("user", {
+                    "type": "tool_result", "tool_use_id": PAST_SECOND_ID, "content": "第二个已完成的旧工具结果。"})]
+                blocks_in_order = [block for row in native["messages"] for block in blocks(row)]
+                for key in ("id", "tool_use_id"):
+                    assert [block[key] for block in blocks_in_order if block.get(key) in (PAST_ID, PAST_SECOND_ID)] == [
+                        PAST_ID, PAST_SECOND_ID,
+                    ]
+            proof["closed_historical_tools"] = 2
         if current_text_blocks:
             proof.update(current_text_blocks=2, changed_current_blocks_status=changed_blocks)
         if signed_tool_history:
@@ -836,7 +855,7 @@ def verify_model(received, *, policy, old_content, current_text_blocks=False):
         (old,) = find_blocks(body, "id", PAST_ID)
         (old_result,) = find_blocks(body, "tool_use_id", PAST_ID)
         assert old == ("assistant", {"type": "tool_use", "id": PAST_ID, "name": "OldNote", "input": ARGS})
-        assert old_result[0] == "user" and old_result[1]["content"] == old_content
+        assert old_result[0] == "user" and old_result[1]["content"] == old_content, old_result
         (tool,) = [t for t in body["tools"] if t.get("description") == TOOL["description"]]
         assert tool["name"] == NATIVE_TOOL_NAME and tool["input_schema"] == TOOL["input_schema"]
     assert not find_blocks(first, "id", NEW_ID) and not find_blocks(first, "tool_use_id", NEW_ID)
@@ -895,6 +914,7 @@ def main():
     scenario.add_argument("--history-png", action="store_true")
     scenario.add_argument("--history-images", action="store_true")
     scenario.add_argument("--history-tool-blocks", action="store_true")
+    scenario.add_argument("--split-history-tools", action="store_true")
     scenario.add_argument("--mixed-release", nargs=3, type=Path,
                           metavar=("OLD_SOURCE", "OLD_GATEWAY", "OLD_SENDER"))
     scenario.add_argument("--failure-boundaries", action="store_true")
@@ -912,7 +932,7 @@ def main():
                        history_images=args.history_images, history_tool_blocks=args.history_tool_blocks,
                        previous=args.mixed_release,
                        failure_boundaries=args.failure_boundaries, current_text_blocks=args.current_text_blocks,
-                       signed_tool_history=args.signed_tool_history)
+                       signed_tool_history=args.signed_tool_history, split_history_tools=args.split_history_tools)
         print(json.dumps(proof, ensure_ascii=False))
 
 

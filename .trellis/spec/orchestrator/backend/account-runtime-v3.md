@@ -2556,6 +2556,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 当前用户消息的多个纯文本块在 `session.append` 阶段按原顺序替换本会话的提交标记，CLI 按原生方式保存并组装。派发前核对本轮标记和实际文本块。原工具回执冻结文本块边界。原进程丢失后，已提交的块随核对过的历史载入，继续提示单独提交。
 - 已确认的用户历史可保留内嵌 Base64 PNG、JPEG、GIF 和 WebP。恢复时按原角色和内容块顺序交给 CLI，用户提醒可附在同一条历史消息。事件源核对格式标识，固定 CLI 与模型沿用原数据。URL 图像和本轮多块媒体沿各自既有输入合同。
 - 已闭合的旧工具结果可保留非空有序 `text` 块数组和原工具 ID。带扩展字段的结果块沿现有输入合同，先前完成的工具保持已完成。
+- 旧工具调用和回执可以拆在相邻同角色历史里。原生导入按角色合并相邻行，保持块内容和先后顺序，整组调用必须在下一助理轮前闭合。原公开历史仍作为回执归属的比较依据。
 - V2 管理端可选择 `append`、`replace`、`user_reminder`。已核验发送器通过私有预留传递非默认动作。替换以启动文件承载系统正文，省略保留默认正文，显式空串或空数组仅保留身份和计费块。提醒保留默认系统正文，附到首条不含工具回执的用户消息。纯新轮的提醒随原问题提交。完整 CC 原生请求沿原输入合同。已登记等待工具的进程沿用其启动动作。
 - 普通原生输入的 `output_config.effort` 支持 `low`、`medium`、`high`、`max`，由 2.1.293 的 `--effort` 组装。模型出站前核对实际字段。等待和冷恢复沿用根轮冻结的强度。交互 `--json-schema` 的组件探针未生成 `output_config.format`，此字段沿现有输入合同处理。
 - 工具声明由会话私有 HTTP MCP 返回。有工具的轮次等待 `tools/list` 应答写出后才提交 PTY 提示。公开调用块恢复原名，ID 与参数增量仍对应原模型事件。工具结果通过原进程的回执账本交付，接收方、历史、原调用和本轮生效设置均需匹配。
@@ -2596,5 +2597,6 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `verify_tui_cold_history.py --history-png` 核对追加、用户提醒两种动作下的原角色、历史图像字节和单次当前问题。
 - `verify_tui_cold_history.py --history-images` 在同一旧用户消息中核对 PNG、JPEG、GIF、WebP 的顺序和原始数据。
 - `verify_tui_cold_history.py --history-tool-blocks` 核对已闭合的两个文本结果块、顺序及原 ID，并完成一次新工具回执。
+- `verify_tui_cold_history.py --split-history-tools` 核对分行的两对旧工具及结果、原顺序和单次新工具执行。
 - `verify_tui_cold_history.py --current-text-blocks` 核对本轮两个独立文本块的模型实收，合并边界的回执返回 422。与 `--recover-pending-tool` 组合时，另核对重启后原始文本块、记录和工具结果仍被保留。
 - `verify_tui_cold_history.py --signed-tool-history` 由隔离模型发出真实 SSE 签名事件，验证同一活跃工具轮的原块实收和改签名拒绝。与 `--recover-pending-tool` 组合时，核对当前固定版的冷恢复拒绝和零新增投递。

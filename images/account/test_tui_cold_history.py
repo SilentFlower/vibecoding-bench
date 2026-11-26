@@ -357,6 +357,32 @@ class ColdHistoryTests(TestCase):
         result["content"][1]["cache_control"] = {"type": "ephemeral"}
         self.assertIsNone(ColdHistory.from_request(body))
 
+    def test_split_assistant_and_user_rows_preserve_the_closed_tool_group(self):
+        """相邻同角色历史保留原始内容，整组回执须在下一助理轮之前闭合。@return 无。"""
+        body = deepcopy(self.body)
+        messages = body["messages"]
+        other_call = {"role": "assistant", "content": [
+            {"type": "tool_use", "id": "toolu_other", "name": "LookupNote", "input": {}}]}
+        other_result = {"role": "user", "content": [
+            {"type": "tool_result", "tool_use_id": "toolu_other", "content": "第二个历史结果"}]}
+        messages.insert(2, other_call)
+        messages.insert(4, other_result)
+        plan = ColdHistory.from_request(body)
+        self.assertEqual(plan.history, messages[:-1])
+        work, session = Path("/native/workspace"), str(uuid4())
+        with TemporaryDirectory() as directory, ExitStack() as stack:
+            config = Path(directory)
+            self.assertEqual(plan.import_session(config, work, session), session)
+            path = _resume_path(stack, config, work, session, required=True)
+            recorded = [json.loads(line)["message"] for line in path.read_bytes().splitlines()]
+            self.assertEqual(recorded[1:3], [
+                {"role": "assistant", "content": [*messages[1]["content"], *other_call["content"]]},
+                {"role": "user", "content": [*messages[3]["content"], *other_result["content"]]},
+            ])
+            self.assertEqual(plan.history, messages[:-1])
+        messages[4], messages[5] = messages[5], messages[4]
+        self.assertIsNone(ColdHistory.from_request(body))
+
     def test_current_text_boundaries_are_part_of_the_tool_receipt(self):
         """冻结本轮文本块的顺序与边界，对照同一字符串的不同切分。@return 无。"""
         body = deepcopy(self.body)
