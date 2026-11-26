@@ -474,6 +474,35 @@ class ColdHistoryTests(TestCase):
         result["content"][1]["cache_control"]["ttl"] = "unsupported"
         self.assertIsNone(ColdHistory.from_request(body))
 
+    def test_completed_tool_result_images_keep_content_and_ownership(self):
+        """核对旧工具图文的原位置、归属及内嵌来源。@return 无。"""
+        body = deepcopy(self.body)
+        result = body["messages"][2]["content"][0]
+        image = {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": PNG_DATA}}
+        result["content"] = [{"type": "text", "text": "第一段\n第二行"}, image, deepcopy(image)]
+        result["is_error"] = False
+        plan = ColdHistory.from_request(body)
+        self.assertIsNotNone(plan)
+        self.assertTrue(plan.matches_history_tool_images(body))
+
+        changed = deepcopy(body)
+        changed_result = changed["messages"][2]["content"][0]
+        changed_result["content"].reverse()
+        self.assertFalse(plan.matches_history_tool_images(changed))
+        changed_result["content"] = deepcopy(result["content"])
+        changed_result["is_error"] = True
+        self.assertFalse(plan.matches_history_tool_images(changed))
+        self.assertIsNone(ColdHistory.from_request(changed))
+        changed_result["is_error"] = False
+        changed_result["tool_use_id"] = "toolu_different"
+        self.assertFalse(plan.matches_history_tool_images(changed))
+        changed_result["tool_use_id"] = "toolu_old"
+        changed_result["content"][1]["source"] = {"type": "url", "url": "https://example.invalid/image.png"}
+        self.assertFalse(plan.matches_history_tool_images(changed))
+        self.assertIsNone(ColdHistory.from_request(changed))
+        del result["is_error"]
+        self.assertTrue(ColdHistory.from_request(body).matches_history_tool_images(body))
+
     def test_forced_ttl_preserves_nested_history_and_validates_effective_order(self):
         """平台强制 TTL 沿旧合同只改直接断点，按出站顺序校验混合前缀。@return 无。"""
         body = deepcopy(self.body)

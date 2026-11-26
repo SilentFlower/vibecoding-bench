@@ -321,7 +321,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            auxiliary_mode=None,
            auxiliary_kind="title", auxiliary_sample=None, agent_progress=None, stock_client=False,
            cancel_and_change_question=False, oauth_rotation=False, provider_quota=None, slow_tool_stream=False,
-           model_connection_contract=None, external_signed_history=False):
+           model_connection_contract=None, external_signed_history=False, history_tool_images=None):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -333,6 +333,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param history_png 是否核对用户历史里的内嵌 PNG。
     @param history_images 是否核对用户历史里四种内嵌图像。
     @param history_tool_blocks 是否核对已完成工具结果的原始文本块。
+    @param history_tool_images 核对已闭合工具结果的图文块，可显式声明成功或省略错误标志。
     @param previous 可选，旧发行源码、网关、发送器三个离线制品。
     @param failure_boundaries 是否分别在模型收件前后切断隔离连接。
     @param stock_client 是否通过真实外部 CLI 验证完整 V2 输入与工具回执。
@@ -982,9 +983,17 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             text = {"type": "text", "text": "已确认的重复旧工具结果。"}
             mark = {"type": "ephemeral"} if history_cache_scope else {"type": "ephemeral", "ttl": "5m"}
             old_result = [text, {**text, "cache_control": mark}]
+        if history_tool_images:
+            png, jpeg, gif, webp = fixture_image_blocks(all_formats=True)
+            initial_result = [{"type": "text", "text": old_result}] if isinstance(old_result, str) else old_result
+            old_result = [*initial_result, png, {"type": "text", "text": "保持图注和换行。\n第二行"},
+                          jpeg, gif, png, webp]
+        historical_result = {"type": "tool_result", "tool_use_id": PAST_ID, "content": old_result}
+        if history_tool_images == "explicit-success":
+            historical_result["is_error"] = False
         messages[3:3] = [
             {"role": "assistant", "content": [{"type": "tool_use", "name": "OldNote", "id": PAST_ID, "input": ARGS}]},
-            {"role": "user", "content": [{"type": "tool_result", "tool_use_id": PAST_ID, "content": old_result}]},
+            {"role": "user", "content": [historical_result]},
         ]
         if split_history_tools:
             messages.insert(4, {"role": "assistant", "content": [
@@ -1180,6 +1189,17 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             changed = {**follow, "messages": [*messages[:-1], changed_image, *follow["messages"][-2:]]}
             changed_media, response = call(18090, "POST", "/v1/messages", token, changed, headers)
             assert changed_media == 422 and len(received) == 1, (changed_media, response, len(received))
+        if history_tool_images:
+            changed = deepcopy(follow)
+            ((_, historical),) = find_blocks(changed, "tool_use_id", PAST_ID)
+            content = historical["content"]
+            first, second, *_ = [index for index, block in enumerate(content) if block["type"] == "image"]
+            content[first], content[second] = content[second], content[first]
+            changed_history_images, _, _ = checked_messages(
+                manage, token, changed, headers, received, "changed_history_tool_images", expected_status=422,
+                trace_startup=trace_startup,
+            )
+            assert len(received) == 1
         if auto_tool_choice:
             # 两种 auto 字段形状在模型端等效，工具回执仍须匹配根轮实际提交的形状。
             other_auto = {"type": "auto"}
@@ -1464,12 +1484,24 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             assert attempt["ingress_body_sha256"] == sha256(encoded(request_body)).hexdigest()
             assert attempt["cli_and_https_body_sha256"] != attempt["ingress_body_sha256"]
             attempt.update(client_message_id=reply_id, model_message_id=model_id)
-        proof = {"model_posts": len(received), "client_tool_calls": callbacks, "old_tool_calls": 0,
+        proof = {"model_posts": len(received), "client_tool_calls": callbacks,
                  "current_question_count": 1, "old_question_roles": [role for role, _ in HISTORY],
                  "foreign_receipt_status": wrong_subject, "wrong_session_status": wrong_session,
                  "changed_tool_arguments_status": wrong_arguments,
                  "duplicate_receipt_status": duplicate, "tls_versions": [tls for _, _, tls in received],
                  "proxy_connections": len(proxy_targets), "attempts": captures}
+        if history_tool_images:
+            assert all(attempt["diagnostic_body_source"] == "interactive_cli" for attempt in captures), captures
+            modeled = [find_blocks(model, "tool_use_id", PAST_ID) for _, model, _ in received]
+            assert modeled == [[("user", historical_result)]] * 2, modeled
+            proof["history_tool_images"] = {"tool_use_id": PAST_ID,
+                                            "is_error": historical_result.get("is_error"),
+                                            "formats": [block["source"]["media_type"] for block in old_result
+                                                        if block["type"] == "image"],
+                                            "content_sha256": sha256(encoded(old_result)).hexdigest(),
+                                            "changed_order_http": changed_history_images}
+        else:
+            proof["old_tool_calls"] = 0
         if model_connection_contract:
             count = 1 if model_connection_contract == "live" else 2
             ports = {port for port, _ in model_connection_posts}
@@ -3915,6 +3947,8 @@ def main():
     parser.add_argument("--history-cache-markers", action="store_true")
     parser.add_argument("--history-cache-ttl", choices=("5m", "1h"))
     parser.add_argument("--history-cache-scope", choices=("nested", "mixed"))
+    parser.add_argument("--history-tool-images", nargs="?", const="explicit-success",
+                        choices=("explicit-success", "implicit-success"))
     system_roles = parser.add_mutually_exclusive_group()
     system_roles.add_argument("--message-system-roles", dest="message_system_roles", action="store_const", const="observe")
     system_roles.add_argument("--ordinary-message-system-contract", dest="message_system_roles", action="store_const",
@@ -4017,6 +4051,7 @@ def main():
     cache_markers = args.cache_markers or args.cache_marker_capabilities is not None
     trace_startup = (args.initial_idle_model_connection or args.trace_initial_startup or args.trace_recovery_resend or cache_markers
                      or args.model_connection_contract is not None or args.external_signed_history_contract
+                     or args.history_tool_images is not None
                      or args.recovery_readiness_rejection
                      or args.structured_output_contract or bool(args.forced_tool_choice_contract) or args.no_tool_choice_contract
                      or args.disable_parallel_tool_use_contract or bool(args.oauth_rotation or args.provider_quota)
@@ -4048,6 +4083,7 @@ def main():
                        oauth_rotation=bool(args.oauth_rotation), provider_quota=args.provider_quota,
                        output_effort=args.output_effort, history_png=args.history_png,
                        history_images=args.history_images, history_tool_blocks=args.history_tool_blocks,
+                       history_tool_images=args.history_tool_images,
                        previous=previous,
                        failure_boundaries=args.failure_boundaries, current_text_blocks=args.current_text_blocks,
                        signed_tool_history=args.signed_tool_history, signed_tool_response=args.signed_tool_response,

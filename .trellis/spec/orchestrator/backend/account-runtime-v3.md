@@ -2567,6 +2567,8 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 丢进程恢复用原始业务块重建该图文历史行。公开回归的恢复模型请求中，这一行的原始 `content` 与客户端业务数组逐块相等。续轮的工具结果及继续提示各有自己的消息边界。
 - 固定版的 `--print --input-format stream-json` 对照也保留四种格式及重复块，并生成来源文本和相同的末文字换行。普通交互 PTY 拒绝该参数组合。X11 剪贴板 `Ctrl+V` 对照中，四种格式单张实收的 MIME/Base64 均相等，CLI 每张也生成一条来源文本。直接经当前 `session.append` 提交新图块的隔离探针未达到图片提交边界。当前入口继续使用实际粘贴。[CLI 输入参数](https://code.claude.com/docs/en/cli-reference) · [交互剪贴板入口](https://code.claude.com/docs/en/interactive-mode)
 - 已闭合的旧工具结果可保留非空有序 `text` 块数组和原工具 ID。其余扩展字段沿现有输入合同，先前完成的工具保持已完成。
+- 已闭合的成功工具结果可在同一个 `tool_result.content` 数组内混合有序文本和内嵌 Base64 PNG、JPEG、GIF、WebP。原生会话恢复保留重复图块、多行文字、原调用 ID 及 `is_error` 缺省或显式 `false` 的字段形状。账号组件在发送前核对 CLI 生成的结果块及原角色。改写该段历史的回执继续按原归属拒绝。
+- 对 `is_error:true` 的图文结果，固定 2.1.293 读取历史时去掉图像并合并文本。该形状沿原账号路径兼容。已有原生计划在实际出站核对失败时返回 422，模型零收件。
 - 已闭合工具结果内的文本块也可带历史 `ephemeral` 标记。它与历史直接文本共用四个断点预算和 TTL 顺序。发送前按原调用 ID、角色及工具结果内的块位置核对；只处理已确认前缀，活跃工具的新结果继续使用原回执合同。
 - 旧工具调用和回执可以拆在相邻同角色历史里。原生导入按角色合并相邻行，保持块内容和先后顺序，整组调用必须在下一助理轮前闭合。原公开历史仍作为回执归属的比较依据。
 - V2 管理端可选择 `append`、`replace`、`user_reminder`。已核验发送器通过私有预留传递非默认动作。替换以启动文件承载系统正文，省略保留默认正文，显式空串或空数组仅保留身份和计费块。提醒保留默认系统正文，附到首条不含工具回执的用户消息。纯新轮的提醒随原问题提交。完整 CC 原生请求沿原输入合同。已登记等待工具的进程沿用其启动动作。
@@ -2602,6 +2604,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 | 文件归属错误或包含其他工作区的主链 | 拒绝恢复，保留原文件 |
 | 当前轮合法内嵌图像达到长边 2000 像素或解码后 512000 字节，且其余输入满足原生合同 | 三种账号动作均经交互 CLI 投递一次 |
 | 当前轮内嵌图像长边超过 2000 像素或解码后超过 512000 字节，顶层 `system` 可省略或为已支持的文本 | `append` 沿旧账号发送路径保留原 `messages`，投递一次。`replace` 和 `user_reminder` 返回 `422/unsupported_parameter`，模型零收件 |
+| 已闭合的历史 `tool_result` 含图文且 `is_error:true` | `append` 经旧账号发送器保留原图文及错误标志，投递一次。`replace` 和 `user_reminder` 返回 `422/unsupported_parameter`，零尝试、零投递 |
 | 普通 API 携带 `output_config.format.type=json_schema`，单独使用或同带 `effort=medium` | `append` 经旧账号发送器透传，实收一次。`replace` 和 `user_reminder` 返回 `422/unsupported_parameter`，零尝试、零投递 |
 | 普通首轮声明客户端工具，显式 `tool_choice.type=auto` 及 `disable_parallel_tool_use:true` | `append` 经 `account_sender` 保留 `true` 和工具声明，投递一次。`replace` 和 `user_reminder` 返回 `422/unsupported_parameter`，模型零收件 |
 | Sonnet 4.6 普通 API 声明两个客户端工具、关闭思考并要求 `tool_choice.type=any` 或指定 `type=tool` | `append` 经旧账号发送器保留工具表与精确选择。`replace` 和 `user_reminder` 返回 `422/unsupported_parameter`，零尝试、零投递 |
@@ -2653,6 +2656,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `verify_tui_cold_history.py --current-images` 核对本轮九块交错图文、四种内嵌格式、重复 PNG、重复多行文字与边界内纯图片请求的实际模型正文。增加 `--current-image-ending image` 对照图片末块。两种末块均覆盖同进程和 `--recover-pending-tool`，独立比较原始业务块、额外上下文和每条来源文本，并报告原始数组等价性及摘要。九块样本含五张图，首轮及热续轮实收九个业务块、五个 CLI 上下文块和五个附件来源块。末块为文字时多一个 LF。丢进程恢复的该历史行与客户端原始九块逐块相等。交换图片顺序的回执返回 422。夹具还覆盖隔离程序当前 HOME 的目录描述符读取及外部 HOME 拒绝。
 - 独立图像补测使用可完整解码的透明 PNG、带 EXIF 的渐进 JPEG、双帧 GIF、双帧 WebP 及重复图块。核对原 MIME、Base64、顺序和上述原始数组差异。像素和字节边界的 18 例包含三种动作的 2000 像素、512000 字节正例，以及 2001 像素、512001 字节在有无顶层 `system` 时的路由和投递。正例各投递一次。超界 `append` 四例各投递一次，保留原 `messages`。另外八例均为 `422/unsupported_parameter`、零投递。
 - `verify_tui_cold_history.py --history-tool-blocks` 核对已闭合的两个文本结果块、顺序及原 ID，并完成一次新工具回执。`--history-cache-markers` 还核对重复的工具结果文本上单个嵌套断点的准确位置，以及在线续轮、丢进程恢复和篡改拒绝。
+- `verify_tui_cold_history.py --history-tool-images` 核对嵌套图文的四种内嵌格式、重复 PNG、多行文字及原工具 ID。包括三种账号动作、显式成功及 `implicit-success`、在线续轮及丢进程恢复。交换原历史图像顺序的工具回执返回 422，合法回执仍由交互 CLI 投递。可与已确认的直接、嵌套缓存标记组合。
 - `--current-images --history-cache-markers` 核对同轮图文与直接、嵌套历史断点。首轮和合法回执各由交互 CLI 投递一次，保留图文业务块及断点位置，附件来源没有 CLI 自动断点。改写历史标记或交换图片顺序返回 422。与 `--recover-pending-tool` 同用时核对原图文行和断点同时恢复。
 - `verify_tui_cold_history.py --stock-client` 让未修改的固定 Claude Code 2.1.293 从公开 V2 入口执行 `Read`。三种账号提示词策略各用独立客户端 HOME，隔离模型实收正文与客户端逻辑正文逐字节一致。按相同调用 ID 核对工具参数、原回执、客户端读到的便签与最终答复。当前六次投递在管理记录均归属旧账号发送器，并分别关联新进程与热续轮。此结果是完整 CC 的退役前基线。最终 TLS 写出未采集。
 - `verify_tui_cold_history.py --cancel-and-change-question` 在公开首轮交付工具 ID 和部分参数时断开读者，隔离模型继续保留尾段。确认原请求终态为取消后，沿同一公开会话从客户端确认的历史改问。新轮走交互 CLI，已取消问题和工具不会进入模型正文，原绑定和会话档案按原字节保留。迟交被取消的工具回执返回 400、零尝试。两轮各一次模型实收。

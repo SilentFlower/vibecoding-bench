@@ -117,10 +117,17 @@ def _inline_image(block, *, for_paste=False):
     return dimensions is not None and all(0 < side <= _MAX_PASTE_IMAGE_EDGE for side in dimensions)
 
 
-def _text_result_blocks(content):
+def _result_blocks(content, *, allow_images):
     return isinstance(content, list) and bool(content) and all(
-        isinstance(block, dict) and _history_text(block) for block in content
+        isinstance(block, dict) and (_history_text(block) or (allow_images and _inline_image(block)))
+        for block in content
     )
+
+
+def _historical_image_results(rows):
+    return [(row["role"], block) for row in rows for block in _blocks(row)
+            if block.get("type") == "tool_result" and isinstance(block.get("content"), list)
+            and any(isinstance(nested, dict) and nested.get("type") == "image" for nested in block["content"])]
 
 
 def _marked_blocks(content):
@@ -175,7 +182,8 @@ def _closed_history(rows, *, result_types=(str,), signed_rows=()):
                     and isinstance(block.get("tool_use_id"), str)
                     and block["tool_use_id"] not in results
                     and (isinstance(block.get("content"), result_types)
-                         or _text_result_blocks(block.get("content")))
+                         # 固定 CLI 会移除错误工具结果中的图像，并将原文本块合并。
+                         or _result_blocks(block.get("content"), allow_images=not block.get("is_error", False)))
                     and type(block.get("is_error", False)) is bool):
                 results.add(block["tool_use_id"])
             else:
@@ -470,6 +478,16 @@ class ColdHistory:
     def has_history_cache_markers(self):
         """检查已确认的历史是否带显式缓存标记。@return 是否需关闭 CLI 自动断点。"""
         return any(marker for row in self.history for marker in _marked_blocks(_blocks(row)))
+
+    def matches_history_tool_images(self, native):
+        """核对旧工具图文结果。@param native CLI 实际正文。@return 已确认图文仍按原工具 ID 交付。"""
+        expected = _historical_image_results(self.history)
+        if not expected:
+            return True
+        ids = {block["tool_use_id"] for _, block in expected}
+        observed = [(row["role"], block) for row in native["messages"] for block in _blocks(row)
+                    if block.get("type") == "tool_result" and block.get("tool_use_id") in ids]
+        return observed == expected
 
     def matches_history_cache_markers(self, native):
         """核对原生出站的历史断点。@param native CLI 实际生成的请求。@return 原位置与标记是否完整保留。"""

@@ -964,6 +964,9 @@ class _Actor:
                     if not self.cold_history.matches_history_cache_markers(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
                             "code": "unsupported_parameter", "message": "CLI 未保留历史缓存标记"}}))
+                    if not self.cold_history.matches_history_tool_images(native):
+                        raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
+                            "code": "unsupported_parameter", "message": "CLI 未保留历史工具结果中的图文"}}))
                     if handle.kind == "recovered" and not self.recovery_history.matches_recovered_signatures(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
                             "code": "unsupported_parameter", "message": "CLI 未保留已核对的签名工具历史"}}))
