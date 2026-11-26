@@ -97,6 +97,7 @@ REPLY = "CLIENT：合成便签内容"
 SECOND_REPLY = "SECOND：客户端工具合成错误"
 RECONNECT_PREFIX = "续轮在断开前已经交付的合成文本。"
 FINAL = "模型已收到本次客户端回执。"
+AUTO_TEXT_REPLY = "模型直接回答合成问题。"
 TITLE_TEXT = "隔离标题用量对照"
 TITLE_REPLY = json.dumps({"title": TITLE_TEXT}, ensure_ascii=False, separators=(",", ":"))
 AUXILIARY_USAGE = (31, 7)
@@ -294,7 +295,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            current_text_blocks=False, signed_tool_history=False, signed_tool_response=None, split_history_tools=False,
            v1_runtime=None,
            parallel_tools=False, reconnect_tool_stream=False, current_images=False, current_image_ending="text",
-           auto_tool_choice=False,
+           auto_tool_choice=None, auto_tool_direct_text=False,
            adaptive_thinking_model=None, adaptive_thinking_display="updates", thinking_display_model=None,
            thinking_cli_summaries=None,
            recovery_ledger_contention=False, recovery_ledger_deadline=False, recovery_workspace_rejection=False,
@@ -329,7 +330,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param reconnect_tool_stream 是否在真实续轮流中断开再接回。
     @param current_images 是否用本轮原生图文替换纯文本问题。
     @param current_image_ending 本轮九块图文以文字或图片结尾。
-    @param auto_tool_choice 是否核对显式自动选择和并行工具。
+    @param auto_tool_choice 原请求中自动选择的字段形状。
+    @param auto_tool_direct_text 是否让模型在有工具声明时直接返回文本。
     @param adaptive_thinking_model 可选，核对显式 adaptive 的固定模型。
     @param adaptive_thinking_display 在工具首轮与续轮冻结的显式显示值。
     @param thinking_display_model 可选，核对普通 API 思考显示及客户端响应的固定模型。
@@ -466,6 +468,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 )
                 events[-2]["usage"]["output_tokens"] = AUXILIARY_USAGE[1]
                 wire = b"".join(map(frame, events))
+            elif auto_tool_direct_text:
+                wire = message_sse({"type": "text", "text": AUTO_TEXT_REPLY}, "end_turn", "msg_auto_text")
             elif no_tool_choice:
                 wire = message_sse({"type": "text", "text": FINAL}, "end_turn", "msg_cold_reply")
             elif forced_tool_choice:
@@ -872,13 +876,15 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 current[-2], current[-1] = current[-1], current[-2]
         messages.append({"role": "user", "content": current})
         # 历史中的旧工具结果和当前问题之间保留完成边界，CLI 启动后只提交当前问题。
-        declared = [TOOL, PARALLEL_SECOND_TOOL] if parallel_tools else [TOOL]
+        declared = [TOOL, PARALLEL_SECOND_TOOL] if parallel_tools or auto_tool_direct_text else [TOOL]
         expected_ids = [NEW_ID, SECOND_ID] if parallel_tools else [NEW_ID]
         registered_tools = encoded(expected_ids).decode()
         body = {"model": MODEL, "max_tokens": 128, "stream": True, "messages": messages,
                 "tools": declared, "system": [{"type": "text", "text": part} for part in SYSTEM]}
-        if auto_tool_choice:
-            body["tool_choice"] = {"type": "auto", "disable_parallel_tool_use": False}
+        if auto_tool_choice or auto_tool_direct_text:
+            body["tool_choice"] = {"type": "auto"}
+            if auto_tool_choice == "explicit-false":
+                body["tool_choice"]["disable_parallel_tool_use"] = False
         if adaptive_thinking_model:
             body["model"] = adaptive_thinking_model
             if adaptive_thinking_display != "default":
@@ -899,6 +905,23 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 assert len(received) == 1
         events = [json.loads(line[5:]) for line in raw.splitlines() if line.startswith(b"data:")]
         assert events[-1]["type"] == "message_stop", events
+        if auto_tool_direct_text:
+            ((_, model_request, _),) = received
+            names = verify_automatic_model_tools(model_request, declared)
+            starts = [event["content_block"]["type"] for event in events if event["type"] == "content_block_start"]
+            assert starts == ["text"] and not callbacks
+            text = "".join(event["delta"]["text"] for event in events
+                           if event.get("delta", {}).get("type") == "text_delta")
+            (stop_reason,) = [event["delta"]["stop_reason"] for event in events if event["type"] == "message_delta"]
+            assert (text, stop_reason) == (AUTO_TEXT_REPLY, "end_turn"), events
+            (attempt,) = verify_captures(manage, received, account_token)
+            assert attempt["request_id"] == initial_request_id and attempt["diagnostic_body_source"] == "interactive_cli"
+            assert attempt["ingress_body_sha256"] == sha256(encoded(body)).hexdigest()
+            return {"http_status": initial_status, "input_tool_choice": body["tool_choice"],
+                    "model_tools": names, "model_tool_choice_present": "tool_choice" in model_request,
+                    "model_posts": len(received),
+                    "public_content_types": starts, "stop_reason": stop_reason, "client_tool_calls": callbacks,
+                    "public_text": text, "attempt": attempt}
         offered = []
         for event in events:
             if event["type"] != "content_block_start" or event["content_block"]["type"] != "tool_use":
@@ -1025,9 +1048,23 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             changed_media, response = call(18090, "POST", "/v1/messages", token, changed, headers)
             assert changed_media == 422 and len(received) == 1, (changed_media, response, len(received))
         if auto_tool_choice:
-            changed = {**follow, "tool_choice": {"type": "none"}}
-            changed_choice, response = call(18090, "POST", "/v1/messages", token, changed, headers)
-            assert changed_choice == 422 and len(received) == 1, (changed_choice, response, len(received))
+            # 两种 auto 字段形状在模型端等效，工具回执仍须匹配根轮实际提交的形状。
+            other_auto = {"type": "auto"}
+            if auto_tool_choice == "bare":
+                other_auto["disable_parallel_tool_use"] = False
+            changed_choices = {}
+            for label, choice in (
+                ("none", {"type": "none"}),
+                ("parallel_disabled", {"type": "auto", "disable_parallel_tool_use": True}),
+                ("named", {"type": "tool", "name": TOOL["name"]}),
+                ("equivalent_form", other_auto),
+            ):
+                rejected, raw, _ = checked_messages(
+                    manage, token, {**follow, "tool_choice": choice}, headers, received, "changed_tool_choice_" + label,
+                    expected_status=422, trace_startup=trace_startup,
+                )
+                assert len(received) == 1, (label, raw, len(received))
+                changed_choices[label] = rejected
         if adaptive_thinking_model:
             changed_thinking = {}
             changes = {"omitted": {"type": "adaptive", "display": "omitted"},
@@ -1370,9 +1407,12 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             proof.update(current_images=[block["source"]["media_type"] for block in current if block["type"] == "image"],
                          changed_current_images_status=changed_media, raw_current_image_content=raw_media)
         if auto_tool_choice:
-            observed = [native.get("tool_choice") for _, native, _ in received]
-            assert all(choice in (None, {"type": "auto"}, body["tool_choice"]) for choice in observed)
-            proof.update(auto_tool_choice=observed, changed_tool_choice_status=changed_choice)
+            model_tools = [verify_automatic_model_tools(native, declared) for _, native, _ in received]
+            assert all(attempt["diagnostic_body_source"] == "interactive_cli" for attempt in captures), captures
+            proof.update(auto_tool_choice=[native.get("tool_choice") for _, native, _ in received],
+                         input_tool_choice=body["tool_choice"], model_tools=model_tools,
+                         model_tool_choice_present=["tool_choice" in native for _, native, _ in received],
+                         changed_tool_choice_status=changed_choices["none"], tool_choice_rejections=changed_choices)
         if adaptive_thinking_model:
             actual_thinking = [native.get("thinking") for _, native, _ in received]
             assert actual_thinking == [body.get("thinking", ADAPTIVE_THINKING)] * 2, actual_thinking
@@ -3178,6 +3218,17 @@ def find_blocks(body, key, identifier):
     return [(row["role"], b) for row in body["messages"] for b in blocks(row) if b.get(key) == identifier]
 
 
+def verify_automatic_model_tools(model_request, declared):
+    """核对固定 CLI 的默认工具选择及完整工具声明。
+    @param model_request 隔离模型实收正文。@param declared 公开工具声明。@return 实收工具名。
+    """
+    assert "tool_choice" not in model_request, model_request.get("tool_choice")
+    actual = [(tool["name"], tool["description"], tool["input_schema"]) for tool in model_request["tools"]]
+    expected = [("mcp__flower__" + tool["name"], tool["description"], tool["input_schema"]) for tool in declared]
+    assert actual == expected, actual
+    return [name for name, _, _ in actual]
+
+
 def verify_model(received, *, policy, old_content, current_text_blocks=False):
     """检验历史、系统提示、原生动态 MCP 和续轮。@param received HTTPS 实收。
     @param policy 原工具轮的有效动作。@param old_content 已确认的旧工具结果。
@@ -3273,7 +3324,8 @@ def main():
     system_roles.add_argument("--message-system-roles", dest="message_system_roles", action="store_const", const="observe")
     system_roles.add_argument("--ordinary-message-system-contract", dest="message_system_roles", action="store_const",
                               const="ordinary-contract")
-    parser.add_argument("--auto-tool-choice", action="store_true")
+    parser.add_argument("--auto-tool-choice", nargs="?", const="explicit-false", choices=("bare", "explicit-false"),
+                        help="核对根轮的 auto 字段形状及工具回执冻结")
     parser.add_argument("--adaptive-thinking-model", choices=(MODEL, "claude-opus-5-5"))
     parser.add_argument("--adaptive-thinking-display", choices=("default", "updates", "summarized"), default="updates")
     parser.add_argument("--thinking-cli-summaries", choices=("on", "off"))
@@ -3300,6 +3352,8 @@ def main():
     scenario.add_argument("--structured-output-contract", action="store_true")
     scenario.add_argument("--forced-tool-choice-contract", choices=("live", "restart", "restart-metadata-only"))
     scenario.add_argument("--no-tool-choice-contract", action="store_true")
+    scenario.add_argument("--auto-tool-direct-text", action="store_true",
+                          help="带两项工具声明的 auto 请求直接返回文本")
     scenario.add_argument("--interleaved-title", choices=("forward", "mock", "pooled", "pool-unsupported"))
     parser.add_argument("--title-request", type=Path, help="官方 CLI 隔离模型导出的标题请求")
     scenario.add_argument("--interleaved-suggestion", choices=("forward", "mock", "pooled", "pool-unsupported", "tool-output"))
@@ -3387,6 +3441,7 @@ def main():
                        cancel_and_change_question=args.cancel_and_change_question,
                        current_image_ending=args.current_image_ending,
                        auto_tool_choice=args.auto_tool_choice,
+                       auto_tool_direct_text=args.auto_tool_direct_text,
                        adaptive_thinking_model=args.adaptive_thinking_model,
                        adaptive_thinking_display=args.adaptive_thinking_display,
                        thinking_display_model=args.thinking_display_contract,
