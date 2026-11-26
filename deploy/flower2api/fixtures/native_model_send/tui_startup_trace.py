@@ -1,11 +1,15 @@
 """隔离 Messages 夹具的启动阶段探针。"""
 
 from contextlib import suppress
+from hashlib import sha256
 import json
 import os
 from pathlib import Path
 import sys
 from time import monotonic_ns
+
+
+MODEL_BODY_TRACE = Path("/run/v3/tui-v2/.fixture-model-body.jsonl")
 
 
 def startup_event(stage, **fields):
@@ -38,6 +42,7 @@ def main():
     launch_session = launcher.launch_session
     callback = _Actor.callback
     serve_model = _Actor.serve_model
+    claim_model = _Actor._claim_model
 
     def trace_send(self, writer, connection, handle, command):
         startup_event("source_send", reservation_id=handle.reservation["reservation_id"])
@@ -62,10 +67,23 @@ def main():
         startup_event("cli_model_callback", cli_launch_reservation_id=actor.reservation["reservation_id"])
         return serve_model(actor, http, native, native_raw=native_raw)
 
+    def trace_model_body(actor, headers, native, native_raw=None):
+        submission = claim_model(actor, headers, native, native_raw)
+        if submission is not None:
+            # 摘要取自已认领的提交，不能用 CLI 回调的存在推断出站正文来自 CLI。
+            evidence = {"reservation_id": submission.handle.reservation["reservation_id"],
+                        "from_interactive_cli": submission.body == native_raw,
+                        "sha256": sha256(submission.body).hexdigest()}
+            with suppress(OSError), MODEL_BODY_TRACE.open("ab", buffering=0) as stream:
+                stream.write((json.dumps(evidence) + "\n").encode())
+        return submission
+
     source.AccountSource._send_handle = trace_send
     launcher.launch_session = trace_launch
     _Actor.callback = trace_callback
     _Actor.serve_model = trace_model
+    if MODEL_BODY_TRACE.is_file():
+        _Actor._claim_model = trace_model_body
     source.main(driver_factory=TracedDriver)
 
 

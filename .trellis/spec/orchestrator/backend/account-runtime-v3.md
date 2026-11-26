@@ -2593,6 +2593,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `verify_tui_cold_history.py` 使用公开入口、生产事件源、真实 2.1.293 CLI 和账号代理，对照 HTTPS 实收、公开流式调用、JSON 续轮及拒绝路径。
 - `verify_tui_cold_history.py --restart-history` 在原工具续轮收口后核对已导入消息的 `role` 和 `content`。以账号权限预先落盘改写后的历史，再重启发送器并从公开入口提交分叉确认历史，未推进时须复用同一 UUID。完整答复写入后再次重启并重发相同输入，检查独立响应、一次额外模型投递、确认历史、旧档案字节及工具归属。已推进的内容可由后续分支承接，报告记录实际 UUID 和持久档案数量。
 - `verify_tui_cold_history.py --text-input` 从公开入口核对纯新轮、同公开会话另起新轮、纯文本历史以及缺省、空串、空数组和多段系统指令实收。
+- `verify_tui_cold_history.py --cache-markers` 记录旧代发退役前的行为基线。默认追加动作下关闭缓存布局与 TTL 改写时，本轮文本、历史文本、工具声明及嵌套旧工具结果上的显式标记通过旧账号代发保留在原位置。启用强制 `5m` 时历史文本上的显式及缺省时长都变为 `5m`。普通请求根、顶层系统块上的标记，以及使用替换或用户提醒时的已测显式文本标记返回 `422 / unsupported_parameter`，模型零收件。无标记对照使用 CLI 原生正文。夹具按预留对比已认领正文及隔离 HTTPS 实收摘要，最终 TLS 写出保持未采集。该基线保留原生缓存标记合同的退役缺口。
 - `verify_tui_cold_history.py --system-policy` 从管理 API 保存并读回动作，按公开 Messages 的模型实收核对三种落点。`--tool-policy` 对照替换和用户提醒的工具往返。`--toggle-pending-policy` 在原工具等待时更改动作，核对回执隔离及原轮指令。
 - `verify_tui_cold_history.py --recover-pending-tool` 结束唯一等待中的真实 CLI 并重启其账号发送器。修改账号动作和客户端指令后，原回执仅继续其冻结策略，恢复模型步骤的正文来自真实 CLI。
 - 公开首轮和原工具回执的意外状态或断连先写出 HTTP 状态、请求 ID、夹具阶段与隔离模型收件，再在网关退出前读取对应请求的诊断阶段及所属尝试。无响应头时只列同一合成会话和本次时间窗口内的候选。失败证据输出到 stderr，原失败仍使验收退出。

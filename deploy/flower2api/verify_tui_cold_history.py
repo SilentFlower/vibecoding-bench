@@ -30,7 +30,7 @@ from uuid import UUID, uuid4
 from zlib import compress, crc32
 
 from fixtures.native_model_send.fixture_tunnel import _relay
-from fixtures.native_model_send.tui_startup_trace import startup_event
+from fixtures.native_model_send.tui_startup_trace import MODEL_BODY_TRACE, startup_event
 from verify_tui_concurrency import frame
 from verify_tui_final_tls import call, encoded, serve, stop, wait_for
 from verify_tui_http_handoff import MODEL, message_sse
@@ -171,7 +171,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            current_text_blocks=False, signed_tool_history=False, split_history_tools=False, v1_runtime=None,
            parallel_tools=False, reconnect_tool_stream=False, current_images=False, auto_tool_choice=False,
            recovery_ledger_contention=False, recovery_ledger_deadline=False, recovery_workspace_rejection=False,
-           recovery_slow_model=False, initial_idle_model_connection=False, trace_startup=False):
+           recovery_slow_model=False, initial_idle_model_connection=False, trace_startup=False, cache_markers=False):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -199,6 +199,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param recovery_slow_model 是否验证隔离模型收件后的公开超时和诊断归属。
     @param initial_idle_model_connection 是否先占用一个未握手的模型 TCP 连接。
     @param trace_startup 是否记录隔离启动阶段。
+    @param cache_markers 是否核对普通 Messages 显式缓存标记的模型实收和出站归属。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -213,6 +214,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     for directory in (Path("/run/v3/tui-v2"), Path("/native"), Path("/flows/api")):
         directory.mkdir(mode=0o700, parents=True, exist_ok=True)
         os.chown(directory, 1001, 1001)
+    if cache_markers:
+        MODEL_BODY_TRACE.touch(mode=0o600, exist_ok=False)
+        os.chown(MODEL_BODY_TRACE, 1001, 1001)
     certificates(temporary)
     config = Path("/run/v3/sender.json")
     copy2(temporary / "ca.der", config.with_name("verification-ca.der"))
@@ -351,8 +355,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         proxy_url = f"http://127.0.0.1:{proxy.server_port}"
 
         def write_sender_config():
-            state = {"binding": binding, "proxy_url": proxy_url, "allowed_origin": "https://api.anthropic.com",
-                     "native_capture_dir": "/flows/api/cc-prepared"}
+            state = {"binding": binding, "proxy_url": proxy_url, "allowed_origin": "https://api.anthropic.com"}
+            if not cache_markers:
+                state["native_capture_dir"] = "/flows/api/cc-prepared"
             if v1_runtime is None:
                 state["tui_v2"] = {"max_reservations": 4}
             else:
@@ -415,7 +420,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             assert status in (200, 201), (path, status)
             return json.loads(raw)
 
-        manage("PUT", "settings", {"allowed_user_agents": "", "request_diagnostics_log_mode": "debug"})
+        manage("PUT", "settings", {"allowed_user_agents": "",
+                                   "request_diagnostics_log_mode": "info" if cache_markers else "debug"})
         credentials = {"auth_type": "oauth", "access_token": account_token, "refresh_token": token_hex(32),
                        "expires_at": time_ns() // 1_000_000 + 1_800_000, "subscription_type": "max"}
         if v1_runtime is not None:
@@ -438,6 +444,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                           for name in ("cold-history-owner", "cold-history-foreign"))
         headers = {"x-session-id": str(uuid4()), "User-Agent": "flower2api-cold-history-fixture/1"}
         messages = [{"role": role, "content": text} for role, text in HISTORY]
+        if cache_markers:
+            return verify_cache_markers(manage, token, identifier, headers, received)
         if failure_boundaries:
             def post(question):
                 request = {"model": MODEL, "max_tokens": 128, "stream": False,
@@ -1343,6 +1351,100 @@ def verify_text_inputs(manage, token, account_token, headers, history, received,
     return {"text_inputs": requests, "model_posts": len(received) - start}
 
 
+def verify_cache_markers(manage, token, account_id, headers, received):
+    """对照普通请求的缓存标记、模型实收和账号出站选择。
+    @param manage 隔离管理入口。@param token 合成用户令牌。@param account_id 本次 V2 账号。
+    @param headers 公开请求头。@param received 隔离模型实收。@return 按场景输出的证据。
+    """
+    def text(value):
+        return {"type": "text", "text": value}
+
+    def row(role, *content):
+        return {"role": role, "content": list(content)}
+
+    implied = {"type": "ephemeral"}
+    short = {**implied, "ttl": "5m"}
+    long = {**implied, "ttl": "1h"}
+    past, answer = text("缓存标记：历史用户段。"), text("缓存标记：历史助手段。")
+    question, tail = text("缓存标记：本轮问题。"), text("缓存标记：本轮尾段。")
+    system = text("缓存标记：顶层系统正文。")
+    prefix = [row("user", past), row("assistant", answer)]
+    plain = [*prefix, row("user", question, tail)]
+    current = [*prefix, row("user", {**question, "cache_control": short}, tail)]
+    history = [row("user", {**past, "cache_control": long}),
+               row("assistant", {**answer, "cache_control": implied}), plain[-1]]
+    historical_tool = {"type": "tool_use", "name": "OldNote", "id": PAST_ID, "input": ARGS}
+    historical_result = {"type": "tool_result", "tool_use_id": PAST_ID,
+                         "content": [{**answer, "cache_control": short}]}
+    tool = {"name": "CacheProof", "description": "仅核对声明上的缓存标记。",
+            "input_schema": {"type": "object", "properties": {}}, "cache_control": long}
+    closed = [prefix[0], row("assistant", historical_tool), row("user", historical_result),
+              row("assistant", text("已结束旧工具轮。")), plain[-1]]
+    forced_ttl_history = [row("user", {**past, "cache_control": short}),
+                          row("assistant", {**answer, "cache_control": short}), plain[-1]]
+    cases = (
+        ("unmarked", "append", {}, plain, None, 200),
+        ("current", "append", {}, current, current, 200),
+        ("history", "append", {}, history, history, 200),
+        ("tool", "append", {"tools": [tool]}, plain, plain, 200),
+        ("nested_result", "append", {}, closed, closed, 200),
+        ("root", "append", {"cache_control": implied}, plain, None, 422),
+        ("system", "append", {"system": [{**system, "cache_control": long}]}, plain, None, 422),
+        ("replace", "replace", {"system": [system]}, current, None, 422),
+        ("user_reminder", "user_reminder", {"system": [system]}, current, None, 422),
+        ("forced_ttl_5m", "append", {}, history, forced_ttl_history, 200),
+    )
+    proof = {}
+    account_path = f"accounts/{account_id}"
+    for name, policy, extra, messages, expected, http_status in cases:
+        account = manage("PUT", account_path, {"client_system_prompt_policy": policy})
+        assert account["request_backend"] == "tui_v2" and account["client_system_prompt_policy"] == policy
+        manage("PUT", "settings", {"message_cache_control_rewrite": "off",
+                                    "cache_control_ttl_rewrite": "5m" if name == "forced_ttl_5m" else "off"})
+        body = {"model": MODEL, "max_tokens": 128, "stream": False, "messages": messages, **extra}
+        before = len(received)
+        status, raw, request_id = checked_messages(
+            manage, token, body, {**headers, "x-session-id": str(uuid4())}, received, name,
+            expected_status=http_status, trace_startup=True,
+        )
+        assert request_id
+        query = "request-diagnostics?" + urlencode({"correlation_id": request_id})
+        (record,) = wait_for(lambda: [item for item in manage("GET", query)["items"] if item.get("finished_at")])
+        assert record["request_id"] == request_id
+        details = manage("GET", "request-diagnostics/" + request_id)["request"]
+        reservation = details["context"]["tui_reservation_id"]
+        claims = [json.loads(line) for line in MODEL_BODY_TRACE.read_text().splitlines()]
+        own_claims = [claim for claim in claims if claim["reservation_id"] == reservation]
+        evidence = {"http_status": status, "model_posts": len(received) - before, "account_policy": policy,
+                    "request_id": request_id, "reservation_id": reservation, "attempt_count": record["attempt_count"]}
+        if status == 422:
+            assert len(received) == before and not own_claims and record["attempt_count"] == 0, (name, evidence)
+            error = json.loads(raw)["error"]["code"]
+            assert error == "unsupported_parameter", (name, error)
+            evidence["code"] = error
+        else:
+            assert record["attempt_count"] == 1, (name, evidence)
+            assert json.loads(raw)["content"] == [text(FINAL)], (name, raw)
+            ((digest, model, _),) = received[before:]
+            (claim,) = own_claims
+            assert claim["sha256"] == digest, (name, evidence, claim)
+            assert claim["from_interactive_cli"] is (name == "unmarked"), (name, claim)
+            assert model.get("tools", []) == body.get("tools", []), name
+            if expected is None:
+                user_texts = [b.get("text") for message in model["messages"] if message["role"] == "user"
+                              for b in blocks(message)]
+                assert user_texts.count(question["text"]) == user_texts.count(tail["text"]) == 1
+            else:
+                assert model["messages"] == expected, (name, model["messages"])
+                evidence["model_messages"] = model["messages"]
+                if model.get("tools"):
+                    evidence["model_tools"] = model["tools"]
+            evidence.update(from_interactive_cli=claim["from_interactive_cli"], model_body_sha256=digest)
+        proof[name] = evidence
+    assert not any(path.is_file() for path in Path("/flows/api").rglob("*"))
+    return {"account_backend": "tui_v2", "cases": proof, "model_posts": len(received), "wire_final": "unavailable"}
+
+
 def blocks(row):
     """读取模型端实际内容块。@param row 模型消息。@return 内容块序列。"""
     return row["content"] if isinstance(row["content"], list) else [{"type": "text", "text": row["content"]}]
@@ -1600,6 +1702,7 @@ def main():
     scenario = parser.add_mutually_exclusive_group()
     scenario.add_argument("--restart-history", action="store_true")
     scenario.add_argument("--text-input", action="store_true")
+    scenario.add_argument("--cache-markers", action="store_true")
     scenario.add_argument("--system-policy", action="store_true")
     scenario.add_argument("--toggle-pending-policy", action="store_true")
     scenario.add_argument("--tool-policy", choices=("replace", "user_reminder"))
@@ -1627,7 +1730,7 @@ def main():
             or Path("/run/v3/sender.json").exists() or any(Path("/native").glob("*"))):
         raise RuntimeError("请在空白的 docker --network none 账号容器中运行")
     previous = args.mixed_release
-    trace_startup = args.initial_idle_model_connection or args.trace_initial_startup
+    trace_startup = args.initial_idle_model_connection or args.trace_initial_startup or args.cache_markers
     if trace_startup and (previous or args.mixed_image_peers or args.v1_runtime):
         parser.error("启动观测需要当前 V2 源码夹具")
     if args.mixed_image_peers:
@@ -1655,7 +1758,8 @@ def main():
                        recovery_ledger_deadline=args.recovery_ledger_deadline,
                        recovery_workspace_rejection=args.recovery_workspace_rejection,
                        recovery_slow_model=args.recovery_slow_model,
-                       initial_idle_model_connection=args.initial_idle_model_connection, trace_startup=trace_startup)
+                       initial_idle_model_connection=args.initial_idle_model_connection, trace_startup=trace_startup,
+                       cache_markers=args.cache_markers)
         print(json.dumps(proof, ensure_ascii=False))
 
 
