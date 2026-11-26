@@ -112,6 +112,8 @@ def _model_head(handle, status, content_type):
             fields["body_source"] = body_source
         if session_origin := getattr(handle, "session_origin", None):
             fields["session_origin"] = session_origin
+        if instruction_location := getattr(handle, "instruction_location", None):
+            fields["instruction_location"] = instruction_location
     return fields
 
 

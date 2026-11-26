@@ -1114,6 +1114,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             assert [attempt["diagnostic_session_origin"] for attempt in captures] == [
                 "external_import", "disk_resume" if recover_pending else "live_process",
             ], captures
+        if recover_pending or toggle_pending_policy or tool_policy:
+            location = "user_reminder" if tool_policy == "user_reminder" else "system"
+            assert [a["diagnostic_instruction_location"] for a in captures] == [location] * 2, captures
         for attempt, request_id, request_body, reply_id, model_id in zip(
             captures, (initial_request_id, continuation_request_id),
             (body, follow), (events[0]["message"]["id"], final["id"]),
@@ -1386,6 +1389,7 @@ def checked_messages(manage, token, body, headers, received, phase, *, expected_
         evidence.update(http_status=response.status, request_id=response.getheader("x-cc2api-request-id"))
         assert response.getheader("x-v3-tui-body-source") is None
         assert response.getheader("x-v3-tui-session-origin") is None
+        assert response.getheader("x-v3-tui-instruction-location") is None
         if trace_startup:
             startup_event("public_response_headers", phase=phase, session_id=session_id,
                           request_id=evidence["request_id"], http_status=response.status,
@@ -1461,7 +1465,7 @@ def report_request_diagnostics(manage, phase, request_id, session_id, started_at
             "control_state", "control_error_code", "control_recovery", "observed_control_http_status",
             "native_receive_ended", "native_source_terminal", "tui_reservation_id",
             "tool_continuation_mode", "tool_continuation_path", "tool_continuation_reason",
-            "tui_body_source", "tui_session_origin",
+            "tui_body_source", "tui_session_origin", "tui_instruction_location",
         ) if context.get(key) is not None}
 
     try:
@@ -1650,9 +1654,13 @@ def verify_message_system_roles(manage, token, account, received, model_betas, *
                 rejections[policy + "_api"] = (422, "unsupported_parameter")
                 rejections["minimal_system_" + policy] = (422, "unsupported_parameter")
                 rejections["minimal_system_after_user_" + policy] = (422, "unsupported_parameter")
+                rejections["minimal_system_only_" + policy] = (422, "unsupported_parameter")
         cases.extend((variant + "_" + policy, "api", policy, model_ok, variant, False)
                      for policy in policies
                      for variant in ("minimal_root_only", "minimal_system", "minimal_system_after_user"))
+        if backend == "tui_v2":
+            cases.extend(("minimal_system_only_" + policy, "api", policy, model_ok, "minimal_system_only", False)
+                         for policy in policies)
 
     proof = {}
     active_policy = default_policy
@@ -1690,6 +1698,8 @@ def verify_message_system_roles(manage, token, account, received, model_betas, *
         elif variant == "bad_clear_at":
             messages[2]["clear_at"] = "past"
         body = {"model": model, "max_tokens": 128, "stream": True, "messages": messages, "system": system}
+        if variant == "minimal_system_only":
+            del body["system"]
         if origin.startswith("cc_"):
             # 使用合成身份对照结构校验，公开鉴权仍由同一个真实网关令牌完成。
             identity = {"type": "text", "text": "You are Claude Code, Anthropic's official CLI for Claude."}
@@ -1731,6 +1741,16 @@ def verify_message_system_roles(manage, token, account, received, model_betas, *
                 result.update(reservation_id=claim["reservation_id"],
                               provider_path="interactive_cli" if claim["from_interactive_cli"] else "account_sender",
                               attribution="request_reservation" if reservation is not None else "serial_provider_digest")
+                if fixed:
+                    (attempt,) = details["attempts"]
+                    observed = attempt["context"].get("tui_instruction_location")
+                    expected = None if variant == "minimal_system_only" else (
+                        "user_reminder" if policy == "user_reminder" else "system"
+                    )
+                    assert observed == expected, (label, attempt)
+                    if variant in ("system", "minimal_system", "minimal_system_after_user", "minimal_system_only"):
+                        assert attempt["context"]["tui_body_source"] == "account_sender", (label, attempt)
+                    result["diagnostic_instruction_location"] = observed
             else:
                 result["provider_path"] = "native293"
             model_system = model_body.get("system", [])
@@ -1746,8 +1766,9 @@ def verify_message_system_roles(manage, token, account, received, model_betas, *
                           model_metadata_present=bool(metadata),
                           model_fixture_device_retained=model_identity.get("device_id") == "1" * 64,
                           messages_preserved=model_body["messages"] == messages)
-            if variant in ("system", "minimal_system", "minimal_system_after_user"):
-                assert model_body["messages"] == messages and result["model_root_system"] == system, (label, result)
+            if variant in ("system", "minimal_system", "minimal_system_after_user", "minimal_system_only"):
+                top_level = [] if variant == "minimal_system_only" else system
+                assert model_body["messages"] == messages and result["model_root_system"] == top_level, (label, result)
         else:
             assert len(received) == before and not claims, (label, result)
             result["error_code"] = json.loads(raw)["error"].get("code")
@@ -2170,6 +2191,7 @@ def verify_structured_output(manage, token, identifier, received):
                 claims = MODEL_BODY_TRACE.read_text().splitlines()[before_claims:]
                 assert request["request_id"] == request_id, request
                 assert request["log_mode"] == "info" and "tui_body_source" not in (request.get("context") or {})
+                assert "tui_instruction_location" not in (request.get("context") or {})
                 summary = json.dumps(detail, ensure_ascii=False)
                 assert question not in summary and system not in summary
                 result = {"status": status, "policy": policy, "response_mode": response_mode,
@@ -2203,9 +2225,14 @@ def verify_structured_output(manage, token, identifier, received):
                     user_texts = [b.get("text", "") for row in native["messages"] if row["role"] == "user"
                                   for b in blocks(row)]
                     reminder = policy == "user_reminder"
+                    instruction_location = attempt["context"].get("tui_instruction_location")
                     assert sum(text.count(question) for text in user_texts) == 1, (phase, user_texts)
                     assert sum(text.count(system) for text in user_texts) == int(reminder), (phase, user_texts)
                     assert sum(text.count(system) for text in root_blocks) == int(not reminder), (phase, root_blocks)
+                    assert instruction_location == ("user_reminder" if reminder else "system"), (
+                        phase, instruction_location, sum(text == system for text in root_blocks),
+                        sum(text.endswith("\n\n" + system) for text in root_blocks),
+                    )
                     if policy == "replace":
                         assert root_blocks[2:] == [system], (phase, root_blocks)
                     if stream:
@@ -2224,6 +2251,7 @@ def verify_structured_output(manage, token, identifier, received):
                     result.update(provider_path="interactive_cli" if from_cli else "account_sender",
                                   diagnostic_body_source=body_source,
                                   diagnostic_session_origin=session_origin,
+                                  diagnostic_instruction_location=instruction_location,
                                   attempt_id=reservation, model_body_sha256=digest, model_output_config=output,
                                   model_instruction_role="user" if reminder else "system",
                                   model_root_system_shape="string" if isinstance(root, str) else "blocks",
@@ -2397,6 +2425,9 @@ def verify_text_inputs(manage, token, account_token, headers, history, received,
         requests.append({"case": name, "body_sha256": sha256(encoded(body)).hexdigest(), "client_message_id": reply["id"]})
     for info, attempt in zip(requests, verify_captures(manage, received[start:], account_token), strict=True):
         assert info["body_sha256"] == attempt["ingress_body_sha256"]
+        explicit = info["case"] in ("multiple_blocks", "nonempty_string")
+        location = ("user_reminder" if policy == "user_reminder" else "system") if explicit else None
+        assert attempt["diagnostic_instruction_location"] == location, (info, attempt)
         info.update(attempt)
     return {"text_inputs": requests, "model_posts": len(received) - start}
 
@@ -2890,7 +2921,9 @@ def verify_captures(manage, received, account_token):
                                     "ingress_body_sha256": snap["ingress"]["original_body_sha256"],
                                     "cli_and_https_body_sha256": digest, "final_tls_capture": "unavailable",
                                     "diagnostic_body_source": (attempt.get("context") or {}).get("tui_body_source"),
-                                    "diagnostic_session_origin": (attempt.get("context") or {}).get("tui_session_origin")}
+                                    "diagnostic_session_origin": (attempt.get("context") or {}).get("tui_session_origin"),
+                                    "diagnostic_instruction_location": (attempt.get("context") or {}).get(
+                                        "tui_instruction_location")}
         return [captures[digest] for digest in expected] if captures.keys() == expected.keys() else None
 
     return wait_for(observe)

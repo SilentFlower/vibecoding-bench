@@ -33,6 +33,7 @@ from tui_reconnect import ReceiptCheckpoints, digest
 from tui_input_policy import CONTEXT_BETA, InputRejection, native_input
 from tui_messages import (
     BODY_LIMIT,
+    MessageInputObservation,
     MODEL_PROTOCOL_HEADERS,
     ModelResponseError,
     SubagentAmbiguousError,
@@ -985,6 +986,8 @@ class _Actor:
             if native_raw is None:
                 raise RuntimeError("冷导入缺少实际 CLI 正文")
             handle.body_source = "interactive_cli"
+            plan = self.recovery_history or self.cold_history
+            handle.instruction_location = plan.observed_instruction_location(native)
             return _ModelSubmission(step, handle, native_raw, headers, account_token)
         # 旧进程仍校验启动 AT。文件模式的令牌已经与原生步骤绑定。
         if handle.api_context is not None:
@@ -1005,6 +1008,7 @@ class _Actor:
             handle.upstream_session_id,
         )
         handle.body_source = "account_sender"
+        handle.instruction_location = handle.input_observation.instruction_location
         return _ModelSubmission(step, handle, raw, headers, account_token)
 
     def serve_model(self, http, native, *, native_raw=None):
@@ -1195,7 +1199,10 @@ def _receipt_request(body, reservation, *, cache_ttl=None):
 class _Reserved:
     """账号内只准单次提交的交互预留。"""
 
-    def __init__(self, actor, kind, history, answers, body, stream, raw, reservation, request_digest=None):
+    def __init__(
+        self, actor, kind, history, answers, body, stream, raw, reservation, request_digest=None,
+        *, input_observation,
+    ):
         self.actor = actor
         self.kind = kind
         self.history = history
@@ -1223,6 +1230,8 @@ class _Reserved:
         self.signature_known = False
         self.repair_attempt_id = None
         self.body_source = None
+        self.input_observation = input_observation
+        self.instruction_location = None
         self.sent = self.completed = False
         self.request_digest = request_digest
 
@@ -1572,9 +1581,11 @@ class SessionDriver:
         """只预留身份和物理容量，收到 send 才启动。@param reservation 身份。@param raw 正文。
         @param cancel_event 准备连接断开信号。@return 可单次提交的预留。
         """
+        input_observation = MessageInputObservation()
         body, stream, frozen = input_message(
             raw, native=reservation.get("input_format"), session_id=reservation["session_id"],
             body_policy=reservation.get("body_policy"),
+            observation=input_observation,
         )
         # 在认领工具回执之前检查退避期，等待结束后客户端仍能将回执交还原进程。
         check_wait = getattr(self.launcher, "check_provider_backoff", None)
@@ -1681,6 +1692,7 @@ class SessionDriver:
                         frozen,
                         reservation,
                         active_request,
+                        input_observation=input_observation,
                     )
                     if actor.cold_history is not None:
                         prompt_index = len(actor.cold_history.history) + 1
@@ -1833,6 +1845,7 @@ class SessionDriver:
                             frozen,
                             reservation,
                             request if checkpoint is not None else None,
+                            input_observation=input_observation,
                         )
                         actor.claim = handle
                         return handle

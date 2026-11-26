@@ -1,5 +1,6 @@
 """受管本机推理服务的冻结 Messages 输入和同一响应的原始 SSE 观察。"""
 
+from dataclasses import dataclass
 from email.message import Message
 import hashlib
 import json
@@ -211,9 +212,20 @@ def _finite(value):
         return False
 
 
-def input_message(raw, *, native=False, body_policy=None, session_id=None):
+@dataclass
+class MessageInputObservation:
+    """记录账号代发正文可核对的普通 Messages 指令落点。@param instruction_location 已组装的顶层落点。"""
+
+    instruction_location: str | None = None
+
+
+def input_message(
+    raw, *, native=False, body_policy=None, session_id=None,
+    observation: MessageInputObservation | None = None,
+):
     """核验公开 Messages 业务输入，冻结本轮提供方请求。@param raw 原始字节。
     @param native 原版 CLI 来源线索。@param body_policy 受信预留的本轮设置。@param session_id 网关原会话。
+    @param observation 可选，记录实际组装的普通 Messages 顶层业务指令落点。
     @return 带启动参数的原始历史、外层流选项、内部取流正文。
     """
     body = json.loads(raw, object_pairs_hook=_unique, parse_constant=_invalid_number)
@@ -299,6 +311,11 @@ def input_message(raw, *, native=False, body_policy=None, session_id=None):
         # 已知的无效改写应在工具回执认领前拒绝；调用方仍可用有效配置提交同一结果。
         raise InputRejection("unsupported_parameter")
     wire = raw if stream and not removed and outgoing is body else encode({**outgoing, "stream": True})
+    if observation is not None and not native:
+        system = outgoing.get("system", "")
+        texts = (system,) if isinstance(system, str) else (block["text"] for block in system)
+        if any(text.strip() for text in texts):
+            observation.instruction_location = "system"
     if outgoing.get("thinking") is not body.get("thinking"):
         # 启动器与上游模型共用本轮推理参数；工具校验、子代理归属仍读取原始历史。
         body = {**body, "thinking": outgoing["thinking"]}

@@ -508,6 +508,32 @@ class ColdHistoryTests(TestCase):
             self.assertEqual(ColdHistory.from_request({**body, "system": value}, "replace").system_argument(),
                              ("--system-prompt-file", ""))
 
+    def test_instruction_location_uses_the_cli_role_and_exact_text(self):
+        """核对系统原文与提醒角色，用户引述及工具结果不能代替已组装指令。@return 无。"""
+        system = "业务指令一\n业务指令二"
+        reminder = f"<system-reminder>\n{system}\n</system-reminder>"
+        direct = {"type": "text", "text": reminder}
+        for policy in ("append", "replace"):
+            plan = ColdHistory.from_request(self.body, policy)
+            self.assertEqual(plan.observed_instruction_location({
+                "system": [{"type": "text", "text": system}], "messages": [],
+            }), "system")
+            self.assertIsNone(plan.observed_instruction_location({
+                "system": f"用户引述 {system}", "messages": [{"role": "user", "content": [direct]}],
+            }))
+            appended = {"system": [{"type": "text", "text": f"合成原生默认正文\n\n{system}"}], "messages": []}
+            self.assertEqual(plan.observed_instruction_location(appended), "system" if policy == "append" else None)
+        plan = ColdHistory.from_request(self.body, "user_reminder")
+        self.assertEqual(plan.observed_instruction_location({
+            "messages": [{"role": "user", "content": [direct]}],
+        }), "user_reminder")
+        self.assertIsNone(plan.observed_instruction_location({"system": system, "messages": [
+            {"role": "assistant", "content": [direct]},
+            {"role": "user", "content": [{"type": "tool_result", "content": [direct]}]},
+        ]}))
+        self.assertIsNone(ColdHistory.from_request({**self.body, "system": ""}, "replace")
+                          .observed_instruction_location({"system": system, "messages": []}))
+
     def test_reminder_is_added_only_to_first_suitable_user_message(self):
         """导入优先附在首条用户消息，纯新轮保留原始问题和提醒顺序。@return 无。"""
         marker = "<system-reminder>\n业务指令一\n业务指令二\n</system-reminder>"

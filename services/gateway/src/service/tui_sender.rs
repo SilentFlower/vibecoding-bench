@@ -24,7 +24,7 @@ use uuid::Uuid;
 
 use crate::error::AppError;
 use crate::model::account::TuiSystemPromptPolicy;
-use crate::model::request_diagnostics::{TuiBodySource, TuiSessionOrigin};
+use crate::model::request_diagnostics::{TuiBodySource, TuiInstructionLocation, TuiSessionOrigin};
 use crate::service::diagnostics::tui_startup_event;
 use crate::service::gateway::is_passive_usage_header;
 use crate::service::native_capture::tui_wire::CaptureJob;
@@ -43,6 +43,7 @@ use crate::service::runtime_transport::{
 };
 use crate::service::runtime_transport::{
     TUI_BODY_SOURCE, TUI_CAPTURE, TUI_CLI_SUBMISSION, TUI_ERROR_SOURCE, TUI_FINAL_CAPTURE,
+    TUI_INSTRUCTION_LOCATION,
     TUI_MODEL_ACCEPT_OMITTED, TUI_MODEL_HEADER_POLICY, TUI_PREPARE_BIND, TUI_PREPARE_EXCHANGE,
     TUI_PREPARE_LEDGER, TUI_PROMPT_SUGGESTION,
     TUI_REPAIR_ATTEMPT, TUI_SEND_CLAIM, TUI_SENDER_CONFIG, TUI_SESSION_ORIGIN, TUI_SIGNATURE_REPAIR,
@@ -1645,6 +1646,15 @@ impl TuiSender {
                     .headers_mut()
                     .insert(TUI_SESSION_ORIGIN, HeaderValue::from_static(origin.as_str()));
             }
+            if let Some(location) = head["instruction_location"]
+                .as_str()
+                .and_then(TuiInstructionLocation::from_wire)
+            {
+                response.headers_mut().insert(
+                    TUI_INSTRUCTION_LOCATION,
+                    HeaderValue::from_static(location.as_str()),
+                );
+            }
         }
         if options.captured {
             response
@@ -2295,6 +2305,7 @@ mod tests {
                     "status":200, "content_type":"text/event-stream", "message_id_mode":"gateway",
                     "body_source":"account_sender",
                     "session_origin":"live_process",
+                    "instruction_location":"system",
                     "quota_headers":{
                         "anthropic-ratelimit-unified-5h-utilization":"0.25",
                         "anthropic-ratelimit-unified-5h-reset":"2030-01-01T12:00:00Z",
@@ -2312,6 +2323,7 @@ mod tests {
         let response = response.unwrap();
         assert_eq!(response.headers()[TUI_BODY_SOURCE], "account_sender");
         assert_eq!(response.headers()[TUI_SESSION_ORIGIN], "live_process");
+        assert_eq!(response.headers()[TUI_INSTRUCTION_LOCATION], "system");
         assert_eq!(
             response.headers()["anthropic-ratelimit-unified-5h-utilization"],
             "0.25"
@@ -2460,6 +2472,7 @@ mod tests {
         assert_eq!(response.headers()[TUI_CAPTURE], "queued");
         assert!(!response.headers().contains_key(TUI_BODY_SOURCE));
         assert!(!response.headers().contains_key(TUI_SESSION_ORIGIN));
+        assert!(!response.headers().contains_key(TUI_INSTRUCTION_LOCATION));
         assert_eq!(
             response.headers()["anthropic-ratelimit-unified-7d-utilization"],
             "0.43"

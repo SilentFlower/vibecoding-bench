@@ -384,6 +384,33 @@ impl TuiSessionOrigin {
     }
 }
 
+/// 普通 Messages 显式顶层业务指令在实际模型请求中的落点。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TuiInstructionLocation {
+    System,
+    UserReminder,
+}
+
+impl TuiInstructionLocation {
+    /// 识别已知业务指令落点。@param value 发送器回执值。@return 匹配的落点。
+    pub(crate) fn from_wire(value: &str) -> Option<Self> {
+        match value {
+            "system" => Some(Self::System),
+            "user_reminder" => Some(Self::UserReminder),
+            _ => None,
+        }
+    }
+
+    /// 返回私有响应头所用的值。@return 对应的协议字符串。
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::System => "system",
+            Self::UserReminder => "user_reminder",
+        }
+    }
+}
+
 /// 跨平台入口、执行身份及源事实；不保存正文、凭据或任意原生事件。
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
@@ -413,6 +440,9 @@ pub struct DiagnosticContext {
     /// 同一次 V2 尝试实际使用的已确认会话来源。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tui_session_origin: Option<TuiSessionOrigin>,
+    /// 实际模型正文中已核对的普通顶层业务指令落点。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tui_instruction_location: Option<TuiInstructionLocation>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input_rejection_reason: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

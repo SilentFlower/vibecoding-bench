@@ -28,8 +28,8 @@ use crate::model::identity::device_profile;
 use crate::model::request_diagnostics::{
     AttemptDiagnostic, DiagnosticContext, DiagnosticParameters, DiagnosticSessions,
     DiagnosticTokens, ExecutionLocation, NativeRejection, NativeRequestObservation,
-    RequestDiagnostic, RequestLogMode, TuiBodySource, TuiSessionOrigin, normalize_correlation_id,
-    safe_model,
+    RequestDiagnostic, RequestLogMode, TuiBodySource, TuiInstructionLocation, TuiSessionOrigin,
+    normalize_correlation_id, safe_model,
 };
 use crate::service::native_capture;
 use crate::service::request_session::RequestSession;
@@ -795,18 +795,21 @@ impl AttemptTrace {
     }
 
     /// 记录已绑定发送器确认的同轮归属。
-    /// @param source 实际正文来源。@param origin 实际会话来源。@return 无。
+    /// @param source 实际正文来源。@param origin 实际会话来源。
+    /// @param instruction_location 已核对的业务指令落点。@return 无。
     pub(super) fn tui_sources(
         &mut self,
         source: Option<TuiBodySource>,
         origin: Option<TuiSessionOrigin>,
+        instruction_location: Option<TuiInstructionLocation>,
     ) {
         if let Some(record) = self.record.as_mut()
-            && (source.is_some() || origin.is_some())
+            && (source.is_some() || origin.is_some() || instruction_location.is_some())
         {
             let context = record.context.get_or_insert_with(Default::default);
             context.tui_body_source = source;
             context.tui_session_origin = origin;
+            context.tui_instruction_location = instruction_location;
         }
     }
 

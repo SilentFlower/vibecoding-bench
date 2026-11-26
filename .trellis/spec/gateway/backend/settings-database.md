@@ -319,6 +319,7 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - 尝试记录实际冻结画像 key/选择方式、最终模型/max_tokens/thinking 类型与预算/effort/stream/工具数量、匿名 session/thread、响应模型与消息、stop_reason、六类 token、partial、状态、耗时、重试原因和受控错误阶段/类型。未知字段保留 `null`；累计 usage 使用每字段最大值，5m/1h 缓存写明细不重复加入总量。
 - V2 尝试的 `context.tui_body_source` 取自收到模型帧后的同次私有发送器回执。 `interactive_cli` 表示采用交互 CLI 的实际请求正文，`account_sender` 表示采用账号发送器组装的正文。两种诊断模式均可记录。历史回复、缺少确认的尝试和本地拒绝保持字段缺省。公开响应过滤私有字段。该字段不包含正文，也不代表最终 TLS 写出采集。
 - 同次私有回执可携带 `context.tui_session_origin`。`live_process` 表示原进程承接工具续轮，`new_session` 表示启动时没有载入历史，`disk_resume` 表示载入已登记档案或由持久工具回执核对的恢复前缀，`external_import` 表示本次实际发布并载入外部历史。重复导入命中已有确认分叉时记录 `disk_resume`。该字段不保存文件位置、会话正文或凭据。旧记录和缺少成功模型帧的尝试保持字段缺省。
+- `context.tui_instruction_location` 仅记录普通 Messages 显式非空顶层业务指令在实际选中正文的落点。系统文本为 `system`。在用户直接文本中核对完整提醒为 `user_reminder`。CLI 正文从同次认领的已组装请求核对，旧账号代发从本次实际冻结正文核对。省略、空指令、完整 CC 客户端自带身份、仅消息级 system 和缺少确认的尝试保持字段缺省。旧记录兼容缺省。指令原文不上报管理摘要或公开响应。
 - 根记录包含起止时间、下游状态、最终选中账号、结果、尝试数和可选的会话字段。根状态与尝试实际上游状态分开；中间认证或签名错误不得覆盖后续尝试结果。首字节字段 `ttft_ms` 测量响应头到达耗时，不解释为首个模型文本 token。
 - 本地拒绝、模拟和缓存命中有根记录，但无虚构的上游尝试。EOF、末帧、读取错误和 Drop 只终结一次；HTTP 200 内的错误事件与成功区分，缺用量或采样失败标记 `incomplete/partial`。发送错误不伪造上游 HTTP 状态或断言未提交。
 - 本地 503 的 `error_stage` 由实际失败边界写入：选号为 `account_selection`，凭据解析为 `credentials`，V3 环境/传输绑定准备为 `runtime_prepare`，原生能力检查及原生准备拒绝为 `native_prepare`。`RequestTraceGuard::error` 保留已记录阶段；通用 `AppError::ServiceUnavailable` 缺少边界信息时回退 `gateway`，不能仅凭错误类型归为选号失败。诊断标记不改变响应、准入超时或重试行为。

@@ -279,6 +279,41 @@ class ColdHistory:
             return "--append-system-prompt-file", self.system
         return None
 
+    def observed_instruction_location(self, native):
+        """在固定 CLI 已组装的正文中核对普通顶层业务指令。
+        @param native 同次认领的 CLI 请求对象。@return 已匹配的角色落点，或未观测。
+        """
+        if not self.system or not self.system.strip():
+            return None
+        if self.system_policy != "user_reminder":
+            root = native.get("system")
+            if isinstance(root, str):
+                texts = (root,)
+            elif isinstance(root, list):
+                texts = (block.get("text") for block in root
+                         if isinstance(block, dict) and block.get("type") == "text")
+            else:
+                return None
+            # 固定 CLI 将追加文件接到原生系统文本末尾，中间使用双换行。
+            suffix = "\n\n" + self.system if self.system_policy == "append" else None
+            for text in texts:
+                if text == self.system or (suffix and isinstance(text, str) and text.endswith(suffix)):
+                    return "system"
+            return None
+        # 当前单文本可能整体提交到 CLI。历史和分块提交使用独立的提醒块。
+        reminder = self._reminder()
+        expected = {reminder, reminder + "\n"}
+        if not self.history and not self.current_blocks:
+            submitted = self.submitted_prompt()
+            expected.update((submitted, submitted + "\n"))
+        for row in native["messages"]:
+            if isinstance(row, dict) and row.get("role") == "user" and isinstance(row.get("content"), (str, list)):
+                for block in _blocks(row):
+                    if (isinstance(block, dict) and block.get("type") == "text" and
+                            isinstance(text := block.get("text"), str) and text in expected):
+                        return "user_reminder"
+        return None
+
     def submitted_prompt(self):
         """取得单文本提交内容。@return 正文，必要时包含用户提醒。"""
         if self._reminder_index() == len(self.history):
