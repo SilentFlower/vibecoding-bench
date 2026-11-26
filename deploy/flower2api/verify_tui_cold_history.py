@@ -510,7 +510,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 wait_for(lambda: database.execute("SELECT count(*) FROM tui_native_turns WHERE tools IN (?, ?)",
                                                  (json.dumps([NEW_ID]), "!" + json.dumps([NEW_ID]))).fetchone()[0] == 0)
             stop(source)
-            install_source()
+            if previous[0] is not None:
+                install_source()
             binding.update(generation=2, release_id=next_release)
             write_sender_config()
             binding["tui_predecessors"] = [old_binding]
@@ -969,6 +970,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--gateway", type=Path, required=True)
     parser.add_argument("--sender", type=Path, required=True)
+    parser.add_argument("--shared-state", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--current-text-blocks", action="store_true")
     parser.add_argument("--signed-tool-history", action="store_true")
     scenario = parser.add_mutually_exclusive_group()
@@ -985,24 +987,30 @@ def main():
     scenario.add_argument("--split-history-tools", action="store_true")
     scenario.add_argument("--mixed-release", nargs=3, type=Path,
                           metavar=("OLD_SOURCE", "OLD_GATEWAY", "OLD_SENDER"))
+    scenario.add_argument("--mixed-image-peers", nargs=2, type=Path, help=argparse.SUPPRESS)
     scenario.add_argument("--failure-boundaries", action="store_true")
     scenario.add_argument("--v1-runtime", type=Path)
     args = parser.parse_args()
     if (not Path("/.dockerenv").exists() or {name for _, name in if_nameindex()} != {"lo"}
             or Path("/run/v3/sender.json").exists() or any(Path("/native").glob("*"))):
         raise RuntimeError("请在空白的 docker --network none 账号容器中运行")
-    if args.v1_runtime is None:
-        install_source(args.mixed_release[0] if args.mixed_release else ROOT)
+    previous = args.mixed_release
+    if args.mixed_image_peers:
+        if args.shared_state is None:
+            parser.error("镜像混跑须使用私有共享夹具目录")
+        previous = (None, *args.mixed_image_peers)
+    elif args.v1_runtime is None:
+        install_source(previous[0] if previous else ROOT)
     elif sha256(args.v1_runtime.read_bytes()).hexdigest() != V1_RUNTIME_SHA256:
         parser.error("V1 启动器摘要与固定版不符")
-    with TemporaryDirectory(prefix="cold-history-") as directory:
+    with TemporaryDirectory(prefix="cold-history-", dir=args.shared_state) as directory:
         proof = verify(args.gateway, args.sender, Path(directory),
                        restart_history=args.restart_history, text_input=args.text_input,
                        system_policy=args.system_policy, toggle_pending_policy=args.toggle_pending_policy,
                        tool_policy=args.tool_policy, recover_pending=args.recover_pending_tool,
                        output_effort=args.output_effort, history_png=args.history_png,
                        history_images=args.history_images, history_tool_blocks=args.history_tool_blocks,
-                       previous=args.mixed_release,
+                       previous=previous,
                        failure_boundaries=args.failure_boundaries, current_text_blocks=args.current_text_blocks,
                        signed_tool_history=args.signed_tool_history, split_history_tools=args.split_history_tools,
                        v1_runtime=args.v1_runtime)
