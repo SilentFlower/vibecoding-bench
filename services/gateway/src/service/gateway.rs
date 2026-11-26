@@ -82,7 +82,9 @@ use crate::service::telemetry::{
     merge_message_usage,
 };
 use crate::service::tui_backend::{self, LEGACY_BINDING, TUI_V2, TuiRequestRoute};
-use crate::service::tui_native_drain::{NativeTurn, active_agent_account, continuation_account};
+use crate::service::tui_native_drain::{
+    NativeTurn, active_agent_account, continuation_account, summary_account,
+};
 use crate::service::tui_tool_history::{self, SERVER_SESSION_PREFIX};
 use crate::service::usage::UsageCapture;
 use crate::service::v3_scheduling::{RequestPhase, SchedulingRequest};
@@ -2347,7 +2349,32 @@ impl GatewayService {
             (vec![], vec![])
         };
         let original_session = session.as_ref().and_then(RequestSession::original);
-        let tool_owner = if method == "POST"
+        let summary = if method == "POST"
+            && path == "/v1/messages"
+            && client_type == ClientType::ClaudeCode
+            && runtime_transport::tui_runtime_configured()
+            && let (Some(principal), Some(session)) = (api_token, original_session)
+            && !session.starts_with(SERVER_SESSION_PREFIX)
+            && let Some(model) = body_map["model"].as_str()
+            && body_map.get("stream").is_none_or(|v| v.is_boolean())
+            && let Some((label, ids)) = super::agent_summary::messages_summary(&body_map)
+            && runtime_transport::tui_agent_header(&native_header_map)
+                .is_ok_and(|hint| hint.is_some())
+            && let Some(owner) = summary_account(
+                &self.account_svc.tui_database(),
+                principal.id,
+                session,
+                &ids,
+            )
+            .await?
+        {
+            Some((owner, label, model))
+        } else {
+            None
+        };
+        let tool_owner = if let Some((owner, ..)) = &summary {
+            Some(*owner)
+        } else if method == "POST"
             && path == "/v1/messages"
             && runtime_transport::tui_runtime_configured()
             && let Some(principal) = api_token
@@ -2392,6 +2419,28 @@ impl GatewayService {
         } else {
             allowed_ids
         };
+        // 先冻结本次模式。只有已核对原工具组的进度读取可以获得独立模型预留。
+        let native_summary = summary.is_some();
+        if let Some((owner, label, model)) = summary
+            && self
+                .settings_store
+                .get_value("tui_local_agent_summary", "false")
+                .await?
+                == "true"
+        {
+            // 进度读取不占用模型选号、并发和发送许可；上面的原账号、主体及令牌范围仍然适用。
+            if let Some(response) = session_policy_block::check_current().await? {
+                return Ok(response);
+            }
+            diagnostics::selected_account(owner);
+            diagnostics::error_stage("tui_agent_summary");
+            diagnostics::local_outcome("local_response");
+            return Ok(super::gemini::agent_summary_response(
+                label,
+                model,
+                body_map["stream"] == true,
+            ));
+        }
         let request_model = body_map
             .get("model")
             .and_then(|model| model.as_str())
@@ -2611,7 +2660,7 @@ impl GatewayService {
             if tool_owner.is_some() && tui_route.is_none() {
                 return Err(AppError::BadRequest("工具结果的原执行路径已退场".into()));
             }
-            if agent_account.is_some() && account.request_backend != TUI_V2 {
+            if (agent_account.is_some() || native_summary) && account.request_backend != TUI_V2 {
                 return Err(AppError::BadRequest("V2 子代理的原执行路径已退场".into()));
             }
 
@@ -2634,15 +2683,16 @@ impl GatewayService {
                     return Err(AppError::BadRequest("V2 服务端会话不可由客户端声明".into()));
                 }
                 let fixture = runtime_transport::tui_fixture(&account);
-                let owner = (original_session.is_none() || !fixture)
+                let owner = (!native_summary && (original_session.is_none() || !fixture))
                     .then_some((principal.id, original_session));
-                let returning_tool = tui_tool_history::has_result(&body_map);
+                let returning_tool = !native_summary && tui_tool_history::has_result(&body_map);
                 if owner.is_some() && returning_tool && tool_owner != Some(account.id) {
                     return Err(AppError::BadRequest(
                         "未找到可接续的工具轮，请用原入口令牌和会话提交原工具组。若原轮已结束，请发起新一轮".into(),
                     ));
                 }
                 if (returning_tool || agent_account == Some(account.id))
+                    && !native_summary
                     && let Some(signal) = cutover.as_ref()
                 {
                     signal.protect_tui();
@@ -2684,6 +2734,7 @@ impl GatewayService {
                         body: &body_bytes,
                         headers: &native_header_map,
                         native_cc: client_type == ClientType::ClaudeCode,
+                        agent_summary: native_summary,
                         oauth_file: account.auth_type == AccountAuthType::Oauth,
                         body_policy: runtime_transport::TuiBodyPolicy::new(
                             native_message_cache,
@@ -2704,7 +2755,7 @@ impl GatewayService {
                         session.as_ref().and_then(|s| s.source_header),
                     );
                 }
-                if turn.is_some() && owned_tool_group != prepared.continuation {
+                if (turn.is_some() || native_summary) && owned_tool_group != prepared.continuation {
                     return Err(AppError::ServiceUnavailable(
                         "V2 sender 工具归属与登记不符".into(),
                     ));

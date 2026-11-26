@@ -1,5 +1,6 @@
 //! Gemini入口的账号许可、原生帧保真与跨HTTP工具轮归属。
 mod messages;
+pub(super) use messages::agent_summary_response;
 mod receipts;
 mod replay;
 mod websearch;
@@ -1798,7 +1799,7 @@ pub(super) async fn generate_messages(
             // 摘要重带已经完成的结果，只生成本地状态。工具归属和响应缓存继续由主请求持有。
             diagnostics::error_stage("agy_agent_summary");
             diagnostics::local_outcome("local_response");
-            return Ok(messages::agent_summary_response(summary, model, streaming));
+            return Ok(agent_summary_response(summary, model, streaming));
         }
         execute(
             service,

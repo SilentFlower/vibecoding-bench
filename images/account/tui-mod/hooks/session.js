@@ -69,7 +69,11 @@ export function register(on) {
     .catch(() => ({ decision: 'deny' }))
   on('session.append', { door: 'tool-result' }, async ($, e, next) => {
     const ids = e.message.content.filter(b => b.type === 'tool_result').map(b => b.tool_use_id)
-    const { results } = await post($, 'results', { ids })
+    let reply = await post($, 'results', { ids })
+    while (reply.pending) {
+      reply = await post($, 'results', { ids, ticket: reply.pending })
+    }
+    const { results } = reply
     const content = e.message.content.map(b => {
       if (b.type !== 'tool_result') return b
       const answer = results.find(r => r.tool_use_id === b.tool_use_id)

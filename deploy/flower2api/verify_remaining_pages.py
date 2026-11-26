@@ -49,12 +49,27 @@ async def main():
         await page.get_by_role('button',name='模型与缓存',exact=True).click();await page.get_by_role('searchbox',name='搜索系统设置',exact=True).fill('准入等待');await expect(page.locator('[name=v3_admission_wait_seconds]')).to_have_value('99')
         await page.get_by_role('button',name='撤销修改',exact=True).click();await expect(page.locator('[name=v3_admission_wait_seconds]')).to_have_value('120')
         await page.get_by_role('searchbox',name='搜索系统设置',exact=True).fill('');await page.get_by_role('button',name='会话与调度',exact=True).click();await page.locator('[name=v3_admission_wait_seconds]').fill('99')
-        # 保存载荷为 Settings.vue fieldBindings 的全部键：settingsSchema 58 项加会话封禁 2 项，与页头「60 项配置」一致。
-        await expect(page.locator('.settings-total')).to_have_text('60 项配置')
-        fixture.settings_gate=asyncio.Event();fixture.settings_started.clear();await page.get_by_role('button',name='保存配置',exact=True).click();await asyncio.wait_for(fixture.settings_started.wait(),5);await page.locator('[name=v3_admission_wait_seconds]').fill('98');fixture.settings_gate.set();await expect(page.get_by_role('button',name='保存配置',exact=True)).to_be_enabled();assert fixture.settings['v3_admission_wait_seconds']=='99';await expect(page.locator('[name=v3_admission_wait_seconds]')).to_have_value('98');assert len(fixture.settings)==60;assert all(isinstance(value,str) for value in fixture.settings.values())
+        # 保存载荷为 Settings.vue fieldBindings 的全部键：settingsSchema 59 项加会话封禁 2 项，与页头「61 项配置」一致。
+        await expect(page.locator('.settings-total')).to_have_text('61 项配置')
+        fixture.settings_gate=asyncio.Event();fixture.settings_started.clear();await page.get_by_role('button',name='保存配置',exact=True).click();await asyncio.wait_for(fixture.settings_started.wait(),5);await page.locator('[name=v3_admission_wait_seconds]').fill('98');fixture.settings_gate.set();await expect(page.get_by_role('button',name='保存配置',exact=True)).to_be_enabled();assert fixture.settings['v3_admission_wait_seconds']=='99';await expect(page.locator('[name=v3_admission_wait_seconds]')).to_have_value('98');assert len(fixture.settings)==61;assert all(isinstance(value,str) for value in fixture.settings.values())
         await page.get_by_role('button',name='撤销修改',exact=True).click();await expect(page.locator('[name=v3_admission_wait_seconds]')).to_have_value('99')
         await page.locator('[name=v3_admission_wait_seconds]').fill('0');await page.get_by_role('button',name='保存配置',exact=True).click();await expect(page.locator('.setting-error').first).to_be_visible();assert len([write for write in fixture.writes if write['path']=='/admin/settings'])==1
         await page.get_by_role('button',name='撤销修改',exact=True).click()
+        await page.get_by_role('searchbox',name='搜索系统设置',exact=True).fill('本地生成子代理进度')
+        toggle=page.get_by_role('switch',name='本地生成子代理进度',exact=True)
+        await expect(toggle).not_to_be_checked()
+        await toggle.click()
+        await page.get_by_role('button',name='保存配置',exact=True).click()
+        await expect(page.get_by_role('button',name='保存配置',exact=True)).to_be_disabled()
+        assert fixture.settings['tui_local_agent_summary']=='true'
+        await page.reload()
+        await page.get_by_role('searchbox',name='搜索系统设置',exact=True).fill('本地生成子代理进度')
+        await expect(toggle).to_be_checked()
+        await toggle.click()
+        await page.get_by_role('button',name='保存配置',exact=True).click()
+        await expect(page.get_by_role('button',name='保存配置',exact=True)).to_be_disabled()
+        assert fixture.settings['tui_local_agent_summary']=='false'
+        await page.get_by_role('searchbox',name='搜索系统设置',exact=True).fill('')
         for width in [1440,720,390]:
             await page.set_viewport_size({'width':width,'height':1000});assert await page.evaluate('document.documentElement.scrollWidth<=innerWidth');await page.screenshot(path=str(out/f'settings-{width}.png'),full_page=True)
         await page.set_viewport_size({'width':1440,'height':1000});await page.goto(BASE+'/requests');await expect(page.locator('.request-records')).to_contain_text('claude-fable-5');await expect(page.locator('.request-records')).to_contain_text('0 ms');await expect(page.get_by_role('radio',name='错误 7',exact=True)).to_be_visible();await page.get_by_role('radio',name='错误 7',exact=True).click();await expect(page.locator('.request-empty')).to_be_visible();assert fixture.diagnostic_queries[-1]['outcome']==['errors']
@@ -62,7 +77,7 @@ async def main():
         for width in [1440,720,390]:
             await page.set_viewport_size({'width':width,'height':1000});assert await page.evaluate('document.documentElement.scrollWidth<=innerWidth');await page.screenshot(path=str(out/f'requests-{width}.png'),full_page=True)
         assert not errors,errors
-        (out/'verification.json').write_text(json.dumps({'passed':True,'settings_keys':sorted(fixture.settings),'errors':errors,'queries':fixture.diagnostic_queries},ensure_ascii=False,indent=2));await browser.close();print('系统设置56字段与请求列表交互验证通过')
+        (out/'verification.json').write_text(json.dumps({'passed':True,'settings_keys':sorted(fixture.settings),'errors':errors,'queries':fixture.diagnostic_queries},ensure_ascii=False,indent=2));await browser.close();print('系统设置与请求列表交互验证通过')
 
 
 if __name__=='__main__':asyncio.run(main())

@@ -966,6 +966,7 @@ impl PrimePollerService {
                     body: &bytes,
                     headers: &HeaderMap::new(),
                     native_cc: false,
+                    agent_summary: false,
                     oauth_file: account.auth_type == AccountAuthType::Oauth,
                     body_policy: TuiBodyPolicy::default(),
                 },

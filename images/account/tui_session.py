@@ -21,7 +21,7 @@ import termios
 import time
 from threading import Condition, Event, Thread
 from urllib.parse import urlsplit
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from tui_capacity import TuiCapacity, TuiCapacityError
 from tui_input_policy import CONTEXT_BETA
@@ -43,6 +43,8 @@ from tui_messages import (
 
 # 与网关的 BINDING_TTL_MS 一致，客户端确认工具时原进程和资源名额仍随会话保留。
 _RECEIPT_SECONDS = 60 * 60
+# CC 2.1.293 的单次 Mod HTTP 调用在 30 秒中止，留出响应和调度余量。
+_RECEIPT_POLL_SECONDS = 20
 # 同步父链占满物理进程时，给在途回执留出短暂释放机会。后台配对使用原请求期限。
 _AGENT_HANDOFF_SECONDS = 2.0
 # 只在原工具有效期内留历史配对，耗尽时不再发放后台认领权限。
@@ -87,6 +89,7 @@ class _Waiting:
 
     actor_key: tuple
     offer: _AgentOffer | None = None
+    agent_summary: bool = False
     exact_receipt_only: bool = False
     groups: frozenset | None = None
 
@@ -177,6 +180,10 @@ def _install_mod(source, private_dir):
         shutil.copytree(source / component, private_dir / component, dirs_exist_ok=True)
 
 
+class _StaleReceipt(ValueError):
+    """迟到或重复的私有查询，只结束本次查询。"""
+
+
 class _Callback(BaseHTTPRequestHandler):
     """只在当前会话的回环端口接收原版 Mod 回执。"""
 
@@ -223,6 +230,9 @@ class _Callback(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(payload)))
             self.end_headers()
             self.wfile.write(payload)
+        except _StaleReceipt:
+            with suppress(OSError):
+                self.send_error(409)
         except ModelResponseError as error:
             actor.abort(error)
             with suppress(OSError):
@@ -281,6 +291,7 @@ class _Actor:
         self.wait_until = None
         self.answers = {}
         self.delivered = set()
+        self.receipt_key = secrets.token_bytes(32)
         self.claim = None
         self.port = None
         self.worker = None
@@ -461,39 +472,7 @@ class _Actor:
                 prompt, self.prompt = self.prompt, None
                 return {"prompt": prompt, "guard": self.guard_text}
             elif path == "/results":
-                ids = data["ids"]
-                if (
-                    not ids
-                    or self.step is None
-                    or not all(isinstance(i, str) for i in ids)
-                    or len(set(ids)) != len(ids)
-                ):
-                    raise ValueError("原生工具归属无效")
-                declared = {
-                    b["id"]
-                    for b in (self.expected or self.step.blocks)
-                    if b["type"] == "tool_use"
-                }
-                requested = set(ids)
-                delivered = self.delivered
-                if not requested <= declared or requested & delivered:
-                    raise ValueError("原生工具未在该轮登记")
-                if not self.changed.wait_for(
-                    lambda: (
-                        self.dead.is_set()
-                        or delivered is not self.delivered
-                        or requested <= self.answers.keys()
-                    ),
-                    _RECEIPT_SECONDS,
-                ):
-                    raise ValueError("已超过会话工具绑定有效期")
-                if self.dead.is_set():
-                    raise ValueError("原生工具已取消")
-                # 等待释放过锁；另一回调可能已领取回执，或原轮已经结束。
-                if delivered is not self.delivered or requested & delivered:
-                    raise ValueError("原生工具回执已交付或已换轮")
-                delivered.update(requested)
-                return {"results": [self.answers[i] for i in ids]}
+                return self._tool_results(data)
             elif path == "/begin":
                 if self.step is None or self.claim is None or self.dead.is_set():
                     raise ValueError("缺少已提交的有效预留")
@@ -543,9 +522,45 @@ class _Actor:
                 raise ValueError("非法原生步骤状态")
         return {}
 
+    def _tool_results(self, data):
+        """在持有 actor 条件锁时等待本步工具。@param data 私有查询。@return 原始回执或下次查询编号。"""
+        ids = data.get("ids")
+        if (not isinstance(ids, list) or not ids or self.step is None
+                or not all(isinstance(i, str) for i in ids) or len(set(ids)) != len(ids)):
+            raise _StaleReceipt("原生工具归属无效")
+        requested = set(ids)
+        declared = {b["id"] for b in (self.expected or self.step.blocks) if b["type"] == "tool_use"}
+        delivered = self.delivered
+        if not requested <= declared or requested & delivered:
+            raise _StaleReceipt("原生工具未在该轮登记或已经交付")
+        # 编号绑定此 actor 的模型步骤及工具子集；轮询次数不会增加驻留记录。
+        ticket = hmac.new(self.receipt_key, _json(sorted(ids)).encode(), sha256).hexdigest()
+        if "ticket" in data and data["ticket"] != ticket:
+            raise _StaleReceipt("工具等待编号已失效")
+        timeout = _RECEIPT_POLL_SECONDS
+        if self.wait_until is not None:
+            remaining = self.wait_until - time.monotonic()
+            if remaining <= 0:
+                raise _StaleReceipt("已超过会话工具绑定有效期")
+            timeout = min(timeout, remaining)
+        if not self.changed.wait_for(
+            lambda: self.dead.is_set() or delivered is not self.delivered or requested <= self.answers.keys(),
+            timeout,
+        ):
+            if self.wait_until is not None and time.monotonic() >= self.wait_until:
+                raise _StaleReceipt("已超过会话工具绑定有效期")
+            return {"pending": ticket}
+        if self.dead.is_set() or delivered is not self.delivered or requested & delivered:
+            raise _StaleReceipt("原生工具回执已取消、已交付或已换轮")
+        delivered.update(requested)
+        return {"results": [self.answers[i] for i in ids]}
+
     def _observe(self, step, event):
         with self.changed:
             block = step.observe(event)
+        if self.reservation.get("agent_summary"):
+            # 进度回复只交给辅助请求，模型输出不能创建业务工具派工。
+            return
         if block is None or block["type"] != "tool_use" or block["name"] not in ("Agent", "Task", "SendMessage"):
             if step.stopped:
                 with self.driver.lock:
@@ -708,6 +723,7 @@ class _Actor:
                 # 在原版终端看到它们之前换一份交付记录，避免它读到上一轮同名 ID 的旧结果。
                 self.answers = {}
                 self.delivered = set()
+                self.receipt_key = secrets.token_bytes(32)
                 self.changed.notify_all()
         if not pending:
             http.send_error(409, "No pending model step")
@@ -901,7 +917,7 @@ class _Reserved:
             if actor.claim is not self:
                 return
             actor.claim = None
-            if self.sent and (not self.completed or not actor.expected):
+            if self.sent and (not self.completed or not actor.expected or self.reservation.get("agent_summary")):
                 step = actor.step
                 actor.completed_normally = (
                     self.completed
@@ -929,19 +945,21 @@ class SessionDriver:
         self.oauth_file_available = getattr(launcher, "file_oauth_enabled", lambda: False)()
         # 编排每个 HTTP 并发配置两个预留。等待新 TUI 的队列必须留下至少一个传输名额还工具。
         limit = max(1, config["max_reservations"] // 2)
+        self.summary_only_headroom = False
         if capacity is None:
             memory = Path("/sys/fs/cgroup/memory.max").read_text().strip()
             # 1GiB 账号实测同时持有三个 TUI。预留 256MiB 基础开销及每进程 256MiB。
             reserve = 256 * 1024**2
+            self.summary_only_headroom = memory == "max"
             budget = (
-                (limit + 1) * reserve
+                (limit + 2) * reserve
                 if memory == "max"
                 else int(memory)
                 if memory.isdecimal()
                 else 0
             )
             # 暂停等 Agent 的父进程继续记入 RAM；只多规划一个经验证的子进程。
-            # 无 cgroup 硬预算时沿用旧的保守预算，由物理容量本身裁掉余量。
+            # 无硬预算时把最后一位仅用于等工具的子代理查询进度；其它入口沿用之前的上限。
             capacity = TuiCapacity(
                 limit + 1,
                 budget_bytes=budget,
@@ -1145,11 +1163,17 @@ class SessionDriver:
 
     def _eligible(self, ticket, ordinary_room):
         key, offer = ticket.actor_key, ticket.offer
-        # 子身份本身没有额外容量。只有仍在原父进程上等待的依赖可以借驻留位。
-        return (
-            key not in self.sessions
-            and (len(key) == 5 or offer is not None)
-            and (ordinary_room or offer is not None and any(offer.waiting_ancestors()))
+        if key in self.sessions:
+            return False
+        if ticket.agent_summary:
+            # 只有原子代理正在等工具时才借一个空闲物理位；父子派工已经排队时先满足派工。
+            owner = self.sessions.get(key[:-1])
+            return ordinary_room or (
+                owner is not None and owner.expected is not None and not owner.dead.is_set()
+                and not any(w.offer and any(w.offer.waiting_ancestors()) for w in self.waiters)
+            )
+        return (len(key) == 5 or offer is not None) and (
+            ordinary_room or offer is not None and any(offer.waiting_ancestors())
         )
 
     def _blocked_dependency(self, ticket):
@@ -1190,6 +1214,13 @@ class SessionDriver:
         )
         agent_hint = reservation.get("agent_hint")
         actor_key = identity if agent_hint is None else (*identity, agent_hint)
+        summary = reservation.get("agent_summary") is True
+        if summary:
+            if agent_hint is None or reservation["continuation_only"]:
+                raise ValueError("原生进度查询缺少独立预留")
+            # 只有认证的网关在核对原工具组后设置此位。用独立 actor 和工作区运行原始正文。
+            # 同一个子代理的重复查询串行使用自己的进度工作区，避免每次心跳创建一份持久 HOME。
+            actor_key = (*actor_key, "agent-summary")
         returned = split_reply(messages)[1]
         deadline = reservation["deadline_unix_ms"] / 1000
 
@@ -1199,7 +1230,7 @@ class SessionDriver:
                 raise TimeoutError("原版会话预留已取消或到期")
             return result
 
-        if returned or reservation["continuation_only"]:
+        if not summary and (returned or reservation["continuation_only"]):
             with self.lock:
                 actor = self.sessions.get(actor_key)
             if actor is None or not returned:
@@ -1237,18 +1268,18 @@ class SessionDriver:
 
         prompt = prompt_text(messages)
         with self.lock:
-            if agent_hint is not None and (
+            if agent_hint is not None and not summary and (
                 actor_key in self.sessions
                 or any(item.actor_key == actor_key for item in self.waiters)
             ):
                 raise SubagentBindingError("此子代理已持有独立进程，工具回执须返回原轮")
-            if agent_hint is not None:
+            if agent_hint is not None and not summary:
                 child_text, extras = _agent_prompt(messages)
                 prompts = [sha256(child_text.encode()).digest()]
                 if child_text.endswith("\n"):
                     prompts.append(sha256(child_text[:-1].encode()).digest())
             offer = None
-            ticket = _Waiting(actor_key)
+            ticket = _Waiting(actor_key, agent_summary=summary)
             handoff_limit = time.monotonic() + _AGENT_HANDOFF_SECONDS
             try:
                 while True:
@@ -1261,7 +1292,12 @@ class SessionDriver:
                             raise SubagentAmbiguousError("本次预留结束前未收到对应启动回执") from None
                         raise
                     capacity = self.capacity.snapshot()
-                    if agent_hint is not None and offer is None:
+                    physical_limit = self.ordinary_limit if self.summary_only_headroom and not summary else capacity.limit
+                    if (summary and capacity.in_use >= physical_limit and self.sessions
+                            and all(actor.expected and actor.claim is None for actor in self.sessions.values())):
+                        # 全部物理位都在等外部工具。让进度请求退避，把下一次准入留给真回执。
+                        raise TimeoutError("原工具等待已占满账号物理进程额度")
+                    if agent_hint is not None and not summary and offer is None:
                         # 两个相同提示在收到启动回执前无法区分，挂起握手而不占进程。
                         offer = ticket.offer = self._claim_agent(
                             identity,
@@ -1274,7 +1310,7 @@ class SessionDriver:
                         if not self._valid_agent(offer, agent_hint, extras):
                             raise SubagentBindingError("子代理所属原轮已结束或取消")
                         if (
-                            capacity.in_use >= capacity.limit
+                            capacity.in_use >= physical_limit
                             and not offer.asynchronous
                             and self._blocked_dependency(ticket)
                         ):
@@ -1298,21 +1334,19 @@ class SessionDriver:
                         None,
                     )
                     if (
-                        capacity.in_use < capacity.limit
+                        capacity.in_use < physical_limit
                         and self._eligible(ticket, ordinary_room)
                         and first in (None, ticket)
                     ):
                         slot = self.capacity.acquire(
                             timeout=0, cancel_event=cancel_event
                         )
-                        actor_reservation = (
-                            reservation
-                            if offer is None
-                            else {
-                                **reservation,
-                                "session_id": AGENT_SESSION_PREFIX + str(uuid4()),
-                            }
-                        )
+                        actor_reservation = reservation
+                        if summary:
+                            branch_id = UUID(bytes=sha256(_json(actor_key).encode()).digest()[:16], version=4)
+                            actor_reservation = {**reservation, "session_id": AGENT_SESSION_PREFIX + str(branch_id)}
+                        elif offer is not None:
+                            actor_reservation = {**reservation, "session_id": AGENT_SESSION_PREFIX + str(uuid4())}
                         actor = _Actor(
                             self,
                             actor_key,
@@ -1344,9 +1378,9 @@ class SessionDriver:
                     if ticket not in self.waiters:
                         # 源端与 sender 都给一个可信子依赖留下有界位置。
                         # 已占满普通队列时，合法子轮仍可等下一次物理释放。
-                        reserved = any(len(item.actor_key) > 5 for item in self.waiters)
+                        reserved = any(len(item.actor_key) > 5 and not item.agent_summary for item in self.waiters)
                         if len(self.waiters) - int(reserved) >= self.max_waiters and (
-                            reserved or agent_hint is None
+                            reserved or agent_hint is None or summary
                         ):
                             raise TimeoutError("交互等待队列已满")
                         self.waiters.append(ticket)

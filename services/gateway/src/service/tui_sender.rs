@@ -76,6 +76,8 @@ struct Identity {
     continuation_only: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     agent_hint: Option<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    agent_summary: bool,
 }
 
 impl Identity {
@@ -92,6 +94,8 @@ impl Identity {
             || binding.generation == 0
             || binding.release_id.is_empty()
             || identity.principal_id <= 0
+            || (identity.agent_summary
+                && (identity.agent_hint.is_none() || identity.continuation_only))
             || !valid_id(&identity.session_id)
             || identity
                 .agent_hint
@@ -350,6 +354,7 @@ struct VerifiedSource {
     body_policy: bool,
     input_policy: bool,
     agent_scope: bool,
+    agent_summary: bool,
     session_mapping: bool,
     managed_oauth: bool,
     oauth_file: bool,
@@ -381,6 +386,7 @@ async fn verify_source(
         body_policy: reply["body_policy_protocol"].as_u64() == Some(1),
         input_policy: reply["input_policy_protocol"].as_u64() == Some(1),
         agent_scope: reply["agent_scope_protocol"].as_u64() == Some(1),
+        agent_summary: reply["agent_summary_protocol"].as_u64() == Some(1),
         session_mapping: reply["upstream_session_protocol"].as_u64() == Some(1),
         managed_oauth: reply["managed_oauth_protocol"].as_u64() == Some(1),
         oauth_file: reply["oauth_file_protocol"].as_u64() == Some(1),
@@ -430,7 +436,7 @@ impl TuiSender {
         binding: &TransportBinding,
         config: Option<&Value>,
         receipt: Option<&TuiReceiptProbe>,
-    ) -> Option<(bool, Option<bool>)> {
+    ) -> Option<(bool, Option<bool>, bool)> {
         setting(config).ok()?;
         let source = timeout(Duration::from_secs(1), async {
             submission_log::was_consumed(&self.submission_storage, binding, None).await?;
@@ -443,6 +449,7 @@ impl TuiSender {
         Some((
             source.idle && inactive,
             source.receipt_idle.map(|idle| idle && inactive),
+            source.agent_summary,
         ))
     }
 
@@ -471,8 +478,10 @@ impl TuiSender {
             let probe_used = book
                 .values()
                 .any(|record| record.agent_probe && !matches!(record.phase, Phase::Closed));
-            let agent_probe =
-                !probe_used && identity.agent_hint.is_some() && !identity.continuation_only;
+            let agent_probe = !probe_used
+                && identity.agent_hint.is_some()
+                && !identity.continuation_only
+                && !identity.agent_summary;
             if !agent_probe && occupied(&book) - usize::from(probe_used) >= maximum {
                 return Err(limited());
             }
@@ -573,6 +582,7 @@ impl TuiSender {
                 body_policy,
                 input_policy,
                 agent_scope,
+                agent_summary,
                 session_mapping,
                 managed_oauth,
                 oauth_file,
@@ -580,6 +590,9 @@ impl TuiSender {
             } = verify_source(&self.path, binding, "bind", None)
                 .await
                 .map_err(|_| unavailable())?;
+            if identity.agent_summary && !agent_summary {
+                return Err(unavailable());
+            }
             if identity.agent_hint.is_some() && !agent_scope {
                 return Err(AppError::TuiInputUnsupported);
             }
@@ -1268,6 +1281,7 @@ mod tests {
                 reservation_id: Uuid::new_v4().to_string(),
                 deadline_unix_ms: now_ms() + 30_000,
                 continuation_only: false,
+                agent_summary: false,
                 agent_hint: None,
             }
         }
@@ -1954,11 +1968,12 @@ mod tests {
                     json!({"principal_id":1,"session_id":"original"})
                 );
                 reply["idle"] = json!(false);
+                reply["agent_summary_protocol"] = json!(1);
                 reply["receipt_idle"] = json!(true);
                 write_json(&mut socket, &reply).await.unwrap();
             }
         );
-        assert_eq!(status, Some((false, Some(true))));
+        assert_eq!(status, Some((false, Some(true), true)));
     }
 
     #[tokio::test]
@@ -1975,7 +1990,7 @@ mod tests {
                 write_json(&mut socket, &reply).await.unwrap();
             }
         );
-        assert_eq!(idle, Some((true, None)));
+        assert_eq!(idle, Some((true, None, false)));
         let mut identity = source.identity();
         identity.continuation_only = true;
         let (prepared, mut socket) = tokio::join!(source.prepare(&identity, body), async {

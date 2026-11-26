@@ -73,6 +73,34 @@ Claude Code 在父模型响应仍打开时，可能已为完整的 `Agent` 或 `
 
 `test_open_group_waits_until_tool_order_is_known`、`test_cancelled_parent_waiter_cannot_move_to_replacement_step` 和 `test_closed_agent_block_and_late_directed_message` 分别覆盖组封闭、同提示替代派工、晚到回执与追加消息。`test_cli_groups_agent_text_without_changing_tools_or_signatures` 覆盖父续轮分组及内容改动。
 
+## V2 慢工具回执
+
+### 1. 适用范围
+
+客户端执行工具期间，账号进程通过会话专属的 Mod 回调等待工具结果。
+
+### 2. 接口
+
+首次私有请求为 `POST /results {"ids":[...]}`。返回 `{"pending":"<编号>"}` 后，Mod 用同一组 ID 和 `ticket` 继续查询。结果到齐即返回 `{"results":[...]}`。
+
+### 3. 数据合同
+
+在 V2 原生进度模式中，已核对完整工具组的网关使用 `agent_summary=true` 预留，源返回独立进度工作区。同一主体、会话及子代理复用专属进度目录。模型每次读取本次冻结的请求，进度 actor 结束后归还物理位。 账号没有 cgroup 内存硬上限时，只有正在等待工具的子代理可为原生进度查询借用一个额外驻留位。显式内存上限仍约束总进程数。全部物理位都在等待工具结果时，摘要请求按已有容量退避返回，真回执照常认领。
+
+一次本地条件等待最多 20 秒。编号绑定原账号进程、模型步骤和工具 ID 集合。每段等待复用原工具有效期。业务回执就绪后唤醒等待方，并按原输入顺序交付结果。
+
+### 4. 异常
+
+过期、陈旧编号、错误组和重复交付的私有查询返回 409。会话取消会唤醒等待方。
+
+### 5. 场景
+
+Bash 在第 43 秒结束时跨过两次分段等待，第三次查询立即获得真实结果。下一步即使复用相同的工具 ID，也需要该步的编号。
+
+### 6. 验证
+
+`test_slow_receipt_polls_only_its_current_group` 核对编号、截止与重复交付。用真实 CC 2.1.293 核对慢工具、并发进度查询及真实模型续轮次数。
+
 ## V2 直接工具调用的客户端回执
 
 - `tool_receipts(messages, previous, expected)` 在原会话的历史和完整工具组匹配后，按工具 ID 交付结果。

@@ -402,6 +402,40 @@ async fn has_registered_group(
     Ok(known != 0)
 }
 
+/// 只读定位进度摘要所属的原 V2 工具组。@param pool 数据库。@param principal 主体。
+/// @param session 显式会话。@param ids 排序后的完整工具组。@return 唯一原账号。
+pub(super) async fn summary_account(
+    pool: &AnyPool,
+    principal: i64,
+    session: &str,
+    ids: &[&str],
+) -> Result<Option<i64>, AppError> {
+    let tools = serde_json::to_string(ids).expect("纯字符串集合可编码");
+    // 消费中的组保留 ! 前缀，完成后转为有期限的摘要。三个阶段都只读。
+    let rows = sqlx::query_scalar::<_, i64>(
+        "SELECT DISTINCT t.account_id FROM tui_native_turns t JOIN accounts a ON a.id=t.account_id
+         WHERE t.principal_id=$1 AND t.session_id=$2 AND t.version=$3 AND a.request_backend=$4
+         AND a.platform='claude_code' AND a.status='active'
+         AND NOT EXISTS (SELECT 1 FROM tui_stateless_turn_proofs p WHERE p.turn_id=t.id)
+         AND (t.tools=$5 OR t.tools=$6 OR (t.tools LIKE '#%' AND substr(t.tools,22,1)='E'
+              AND substr(t.tools,2,20)>$7 AND substr(t.tools,23)=$8)) LIMIT 2",
+    )
+    .bind(principal)
+    .bind(session)
+    .bind(TUI_V2_RECEIPT_VERSION)
+    .bind(super::tui_backend::TUI_V2)
+    .bind(&tools)
+    .bind(format!("!{tools}"))
+    .bind(format!("{:020}", now_ms()))
+    .bind(tool_digest(&tools))
+    .fetch_all(pool)
+    .await?;
+    Ok(match rows.as_slice() {
+        [account] => Some(*account),
+        _ => None,
+    })
+}
+
 /// 从登记定位原账号，供调度过滤。@param pool 数据库。@param owner 已认证主体与可选会话。
 /// @param body 公开 Messages。@return 原账号；发送前仍需核对权限、版本、代次并认领。
 pub(super) async fn continuation_account(
@@ -922,6 +956,70 @@ mod tests {
                 .await
                 .unwrap();
             assert_eq!(pending, awaiting_v2_tools(pool.clone()).await.unwrap());
+        }
+    }
+
+    /// 后台进度只读本主体及会话的完整 V2 工具组，覆盖认领前、认领中和终态。
+    #[tokio::test]
+    async fn summary_account_checks_live_claimed_and_consumed_groups() {
+        install_default_drivers();
+        let pool = AnyPoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        migrate(&pool, "sqlite").await.unwrap();
+        sqlx::query(
+            "INSERT INTO accounts(id,name,email,token,device_id,request_backend)
+            VALUES(1,'test','receipt@test.invalid','synthetic','one','tui_v2')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let tools = r#"["one","two"]"#;
+        let digest = super::tool_digest(tools);
+        sqlx::query("INSERT INTO tui_native_turns VALUES('first',1,20,'session','binding',$1,$2)")
+            .bind(TUI_V2_RECEIPT_VERSION)
+            .bind(tools)
+            .execute(&pool)
+            .await
+            .unwrap();
+        for (value, owner) in [
+            (tools.into(), Some(1)),
+            (format!("!{tools}"), Some(1)),
+            (
+                format!("#{:020}E{digest}", super::now_ms() + 60000),
+                Some(1),
+            ),
+            (format!("#{:020}E{digest}", 0), None),
+        ] {
+            sqlx::query("UPDATE tui_native_turns SET tools=$1 WHERE id='first'")
+                .bind(&value)
+                .execute(&pool)
+                .await
+                .unwrap();
+            for (principal, session, ids, expected) in [
+                (20, "session", &["one", "two"][..], owner),
+                (21, "session", &["one", "two"][..], None),
+                (20, "other", &["one", "two"][..], None),
+                (20, "session", &["one"][..], None),
+            ] {
+                assert_eq!(
+                    super::summary_account(&pool, principal, session, ids)
+                        .await
+                        .unwrap(),
+                    expected
+                );
+            }
+            assert_eq!(
+                sqlx::query_scalar::<_, String>(
+                    "SELECT tools FROM tui_native_turns WHERE id='first'"
+                )
+                .fetch_one(&pool)
+                .await
+                .unwrap(),
+                value
+            );
         }
     }
 

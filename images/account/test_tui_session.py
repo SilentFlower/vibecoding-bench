@@ -1337,6 +1337,83 @@ class SessionTests(unittest.TestCase):
                 self.assertEqual(driver.capacity.snapshot().in_use, 0)
                 driver.launcher.local_model_response.assert_called_once()
 
+    def test_native_agent_summary_preserves_receipt_and_reuses_only_its_own_workspace(self):
+        """原生进度使用独立进程和原正文，重复查询复用专属工作区。@return 无。"""
+        with closing(self._driver(limit=2, physical=2)) as driver:
+            parent_id = self._identity("test-session")
+            group = [{"type": "tool_use", "id": "r", "name": "Read", "input": {}}]
+            with closing(driver.prepare(parent_id, encode(self._body()))) as parent:
+                self._offered(parent, *group)
+                answers = [{"type": "tool_result", "tool_use_id": "r", "content": "示例"}]
+                history = [*self._body()["messages"], {"role": "assistant", "content": group},
+                           {"role": "user", "content": [*answers, {"type": "text", "text": "查询进度"}]}]
+                raw = encode({**self._body(), "messages": history})
+                def read_summary(agent):
+                    private = {**parent_id, "agent_hint": agent, "agent_summary": True}
+                    with closing(driver.prepare(private, raw)) as handle:
+                        self.assertEqual(handle.kind, "new")
+                        self.assertEqual(handle.raw, raw)
+                        self.assertIsNot(handle.actor, parent.actor)
+                        self.assertEqual(parent.actor.expected, group)
+                        self.assertFalse(parent.actor.dead.is_set())
+                        return handle.actor.reservation["session_id"]
+                first = read_summary("agent-one")
+                self.assertEqual(first, read_summary("agent-one"))
+                self.assertNotEqual(first, read_summary("agent-two"))
+                with self.assertRaises(ValueError):
+                    driver.prepare({**parent_id, "agent_summary": True}, raw)
+
+    def test_native_progress_yields_to_receipts_when_hard_limit_is_full(self):
+        """物理容量只够原进程时，摘要退避且真回执仍能立刻认领。@return 无。"""
+        identity = self._identity("one-slot")
+        tool = {"type": "tool_use", "id": "original", "name": "Read", "input": {}}
+        result = {"type": "tool_result", "tool_use_id": tool["id"], "content": "完成"}
+        body = self._body()
+        answer = {**body, "messages": [*body["messages"], {"role": "assistant", "content": [tool]},
+                                        {"role": "user", "content": [result]}]}
+        with closing(self._driver(limit=1, physical=1)) as driver:
+            actor = self._offered(driver.prepare(identity, encode(body)), tool)
+            with self.assertRaisesRegex(TimeoutError, "物理进程额度"):
+                driver.prepare({**identity, "agent_hint": "agent-one", "agent_summary": True}, encode(answer))
+            with closing(driver.prepare(identity, encode(answer))) as handle:
+                self.assertIs(handle.actor, actor)
+                self.assertEqual(handle.answers, {tool["id"]:result})
+
+    def test_slow_receipt_polls_only_its_current_group(self):
+        """分段查询等待原结果，过期编号、并行组和重复回执相互隔离。@return 无。"""
+        with closing(self._driver()) as driver, closing(
+            driver.prepare(self._identity("slow"), encode(self._body()))
+        ) as handle:
+            actor = handle.actor
+            actor.step = WireStep([])
+            actor.expected = [{"type": "tool_use", "id": i} for i in ("a", "b")]
+            actor.wait_until = time.monotonic() + 3600
+            deadline = actor.wait_until
+            with patch("tui_session._RECEIPT_POLL_SECONDS", 0):
+                ticket = actor.callback("/results", {"ids": ["a"]})["pending"]
+                query = {"ids": ["a"], "ticket": ticket}
+                self.assertEqual(actor.callback("/results", query), {"pending": ticket})
+                self.assertEqual(actor.wait_until, deadline)
+                with self.assertRaises(ValueError):
+                    actor.callback("/results", {"ids": ["b"], "ticket": ticket})
+                actor.answers = {"a": {"content": "A"}, "b": {"content": "B"}}
+                self.assertEqual(actor.callback("/results", query), {"results": [{"content": "A"}]})
+                with self.assertRaises(ValueError):
+                    actor.callback("/results", query)
+                self.assertEqual(actor.callback("/results", {"ids": ["b"]}), {"results": [{"content": "B"}]})
+                actor.answers.clear()
+                actor.delivered = set()
+                # 模拟下一步再次出现同样的 ID，上一轮编号也必须失效。
+                actor.receipt_key = b"next-step"
+                with self.assertRaises(ValueError):
+                    actor.callback("/results", query)
+                actor.wait_until = time.monotonic() - 1
+                with self.assertRaises(ValueError):
+                    actor.callback("/results", {"ids": ["a"]})
+                actor.abort()
+                with self.assertRaises(ValueError):
+                    actor.callback("/results", query)
+
     def test_duplicate_callback_waiting_for_the_same_receipt_is_rejected(self):
         """同一回执到达前后交错的两个回调只有一个能够交付。@return 无。"""
         with (

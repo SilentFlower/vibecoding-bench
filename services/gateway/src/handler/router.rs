@@ -2663,6 +2663,9 @@ async fn get_settings(State(state): State<AppState>) -> Result<Json<serde_json::
         .entry("rewrite_disabled_thinking_models".into())
         .or_insert_with(|| DEFAULT_REWRITE_DISABLED_THINKING_MODELS.to_string());
     settings
+        .entry("tui_local_agent_summary".into())
+        .or_insert_with(|| "false".into());
+    settings
         .entry("intercept_assistant_prefill_enabled".into())
         .or_insert_with(|| DEFAULT_INTERCEPT_ASSISTANT_PREFILL_ENABLED.to_string());
     settings
@@ -2875,6 +2878,7 @@ async fn update_settings(
     for key in &[
         "intercept_warmup_title_enabled",
         "intercept_warmup_suggestion_enabled",
+        "tui_local_agent_summary",
         "intercept_warmup_haiku_probe_enabled",
         "rewrite_disabled_thinking_enabled",
         "intercept_assistant_prefill_enabled",
@@ -4833,6 +4837,62 @@ mod tests {
             .unwrap();
         let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(value["fable_weekly_usage_limit_percent"], "50");
+    }
+
+    /// 原生进度为默认值。持久设置只接受明确的布尔字符串。
+    #[tokio::test]
+    async fn tui_local_agent_summary_setting_validates_and_persists() {
+        let app = test_router().await;
+        for (choice, expected) in [
+            (None, "false"),
+            (Some("true"), "true"),
+            (Some("typo"), "true"),
+            (Some("false"), "false"),
+        ] {
+            if let Some(choice) = choice {
+                let response = app
+                    .clone()
+                    .oneshot(
+                        Request::builder()
+                            .method(Method::PUT)
+                            .uri("/admin/settings")
+                            .header(header::AUTHORIZATION, "Bearer admin")
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Body::from(
+                                serde_json::json!({"tui_local_agent_summary":choice}).to_string(),
+                            ))
+                            .unwrap(),
+                    )
+                    .await
+                    .unwrap();
+                assert_eq!(
+                    response.status(),
+                    if choice == "typo" {
+                        StatusCode::BAD_REQUEST
+                    } else {
+                        StatusCode::OK
+                    }
+                );
+            }
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .uri("/admin/settings")
+                        .header(header::AUTHORIZATION, "Bearer admin")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            let body = body::to_bytes(response.into_body(), 1024 * 1024)
+                .await
+                .unwrap();
+            assert_eq!(
+                serde_json::from_slice::<serde_json::Value>(&body).unwrap()["tui_local_agent_summary"],
+                expected
+            );
+        }
     }
 
     #[tokio::test]

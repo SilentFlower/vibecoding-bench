@@ -166,6 +166,7 @@ class AccountSource:
             "input_policy_protocol": 1,
             "capture_http_protocol": 1,
             "agent_scope_protocol": 1,
+            "agent_summary_protocol": 1,
             "upstream_session_protocol": 1,
         }
         receipt = hello.get("receipt") if action == "status" else None

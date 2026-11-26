@@ -921,6 +921,8 @@ struct TuiReservationIdentity<'a> {
     continuation_only: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     agent_hint: Option<&'a str>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    agent_summary: bool,
 }
 
 #[cfg(feature = "tui-v2-candidate")]
@@ -979,7 +981,7 @@ async fn tui_status(
     binding: &TransportBinding,
     fixture: bool,
     probe: Option<&TuiReceiptProbe>,
-) -> Result<bool, TuiV2Unavailable> {
+) -> Result<(bool, bool), TuiV2Unavailable> {
     let mut request = client
         .get(format!(
             "{}/internal/status",
@@ -1008,14 +1010,18 @@ async fn tui_status(
         .await
         .map_err(|_| TuiV2Unavailable::ReadinessUnverified)?;
     let idle = tui_status_snapshot(binding, &status, fixture)?;
+    let summary = status["tui_v2"]["agent_summary_protocol"] == 1;
     if probe.is_some() {
         if !fixture && status["evidence_ok"] != true {
             return Err(TuiV2Unavailable::ReadinessUnverified);
         }
         // 旧 sender 没有逐轮报告，只有完全空闲才能证明原轮已退出。
-        return Ok(status["tui_v2"]["receipt_idle"].as_bool().unwrap_or(idle));
+        return Ok((
+            status["tui_v2"]["receipt_idle"].as_bool().unwrap_or(idle),
+            summary,
+        ));
     }
-    Ok(idle)
+    Ok((idle, summary))
 }
 
 fn tui_status_snapshot(
@@ -1123,7 +1129,7 @@ async fn probe_tui_account(
             predecessors,
             ..
         } = tui_transport(account, None, registered, false).await?;
-        let idle = tui_status(&client, &binding, fixture, probe).await?;
+        let (idle, _) = tui_status(&client, &binding, fixture, probe).await?;
         Ok(TuiBindingStatus {
             key: tui_sender_key(&binding, fixture),
             idle,
@@ -1334,6 +1340,7 @@ pub(super) struct TuiReadySender {
     binding: TransportBinding,
     pub(super) key: String,
     pub(super) idle: bool,
+    agent_summary: bool,
     predecessors: Vec<String>,
     tui_oauth_profile: Option<Map<String, Value>>,
 }
@@ -1365,7 +1372,7 @@ pub(super) async fn ready_tui_sender(
     let budget = deadline
         .checked_duration_since(Instant::now())
         .ok_or(AppError::AdmissionLimited { retry_after: 1 })?;
-    let (transport, idle) = timeout(budget, async {
+    let (transport, (idle, agent_summary)) = timeout(budget, async {
         let transport = tui_transport(account, wake.then_some(budget), registered, true).await?;
         let idle = tui_status(
             &transport.client,
@@ -1392,6 +1399,7 @@ pub(super) async fn ready_tui_sender(
         binding,
         key,
         idle,
+        agent_summary,
         predecessors,
         tui_oauth_profile,
     })
@@ -1698,6 +1706,7 @@ pub(super) struct TuiMessagesInput<'a> {
     pub body: &'a Bytes,
     pub headers: &'a HeaderMap,
     pub native_cc: bool,
+    pub agent_summary: bool,
     pub oauth_file: bool,
     pub body_policy: TuiBodyPolicy,
 }
@@ -1845,7 +1854,12 @@ fn tui_agent_hint<'a>(input: &TuiMessagesInput<'a>) -> Result<Option<&'a str>, A
     if !input.native_cc {
         return Ok(None);
     }
-    let mut hints = input.headers.get_all("x-claude-code-agent-id").iter();
+    tui_agent_header(input.headers)
+}
+
+/// 读取唯一且有效的原生子代理标识。@param headers 公开入口头。@return 可选的标识。
+pub(super) fn tui_agent_header(headers: &HeaderMap) -> Result<Option<&str>, AppError> {
+    let mut hints = headers.get_all("x-claude-code-agent-id").iter();
     let Some(value) = hints.next() else {
         return Ok(None);
     };
@@ -1875,6 +1889,11 @@ pub(super) async fn prepare_tui(
             .checked_duration_since(Instant::now())
             .ok_or_else(limited)
     };
+    if input.agent_summary && !sender.agent_summary {
+        return Err(AppError::ServiceUnavailable(
+            "原生进度请求需要支持独立摘要的账号发送器".into(),
+        ));
+    }
     let TuiReadySender {
         client,
         binding,
@@ -1899,6 +1918,7 @@ pub(super) async fn prepare_tui(
         deadline_unix_ms: now_ms().saturating_add(remaining()?.as_millis() as u64),
         continuation_only,
         agent_hint,
+        agent_summary: input.agent_summary,
     };
     let identity_header = STANDARD.encode(
         serde_json::to_vec(&identity)
@@ -3123,7 +3143,10 @@ async fn status(
                 .status(&config.binding, Some(configuration), receipt_probe.as_ref())
                 .await
             {
-                Some((idle, receipt_idle)) => {
+                Some((idle, receipt_idle, agent_summary)) => {
+                    if agent_summary {
+                        status["agent_summary_protocol"] = json!(1);
+                    }
                     status["ready"] = json!(true);
                     status["idle"] = json!(idle);
                     if let Some(receipt_idle) = receipt_idle {
@@ -5761,6 +5784,7 @@ mod tests {
                 key: tui_sender_key(&binding, true),
                 binding,
                 idle: true,
+                agent_summary: false,
                 predecessors: Vec::new(),
                 tui_oauth_profile: None,
             };
@@ -5768,6 +5792,7 @@ mod tests {
                 body: &body,
                 headers: &headers,
                 native_cc: false,
+                agent_summary: false,
                 oauth_file: false,
                 body_policy,
             };
@@ -5848,6 +5873,7 @@ mod tests {
                 body: &body,
                 headers: &headers,
                 native_cc: true,
+                agent_summary: false,
                 oauth_file: false,
                 body_policy: TuiBodyPolicy::default(),
             })
@@ -5859,6 +5885,7 @@ mod tests {
                 body: &body,
                 headers: &headers,
                 native_cc: false,
+                agent_summary: false,
                 oauth_file: false,
                 body_policy: TuiBodyPolicy::default(),
             })
@@ -5871,6 +5898,7 @@ mod tests {
                 body: &body,
                 headers: &headers,
                 native_cc: true,
+                agent_summary: false,
                 oauth_file: false,
                 body_policy: TuiBodyPolicy::default(),
             })

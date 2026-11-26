@@ -19,6 +19,7 @@ use serde_json::{Map, Value, json};
 use uuid::Uuid;
 
 use crate::error::AppError;
+use crate::service::agent_summary::{describe_action, is_summary_prompt};
 
 use super::{
     AGY_IMAGE_MIME_TYPES, gemini_thinking_budget_tier, gemini_thinking_level_tier, prompt_blocked,
@@ -29,17 +30,6 @@ const IMAGE_BASE64: GeneralPurpose = GeneralPurpose::new(
     GeneralPurposeConfig::new().with_decode_padding_mode(DecodePaddingMode::Indifferent),
 );
 const USER_PROMPT_SUBMIT_CONTEXT_PREFIX: &str = "UserPromptSubmit hook additional context: ";
-const AGENT_SUMMARY_HEADER: &str = "Describe your most recent action in 3-5 words using present tense (-ing). Name the file or function, not the branch. Do not use tools.\n";
-const AGENT_SUMMARY_EXAMPLES: &str = r#"
-Good: "Reading runAgent.ts"
-Good: "Fixing null check in validate.ts"
-Good: "Running auth module tests"
-Good: "Adding retry logic to fetchUser"
-
-Bad (past tense): "Analyzed the branch diff"
-Bad (too vague): "Investigating the issue"
-Bad (too long): "Reviewing full branch diff and AgentTool.tsx integration"
-Bad (branch name): "Analyzed adam/background-summary branch diff""#;
 fn invalid(message: &str) -> AppError {
     AppError::BadRequest(message.into())
 }
@@ -318,17 +308,7 @@ pub(super) fn message_id() -> String {
 fn agent_summary(contents: &[Value]) -> Option<String> {
     let (last, history) = contents.split_last()?;
     let (prompt, parts) = last["parts"].as_array()?.split_last()?;
-    let previous = prompt["text"]
-        .as_str()?
-        .strip_prefix(AGENT_SUMMARY_HEADER)?
-        .strip_suffix(AGENT_SUMMARY_EXAMPLES)?;
-    if last["role"] != "user"
-        || (!previous.is_empty()
-            && !previous
-                .strip_prefix("\nPrevious: \"")
-                .and_then(|value| value.strip_suffix("\" — say something NEW.\n"))
-                .is_some_and(|value| !value.is_empty() && !value.contains('\n')))
-    {
+    if last["role"] != "user" || !is_summary_prompt(prompt["text"].as_str()?) {
         return None;
     }
     // SDK 可把摘要追加到工具结果所在的 user 块，也可单独发送一个 user 块。
@@ -358,31 +338,11 @@ fn agent_summary(contents: &[Value]) -> Option<String> {
         latest = Some((call, response["response"]["is_error"] == true));
     }
     let (call, failed) = latest?;
-    let (action, fallback) = match (failed, call["name"].as_str()?) {
-        (true, _) => return Some("Checking a tool error".into()),
-        (_, "Read") => ("Reading", "Reading a local file"),
-        (_, "Edit" | "MultiEdit") => ("Editing", "Editing a local file"),
-        (_, "Write") => ("Writing", "Writing a local file"),
-        (_, "Bash") => return Some("Running a shell command".into()),
-        (_, "Grep" | "Glob" | "WebSearch" | "web_search") => {
-            return Some("Searching for matching results".into());
-        }
-        _ => return Some("Checking the tool result".into()),
-    };
-    let file = call["args"]["file_path"]
-        .as_str()
-        .and_then(|path| path.rsplit(['/', '\\']).next())
-        .filter(|file| {
-            !file.is_empty()
-                && file.len() <= 80
-                && file
-                    .bytes()
-                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
-        });
-    Some(match file {
-        Some(file) => format!("{action} file {file}"),
-        None => fallback.into(),
-    })
+    Some(describe_action(
+        call["name"].as_str()?,
+        &call["args"],
+        failed,
+    ))
 }
 
 fn usage(source: &Value) -> Value {
@@ -464,7 +424,7 @@ fn content_block(part: &Value) -> Option<Value> {
 
 /// 返回本地工具进度及供计费网关识别的回执。
 /// @param summary 已生成的标签。@param model 公开模型。@param streaming 是否使用 SSE。@return Messages 响应。
-pub(super) fn agent_summary_response(summary: String, model: &str, streaming: bool) -> Response {
+pub(crate) fn agent_summary_response(summary: String, model: &str, streaming: bool) -> Response {
     let frame = json!({"candidates":[{
         "content":{"parts":[{"text":summary}]},"finishReason":"STOP"
     }]});
@@ -473,6 +433,7 @@ pub(super) fn agent_summary_response(summary: String, model: &str, streaming: bo
     } else {
         json_response(&frame, model)
     };
+    // 历史回执名表示本地生成的进度标签，内核来源单独记在诊断里。
     response.headers_mut().insert(
         "x-flower2api-local-response",
         HeaderValue::from_static("agy_agent_summary"),
@@ -746,10 +707,11 @@ pub(super) fn stream_response(
 #[cfg(test)]
 mod tests {
     use super::{
-        AGENT_SUMMARY_EXAMPLES, AGENT_SUMMARY_HEADER, agent_summary_response, json_response,
-        response_text, stream_response, system_reminder_target, thinking_tier,
+        agent_summary_response, json_response, response_text, stream_response,
+        system_reminder_target, thinking_tier,
     };
     use crate::error::AppError;
+    use crate::service::agent_summary::{AGENT_SUMMARY_EXAMPLES, AGENT_SUMMARY_HEADER};
     use axum::body::to_bytes;
     use axum::http::StatusCode;
     use futures_util::stream;

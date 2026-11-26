@@ -266,6 +266,7 @@ mod tests {
             deadline_unix_ms: 0,
             continuation_only: false,
             agent_hint: None,
+            agent_summary: false,
         }
     }
 

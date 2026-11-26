@@ -2161,7 +2161,7 @@ transport.submit(prepared, body, ttfb_timeout).await
 - `usage_prefix_retains_http_error_until_the_first_deliverable_frame` 核对首帧之前的错误、开流后 SSE 终态和缓存用量保留。`history_closure_requires_the_original_worker_and_request` 核对回执归属和缺失证明。
 - `verify_agy_native_loopback.py --tool-receipts` 以两笔重叠的原版调用验证 Scanner 帧归属，并重放一笔侧调用的空会话。核对真实 EOF 失败的 16 次重试、一次历史恢复、恢复用尽的 400、跨重启回执、维护收口恢复与成功记录存储异常。`--continuation-modes` 同时核对 Gemini Claim 占位签名。`--tool-deadlines` 核对长工具等待和已回收响应的 410。
 
-## Scenario: AGY 本地进度标签回执
+## Scenario: 工具进度的原生与本地响应
 
 ### 1. Scope / Trigger
 
@@ -2170,19 +2170,21 @@ transport.submit(prepared, body, ttfb_timeout).await
 ### 2. Signatures
 
 - `agent_summary_response(summary: String, model: &str, streaming: bool) -> Response`
-- HTTP 200，响应头 `X-Flower2API-Local-Response: agy_agent_summary`。
+- 系统设置 `GET/PUT /admin/settings` 的 `tui_local_agent_summary` 接受字符串 `true` 或 `false`，缺省为 `false`，保存后从下一次匹配的 V2 请求开始生效。
+- 成功的本地进度响应为 HTTP 200，响应头 `X-Flower2API-Local-Response: agy_agent_summary`。
 
 ### 3. Contracts
 
-- 鉴权、固定摘要模板与工具结果配对、可用候选校验通过后，本地标签分支生成回执。此时上游模型尝试为 0。
+- 鉴权、固定摘要模板与工具结果配对、可用候选校验通过后，本地标签分支生成回执。此时上游模型尝试为 0。V2 还须匹配当前主体、显式会话、可访问的 V2 账号及原先登记的完整工具组。查询只读，真正的工具回执仍可认领一次。
+- V2 原生模式沿原账号、原模型和原始 Messages 输入独立推理，复用常规发送准入、缓存与用量采集。真实工具回执由原进程单次认领。账号发送器通过 `agent_summary_protocol=1` 宣告支持。未升级的发送器在独立准备前返回 503，正在等待的原工具组可继续。
 - JSON 返回文本、`stop_reason=end_turn` 和明确的零输入、零输出、零缓存读取用量。SSE 在 `message_start` 和 `message_delta` 都提供相同的零用量，并以 `message_stop` 收尾。
-- 外层计费网关从受信任渠道的实际响应中取得回执，用它区分明确零用量与缺失用量。只有本地进度标签成功响应携带此值。
+- 外层计费网关从受信任渠道的实际响应中取得回执，用它区分明确零用量与缺失用量。只有本地进度标签成功响应携带此值。该值按已有线协议固定。本地模式的 V2 来源记在内部诊断阶段 `tui_agent_summary`。
 
 ### 4. Validation & Error Matrix
 
 | 条件 | 结果 |
 | --- | --- |
-| 本地进度标签匹配且账号候选可用 | HTTP 200、局部生成的标签和回执 |
+| 本地模式下进度标签匹配且账号可用 | HTTP 200、局部生成的标签和回执 |
 | 本地进度标签匹配但候选为空 | 503 |
 | 普通模型响应 | 模型内容和供应方用量 |
 
