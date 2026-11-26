@@ -82,6 +82,7 @@ REPLY = "CLIENT：合成便签内容"
 SECOND_REPLY = "SECOND：客户端工具合成错误"
 RECONNECT_PREFIX = "续轮在断开前已经交付的合成文本。"
 FINAL = "模型已收到本次客户端回执。"
+FORCED_CHOICES = {"any": {"type": "any"}, "named": {"type": "tool", "name": SECOND_TOOL["name"]}}
 
 
 def response_json(handler, payload):
@@ -230,7 +231,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            recovery_ledger_contention=False, recovery_ledger_deadline=False, recovery_workspace_rejection=False,
            recovery_slow_model=False, initial_idle_model_connection=False, trace_startup=False, cache_markers=False,
            history_cache_markers=False, history_cache_ttl=None, cache_capability=None, message_system_roles=False,
-           structured_output=False):
+           structured_output=False, forced_tool_choice=None):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -269,6 +270,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param cache_capability 对照生产入口或 CLI 提示词和工具的缓存标记能力。
     @param message_system_roles 消息级系统角色对照或普通 API 固定回归模式。
     @param structured_output 是否核对普通 API 的结构化输出和实际发送路径。
+    @param forced_tool_choice 核对强制工具选择及同进程或重启回执。
     @return 脱敏证据。
     """
     secret, admin, internal, account_token = (token_hex(32) for _ in range(4))
@@ -283,7 +285,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     for directory in (Path("/run/v3/tui-v2"), Path("/native"), Path("/flows/api")):
         directory.mkdir(mode=0o700, parents=True, exist_ok=True)
         os.chown(directory, 1001, 1001)
-    inspect_model_body = cache_markers or message_system_roles or thinking_display_model or structured_output
+    inspect_model_body = (cache_markers or message_system_roles or thinking_display_model or structured_output
+                          or forced_tool_choice)
     if inspect_model_body and v1_runtime is None:
         MODEL_BODY_TRACE.touch(mode=0o600, exist_ok=False)
         os.chown(MODEL_BODY_TRACE, 1001, 1001)
@@ -335,7 +338,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 sleep(SLOW_MODEL_DELAY)
             restart = any(b.get("text") == AFTER_RESTART for row in body["messages"] for b in blocks(row))
             prefix = b""
-            if not results and tool and not restart and v1_runtime is None:
+            if forced_tool_choice:
+                wire = fixture_forced_tool_sse(body)
+            elif not results and tool and not restart and v1_runtime is None:
                 content = {"type": "tool_use", "id": NEW_ID, "name": tool["name"], "input": ARGS}
                 second = None
                 if parallel_tools:
@@ -564,6 +569,18 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                                fixed=message_system_roles == "ordinary-contract")
         if structured_output:
             return verify_structured_output(manage, token, identifier, received)
+        if forced_tool_choice:
+            def restart_forced(headers):
+                nonlocal source
+                marker = ("--name=" + headers["x-session-id"]).encode()
+                (pid,) = [int(path.parent.name) for path in Path("/proc").glob("[0-9]*/cmdline")
+                          if fixture_command_has(path, marker)]
+                os.kill(pid, SIGKILL)
+                source = restart(source, "forced_tool_receipt")
+                assert not Path(f"/proc/{pid}").exists()
+
+            return verify_forced_tool_choice(manage, token, identifier, received, sender_state_after_failure,
+                                             restart_forced if forced_tool_choice == "restart" else None)
         if cache_capability:
             return verify_cache_capabilities(manage, token, identifier, headers, received, cache_capability)
         if history_cache_markers:
@@ -1719,6 +1736,101 @@ def verify_thinking_display_contract(manage, token, identifier, received, model,
             "wire_final": "unavailable", "cases": proof, "model_posts": len(received)}
 
 
+def fixture_forced_tool_sse(body):
+    """按实收工具选择返回合成 tool_use。@param body 模型实收。@return 原始 SSE。"""
+    choice = body.get("tool_choice", {})
+    if choice.get("type") in ("any", "tool"):
+        repeat = bool(find_blocks(body, "tool_use_id", NEW_ID))
+        # any 的两次响应选不同工具，指定工具的两次响应保持同名并分配独立 ID。
+        selected = choice.get("name", SECOND_TOOL["name"] if repeat else TOOL["name"])
+        if any(tool["name"] == selected for tool in body.get("tools", [])):
+            tool_id = SECOND_ID if repeat else NEW_ID
+            tool = {"type": "tool_use", "name": selected, "id": tool_id, "input": SECOND_ARGS if repeat else ARGS}
+            return message_sse(tool, "tool_use", f"msg_{tool_id}")
+    return message_sse({"type": "text", "text": FINAL}, "end_turn", "msg_forced_final")
+
+
+def verify_forced_tool_choice(manage, token, identifier, received, sender_status, restart):
+    """从公开入口核对强制选择、原工具回执和 CLI 正文。
+    @param manage 管理入口。@param token 合成令牌。@param identifier 账号 ID。
+    @param received 模型实收。@param sender_status 失败后查询发送器。@param restart 可选的发送器重启。
+    @return 按请求关联的证据。
+    """
+    cases = {}
+    tools = [TOOL, SECOND_TOOL]
+
+    def post(body, phase, expected_status):
+        before = len(received)
+        status, raw, request_id = checked_messages(manage, token, body, headers, received, phase,
+                                                   expected_status=expected_status, trace_startup=True,
+                                                   sender_status=sender_status)
+        reservation, record, claims = cache_marker_claims(manage, request_id)
+        proof = {"status": status, "request_id": request_id, "reservation_id": reservation,
+                 "attempt_count": record["attempt_count"], "model_posts": len(received) - before}
+        if status != 200:
+            assert proof["attempt_count"] == proof["model_posts"] == 0 and not claims, (phase, proof)
+            proof.update(error_code=json.loads(raw)["error"]["code"], diagnostics_stage=record.get("error_stage"))
+            return raw, proof
+        ((digest, model, _),), (claim,) = received[before:], claims
+        assert proof["attempt_count"] == proof["model_posts"] == 1 and claim["sha256"] == digest, (phase, proof)
+        assert not claim["from_interactive_cli"] and not claim["uses_native_history"], (phase, claim)
+        assert claim["cli_sha256"] and claim["cli_sha256"] != digest, (phase, claim)
+        assert claim["cli_tool_choice"] in (None, {"type": "auto"}), (phase, claim)
+        assert model["tool_choice"] == body["tool_choice"] and model["tools"] == tools, (phase, model)
+        assert model["thinking"] == body["thinking"], (phase, model)
+        result = [(r["role"], b) for r in body["messages"] for b in blocks(r) if b["type"] in ("tool_use", "tool_result")]
+        observed = [(r["role"], b) for r in model["messages"] for b in blocks(r) if b["type"] in ("tool_use", "tool_result")]
+        assert observed == result, (phase, observed)
+        proof.update(provider_path="account_sender", model_body_sha256=digest, model_tool_choice=model["tool_choice"],
+                     model_tools=[tool["name"] for tool in model["tools"]], tool_history=observed,
+                     cli_body_sha256=claim["cli_sha256"], cli_tool_choice=claim["cli_tool_choice"],
+                     cli_tool_names=claim["cli_tool_names"])
+        return raw, proof
+
+    policies = ("append",) if restart else ("append", "replace", "user_reminder")
+    for policy in policies:
+        account = manage("PUT", f"accounts/{identifier}", {"client_system_prompt_policy": policy})
+        assert account["client_system_prompt_policy"] == policy
+        for label, choice in FORCED_CHOICES.items():
+            phase = policy + "_" + label
+            headers = {"x-session-id": str(uuid4()), "User-Agent": "flower2api-forced-tool-fixture/1"}
+            messages = [{"role": "user", "content": "查询合成便签。"}]
+            body = {"model": MODEL, "max_tokens": 128, "messages": messages, "tools": tools, "stream": False,
+                    "system": SYSTEM[0], "thinking": {"type": "disabled"}, "tool_choice": choice}
+            status = 200 if policy == "append" else 422
+            raw, first = post(body, phase + "_initial", status)
+            if status == 422:
+                assert first["error_code"] == "unsupported_parameter", (phase, raw)
+                cases[phase] = {"initial": first}
+                continue
+            second_name = SECOND_TOOL["name"]
+            first_name = TOOL["name"] if label == "any" else second_name
+            follow = body
+            tool_proofs = [first]
+            for tool_id, name, args in ((NEW_ID, first_name, ARGS), (SECOND_ID, second_name, SECOND_ARGS)):
+                if tool_id == SECOND_ID:
+                    raw, step = post(follow, phase + "_receipt_forced", 200)
+                    tool_proofs.append(step)
+                tool_reply = json.loads(raw)
+                expected = {"type": "tool_use", "id": tool_id, "name": name, "input": args}
+                assert tool_reply["stop_reason"] == "tool_use" and tool_reply["content"] == [expected], (phase, tool_reply)
+                tool_proofs[-1]["public_tool"] = expected
+                receipt = {"type": "tool_result", "tool_use_id": tool_id, "content": REPLY}
+                messages = [*messages, {"role": "assistant", "content": tool_reply["content"]},
+                            {"role": "user", "content": [receipt]}]
+                follow = {**body, "messages": messages}
+                if tool_id == NEW_ID and restart:
+                    restart(headers)
+            final_request = {**follow, "tool_choice": {"type": "auto"}}
+            raw, final = post(final_request, phase + "_receipt_auto", 200)
+            reply = json.loads(raw)
+            assert reply["stop_reason"] == "end_turn" and reply["content"] == [{"type": "text", "text": FINAL}], raw
+            final.update(client_text=reply["content"][0]["text"], client_stop_reason=reply["stop_reason"])
+            cases[phase] = {"initial": first, "forced_receipt": tool_proofs[-1], "auto_receipt": final, "client_tool_calls": 2}
+    assert not any(path.is_file() for path in Path("/flows/api").rglob("*"))
+    return {"wire_final": "unavailable", "restarted": restart is not None, "cases": cases, "model_posts": len(received)}
+
+
 def verify_structured_output(manage, token, identifier, received):
     """核对三种账号动作下的普通结构化输出。
     @param manage 管理入口。@param token 合成令牌。@param identifier 账号 ID。
@@ -2465,6 +2577,7 @@ def main():
     scenario.add_argument("--initial-idle-model-connection", action="store_true")
     scenario.add_argument("--output-effort", action="store_true")
     scenario.add_argument("--structured-output-contract", action="store_true")
+    scenario.add_argument("--forced-tool-choice-contract", choices=("live", "restart"))
     scenario.add_argument("--thinking-display-contract", choices=tuple(THINKING_DISPLAY_DEFAULTS))
     scenario.add_argument("--history-png", action="store_true")
     scenario.add_argument("--history-images", action="store_true")
@@ -2498,7 +2611,7 @@ def main():
     previous = args.mixed_release
     cache_markers = args.cache_markers or args.cache_marker_capabilities is not None
     trace_startup = (args.initial_idle_model_connection or args.trace_initial_startup or cache_markers
-                     or args.structured_output_contract
+                     or args.structured_output_contract or bool(args.forced_tool_choice_contract)
                      or bool(args.thinking_display_contract)
                      or (bool(args.message_system_roles) and args.v1_runtime is None))
     if trace_startup and (previous or args.mixed_image_peers or args.v1_runtime):
@@ -2537,7 +2650,8 @@ def main():
                        initial_idle_model_connection=args.initial_idle_model_connection, trace_startup=trace_startup,
                        cache_markers=cache_markers, history_cache_markers=args.history_cache_markers,
                        history_cache_ttl=args.history_cache_ttl, cache_capability=args.cache_marker_capabilities,
-                       message_system_roles=args.message_system_roles, structured_output=args.structured_output_contract)
+                       message_system_roles=args.message_system_roles, structured_output=args.structured_output_contract,
+                       forced_tool_choice=args.forced_tool_choice_contract)
         print(json.dumps(proof, ensure_ascii=False))
 
 

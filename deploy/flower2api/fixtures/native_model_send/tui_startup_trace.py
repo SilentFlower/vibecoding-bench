@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import sys
 from time import monotonic_ns
+from traceback import extract_tb
 
 
 MODEL_BODY_TRACE = Path("/run/v3/tui-v2/.fixture-model-body.jsonl")
@@ -67,7 +68,15 @@ def main():
             options["arguments"] = arguments
             startup_event("cli_thinking_summaries_setting", reservation_id=ident, enabled=thinking_summaries)
         startup_event("cli_launch", reservation_id=ident)
-        process = launch_session(reservation, command, **options)
+        try:
+            process = launch_session(reservation, command, **options)
+        except Exception as error:
+            # 保留失败位置供回环诊断。异常原文可能含文件或命令参数。
+            location = extract_tb(error.__traceback__)[-1]
+            startup_event("cli_launch_failed", reservation_id=ident, error_type=type(error).__name__,
+                          errno=getattr(error, "errno", None), module=Path(location.filename).name,
+                          function=location.name, line=location.lineno)
+            raise
         startup_event("cli_spawned", reservation_id=ident)
         return process
 
@@ -91,6 +100,9 @@ def main():
             evidence = {"reservation_id": submission.handle.reservation["reservation_id"],
                         "uses_native_history": actor.cold_history is not None,
                         "from_interactive_cli": submission.body == native_raw,
+                        "cli_tool_choice": native.get("tool_choice"),
+                        "cli_tool_names": [tool.get("name") for tool in native.get("tools") or []],
+                        "cli_sha256": sha256(native_raw).hexdigest() if native_raw is not None else None,
                         "sha256": sha256(submission.body).hexdigest()}
             with suppress(OSError), MODEL_BODY_TRACE.open("ab", buffering=0) as stream:
                 stream.write((json.dumps(evidence) + "\n").encode())
