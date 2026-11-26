@@ -521,20 +521,47 @@ class ColdHistoryTests(TestCase):
         for output in ({"effort": "unknown"}, {"format": {"type": "json_schema", "schema": {}}}):
             self.assertIsNone(ColdHistory.from_request({**self.body, "output_config": output}))
 
-    def test_explicit_adaptive_updates_is_frozen(self):
+    def test_explicit_adaptive_display_is_frozen(self):
         """已验证的自适应思考配置随根轮冻结。@return 无。"""
-        thinking = {"type": "adaptive", "display": "updates"}
+        updates = {"type": "adaptive", "display": "updates"}
+        summarized = {"type": "adaptive", "display": "summarized"}
         for model in ("claude-sonnet-4-6", "claude-opus-5-5"):
-            with self.subTest(model=model):
-                body = {**self.body, "model": model, "thinking": thinking}
-                plan = ColdHistory.from_request(body)
-                boundary = plan.receipt_boundary()
-                self.assertEqual(plan.thinking, thinking)
-                self.assertEqual(ColdHistory.from_receipt_boundary(body, boundary), plan)
-                for changed in ({"type": "adaptive"}, {**thinking, "display": "omitted"},
-                                {**thinking, "display": "summarized"}, {"type": "disabled"}):
-                    self.assertIsNone(ColdHistory.from_receipt_boundary({**body, "thinking": changed}, boundary))
-        self.assertIsNone(ColdHistory.from_request({**self.body, "model": "claude-haiku-4-5", "thinking": thinking}))
+            for thinking, alternate in ((updates, summarized), (summarized, updates)):
+                with self.subTest(model=model, thinking=thinking):
+                    body = {**self.body, "model": model, "thinking": thinking}
+                    plan = ColdHistory.from_request(body)
+                    boundary = plan.receipt_boundary()
+                    self.assertEqual(plan.thinking, thinking)
+                    self.assertEqual(ColdHistory.from_receipt_boundary(body, boundary), plan)
+                    for substitution in (alternate, {"type": "disabled"}):
+                        self.assertIsNone(ColdHistory.from_receipt_boundary({**body, "thinking": substitution}, boundary))
+                    for changed in ({"type": "adaptive"}, {**thinking, "display": "omitted"}):
+                        self.assertIsNone(ColdHistory.from_request({**body, "thinking": changed}))
+        self.assertIsNone(ColdHistory.from_request({**self.body, "model": "claude-haiku-4-5", "thinking": summarized}))
+
+    def test_signed_tool_recovery_retains_only_the_observed_model(self):
+        """只恢复有已登记模型的签名工具组，并核对实际出站签名。@return 无。"""
+        root = {**self.body, "thinking": {"type": "adaptive", "display": "summarized"}}
+        plan = ColdHistory.from_request(root)
+        thinking = {"type": "thinking", "thinking": "合成摘要", "signature": "合成签名"}
+        tool = {"type": "tool_use", "id": "toolu_new", "name": "LookupNote", "input": {}}
+        messages = [*root["messages"], {"role": "assistant", "content": [thinking, tool]},
+                    {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_new", "content": "回执"}]}]
+        self.assertIsNone(plan.resume_receipts(messages))
+        self.assertIsNone(plan.resume_receipts(messages, signed_tool_models={"toolu_other": self.body["model"]}))
+        recovered = plan.resume_receipts(messages, signed_tool_models={"toolu_new": "claude-opus-5-5"})
+        work, session = Path("/native/workspace"), str(uuid4())
+        with TemporaryDirectory() as directory, ExitStack() as stack:
+            config = Path(directory)
+            recovered.import_session(config, work, session)
+            path = _resume_path(stack, config, work, session, required=True)
+            archived = [json.loads(line)["message"] for line in path.read_text().splitlines()]
+        self.assertEqual(archived[-2]["model"], "claude-opus-5-5")
+        self.assertEqual(set(archived[-2]), {"role", "content", "model"})
+        self.assertTrue(all(set(row) == {"role", "content"} for row in [*archived[:-2], archived[-1]]))
+        self.assertTrue(recovered.matches_recovered_signatures({"messages": archived}))
+        archived[-2]["content"][0]["signature"] = "改写签名"
+        self.assertFalse(recovered.matches_recovered_signatures({"messages": archived}))
 
     def test_explicit_auto_tool_choice_preserves_parallel_permission(self):
         """自动选择进入原生合同并随原工具组冻结。@return 无。"""

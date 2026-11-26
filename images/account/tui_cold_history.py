@@ -22,6 +22,7 @@ MCP_SERVER = "flower"
 MCP_PREFIX = f"mcp__{MCP_SERVER}__"
 RESUME_PROMPT = "Continue from where you left off."
 IMPORT_BOUNDARY = "flower2apiImportBoundary"
+SIGNED_THINKING_TYPES = ("thinking", "redacted_thinking")
 _IMAGE_HEADERS = {
     "image/png": (b"\x89PNG\r\n\x1a\n",),
     "image/jpeg": (b"\xff\xd8\xff",),
@@ -139,11 +140,20 @@ def _automatic_tools(choice):
             and choice.get("disable_parallel_tool_use", False) is False)
 
 
-def _closed_history(rows, *, result_types=(str,)):
+def _signed_thinking(block):
+    if block["type"] == "redacted_thinking":
+        return block.keys() == {"type", "data"} and isinstance(block.get("data"), str) and bool(block["data"])
+    return (block["type"] == "thinking" and block.keys() == {"type", "thinking", "signature"}
+            and isinstance(block.get("thinking"), str) and isinstance(block.get("signature"), str)
+            and bool(block["signature"]))
+
+
+def _closed_history(rows, *, result_types=(str,), signed_rows=()):
     pending, seen, results = set(), set(), set()
     for index, row in enumerate(rows):
         for block in _blocks(row):
-            if _history_text(block) or (row["role"] == "user" and _inline_image(block)):
+            if (_history_text(block) or (row["role"] == "user" and _inline_image(block))
+                    or (index in signed_rows and row["role"] == "assistant" and _signed_thinking(block))):
                 continue
             if (row["role"] == "assistant" and block.get("type") == "tool_use"
                     and block.keys() == {"type", "id", "name", "input"}
@@ -187,6 +197,7 @@ class ColdHistory:
     current_blocks: tuple[dict, ...] = ()
     tool_choice: dict | None = None
     cache_ttl: str = "off"
+    recovered_models: tuple[tuple[int, str], ...] = ()
 
     @classmethod
     def from_request(cls, body, system_policy="append", *, cache_ttl="off"):
@@ -202,9 +213,10 @@ class ColdHistory:
             return None
         thinking = body.get("thinking")
         if thinking not in (None, {"type": "disabled"}):
-            # 固定 CLI 在这两个模型上原样生成显式 updates。其他显示模式仍使用现有合同。
+            # 只接受固定 CLI 能原样生成的显式显示模式。
             if (body["model"] not in ("claude-sonnet-4-6", "claude-opus-5-5")
-                    or thinking != {"type": "adaptive", "display": "updates"}):
+                    or thinking not in ({"type": "adaptive", "display": "updates"},
+                                        {"type": "adaptive", "display": "summarized"})):
                 return None
         output = body.get("output_config", {})
         if not isinstance(output, dict) or output and (
@@ -280,6 +292,8 @@ class ColdHistory:
             scope = (*scope, self.effort)
         if self.tool_choice is not None:
             scope = (*scope, self.tool_choice)
+        if self.recovered_models:
+            scope = (*scope, self.recovered_models)
         return scope if self.cache_ttl == "off" else (*scope, self.cache_ttl)
 
     def matches_tool_choice(self, native):
@@ -313,9 +327,10 @@ class ColdHistory:
                 return plan
         return None
 
-    def resume_receipts(self, messages):
+    def resume_receipts(self, messages, *, signed_tool_models=None):
         """将已认领的原生工具组纳入恢复历史。
-        @param messages 已核对原历史、调用和回执的完整公开消息。@return 本次原生恢复计划。
+        @param messages 已核对原历史、调用和回执的完整公开消息。
+        @param signed_tool_models 账号亲自观测并按工具 ID 保存的模型名。@return 本次原生恢复计划。
         """
         history = []
         for index, row in enumerate(messages):
@@ -340,10 +355,45 @@ class ColdHistory:
                 history[-1]["content"] += content
             else:
                 history.append({"role": role, "content": list(content)})
-        if not _closed_history(history, result_types=(str, list)):
+        models = {}
+        if signed_tool_models:
+            for index, row in enumerate(history):
+                content = row["content"]
+                if row["role"] != "assistant" or not any(block["type"] in SIGNED_THINKING_TYPES for block in content):
+                    continue
+                reported = {signed_tool_models.get(block["id"]) for block in content if block["type"] == "tool_use"}
+                if len(reported) != 1:
+                    return None
+                (model,) = reported
+                if not isinstance(model, str) or not model:
+                    return None
+                models[index] = model
+        if not _closed_history(history, result_types=(str, list), signed_rows=models):
             return None
         # 交互 CLI 从闭合的工具结果开始读取。新模型步骤仍由受管 PTY 标记认领。
-        return replace(self, history=history, prompt=RESUME_PROMPT, current_blocks=())
+        return replace(self, history=history, prompt=RESUME_PROMPT, current_blocks=(),
+                       recovered_models=tuple(models.items()))
+
+    def matches_recovered_signatures(self, native):
+        """核对原生出站是否保留已认证的签名及工具组。@param native CLI 正文。@return 核对结果。"""
+        if not self.recovered_models:
+            return True
+
+        def signed_groups(rows):
+            groups, current = [], []
+            for row in rows:
+                if row["role"] == "assistant":
+                    current.extend(_blocks(row))
+                elif current:
+                    groups.append(current)
+                    current = []
+            if current:
+                groups.append(current)
+            return [[block["id"] if block["type"] == "tool_use" else block for block in content
+                     if block["type"] in (*SIGNED_THINKING_TYPES, "tool_use")]
+                    for content in groups if any(block["type"] in SIGNED_THINKING_TYPES for block in content)]
+
+        return signed_groups(native["messages"]) == signed_groups(self.history)
 
     def _reminder(self):
         return f"<system-reminder>\n{self.system}\n</system-reminder>"
@@ -442,8 +492,9 @@ class ColdHistory:
         # 旧导入文件只记录了当时使用的请求模型。按原条件读回，保留已存在的文件。
         legacy = IMPORT_BOUNDARY not in first
         matches = legacy or first[IMPORT_BOUNDARY] == boundary
+        models = dict(self.recovered_models)
         parent = None
-        for row, expected in zip_longest(chain((first,), rows), history):
+        for index, (row, expected) in enumerate(zip_longest(chain((first,), rows), history)):
             # 直接恢复要求文件正好停在确认边界。本轮问题由新轮提交。
             if row is None or expected is None or row["type"] != expected[0]:
                 matches = False
@@ -451,6 +502,7 @@ class ColdHistory:
             message = row.get("message", {})
             if (row.get("parentUuid") != parent or not isinstance(row.get("uuid"), str)
                     or (message.get("role"), message.get("content")) != expected
+                    or index in models and message.get("model") != models[index]
                     or legacy and row["type"] == "assistant" and message.get("model") != self.model):
                 matches = False
             parent = row.get("uuid")
@@ -460,11 +512,16 @@ class ColdHistory:
         timestamp = datetime.now(timezone.utc).isoformat()
         parent = None
         rows = []
-        for role, content in history:
+        models = dict(self.recovered_models)
+        for index, (role, content) in enumerate(history):
             uid = str(uuid4())
+            message = {"role": role, "content": content}
+            if index in models:
+                # 2.1.293 需要真实助手模型来读取已签名的工具组。
+                message["model"] = models[index]
             record = {
                 "parentUuid": parent, "uuid": uid, "sessionId": session_id, "cwd": str(work),
-                "type": role, "message": {"role": role, "content": content}, "isSidechain": False,
+                "type": role, "message": message, "isSidechain": False,
                 "userType": "external", "timestamp": timestamp,
             }
             if parent is None:

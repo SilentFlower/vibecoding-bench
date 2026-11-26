@@ -141,13 +141,14 @@ def build_cutover_record(temporary, old, deployment, release):
     return gate
 
 
-def fixture_tool_sse(tool, *, with_signature, second=None):
+def fixture_tool_sse(tool, *, with_signature, second=None, model=MODEL):
     """交付隔离模型工具流。@param tool 原生工具调用。@param with_signature 是否先交付合成签名块。
-    @param second 可选的同轮第二次工具调用。@return SSE。"""
+    @param second 可选的同轮第二次工具调用。@param model 模型实际回复的身份。@return SSE。"""
     wire = message_sse(tool, "tool_use", "msg_cold_tool")
-    if not with_signature and second is None:
+    if not with_signature and second is None and model == MODEL:
         return wire
     events = [json.loads(line[5:]) for line in wire.splitlines() if line.startswith(b"data:")]
+    events[0]["message"]["model"] = model
     if second is not None:
         secondary = message_sse(second, "tool_use", "msg_fixture_unused")
         extra = [json.loads(line[5:]) for line in secondary.splitlines() if line.startswith(b"data:")]
@@ -181,11 +182,13 @@ def fixture_reconnect_sse(name):
     return b"".join(map(frame, prefix)), b"".join(map(frame, tail))
 
 
-def fixture_thinking_display_sse(body):
-    """按实收的思考设置与模型默认值生成合成流。@param body 隔离模型实收。@return SSE 字节。"""
+def fixture_thinking_display_sse(body, *, message_id="msg_cold_thinking_display"):
+    """按实收的思考设置与模型默认值生成合成流。
+    @param body 隔离模型实收。@param message_id 合成助手消息 ID。@return SSE 字节。
+    """
     model = body["model"]
     display = body["thinking"].get("display", THINKING_DISPLAY_DEFAULTS[model])
-    wire = message_sse({"type": "text", "text": FINAL}, "end_turn", "msg_cold_thinking_display")
+    wire = message_sse({"type": "text", "text": FINAL}, "end_turn", message_id)
     events = [json.loads(line[5:]) for line in wire.splitlines() if line.startswith(b"data:")]
     events[0]["message"]["model"] = model
     for event in events:
@@ -209,7 +212,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            history_png=False, history_images=False, history_tool_blocks=False, previous=None, failure_boundaries=False,
            current_text_blocks=False, signed_tool_history=False, split_history_tools=False, v1_runtime=None,
            parallel_tools=False, reconnect_tool_stream=False, current_images=False, auto_tool_choice=False,
-           adaptive_thinking_model=None, thinking_display_model=None, thinking_cli_summaries=None,
+           adaptive_thinking_model=None, adaptive_thinking_display="updates", thinking_display_model=None,
+           thinking_cli_summaries=None,
            recovery_ledger_contention=False, recovery_ledger_deadline=False, recovery_workspace_rejection=False,
            recovery_slow_model=False, initial_idle_model_connection=False, trace_startup=False, cache_markers=False,
            history_cache_markers=False, history_cache_ttl=None, cache_capability=None, message_system_roles=False):
@@ -234,7 +238,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param reconnect_tool_stream 是否在真实续轮流中断开再接回。
     @param current_images 是否用本轮原生图文替换纯文本问题。
     @param auto_tool_choice 是否核对显式自动选择和并行工具。
-    @param adaptive_thinking_model 可选，核对显式 adaptive/updates 的固定模型。
+    @param adaptive_thinking_model 可选，核对显式 adaptive 的固定模型。
+    @param adaptive_thinking_display 在工具首轮与续轮冻结的显式显示值。
     @param thinking_display_model 可选，核对普通 API 思考显示及客户端响应的固定模型。
     @param thinking_cli_summaries 可选，核对正式 CLI 摘要设置的隔离对照。
     @param recovery_ledger_contention 是否在提交原回执时短暂占用账号账本锁。
@@ -272,6 +277,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     received, callbacks, proxy_targets = [], [], []
     slow_tool_arrivals = []
     model_betas = []
+    summarized_thinking = adaptive_thinking_model is not None and adaptive_thinking_display == "summarized"
     lookups = []
     deny_proxy = False
     denied_tunnels = []
@@ -318,11 +324,13 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 if parallel_tools:
                     other, = [t for t in body["tools"] if t.get("description") == SECOND_TOOL["description"]]
                     second = {"type": "tool_use", "id": SECOND_ID, "name": other["name"], "input": SECOND_ARGS}
-                wire = fixture_tool_sse(content, with_signature=signed_tool_history, second=second)
+                wire = fixture_tool_sse(content, with_signature=signed_tool_history, second=second, model=body["model"])
             elif reconnect_tool_stream and results and not find_blocks(body, "tool_use_id", RECONNECT_ID):
                 prefix, wire = fixture_reconnect_sse(tool["name"])
             elif thinking_display_model:
                 wire = fixture_thinking_display_sse(body)
+            elif summarized_thinking:
+                wire = fixture_thinking_display_sse(body, message_id="msg_cold_reply")
             else:
                 wire = message_sse({"type": "text", "text": FINAL}, "end_turn", "msg_cold_reply")
             self.send_response(200)
@@ -619,8 +627,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         if auto_tool_choice:
             body["tool_choice"] = {"type": "auto", "disable_parallel_tool_use": False}
         if adaptive_thinking_model:
-            body.update(model=adaptive_thinking_model, thinking=ADAPTIVE_THINKING)
-            headers["anthropic-beta"] = THINKING_UPDATES_BETA
+            body.update(model=adaptive_thinking_model, thinking={**ADAPTIVE_THINKING, "display": adaptive_thinking_display})
+            if not summarized_thinking:
+                headers["anthropic-beta"] = THINKING_UPDATES_BETA
         if recover_pending:
             body["output_config"] = {"effort": "medium"}
         with ExitStack() as initial_connections:
@@ -745,8 +754,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             assert changed_choice == 422 and len(received) == 1, (changed_choice, response, len(received))
         if adaptive_thinking_model:
             changed_thinking = {}
-            for label, thinking in (("omitted", {"type": "adaptive", "display": "omitted"}),
-                                    ("disabled_with_platform_rewrite", {"type": "disabled"})):
+            changes = {"omitted": {"type": "adaptive", "display": "omitted"},
+                       "disabled_with_platform_rewrite": {"type": "disabled"}}
+            if summarized_thinking:
+                changes.update(default_display={"type": "adaptive"}, updates=ADAPTIVE_THINKING)
+            for label, thinking in changes.items():
                 changed_status, raw, _ = checked_messages(
                     manage, token, {**follow, "thinking": thinking}, headers, received,
                     "changed_thinking_" + label, expected_status=422,
@@ -877,21 +889,28 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                         "original_history_preserved": True}
             finally:
                 manage("PUT", "settings", {budget_key: previous_budget})
-        expected_status = 422 if signed_tool_history and recover_pending else 200
+        rejected_signed_recovery = signed_tool_history and recover_pending and not summarized_thinking
         status, raw, continuation_request_id = checked_messages(
             manage, token, follow, headers, received, "recovered_receipt" if recover_pending else "receipt",
-            expected_status=expected_status, trace_startup=trace_startup,
+            expected_status=422 if rejected_signed_recovery else 200, trace_startup=trace_startup,
             sender_status=sender_state_after_failure,
         )
-        if signed_tool_history and recover_pending:
-            # 固定 CLI 在本轮冷恢复的继续提示之后会裁掉签名。准备拒绝必须先于第二次模型投递。
+        if rejected_signed_recovery:
+            # 缺少已登记助手模型的旧合同在准备阶段拒绝，避免恢复后丢掉原签名。
             assert status == 422 and len(received) == 1, (status, raw, len(received))
             assert original_file.read_bytes() == original_history
             (first_attempt,) = verify_captures(manage, received, account_token)
-            return {"cold_recovery_status": status, "changed_signature_status": changed_signature,
-                    "model_posts": len(received), "original_history_preserved": True, "attempt": first_attempt}
+            proof = {"cold_recovery_status": status, "changed_signature_status": changed_signature,
+                     "model_posts": len(received), "original_history_preserved": True, "attempt": first_attempt}
+            if adaptive_thinking_model:
+                assert received[0][1]["thinking"] == body["thinking"]
+                proof.update(thinking=received[0][1]["thinking"], changed_thinking_status=changed_thinking)
+            return proof
         final = json.loads(raw)
-        assert final["content"] == [{"type": "text", "text": FINAL}]
+        if summarized_thinking:
+            verify_client_thinking_reply(raw, False, adaptive_thinking_model, SIGNED_THINKING["thinking"])
+        else:
+            assert final["content"] == [{"type": "text", "text": FINAL}]
         duplicate, _ = call(18090, "POST", "/v1/messages", token, follow, headers)
         assert duplicate == 400 and len(received) == 2, (duplicate, len(received))
         assert callbacks == expected_ids
@@ -1004,11 +1023,14 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             proof.update(auto_tool_choice=observed, changed_tool_choice_status=changed_choice)
         if adaptive_thinking_model:
             actual_thinking = [native.get("thinking") for _, native, _ in received]
-            assert actual_thinking == [ADAPTIVE_THINKING] * 2, actual_thinking
+            assert actual_thinking == [body["thinking"]] * 2, actual_thinking
             assert all(native["model"] == adaptive_thinking_model for _, native, _ in received)
-            assert len(model_betas) == 2 and all(THINKING_UPDATES_BETA in beta.split(",") for beta in model_betas), model_betas
+            if not summarized_thinking:
+                assert len(model_betas) == 2 and all(THINKING_UPDATES_BETA in beta.split(",") for beta in model_betas), model_betas
             proof.update(thinking_model=adaptive_thinking_model, thinking=actual_thinking,
                          changed_thinking_status=changed_thinking)
+            if summarized_thinking:
+                proof["client_content"] = final["content"]
         if signed_tool_history:
             hydrated = find_blocks(received[1][1], "type", "thinking")
             assert hydrated == [("assistant", SIGNED_THINKING)], (
@@ -1024,7 +1046,16 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             _, native_recovery, _ = received[-1]
             assert all(document["output_config"]["effort"] == "medium" for _, document, _ in received)
             restored_id = json.loads(native_recovery["metadata"]["user_id"])["session_id"]
-            assert restored_id != original_id and (original_file.parent / (restored_id + ".jsonl")).is_file()
+            restored_file = original_file.parent / (restored_id + ".jsonl")
+            assert restored_id != original_id and restored_file.is_file()
+            if signed_tool_history and summarized_thinking:
+                archived = [row["message"] for row in map(json.loads, restored_file.read_text().splitlines())
+                            if row.get("type") == "assistant" and any(
+                                block.get("id") == NEW_ID for block in blocks(row["message"]))]
+                (signed,) = archived
+                assert set(signed) == {"role", "content", "model"}
+                assert signed["model"] == events[0]["message"]["model"]
+                proof["recovered_signed_tool_model"] = signed["model"]
             restored_text = [(row["role"], block.get("text")) for row in native_recovery["messages"] for block in blocks(row)]
             continue_prompt_count = restored_text.count(("user", "Continue from where you left off."))
             assert continue_prompt_count == 1
@@ -1583,6 +1614,7 @@ def verify_thinking_display_contract(manage, token, identifier, received, model,
         account = manage("PUT", f"accounts/{identifier}", {"client_system_prompt_policy": policy})
         assert account["client_system_prompt_policy"] == policy
         for label, thinking in configurations.items():
+            native = label in ("no_thinking", "summarized")
             for stream in (True, False):
                 output = "sse" if stream else "json"
                 phase = f"{policy}_{label}_{output}"
@@ -1596,7 +1628,7 @@ def verify_thinking_display_contract(manage, token, identifier, received, model,
                 before_claims = len(MODEL_BODY_TRACE.read_text().splitlines())
                 status, raw, request_id = checked_messages(
                     manage, token, body, headers, received, phase,
-                    expected_status=200 if thinking is None or policy == "append" else 422, trace_startup=True,
+                    expected_status=200 if native or policy == "append" else 422, trace_startup=True,
                 )
                 diagnostic_path = "request-diagnostics/" + request_id
 
@@ -1625,7 +1657,7 @@ def verify_thinking_display_contract(manage, token, identifier, received, model,
                     assert claim["sha256"] == body_hash and claim["reservation_id"] == reservation, (phase, claim)
                     assert attempt["request_id"] == request_id and attempt["attempt_id"] == reservation, (phase, attempt)
                     from_cli = claim["uses_native_history"]
-                    assert from_cli is (thinking is None) and claim["from_interactive_cli"] is from_cli, (phase, claim)
+                    assert from_cli is native and claim["from_interactive_cli"] is from_cli, (phase, claim)
                     assert model_body["model"] == model and model_body["thinking"] == (thinking or native_default), (
                         phase, model_body["thinking"],
                     )
@@ -2277,6 +2309,7 @@ def main():
                               const="ordinary-contract")
     parser.add_argument("--auto-tool-choice", action="store_true")
     parser.add_argument("--adaptive-thinking-model", choices=(MODEL, "claude-opus-5-5"))
+    parser.add_argument("--adaptive-thinking-display", choices=("updates", "summarized"), default="updates")
     parser.add_argument("--thinking-cli-summaries", choices=("on", "off"))
     parser.add_argument("--signed-tool-history", action="store_true")
     parser.add_argument("--trace-initial-startup", action="store_true", help="记录源码 V2 夹具的启动阶段")
@@ -2309,6 +2342,8 @@ def main():
     scenario.add_argument("--failure-boundaries", action="store_true")
     scenario.add_argument("--v1-runtime", type=Path)
     args = parser.parse_args()
+    if args.adaptive_thinking_display != "updates" and args.adaptive_thinking_model is None:
+        parser.error("--adaptive-thinking-display summarized 需要同用 --adaptive-thinking-model")
     if args.thinking_cli_summaries is not None and not args.thinking_display_contract:
         parser.error("--thinking-cli-summaries 需要同用 --thinking-display-contract")
     thinking_cli_summaries = {"on": True, "off": False}.get(args.thinking_cli_summaries)
@@ -2352,6 +2387,7 @@ def main():
                        reconnect_tool_stream=args.reconnect_tool_stream, current_images=args.current_images,
                        auto_tool_choice=args.auto_tool_choice,
                        adaptive_thinking_model=args.adaptive_thinking_model,
+                       adaptive_thinking_display=args.adaptive_thinking_display,
                        thinking_display_model=args.thinking_display_contract,
                        thinking_cli_summaries=thinking_cli_summaries,
                        recovery_ledger_contention=args.recovery_ledger_contention,

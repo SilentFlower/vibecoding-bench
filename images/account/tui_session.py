@@ -28,7 +28,7 @@ from uuid import UUID, uuid4
 
 from runtime_files import atomic_text
 from tui_capacity import TuiCapacity, TuiCapacityError
-from tui_cold_history import ColdHistory, MCP_SERVER
+from tui_cold_history import ColdHistory, MCP_SERVER, SIGNED_THINKING_TYPES
 from tui_reconnect import ReceiptCheckpoints, digest
 from tui_input_policy import CONTEXT_BETA, InputRejection, native_input
 from tui_messages import (
@@ -340,6 +340,7 @@ class _Actor:
         self.worker = None
         self.cold_history = None
         self.recovery_history = None
+        self.signed_tool_models = {}
 
     def model_authorization(self):
         """读取当前模型回环的账号授权。@return 当前回合 AT 或原会话口令。"""
@@ -420,6 +421,9 @@ class _Actor:
                             ]
                         }
                     }
+                    plan = self.cold_history
+                    if plan is not None and (plan.thinking or {}).get("display") == "summarized":
+                        classic["showThinkingSummaries"] = True
                     opts = [
                         # 同一预留会话的显示名稳定。传成单个参数，兼容以连字符开头的合法会话 ID。
                         f"--name={self.reservation['session_id']}",
@@ -441,8 +445,7 @@ class _Actor:
                     launch_options = {}
                     resume = None
                     wait_for_mcp = False
-                    if self.cold_history is not None:
-                        plan = self.cold_history
+                    if plan is not None:
                         # 本轮设置来自当前账号，恢复时也应按当前轮构造系统正文。
                         opts.extend(["--system-prompt-snapshot", "off"])
                         if system_prompt := plan.system_argument():
@@ -724,10 +727,16 @@ class _Actor:
     def _finish_step(self):
         self.expected = self.step.blocks if self.step.reason == "tool_use" else None
         if self.expected:
+            native = self.cold_history.receipt_boundary() if self.cold_history is not None else None
+            if native is not None and (self.cold_history.thinking or {}).get("display") == "summarized":
+                if self.step.response_model and any(b["type"] in SIGNED_THINKING_TYPES for b in self.expected):
+                    self.signed_tool_models.update(dict.fromkeys(self.step.tool_ids, self.step.response_model))
+                if self.signed_tool_models:
+                    native["signed_tool_models"] = self.signed_tool_models
             self.receipt_revision = self.driver.checkpoints.offer(
                 self.identity, self.reservation["session_id"], self.history,
                 [receipt_snapshot(b) for b in self.expected], _RECEIPT_SECONDS,
-                native=self.cold_history.receipt_boundary() if self.cold_history is not None else None,
+                native=native,
             )
             self.wait_until = time.monotonic() + _RECEIPT_SECONDS
             for offer in self.agent_offers.values():
@@ -946,6 +955,9 @@ class _Actor:
                     if not self.cold_history.matches_history_cache_markers(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
                             "code": "unsupported_parameter", "message": "CLI 未保留历史缓存标记"}}))
+                    if handle.kind == "recovered" and not self.recovery_history.matches_recovered_signatures(native):
+                        raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
+                            "code": "unsupported_parameter", "message": "CLI 未保留已核对的签名工具历史"}}))
                 if handle.kind == "recovered" and not self.driver.checkpoints.submit(
                     self.identity, self.receipt_revision, handle.request_digest, True
                 ):
@@ -1658,6 +1670,7 @@ class SessionDriver:
                     return handle
 
         cold = recovery_history = None
+        signed_tool_models = {}
         system_policy = reservation.get("client_system_prompt_policy", "append")
         is_native = native_input(body, reservation.get("input_format"))
         native_history_allowed = (self.managed_oauth and reservation.get("native_cold_history") is True
@@ -1665,13 +1678,15 @@ class SessionDriver:
         if native_checkpoint is not None:
             if not native_history_allowed or not tool_results_only:
                 raise InputRejection("unsupported_parameter")
-            cold = ColdHistory.from_receipt_boundary(body, native_checkpoint)
+            boundary = dict(native_checkpoint)
+            signed_tool_models = boundary.pop("signed_tool_models", {})
+            cold = ColdHistory.from_receipt_boundary(body, boundary)
             if cold is None:
                 raise InputRejection("unsupported_parameter")
             request = _receipt_request(body, reservation, cache_ttl=cold.cache_ttl)
             if prior_request is not None and prior_request != request:
                 raise ValueError("已提交的工具结果或模型参数与重试不符")
-            recovery_history = cold.resume_receipts(messages)
+            recovery_history = cold.resume_receipts(messages, signed_tool_models=signed_tool_models)
             if recovery_history is None:
                 raise InputRejection("unsupported_parameter")
         elif native_history_allowed and checkpoint is None:
@@ -1777,6 +1792,7 @@ class SessionDriver:
                         )
                         actor.cold_history = cold
                         actor.recovery_history = recovery_history
+                        actor.signed_tool_models = signed_tool_models
                         if checkpoint is not None:
                             actor.receipt_revision = revision
                         if offer is not None:

@@ -475,6 +475,7 @@ class WireStep:
         self._argument_bytes = 0
         self.started = self.stopped = False
         self.reason = None
+        self.response_model = None
         self.native = None
         self.native_model = None
         self.claimed = False
@@ -505,6 +506,9 @@ class WireStep:
             and isinstance(event.get("message"), dict)
         ):
             self.started = True
+            model = event["message"].get("model")
+            if isinstance(model, str) and model:
+                self.response_model = model
         elif not self.started:
             raise ValueError("模型流缺少首帧")
         elif (
