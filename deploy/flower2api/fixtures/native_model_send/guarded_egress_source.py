@@ -42,6 +42,7 @@ PERMITS = Path("/tmp/flower-direct-permits.jsonl")
 TUNNELS = Path("/tmp/flower-direct-tunnels.jsonl")
 CANDIDATE_MODE = "candidate-response"
 STOCK_TOOLS = {"Read", "Glob"}
+EARLY_TEXT_STOPS = {"max_tokens", "refusal"}
 MANAGED_BINDING_LOCK = Lock()
 managed_process = None
 launch_context = local()
@@ -305,7 +306,8 @@ class _LiveProjection:
 
     def finish(self, result):
         """确认交付内容及累计用量，再让原终态回调收口。@param result 官方步骤结果。@return 无。"""
-        if result["reason"] != ("tool_use" if self.tools else "end_turn"):
+        reason = result["reason"]
+        if reason not in ({"tool_use"} if self.tools else {"end_turn", *EARLY_TEXT_STOPS}):
             raise ValueError("流式内容与同一步的结束原因不符")
         # 工具轮的终态 answer 按显示需要在独立文本块之间插入换行。逐块交付使用原生索引和实际分片。
         if not self.tools and self.text_digest.digest() != sha256(result["answer"].encode()).digest():
@@ -333,6 +335,10 @@ class _LiveProjection:
         with self.actor.changed:
             self.step.final = [_frame(terminal)]
         ORIGINAL_CALLBACK(self.actor, "/end", result)
+        if reason == "max_tokens":
+            # 原版 CLI 可能内部续写。公开 Messages 交付首次响应的预算终态，由客户端选择是否继续。
+            with self.actor.changed:
+                self.actor._finish_step()
 
 
 def _direct_chunk(actor, data):
@@ -418,6 +424,11 @@ def callback(actor, path, data):
                     or actor.step.native != (data["turn"], data["step"])):
                 raise ValueError("缺少同一文本模型步骤")
             actor.direct_result = data
+        if data["reason"] in EARLY_TEXT_STOPS and INSTALLED_PROBE.is_file():
+            projection = actor.direct_stream or _LiveProjection(actor)
+            projection.finish(data)
+            actor.direct_result = None
+            return {}
         if data["reason"] == "tool_use":
             if actor.direct_stream is not None:
                 actor.direct_stream.finish(data)
@@ -441,6 +452,10 @@ def callback(actor, path, data):
             ]
             _deliver(actor, data, init, parts)
             actor.direct_result = None
+        return {}
+    if (path == "/complete" and actor.step and actor.step.reason == "max_tokens"
+            and actor.step.native[0] == data.get("turn") and actor.finished):
+        # 已经向同一公开请求交付终态，晚到的 CLI 完成通知无需再写终帧。
         return {}
     if path == "/complete" and getattr(actor, "direct_result", None) is not None:
         result = actor.direct_result
