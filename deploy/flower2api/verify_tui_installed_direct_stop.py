@@ -87,9 +87,7 @@ def _check(manage, token, account, received, _homes, final, deliveries, *, reaso
         assert json.loads(raw)["error"]["code"] == "session_policy_blocked"
         assert manage("GET", "request-diagnostics/" + request_id)["attempts"] == [] and len(received) == 1
         proof["same_session_block"] = {"request_id": request_id, "status": status}
-        # 回环受管策略只允许一个活动 CLI 绑定。先观察上一进程的正常退场。
-        original_pid = attempts[0]["delivery"]["tunnel"]["cli_pid"]
-        fixture.wait_for(lambda: not Path(f"/proc/{original_pid}").exists())
+        # 新会话在拒答响应交付后立即提交，允许原 CLI 此时仍在退场。
         fresh_id = str(uuid4())
         fresh = {**body, "messages": [{"role": "user", "content": NEXT_QUESTION}],
                  "metadata": {"user_id": json.dumps({"session_id": fresh_id})}}

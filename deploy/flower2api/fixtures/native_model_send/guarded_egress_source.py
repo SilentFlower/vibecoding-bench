@@ -16,6 +16,7 @@ from threading import Lock, local
 from time import monotonic, monotonic_ns, sleep, time_ns
 from urllib.parse import urlsplit
 from uuid import uuid4
+from weakref import ref
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import frozen_tui_source as source
@@ -44,7 +45,7 @@ CANDIDATE_MODE = "candidate-response"
 STOCK_TOOLS = {"Read", "Glob"}
 EARLY_TEXT_STOPS = {"max_tokens", "refusal"}
 MANAGED_BINDING_LOCK = Lock()
-managed_process = None
+managed_binding = None
 launch_context = local()
 
 
@@ -96,6 +97,29 @@ def _stock_arguments(arguments, mod, options):
     return selected
 
 
+def _await_managed_binding(actor):
+    if managed_binding is None:
+        return
+    process, previous_ref = managed_binding
+    if process.poll() is not None:
+        return
+    previous = previous_ref() if previous_ref is not None else None
+    if actor is None or previous is None:
+        raise RuntimeError("隔离受管绑定仍归活跃 CLI")
+    with previous.changed:
+        retiring = previous.dead.is_set() or (previous.finished and not previous.expected)
+    if not retiring:
+        raise RuntimeError("隔离受管绑定仍归活跃 CLI")
+    # 公开终态可先于原 CLI 退场。仅等待已完成或取消的会话归还绑定，活跃工具轮保持原归属。
+    deadline_ns = actor.reservation["deadline_unix_ms"] * 1_000_000
+    reservation = actor.reservation["reservation_id"]
+    report("direct_binding_retiring", reservation_id=reservation, previous_cli_pid=process.pid)
+    if (not previous.retired.wait(max(0, (deadline_ns - time_ns()) / 1_000_000_000))
+            or process.poll() is None or actor.dead.is_set() or time_ns() >= deadline_ns):
+        raise RuntimeError("当前预留结束前未取得隔离受管绑定")
+    report("direct_binding_retired", reservation_id=reservation, previous_cli_pid=process.pid)
+
+
 def launch(*args, environment, **options):
     """保留原工作区启动器与网络守卫，只替换测试实例的官方代理与端点设置。@return 子进程。"""
     config_dir = options["config_dir"]
@@ -107,15 +131,14 @@ def launch(*args, environment, **options):
                 "HTTPS_PROXY": f"http://127.0.0.1:{context.port}", "NODE_EXTRA_CA_CERTS": str(ca),
                 "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", "DISABLE_AUTOUPDATER": "1",
                 "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "0"}
-    global managed_process
+    global managed_binding
     if POLICY_MODE.is_file():
         arguments = options["arguments"]
         mod = Path(arguments[arguments.index("--plugin-dir") + 1])
         managed = Path("/opt/flower-http-test/flower-http-policy/hooks/runtime/binding.js")
+        actor = getattr(launch_context, "actor", None)
         with MANAGED_BINDING_LOCK:
-            # 隔离受管 Mod 同时只为一个 CLI 授权。进程退出后恢复轮才可发布自己的回环绑定。
-            if managed_process is not None and managed_process.poll() is None:
-                raise RuntimeError("隔离受管绑定仍归活跃 CLI")
+            _await_managed_binding(actor)
             try:
                 atomic_text(managed, (mod / "hooks/binding.js").read_text())
                 if INSTALLED_PROBE.is_file():
@@ -124,8 +147,9 @@ def launch(*args, environment, **options):
                 report("direct_permit_launch_failed", error=type(error).__name__, errno=error.errno,
                        uid=getuid(), gid=getgid())
                 raise
-            managed_process = ORIGINAL_LAUNCH(*args, environment=settings, **options)
-            return managed_process
+            process = ORIGINAL_LAUNCH(*args, environment=settings, **options)
+            managed_binding = (process, ref(actor) if actor is not None else None)
+            return process
     return ORIGINAL_LAUNCH(*args, environment=settings, **options)
 
 
