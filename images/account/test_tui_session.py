@@ -77,6 +77,32 @@ class SessionTests(unittest.TestCase):
                     key, revision, _receipt_request(explicit, identity, previous=previous), recovered=True,
                 ))
 
+    def test_custom_tool_receipt_keeps_the_old_claim_and_rejects_real_changes(self):
+        """新旧摘要支持等价类型，工具表与条件消费继续绑定原回执。@return 无。"""
+        tool = {"name": "LookupNote", "input_schema": {"type": "object", "additionalProperties": False}}
+        other = {**tool, "name": "SetTag"}
+        original = {**self._body(), "tools": [{**tool, "type": "custom"}, other]}
+        switched = {**original, "tools": [tool, {**other, "type": "custom"}]}
+        identity = self._identity("custom-tool")
+        old = digest([{**original, "tool_choice": {"type": "auto"}}, {}, None, None])
+        self.assertEqual(_receipt_request(original, identity), _receipt_request(switched, identity))
+        self.assertEqual(_receipt_request(switched, identity, previous=old), old)
+        for changed in (
+            [*reversed(switched["tools"])],
+            [{**tool, "type": None}, other],
+            [{**tool, "type": "text_editor_20250728"}, other],
+            [{**tool, "input_schema": {**tool["input_schema"], "additionalProperties": 0}}, other],
+        ):
+            with self.subTest(changed=changed):
+                self.assertNotEqual(_receipt_request({**switched, "tools": changed}, identity, previous=old), old)
+        with TemporaryDirectory() as directory, closing(ReceiptCheckpoints(directory)) as checkpoints:
+            key = ("custom-tool", "session-1")
+            revision = checkpoints.offer(key, "session-1", "history", [], 60)
+            self.assertTrue(checkpoints.submit(key, revision, old, recovered=False))
+            restored = _receipt_request(switched, identity, previous=checkpoints.find(key)[3])
+            self.assertTrue(checkpoints.submit(key, revision, restored, recovered=True))
+            self.assertFalse(checkpoints.submit(key, revision, restored, recovered=True))
+
     def test_protocol_headers_use_current_sdk_and_reject_unsupported_beta(self):
         """普通 API 校验同轮原生能力，协议值按准入结果覆盖默认值。@return 无。"""
         identity = {

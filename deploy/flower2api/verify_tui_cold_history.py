@@ -370,7 +370,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            cancel_and_change_question=False, cancel_before_response_headers=None,
            oauth_rotation=False, observe_oauth_delivery=None, provider_quota=None, slow_tool_stream=False,
            model_connection_contract=None, external_signed_history=False, bound_signed_history=None, history_tool_images=None,
-           tool_receipt_images=None, explicit_custom_tool_type=False, history_empty_tool_result=None,
+           tool_receipt_images=None, explicit_custom_tool_type=False, receipt_explicit_custom_tool_type=False,
+           prior_custom_source=None, history_empty_tool_result=None,
            empty_tool_receipt=None, tool_receipt_text_blocks=None, tool_receipt_nested_cache=None,
            tool_receipt_outer_cache=None, model_stream_probe=None):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
@@ -391,7 +392,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param tool_receipt_outer_cache 本轮整个工具结果的外层缓存 TTL，default 表示省略 TTL。
     @param history_tool_images 核对已闭合工具结果的图文块，可显式声明成功或省略错误标志。
     @param tool_receipt_images 核对本轮实际工具调用的图文回执及拒绝边界。
-    @param explicit_custom_tool_type 是否通过显式 custom 的客户端声明进行原生工具往返。
+    @param explicit_custom_tool_type 是否从显式 custom 的根轮转为缺省类型的回执。
+    @param receipt_explicit_custom_tool_type 是否从缺省类型的根轮转为显式 custom 的回执。
+    @param prior_custom_source 可选，写入旧工具摘要的固定账号源码。
     @param previous 可选，旧发行源码、网关、发送器三个离线制品。
     @param mixed_context_keep_all 可选，混版交接时显式保留全部思考的模型。
     @param failure_boundaries 是否分别在模型收件前后切断隔离连接。
@@ -980,9 +983,10 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                               ready=state["ready"], idle=state.get("idle"))
 
         prior_auto_checkpoint = None
+        prior_custom_checkpoint = None
 
         def restart(process, phase):
-            nonlocal prior_auto_checkpoint
+            nonlocal prior_auto_checkpoint, prior_custom_checkpoint
             wait_for(lambda: sender_state().get("idle"))
             if trace_startup:
                 startup_event("sender_stop_requested", phase=phase, sender_pid=process.pid)
@@ -1003,6 +1007,21 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 assert state == "open" and receipt_digest and len(receipt_digest) == 64, (revision, receipt_digest, state)
                 prior_auto_checkpoint = {"revision": revision, "digest": receipt_digest, "state": state,
                                          "prior_source_sha256": prior_sha, "recovery_source_sha256": current_sha}
+                install_source(ROOT, trace_startup=True)
+            if prior_custom_source is not None:
+                module = Path("images/account/tui_cold_history.py")
+                prior_sha = sha256((prior_custom_source / module).read_bytes()).hexdigest()
+                current_sha = sha256((ROOT / module).read_bytes()).hexdigest()
+                assert prior_sha != current_sha
+                with closing(connect("file:/native/tui-reconnect/receipts.db?mode=ro", uri=True)) as database:
+                    ((revision, state, request, context),) = database.execute(
+                        "SELECT r.revision,r.state,r.request,n.context FROM receipts r "
+                        "JOIN native_receipt_inputs n ON r.actor=n.actor AND r.revision=n.revision"
+                    ).fetchall()
+                old_digest = json.loads(context)["digest"]
+                assert state == "open" and request is None and fullmatch(r"[0-9a-f]{64}", old_digest)
+                prior_custom_checkpoint = {"revision": revision, "digest": old_digest, "state": state,
+                                           "prior_source_sha256": prior_sha, "recovery_source_sha256": current_sha}
                 install_source(ROOT, trace_startup=True)
             restarted = start_sender()
             if trace_startup:
@@ -1466,6 +1485,14 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         follow = {**body, "stream": (reconnect_tool_stream or slow_tool_stream or interrupted_tool_stream is not None
                                    or replay_unknown_receipt in ("live", "complete")),
                   "messages": [*messages, {"role": "assistant", "content": offered}, result]}
+        custom_type_receipt = explicit_custom_tool_type or receipt_explicit_custom_tool_type
+        if custom_type_receipt:
+            receipt_tools = deepcopy(declared)
+            if explicit_custom_tool_type:
+                receipt_tools[0].pop("type")
+            else:
+                receipt_tools[0]["type"] = "custom"
+            follow["tools"] = receipt_tools
         if auto_tool_choice:
             other_auto = receipt_auto_tool_choice or ("explicit-false" if auto_tool_choice == "bare" else "bare")
             if prior_auto_source is None:
@@ -1612,15 +1639,26 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 assert len(received) == 1, (label, raw, len(received))
                 assert not manage("GET", "request-diagnostics/" + rejected_id)["attempts"]
                 changed_choices[label] = rejected
-        if explicit_custom_tool_type:
-            changed_tools = deepcopy(declared)
-            changed_tools[0].pop("type")
-            changed_custom_type, _, changed_custom_request = checked_messages(
-                manage, token, {**follow, "tools": changed_tools}, headers, received, "omitted_custom_tool_type",
-                expected_status=422, trace_startup=trace_startup, sender_status=sender_state_after_failure,
-            )
-            assert len(received) == 1
-            assert not manage("GET", "request-diagnostics/" + changed_custom_request)["attempts"]
+        if custom_type_receipt:
+            custom_tool_rejections = {}
+            for changed_field, changed_value in (
+                ("type", "text_editor_20250728"), ("type", None),
+                ("name", "DifferentTool"), ("description", "不同的工具说明"),
+                ("input_schema", {**receipt_tools[0]["input_schema"], "additionalProperties": 0}),
+                ("list", receipt_tools[1:]),
+            ):
+                if changed_field == "list":
+                    changed_tools = changed_value
+                else:
+                    changed_tools = [{**receipt_tools[0], changed_field: changed_value}, *receipt_tools[1:]]
+                label = "null_type" if changed_field == "type" and changed_value is None else changed_field
+                rejected, _, rejected_id = checked_messages(
+                    manage, token, {**follow, "tools": changed_tools}, headers, received, "changed_custom_tool_" + label,
+                    expected_status=422, trace_startup=trace_startup, sender_status=sender_state_after_failure,
+                )
+                assert len(received) == 1
+                assert not manage("GET", "request-diagnostics/" + rejected_id)["attempts"]
+                custom_tool_rejections[label] = {"http": rejected, "request_id": rejected_id}
         if adaptive_thinking_model:
             changed_thinking = {}
             changes = {"omitted": {"type": "adaptive", "display": "omitted"},
@@ -1710,6 +1748,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                     )
                 else:
                     replay = with_auto_tool_choice(follow, auto_tool_choice) if auto_tool_choice else follow
+                    if custom_type_receipt:
+                        replay = {**replay, "tools": declared}
                     proof = verify_tool_stream_reconnect(manage, temporary, token, account_token, headers, follow,
                                                          received, continue_tool_stream, finish_stream, callbacks,
                                                          replay=replay)
@@ -1718,6 +1758,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                         proof.update(input_tool_choice=body.get("tool_choice"), receipt_tool_choice=follow.get("tool_choice"),
                                      replay_tool_choice=replay.get("tool_choice"), tool_choice_rejections=changed_choices,
                                      model_tools=model_tools)
+                    if custom_type_receipt:
+                        proof.update(input_tools=declared, receipt_tools=receipt_tools,
+                                     custom_tool_rejections=custom_tool_rejections)
             finally:
                 continue_tool_stream.set()
                 finish_stream.set()
@@ -1997,6 +2040,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         else:
             assert final["content"] == [{"type": "text", "text": FINAL}]
         duplicate_body = with_auto_tool_choice(follow, auto_tool_choice) if auto_tool_choice else follow
+        if custom_type_receipt:
+            duplicate_body = {**duplicate_body, "tools": declared}
         duplicate, _ = call(18090, "POST", "/v1/messages", token, duplicate_body, headers)
         assert duplicate == 400 and len(received) == 2, (duplicate, len(received))
         assert callbacks == expected_ids
@@ -2257,16 +2302,20 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                      "attempt_id": attempt["attempt_id"], "session_origin": session_origin})
             proof["model_connection_contract"] = {"mode": model_connection_contract,
                                                   "client_hellos": model_client_hellos, "model_posts": observations}
-        if explicit_custom_tool_type:
+        if custom_type_receipt:
             tool_definitions = []
             for _, native, _ in received:
                 verify_automatic_model_tools(native, declared)
                 assert all(tool.get("type", "custom") == "custom" for tool in native["tools"])
                 tool_definitions.append(native["tools"])
             assert all(attempt["diagnostic_body_source"] == "interactive_cli" for attempt in captures)
-            proof["explicit_custom_tool_type"] = {"input_tools": declared, "model_tools_by_post": tool_definitions,
-                                                 "omitted_type_receipt_http": changed_custom_type,
-                                                 "omitted_type_receipt_request_id": changed_custom_request}
+            proof["custom_tool_type_receipt"] = {
+                "input_tools": declared, "receipt_tools": receipt_tools, "model_tools_by_post": tool_definitions,
+                "receipt_http": status, "receipt_request_id": continuation_request_id, "rejections": custom_tool_rejections,
+            }
+            if prior_custom_source is not None:
+                assert prior_custom_checkpoint is not None
+                proof["custom_tool_type_receipt"]["prior_checkpoint"] = prior_custom_checkpoint
         if oauth_rotation:
             assert refresh_calls == [True]
             assert [row["credential"] for row in credential_observations] == ["initial", "rotated"]
@@ -6046,7 +6095,10 @@ def main():
                         help="在本轮工具结果的首个文本块上添加显式缓存断点")
     parser.add_argument("--tool-receipt-outer-cache", choices=("5m", "1h", "default"),
                         help="在本轮工具结果外层添加显式缓存断点")
-    parser.add_argument("--explicit-custom-tool-type", action="store_true")
+    custom_tool_types = parser.add_mutually_exclusive_group()
+    custom_tool_types.add_argument("--explicit-custom-tool-type", action="store_true")
+    custom_tool_types.add_argument("--receipt-explicit-custom-tool-type", action="store_true")
+    parser.add_argument("--prior-custom-source", type=Path, help="用固定旧账号源码写入待恢复的自定义工具回执")
     system_roles = parser.add_mutually_exclusive_group()
     system_roles.add_argument("--message-system-roles", dest="message_system_roles", action="store_const", const="observe")
     system_roles.add_argument("--ordinary-message-system-contract", dest="message_system_roles", action="store_const",
@@ -6148,6 +6200,10 @@ def main():
             args.interrupted_tool_stream != "before-tool" or args.auto_tool_choice is None
             or recover_pending_tool or args.installed_runtime):
         parser.error("--prior-auto-source 需要 --interrupted-tool-stream before-tool 与 --auto-tool-choice")
+    if args.prior_custom_source is not None and (
+            not recover_pending_tool or not (args.explicit_custom_tool_type or args.receipt_explicit_custom_tool_type)
+            or args.prior_auto_source is not None or args.installed_runtime):
+        parser.error("--prior-custom-source 需要自定义工具类型对照及重启恢复")
     if args.installed_runtime and (args.structured_output_contract not in ("live", "restart")
                                    or args.sender != Path("/usr/local/bin/account-sender")):
         parser.error("--installed-runtime 需要结构化工具轮和镜像内置 account-sender")
@@ -6214,7 +6270,7 @@ def main():
                      or args.history_tool_images is not None or args.tool_receipt_images is not None
                      or args.history_empty_tool_result is not None or args.empty_tool_receipt is not None
                      or args.tool_receipt_text_blocks is not None
-                     or args.explicit_custom_tool_type
+                     or args.explicit_custom_tool_type or args.receipt_explicit_custom_tool_type
                      or args.recovery_readiness_rejection
                      or args.recovery_slow_model
                      or args.replay_unknown_receipt is not None
@@ -6233,7 +6289,7 @@ def main():
         previous = (None, *args.mixed_image_peers)
     elif args.v1_runtime is None:
         if not args.installed_runtime:
-            source_root = previous[0] if previous else args.prior_auto_source or ROOT
+            source_root = previous[0] if previous else args.prior_auto_source or args.prior_custom_source or ROOT
             install_source(source_root, trace_startup=trace_startup,
                            cache_capability=args.cache_marker_capabilities, thinking_cli_summaries=thinking_cli_summaries)
     elif sha256(args.v1_runtime.read_bytes()).hexdigest() != V1_RUNTIME_SHA256:
@@ -6260,6 +6316,8 @@ def main():
                        tool_receipt_nested_cache=args.tool_receipt_nested_cache,
                        tool_receipt_outer_cache=args.tool_receipt_outer_cache,
                        explicit_custom_tool_type=args.explicit_custom_tool_type,
+                       receipt_explicit_custom_tool_type=args.receipt_explicit_custom_tool_type,
+                       prior_custom_source=args.prior_custom_source,
                        previous=previous,
                        mixed_context_keep_all=args.mixed_context_keep_all,
                        failure_boundaries=args.failure_boundaries, current_text_blocks=args.current_text_blocks,

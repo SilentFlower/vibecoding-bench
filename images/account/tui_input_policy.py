@@ -24,6 +24,8 @@ _IDENTITIES = {
 }
 _UUID = re.compile(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", re.I | re.ASCII)
 _BILLING = "x-anthropic-billing-header:"
+_CUSTOM_TOOL_NAME = re.compile(r"[A-Za-z0-9_-]+")
+_CUSTOM_TOOL_FIELDS = {"type", "name", "input_schema", "description"}
 CONTEXT_BETA = "context-management-2025-06-27"
 SYSTEM_CLEAR_AT_BETA = "mid-conversation-system-clear-at-2026-08-21"
 SYSTEM_EFFORT_BETA = "mid-conversation-output-config-2026-07-01"
@@ -40,6 +42,41 @@ class InputRejection(ValueError):
 
 def _uuid(value):
     return isinstance(value, str) and _UUID.fullmatch(value) is not None
+
+
+def ordinary_custom_tool(tool):
+    """核对受管 MCP 承接的普通工具。@param tool 客户端声明。@return 是否为普通自定义声明。"""
+    return (isinstance(tool, dict) and tool.keys() <= _CUSTOM_TOOL_FIELDS
+            and tool.get("type", "custom") == "custom"
+            and isinstance(tool.get("name"), str) and _CUSTOM_TOOL_NAME.fullmatch(tool["name"]) is not None
+            and isinstance(tool.get("description", ""), str) and isinstance(tool.get("input_schema"), dict))
+
+
+def custom_tool_type(tool, *, explicit=False):
+    """仅为比较换用等价的工具类型。@param tool 原声明。@param explicit 是否显式表示。
+    @return 原声明或等价副本。
+    """
+    if not ordinary_custom_tool(tool) or ("type" in tool) == explicit:
+        return tool
+    if explicit:
+        return {**tool, "type": "custom"}
+    return {key: value for key, value in tool.items() if key != "type"}
+
+
+def legacy_custom_tool_lists(tools):
+    """列出旧回执可直接核对摘要的字段形状。@param tools 当前有序声明。@return 候选列表。
+    """
+    # 旧回执只有整轮摘要，保留原写法和整组的可核对表示，避免逐工具组合重算大正文。
+    seen = [tools]
+    yield tools
+    for shape in (
+        [custom_tool_type(tool) for tool in tools],
+        [custom_tool_type(tool, explicit=True) for tool in tools],
+        [custom_tool_type(tool, explicit=isinstance(tool, dict) and "type" not in tool) for tool in tools],
+    ):
+        if shape not in seen:
+            seen.append(shape)
+            yield shape
 
 
 def native_input(body, cli):

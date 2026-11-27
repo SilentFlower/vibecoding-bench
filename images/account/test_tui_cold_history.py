@@ -785,19 +785,42 @@ class ColdHistoryTests(TestCase):
         self.assertEqual(list(plan.tools), ["mcp__flower__LookupNote", "mcp__flower__Lookup-Note", "mcp__flower__Lookup_Note"])
         self.assertIn("error", plan.mcp({**request, "method": "tools/call"}))
 
-    def test_explicit_custom_tool_type_keeps_original_receipt_boundary(self):
-        """核对显式 custom 和默认声明的 MCP 契约，以及显式形状冻结。@return 无。"""
+    def test_custom_tool_type_is_equivalent_at_receipt_boundaries(self):
+        """核对当前与旧摘要下的类型等价、真实声明及原有 MCP 契约。@return 无。"""
         tool, = self.body["tools"]
         body = {**self.body, "tools": [{**tool, "type": "custom"}]}
         explicit = ColdHistory.from_request(body)
         implicit = ColdHistory.from_request(self.body)
         request = {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
         self.assertEqual(explicit.mcp(request), implicit.mcp(request))
-        boundary = explicit.receipt_boundary()
-        self.assertEqual(ColdHistory.from_receipt_boundary(body, boundary), explicit)
-        self.assertIsNone(ColdHistory.from_receipt_boundary(self.body, boundary))
-        for kind in (None, "text_editor_20250728"):
-            self.assertIsNone(ColdHistory.from_request({**body, "tools": [{**tool, "type": kind}]}))
+        self.assertEqual(explicit.receipt_boundary(), implicit.receipt_boundary())
+        for incoming, current in ((body, explicit), (self.body, implicit)):
+            for original in (explicit, implicit):
+                self.assertTrue(original.matches_receipt_plan(current))
+                self.assertEqual(ColdHistory.from_receipt_boundary(incoming, original.receipt_boundary()), current)
+                self.assertTrue(current.matches_receipt_plan(
+                    ColdHistory.from_receipt_boundary(incoming, original.receipt_boundary(legacy=True)),
+                ))
+        self.assertEqual(ColdHistory.from_receipt_boundary(
+            self.body, explicit.receipt_boundary(legacy=True),
+        ), explicit)
+        second = {**tool, "name": "SetTag"}
+        first_form = {**body, "tools": [body["tools"][0], second]}
+        second_form = {**body, "tools": [tool, {**second, "type": "custom"}]}
+        first = ColdHistory.from_request(first_form)
+        other = ColdHistory.from_request(second_form)
+        self.assertEqual(first.receipt_boundary(), other.receipt_boundary())
+        self.assertEqual(ColdHistory.from_receipt_boundary(second_form, first.receipt_boundary(legacy=True)), first)
+        for changed in (
+            [], [{**tool, "type": None}], [{**tool, "type": "text_editor_20250728"}],
+            [{**tool, "name": "DifferentTool"}], [{**tool, "description": "不同说明"}],
+            [{**tool, "input_schema": {"type": "string"}}], [tool, second],
+        ):
+            with self.subTest(changed=changed):
+                modified = {**body, "tools": changed}
+                self.assertFalse(explicit.matches_receipt_plan(ColdHistory.from_request(modified)))
+                self.assertIsNone(ColdHistory.from_receipt_boundary(modified, explicit.receipt_boundary()))
+                self.assertIsNone(ColdHistory.from_receipt_boundary(modified, explicit.receipt_boundary(legacy=True)))
 
     def test_output_effort_matches_the_frozen_root_scope(self):
         """只有原生交互 CLI 已支持的强度进入原生计划。@return 无。"""

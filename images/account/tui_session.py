@@ -33,7 +33,10 @@ from tui_cold_history import (
     tool_result_has_images, tool_result_has_text_blocks, tool_result_is_empty,
 )
 from tui_reconnect import ReceiptCheckpoints, digest
-from tui_input_policy import CONTEXT_BETA, SYSTEM_CLEAR_AT_BETA, SYSTEM_EFFORT_BETA, InputRejection, native_input
+from tui_input_policy import (
+    CONTEXT_BETA, SYSTEM_CLEAR_AT_BETA, SYSTEM_EFFORT_BETA, InputRejection,
+    custom_tool_type, legacy_custom_tool_lists, native_input,
+)
 from tui_messages import (
     BODY_LIMIT,
     MessageInputObservation,
@@ -1250,20 +1253,24 @@ def _receipt_request(body, reservation, *, cache_ttl=None, previous=None):
     choice = body.get("tool_choice", {"type": "auto"})
     tools = body.get("tools")
     equivalents = equivalent_auto_tool_choices(choice) if choice is not None else ()
-    if not equivalents or not isinstance(tools, list) or not tools or native_input(body, input_format):
+    if not isinstance(tools, list) or not tools or native_input(body, input_format):
         return digest([body, *scope])
-    canonical, *legacy = equivalents
-    normalized = {**body, "tool_choice": canonical}
+    normalized = {**body, "tools": [custom_tool_type(tool) for tool in tools]}
+    if equivalents:
+        normalized["tool_choice"] = equivalents[0]
     request = digest([normalized, *scope])
     if previous is not None and previous != request:
-        # 已认领的旧回执保留原摘要。比对其余字段后才允许继续使用数据库的条件写入。
-        for shape in legacy:
-            if shape is None:
-                normalized.pop("tool_choice")
-            else:
-                normalized["tool_choice"] = shape
-            if digest([normalized, *scope]) == previous:
-                return previous
+        # 旧写入者仍按原表示保留认领摘要。匹配原摘要后才沿用数据库的条件写入。
+        for declarations in legacy_custom_tool_lists(tools):
+            normalized["tools"] = declarations
+            for shape in equivalents or (choice,):
+                if equivalents:
+                    if shape is None:
+                        normalized.pop("tool_choice", None)
+                    else:
+                        normalized["tool_choice"] = shape
+                if digest([normalized, *scope]) == previous:
+                    return previous
     return request
 
 

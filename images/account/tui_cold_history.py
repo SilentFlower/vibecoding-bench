@@ -6,13 +6,13 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from itertools import chain, groupby, islice, zip_longest
 from pathlib import Path
-import re
 from struct import unpack_from
 from tempfile import TemporaryDirectory
 from uuid import uuid4
 
 from runtime_files import atomic_text
 from tui_cache_policy import model_body
+from tui_input_policy import custom_tool_type, legacy_custom_tool_lists, ordinary_custom_tool
 from tui_messages import encode, same_json_value
 from tui_reconnect import digest
 from tui_workspace_launch import IMPORT_BOUNDARY, WorkspaceLaunchObservation, publish_workspace_history
@@ -394,13 +394,8 @@ class ColdHistory:
         choice = body.get("tool_choice")
         if "tool_choice" in body and not (_automatic_tools(choice) if declared else choice == {"type": "none"}):
             return None
-        for tool in declared:
-            if (tool.keys() - {"type", "name", "input_schema", "description"}
-                    or tool.get("type", "custom") != "custom"
-                    or not re.fullmatch(r"[A-Za-z0-9_-]+", tool["name"])
-                    or not isinstance(tool.get("description", ""), str)
-                    or "input_schema" not in tool):
-                return None
+        if not all(ordinary_custom_tool(tool) for tool in declared):
+            return None
         system = body.get("system")
         if isinstance(system, list):
             if any(block.keys() != {"type", "text"} for block in system):
@@ -477,8 +472,12 @@ class ColdHistory:
             blocks.append({"type": "text", "text": self._reminder()})
         return blocks
 
-    def _scope(self):
-        scope = (self.model, self.system_policy, self.system, self.tools, self.max_tokens, self.thinking)
+    def _comparison_tools(self):
+        return {name: custom_tool_type(tool) for name, tool in self.tools.items()}
+
+    def _scope(self, *, tools=None):
+        scope = (self.model, self.system_policy, self.system,
+                 self.tools if tools is None else tools, self.max_tokens, self.thinking)
         # 缺省沿用既有工作区和等待回执的摘要。
         if self.effort is not None:
             scope = (*scope, self.effort)
@@ -505,16 +504,19 @@ class ColdHistory:
         """核对同一工具轮的根输入。@param plan 客户端回传的根轮计划。@return 是否匹配原轮。"""
         if plan is None:
             return False
-        received = vars(plan)
-        if same_json_value(vars(self), received):
+        expected = {**vars(self), "tools": self._comparison_tools()}
+        received = {**vars(plan), "tools": plan._comparison_tools()}
+        if same_json_value(expected, received):
             return True
         return bool(self.tools) and any(
-            same_json_value({**vars(self), "tool_choice": choice}, received)
+            same_json_value({**expected, "tool_choice": choice}, received)
             for choice in equivalent_auto_tool_choices(self.tool_choice)
         )
 
-    def receipt_boundary(self):
-        """冻结必须随原工具回执复用的根轮输入。@return 不含客户原文的边界。"""
+    def receipt_boundary(self, *, legacy=False):
+        """冻结必须随原工具回执复用的根轮输入。@param legacy 是否核对旧版按原字段生成的摘要。
+        @return 不含客户原文的边界。
+        """
         current = self.current_blocks or self.prompt
         if self.current_blocks and all(block["type"] == "text" for block in self.current_blocks):
             # 已签发的纯文本多块回执仍沿用原摘要。
@@ -522,7 +524,7 @@ class ColdHistory:
         boundary = {
             "prompt_index": len(self.history) + 1,
             "system_policy": self.system_policy,
-            "digest": digest([self._scope(), self.history, current]),
+            "digest": digest([self._scope(tools=None if legacy else self._comparison_tools()), self.history, current]),
         }
         if self.recovered_models:
             boundary["bound_signature_models"] = [list(item) for item in self.recovered_models]
@@ -538,15 +540,23 @@ class ColdHistory:
             plan = cls.from_request(root, boundary["system_policy"], cache_ttl=ttl, signed_models=signed_models)
             if plan is None:
                 continue
-            if plan.receipt_boundary() == boundary:
-                return plan
-            # 旧修订以原字段形状写入摘要。匹配后继续沿用原修订的计划和归档范围。
+            alternatives = [plan]
             if plan.tools:
-                for choice in equivalent_auto_tool_choices(plan.tool_choice):
-                    if choice == plan.tool_choice:
-                        continue
-                    original = replace(plan, tool_choice=choice)
-                    if original.receipt_boundary() == boundary:
+                alternatives.extend(replace(plan, tool_choice=choice)
+                                    for choice in equivalent_auto_tool_choices(plan.tool_choice)
+                                    if choice != plan.tool_choice)
+            for candidate in alternatives:
+                if candidate.receipt_boundary() == boundary:
+                    return candidate
+            canonical = plan._comparison_tools()
+            # 旧摘要只接受可复算的原表示。命中后沿用旧计划的工作区摘要。
+            for tools in legacy_custom_tool_lists(list(plan.tools.values())):
+                declarations = dict(zip(plan.tools, tools, strict=True))
+                if declarations == canonical:
+                    continue
+                for candidate in alternatives:
+                    original = replace(candidate, tools=declarations)
+                    if original.receipt_boundary(legacy=True) == boundary:
                         return original
         return None
 

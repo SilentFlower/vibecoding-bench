@@ -80,25 +80,54 @@ pub(super) fn key(
     if !native
         && !has_tui_billing_marker(body)
         && let Some(fields) = body.as_object()
-        && fields
-            .get("tools")
-            .and_then(Value::as_array)
-            .is_some_and(|v| !v.is_empty())
-        && fields.get("tool_choice").is_some_and(|choice| {
-            *choice == json!({"type": "auto"})
-                || *choice == json!({"type": "auto", "disable_parallel_tool_use": false})
-        })
+        && let Some(tools) = fields.get("tools").and_then(Value::as_array)
     {
-        // 有工具的普通请求省略选择时默认 auto。只从响应索引中略过该选项，出站仍使用原正文。
+        let default_choice = !tools.is_empty()
+            && fields.get("tool_choice").is_some_and(|choice| {
+                *choice == json!({"type": "auto"})
+                    || *choice == json!({"type": "auto", "disable_parallel_tool_use": false})
+            });
+        // 普通工具的默认选择与类型只在响应索引归一，保持发往发送器的原正文。
         hash_json_object(
             &mut hash,
-            fields.iter().filter(|(key, _)| *key != "tool_choice"),
+            fields
+                .iter()
+                .filter(|(key, _)| *key != "tools" && !(default_choice && *key == "tool_choice")),
             false,
         );
+        hash.update(b"[");
+        for tool in tools {
+            hash_receipt_tool(&mut hash, tool);
+        }
+        hash.update(b"]");
     } else {
         hash_json(&mut hash, body, false);
     }
     Ok(hash.finalize().into())
+}
+
+fn hash_receipt_tool(hash: &mut Sha256, tool: &Value) {
+    if let Some(fields) = tool.as_object()
+        && tool["type"] == "custom"
+        && fields.keys().all(|key| {
+            matches!(
+                key.as_str(),
+                "type" | "name" | "input_schema" | "description"
+            )
+        })
+        && tool["name"].as_str().is_some_and(|name| {
+            !name.is_empty()
+                && name
+                    .bytes()
+                    .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, b'_' | b'-'))
+        })
+        && tool["input_schema"].is_object()
+        && fields.get("description").is_none_or(Value::is_string)
+    {
+        hash_json_object(hash, fields.iter().filter(|(key, _)| *key != "type"), false);
+    } else {
+        hash_json(hash, tool, false);
+    }
 }
 
 #[derive(Clone)]
@@ -779,6 +808,54 @@ mod tests {
             reconnect(1, "same-session", &no_tools, false),
             reconnect(1, "same-session", &no_tools_auto, false)
         );
+    }
+
+    /// 原样和等价类型共用响应索引，真实类型、schema 和归属差异保持独立。
+    #[test]
+    fn ordinary_custom_tool_receipt_reconnect_identity() {
+        let headers = HeaderMap::new();
+        let reconnect = |principal, session, body: &_, native| {
+            key(
+                principal,
+                Some(session),
+                body,
+                &headers,
+                native,
+                Default::default(),
+                "",
+            )
+            .unwrap()
+        };
+        let tool = json!({"name": "LookupNote", "input_schema": {"type": "object", "additionalProperties": false}});
+        let mut second = tool.clone();
+        second["name"] = json!("SetTag");
+        let mut first_custom = tool.clone();
+        first_custom["type"] = json!("custom");
+        let mut second_custom = second.clone();
+        second_custom["type"] = json!("custom");
+        let original = json!({"tools": [first_custom, second], "stream": true});
+        let equivalent = json!({
+            "tools": [tool, second_custom], "tool_choice": {"type": "auto"}, "stream": true
+        });
+        let original_key = reconnect(1, "original", &original, false);
+        assert_eq!(original_key, reconnect(1, "original", &equivalent, false));
+        assert_ne!(original_key, reconnect(2, "original", &equivalent, false));
+        assert_ne!(original_key, reconnect(1, "other", &equivalent, false));
+        assert_ne!(
+            reconnect(1, "original", &original, true),
+            reconnect(1, "original", &equivalent, true)
+        );
+        let mut changed = equivalent.clone();
+        changed["tools"].as_array_mut().unwrap().swap(0, 1);
+        assert_ne!(original_key, reconnect(1, "original", &changed, false));
+        changed = equivalent.clone();
+        changed["tools"][0]["input_schema"]["additionalProperties"] = json!(0);
+        assert_ne!(original_key, reconnect(1, "original", &changed, false));
+        for kind in [json!(null), json!("text_editor_20250728")] {
+            changed = equivalent.clone();
+            changed["tools"][0]["type"] = kind;
+            assert_ne!(original_key, reconnect(1, "original", &changed, false));
+        }
     }
 
     /// 拒绝超预算的重连后，原空闲截止时间和观察通知均保持一致。
