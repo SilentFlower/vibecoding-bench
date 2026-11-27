@@ -295,7 +295,8 @@ def fixture_thinking_display_sse(body, *, message_id="msg_cold_thinking_display"
     @param body 隔离模型实收。@param message_id 合成助手消息 ID。@return SSE 字节。
     """
     model = body["model"]
-    display = body["thinking"].get("display", THINKING_DISPLAY_DEFAULTS[model])
+    settings = body["thinking"]
+    display = settings["display"] if "display" in settings else THINKING_DISPLAY_DEFAULTS[model]
     wire = message_sse({"type": "text", "text": FINAL}, "end_turn", message_id)
     events = [json.loads(line[5:]) for line in wire.splitlines() if line.startswith(b"data:")]
     events[0]["message"]["model"] = model
@@ -324,7 +325,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            current_images=False, current_image_ending="text",
            auto_tool_choice=None, auto_tool_direct_text=False,
            adaptive_thinking_model=None, adaptive_thinking_display="updates", thinking_display_model=None,
-           fixed_thinking_model=None,
+           fixed_thinking_model=None, fixed_thinking_display="updates",
            thinking_cli_summaries=None,
            recovery_ledger_contention=False, recovery_ledger_deadline=False, recovery_workspace_rejection=False,
            recovery_readiness_rejection=False,
@@ -385,6 +386,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param adaptive_thinking_model 可选，核对显式 adaptive 的固定模型。
     @param adaptive_thinking_display 在工具首轮与续轮冻结的显式显示值。
     @param fixed_thinking_model 可选，核对固定 4.6 模型的显式思考预算。
+    @param fixed_thinking_display 固定预算工具轮及回执使用的显式显示值。
     @param thinking_display_model 可选，核对普通 API 思考显示及客户端响应的固定模型。
     @param thinking_cli_summaries 可选，核对正式 CLI 摘要设置的隔离对照。
     @param recovery_ledger_contention 是否在提交原回执时短暂占用账号账本锁。
@@ -449,7 +451,10 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     auxiliary_text = SUGGESTION_REPLY if suggestion else TITLE_TEXT
     slow_tool_arrivals = []
     model_betas = []
-    summarized_thinking = adaptive_thinking_model is not None and adaptive_thinking_display == "summarized"
+    summarized_thinking = (
+        (adaptive_thinking_model is not None and adaptive_thinking_display == "summarized")
+        or (fixed_thinking_model is not None and fixed_thinking_display == "summarized")
+    )
     signed_thinking_text = "" if signed_tool_response == "signature-only" else SIGNED_THINKING["thinking"]
     lookups = []
     deny_proxy = False
@@ -1130,8 +1135,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 headers["anthropic-beta"] = THINKING_UPDATES_BETA
         if fixed_thinking_model:
             body.update(model=fixed_thinking_model, max_tokens=4096,
-                        thinking={"type": "enabled", "budget_tokens": 1536, "display": "updates"})
-            headers["anthropic-beta"] = THINKING_UPDATES_BETA
+                        thinking={"type": "enabled", "budget_tokens": 1536, "display": fixed_thinking_display})
+            if fixed_thinking_display == "updates":
+                headers["anthropic-beta"] = THINKING_UPDATES_BETA
         if recover_pending:
             body["output_config"] = {"effort": "medium"}
         with ExitStack() as initial_connections:
@@ -1425,19 +1431,26 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 )
                 assert json.loads(raw)["error"]["code"] == "unsupported_parameter" and len(received) == 1, raw
                 changed_thinking[label] = changed_status
-        if fixed_thinking_model:
+        if fixed_thinking_model and not previous:
             changed_fixed_thinking = {}
-            for field, value in (
-                ("thinking", {**body["thinking"], "budget_tokens": 1792}),
-                ("max_tokens", 4097),
-            ):
+            changes = {
+                "thinking": {"thinking": {**body["thinking"], "budget_tokens": 1792}},
+                "max_tokens": {"max_tokens": 4097},
+            }
+            if summarized_thinking:
+                changes.update(
+                    display_updates={"thinking": {**body["thinking"], "display": "updates"}},
+                    display_omitted={"thinking": {**body["thinking"], "display": "omitted"}},
+                    display_default={"thinking": {"type": "enabled", "budget_tokens": body["thinking"]["budget_tokens"]}},
+                )
+            for label, patch in changes.items():
                 status, raw, changed_id = checked_messages(
-                    manage, token, {**follow, field: value}, headers, received, "changed_fixed_" + field,
+                    manage, token, {**follow, **patch}, headers, received, "changed_fixed_" + label,
                     expected_status=422, trace_startup=trace_startup, sender_status=sender_state_after_failure,
                 )
                 assert json.loads(raw)["error"]["code"] == "unsupported_parameter" and len(received) == 1
                 assert not manage("GET", "request-diagnostics/" + changed_id)["attempts"]
-                changed_fixed_thinking[field] = {"status": status, "request_id": changed_id}
+                changed_fixed_thinking[label] = {"status": status, "request_id": changed_id}
         if history_cache_markers:
             original_markers = observed_cache_breakpoints({"messages": messages})
             if original_markers:
@@ -1686,7 +1699,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             return proof
         final = json.loads(raw)
         if summarized_thinking:
-            verify_client_thinking_reply(raw, False, adaptive_thinking_model, SIGNED_THINKING["thinking"])
+            verify_client_thinking_reply(raw, False, body["model"], SIGNED_THINKING["thinking"])
         else:
             assert final["content"] == [{"type": "text", "text": FINAL}]
         duplicate, _ = call(18090, "POST", "/v1/messages", token, follow, headers)
@@ -1710,7 +1723,10 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             wait_for(lambda: sender_state().get("ready") and sender_state().get("idle"))
             status, raw = call(18090, "POST", "/v1/messages", token, fresh, {**headers, "x-session-id": str(uuid4())})
             assert status == 200 and len(received) == 3, (status, raw, len(received))
-            assert json.loads(raw)["content"] == [{"type": "text", "text": FINAL}]
+            if summarized_thinking:
+                verify_client_thinking_reply(raw, False, body["model"], SIGNED_THINKING["thinking"])
+            else:
+                assert json.loads(raw)["content"] == [{"type": "text", "text": FINAL}]
             native = received[-1][1]
             assert any("You are Claude Code" in block["text"] for block in native["system"])
             assert any(tool["name"] == NATIVE_TOOL_NAME for tool in native["tools"])
@@ -1719,12 +1735,24 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             (new_attempt,) = verify_captures(manage, received[-1:], account_token)
             assert new_attempt["ingress_body_sha256"] == sha256(encoded(fresh)).hexdigest()
             assert new_attempt["cli_and_https_body_sha256"] != new_attempt["ingress_body_sha256"]
-            return {"old_release": release, "next_release": next_release, "new_before_drain": premature,
+            proof = {"old_release": release, "next_release": next_release, "new_before_drain": premature,
                     "wrong_subject": wrong_subject, "wrong_session": wrong_session,
                     "changed_arguments": wrong_arguments, "duplicate": duplicate,
                     "old_release_tool_callbacks": 1, "historical_tool_callbacks": 0,
                     "old_model_posts": 2, "new_model_posts": 1,
                     "new_attempt": new_attempt}
+            if fixed_thinking_model:
+                assert all(native["thinking"] == body["thinking"] and native["max_tokens"] == body["max_tokens"]
+                           for _, native, _ in received)
+                old_attempts = []
+                for request_id in (initial_request_id, continuation_request_id):
+                    (attempt,) = manage("GET", "request-diagnostics/" + request_id)["attempts"]
+                    assert attempt["context"]["tui_body_source"] == "account_sender"
+                    old_attempts.append({"request_id": request_id, "attempt_id": attempt["attempt_id"]})
+                assert new_attempt["diagnostic_body_source"] == "interactive_cli"
+                proof["fixed_thinking"] = {"thinking": body["thinking"], "max_tokens": body["max_tokens"],
+                                           "old_attempts": old_attempts}
+            return proof
         expected_receipts = result["content"] if exact_tool_receipts else ()
         if tool_receipt_outer_cache and history_cache_ttl:
             # 平台 TTL 冻结在工具根轮。出站外层断点应用该值，原客户端回执和内层断点照原样。
@@ -1988,8 +2016,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             actual = [{key: native.get(key) for key in ("model", "thinking", "max_tokens")} for _, native, _ in received]
             assert actual == [{key: body[key] for key in ("model", "thinking", "max_tokens")}] * 2, actual
             assert all(attempt["diagnostic_body_source"] == "interactive_cli" for attempt in captures), captures
-            assert len(model_betas) == 2 and all(THINKING_UPDATES_BETA in beta.split(",") for beta in model_betas), model_betas
+            if fixed_thinking_display == "updates":
+                assert len(model_betas) == 2 and all(THINKING_UPDATES_BETA in beta.split(",") for beta in model_betas), model_betas
             proof["fixed_thinking"] = {"model_posts": actual, "changes": changed_fixed_thinking}
+            if summarized_thinking:
+                proof["client_content"] = final["content"]
         if signed_tool_history:
             hydrated = find_blocks(received[1][1], "type", "thinking")
             assert hydrated == [("assistant", signed_block)], (
@@ -4989,6 +5020,7 @@ def main():
                         help="核对根轮的 auto 字段形状及工具回执冻结")
     parser.add_argument("--adaptive-thinking-model", choices=(MODEL, "claude-opus-5-5"))
     parser.add_argument("--fixed-thinking-model", choices=(MODEL, "claude-opus-4-6"))
+    parser.add_argument("--fixed-thinking-display", choices=("updates", "summarized"), default="updates")
     parser.add_argument("--adaptive-thinking-display", choices=("default", "updates", "summarized"), default="updates")
     parser.add_argument("--thinking-cli-summaries", choices=("on", "off"))
     parser.add_argument("--signed-tool-history", action="store_true")
@@ -5076,6 +5108,8 @@ def main():
         parser.error("--adaptive-thinking-display 需要同用 --adaptive-thinking-model")
     if args.fixed_thinking_model and args.adaptive_thinking_model:
         parser.error("显式固定思考预算和 adaptive 用例须分别运行")
+    if args.fixed_thinking_display != "updates" and args.fixed_thinking_model is None:
+        parser.error("--fixed-thinking-display 需要同用 --fixed-thinking-model")
     if args.signed_tool_response and not args.signed_tool_history:
         parser.error("--signed-tool-response 需要同用 --signed-tool-history")
     if args.thinking_cli_summaries is not None and not args.thinking_display_contract:
@@ -5115,7 +5149,8 @@ def main():
                      or args.disable_parallel_tool_use_contract or bool(args.oauth_rotation or args.provider_quota)
                      or args.slow_tool_stream or args.interrupted_tool_stream is not None
                      or bool(auxiliary_mode or args.agent_progress)
-                     or bool(args.thinking_display_contract or args.fixed_thinking_model)
+                     or bool(args.thinking_display_contract)
+                     or bool(args.fixed_thinking_model and not (previous or args.mixed_image_peers))
                      or (bool(args.message_system_roles) and args.v1_runtime is None))
     if trace_startup and (previous or args.mixed_image_peers or args.v1_runtime):
         parser.error("启动观测需要当前 V2 源码夹具")
@@ -5166,6 +5201,7 @@ def main():
                        auto_tool_direct_text=args.auto_tool_direct_text,
                        adaptive_thinking_model=args.adaptive_thinking_model,
                        fixed_thinking_model=args.fixed_thinking_model,
+                       fixed_thinking_display=args.fixed_thinking_display,
                        adaptive_thinking_display=args.adaptive_thinking_display,
                        thinking_display_model=args.thinking_display_contract,
                        thinking_cli_summaries=thinking_cli_summaries,

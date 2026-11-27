@@ -48,15 +48,18 @@ class ColdHistoryTests(TestCase):
         thinking = {"type": "enabled", "budget_tokens": 1536, "display": "updates"}
         baseline = {**self.body, "thinking": thinking, "max_tokens": 4096}
         for model in ("claude-sonnet-4-6", "claude-opus-4-6"):
-            body = {**baseline, "model": model}
-            with self.subTest(model=model):
-                plan = ColdHistory.from_request(body)
-                self.assertIsNotNone(plan)
-                boundary = plan.receipt_boundary()
-                self.assertEqual(ColdHistory.from_receipt_boundary(body, boundary), plan)
-                changed = {**thinking, "budget_tokens": 1792}
-                self.assertIsNone(ColdHistory.from_receipt_boundary({**body, "thinking": changed}, boundary))
-                self.assertIsNone(ColdHistory.from_receipt_boundary({**body, "max_tokens": 4097}, boundary))
+            for display, other_display in (("updates", "summarized"), ("summarized", "updates")):
+                body = {**baseline, "model": model, "thinking": {**thinking, "display": display}}
+                with self.subTest(model=model, display=display):
+                    plan = ColdHistory.from_request(body)
+                    self.assertIsNotNone(plan)
+                    boundary = plan.receipt_boundary()
+                    self.assertEqual(ColdHistory.from_receipt_boundary(body, boundary), plan)
+                    changed = {**body["thinking"], "budget_tokens": 1792}
+                    self.assertIsNone(ColdHistory.from_receipt_boundary({**body, "thinking": changed}, boundary))
+                    changed = {**body["thinking"], "display": other_display}
+                    self.assertIsNone(ColdHistory.from_receipt_boundary({**body, "thinking": changed}, boundary))
+                    self.assertIsNone(ColdHistory.from_receipt_boundary({**body, "max_tokens": 4097}, boundary))
         for variant in (
             {"model": "claude-opus-5-5"},
             {"thinking": {"type": "enabled", "budget_tokens": 1536}},

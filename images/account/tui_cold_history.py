@@ -324,7 +324,8 @@ class ColdHistory:
             # 这两个模型允许关闭自适应。CLI 会将更大的配置钳制为输出上限或思考预算上限。
             if (body["model"] not in _FIXED_THINKING_MODELS or type(budget) is not int
                     or not 1024 <= budget < body["max_tokens"] <= 128_000
-                    or thinking != {"type": "enabled", "budget_tokens": budget, "display": "updates"}):
+                    or thinking.keys() != {"type", "budget_tokens", "display"}
+                    or thinking["display"] not in ("updates", "summarized")):
                 return None
         elif thinking not in (None, {"type": "disabled"}):
             # 只接受固定 CLI 能原样生成的显式显示模式。
