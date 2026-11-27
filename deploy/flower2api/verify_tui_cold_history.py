@@ -2454,7 +2454,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         if current_images and not recover_pending and not restart_history:
             proof["image_only"] = verify_image_only_requests(
                 manage, token, account_token, headers, received,
-                check_existing=not toggle_pending_policy and tool_policy in (None, "append"),
+                policy="replace" if toggle_pending_policy else tool_policy or "append",
             )
         if restart_history:
             wait_for(lambda: sender_state().get("idle"))
@@ -5649,11 +5649,11 @@ def fixture_image_blocks(*, all_formats):
             for media_type, data in images.items()]
 
 
-def verify_image_only_requests(manage, token, account_token, headers, received, *, check_existing):
+def verify_image_only_requests(manage, token, account_token, headers, received, *, policy):
     """核对原生粘贴边界及超界请求的原入口。
     @param manage 管理入口。@param token 合成调用方。@param account_token 合成模型凭据。
     @param headers 公开请求头。@param received TLS 实收。
-    @param check_existing 默认账号动作下核对超界兼容。@return 各独立请求的证据。
+    @param policy 公开请求实际使用的账号策略。@return 各独立请求的证据。
     """
     def chunk(kind, data):
         return pack(">I", len(data)) + kind + data + pack(">I", crc32(data, crc32(kind)))
@@ -5670,29 +5670,57 @@ def verify_image_only_requests(manage, token, account_token, headers, received, 
             "type": "base64", "media_type": "image/png", "data": b64encode(png).decode("ascii"),
         }}]
 
-    cases = [("native_width_2000", make_png(2000), True), ("native_bytes_512000", make_png(2, 512_000), True)]
-    if check_existing:
-        cases.extend([
-            ("native_24_images", fixture_image_blocks(all_formats=True) * 6, True),
-            ("existing_width_2001", make_png(2001), False),
-            ("existing_bytes_512001", make_png(2, 512_001), False),
-        ])
+    cases = [
+        (name + ("_system" if system else "_omitted"), content, native, system)
+        for name, content, native in [
+            ("both_at_limit", make_png(2000, 512_000), True),
+            ("over_width", make_png(2001, 512_000), False),
+            ("over_bytes", make_png(2000, 512_001), False),
+            ("over_both", make_png(2001, 512_001), False),
+        ]
+        for system in (None, "图像边界验收的独立业务指令。")
+    ]
+    if policy == "append":
+        cases.append(("native_24_images", fixture_image_blocks(all_formats=True) * 6, True, None))
     result = {}
-    for name, content, native in cases:
+    for name, content, native, system in cases:
         body = {"model": MODEL, "max_tokens": 128, "stream": False,
                 "messages": [{"role": "user", "content": content}]}
+        if system is not None:
+            body["system"] = system
         before = len(received)
-        status, raw = call(18090, "POST", "/v1/messages", token, body, {**headers, "x-session-id": str(uuid4())})
-        assert status == 200 and len(received) == before + 1, (name, status, raw, len(received))
-        assert json.loads(raw)["content"] == [{"type": "text", "text": FINAL}]
+        expected = 200 if native or policy == "append" else 422
+        status, raw, request_id = checked_messages(manage, token, body, {**headers, "x-session-id": str(uuid4())},
+                                                  received, name, expected_status=expected)
+        observation = {"http_status": status, "model_posts": len(received) - before, "request_id": request_id}
+        result[name] = observation
+        assert observation["model_posts"] == int(status == 200), (name, observation)
+        response = json.loads(raw)
+        detail = manage("GET", "request-diagnostics/" + request_id)
+        if status == 422:
+            assert response["error"]["code"] == "unsupported_parameter" and detail["attempts"] == [], (
+                name, response, detail,
+            )
+            observation["error_code"] = response["error"]["code"]
+            continue
+        assert response["content"] == [{"type": "text", "text": FINAL}]
+        (diagnostic,) = detail["attempts"]
+        assert diagnostic["attempt_id"] == detail["request"]["context"]["tui_reservation_id"]
+        source = diagnostic["context"]["tui_body_source"]
+        assert source == ("interactive_cli" if native else "account_sender"), (name, source)
+        observation.update(body_source=source, body_sha256=received[-1][0])
+        model = received[-1][1]
         if native:
-            verify_current_image_row(received[-1][1], content, require_alias=True)
+            verify_current_image_row(model, content, require_alias=True)
             (attempt,) = verify_captures(manage, received[-1:], account_token)
-            result[name] = {"model_posts": 1, "attempt": attempt}
+            observation["attempt"] = attempt
         else:
-            # 只在默认账号动作核对超界兼容，保留原入口实收的图像和消息。
-            assert received[-1][1]["messages"] == body["messages"]
-            result[name] = {"model_posts": 1, "body_sha256": received[-1][0]}
+            assert model["messages"] == body["messages"]
+        if system is not None:
+            roots = sum(block.get("text", "").count(system) for block in blocks({"content": model["system"]}))
+            users = sum(block.get("text", "").count(system) for row in model["messages"] if row["role"] == "user"
+                        for block in blocks(row))
+            assert (roots, users) == ((0, 1) if policy == "user_reminder" else (1, 0)), (name, roots, users)
     return result
 
 
