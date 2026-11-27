@@ -95,6 +95,7 @@ class SessionTests(unittest.TestCase):
             with patch.object(actor, "_main_request", return_value=True), self.assertRaises(ModelResponseError) as caught:
                 actor.serve_model(SimpleNamespace(headers=sdk), {})
             self.assertEqual(caught.exception.status, 422)
+            self.assertEqual(caught.exception.source, "tui_cli_input_guard")
             self.assertEqual(json.loads(caught.exception.private_body)["error"]["code"], "unsupported_parameter")
             self.assertFalse(actor.step.claimed)
             driver.launcher.local_model_response.assert_not_called()

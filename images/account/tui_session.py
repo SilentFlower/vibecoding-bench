@@ -897,7 +897,7 @@ class _Actor:
             raise ModelResponseError(422, _json({"type": "error", "error": {
                 "type": "invalid_request_error", "code": "unsupported_parameter",
                 "message": "请求的协议版本或 beta 超出本轮原生 SDK 能力",
-            }}).encode())
+            }}).encode(), source="tui_cli_input_guard")
         actual = {}
         for name, value in sdk_headers.items():
             name = name.lower()
