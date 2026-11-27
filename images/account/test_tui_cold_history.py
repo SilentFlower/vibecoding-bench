@@ -815,8 +815,12 @@ class ColdHistoryTests(TestCase):
         archive = [{"type": "assistant",
                     "message": {"role": "assistant", "id": "msg_archive", "model": model, "content": [block]}}
                    for block in (signature, native_tool)]
+
+        def sources(*archives):
+            return lambda read: (read(iter(rows)) for rows in archives)
+
         self.assertIsNone(ColdHistory.from_request(body))
-        plan = ColdHistory.from_request(body, read_history=lambda read: read(iter(archive)))
+        plan = ColdHistory.from_request(body, read_history=sources(archive))
         self.assertIsNotNone(plan)
         self.assertEqual(plan.recovered_models, ((1, model),))
         boundary = json.loads(json.dumps(plan.receipt_boundary()))
@@ -830,10 +834,14 @@ class ColdHistoryTests(TestCase):
                          for row in archive)],
         ]
         for observed in rejections:
-            self.assertIsNone(ColdHistory.from_request(body, read_history=lambda read: read(iter(observed))))
+            self.assertIsNone(ColdHistory.from_request(body, read_history=sources(observed)))
+        # 即使两份归档使用同一个响应 ID，也不能把分属两档的响应片段拼成来源。
+        self.assertIsNone(ColdHistory.from_request(body, read_history=sources(archive[:1], archive[1:])))
+        self.assertIsNone(ColdHistory.from_request(body, read_history=sources(archive, rejections[-1][2:])))
+        self.assertEqual(ColdHistory.from_request(body, read_history=sources(archive, archive)), plan)
         changed = deepcopy(body)
         changed["messages"][1]["content"][1]["input"] = {"different": True}
-        self.assertIsNone(ColdHistory.from_request(changed, read_history=lambda read: read(iter(archive))))
+        self.assertIsNone(ColdHistory.from_request(changed, read_history=sources(archive)))
         self.assertIsNone(ColdHistory.from_receipt_boundary(changed, boundary))
 
     def test_explicit_auto_tool_choice_preserves_parallel_permission(self):

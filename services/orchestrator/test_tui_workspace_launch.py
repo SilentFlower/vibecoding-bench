@@ -8,8 +8,8 @@ from unittest.mock import patch
 from uuid import UUID, uuid4
 
 from tui_workspace_launch import (
-    HistoryReplay, WorkspaceLaunchObservation, _key, _project_history_dir,
-    launch_workspace_cli, publish_workspace_history,
+    IMPORT_BOUNDARY, HistoryReplay, WorkspaceLaunchObservation, _key, _project_history_dir,
+    launch_workspace_cli, publish_workspace_history, read_bound_history,
 )
 
 
@@ -103,6 +103,45 @@ class BoundLaunchTests(TestCase):
                 with self.subTest(field=field), self.assertRaises(ValueError):
                     self._start(launch={**self.launch, field: value})
             spawn.assert_not_called()
+
+    def test_read_history_uses_the_original_binding_to_verify_branches(self):
+        """同项目的相邻会话分叉仍由各自绑定确定。@return 无。"""
+        boundary = "a" * 64
+
+        def config(native):
+            return self.root / "tui-sessions" / native / "home" / ".claude"
+
+        def publish(native):
+            return publish_workspace_history(
+                config(native), self.cwd, native, lambda _: False,
+                lambda selected: json.dumps({
+                    "type": "user", "sessionId": selected, "cwd": str(self.cwd), IMPORT_BOUNDARY: boundary,
+                }) + "\n", boundary=boundary,
+            )
+
+        self.assertEqual(publish(self.native), self.native)
+        own_branches = (publish(self.native), publish(self.native))
+        neighbor = str(uuid4())
+        who = {**self.who, "session_id": "相邻会话"}
+        key = _key((self.source, who["session_id"]))
+        record = self.base / (key + ".json")
+        record.write_text(json.dumps({
+            "session_key": key, "client_path": self.client, "native_session_id": neighbor,
+        }))
+        record.chmod(0o600)
+        self.assertEqual(publish(neighbor), neighbor)
+        neighbor_branch = publish(neighbor)
+        name = neighbor_branch + ".jsonl"
+        moved = _project_history_dir(config(self.native), self.cwd) / name
+        moved.write_bytes((_project_history_dir(config(neighbor), self.cwd) / name).read_bytes())
+        moved.chmod(0o600)
+
+        def read(rows):
+            return [row["sessionId"] for row in rows]
+
+        self.assertCountEqual(list(read_bound_history(self.who, self.root, read)),
+                              [[self.native], *([item] for item in own_branches)])
+        self.assertCountEqual(list(read_bound_history(who, self.root, read)), [[neighbor], [neighbor_branch]])
 
     def test_resume_checks_stored_main_chain_and_missing_history(self):
         """缺失、空白或属于别处的原生记录不能恢复。@return 无。"""

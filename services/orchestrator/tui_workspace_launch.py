@@ -5,16 +5,21 @@ from contextlib import ExitStack
 from dataclasses import dataclass
 from fcntl import LOCK_EX, flock
 from hashlib import sha256
-from itertools import count
+from itertools import chain, count
 import json
 import os
 from pathlib import Path
 import re
 from stat import S_IMODE, S_ISREG
 from subprocess import Popen
+from typing import TypeVar
 from uuid import UUID, uuid4
 
 from runtime_files import atomic_text, directory_fd, private_directory
+
+
+IMPORT_BOUNDARY = "flower2apiImportBoundary"
+_ReadResult = TypeVar("_ReadResult")
 
 
 class _MissingMainHistory(ValueError):
@@ -46,6 +51,11 @@ def _key(fields) -> str:
     # 与发送器相同的有序 JSON 元组，显式编码避免不同身份字段拼接成相同字符串。
     data = json.dumps(fields, ensure_ascii=False, separators=(",", ":")).encode()
     return sha256(data).hexdigest()
+
+
+def _branch_id(native_id: str, boundary: str, revision: int) -> str:
+    digest = bytes.fromhex(_key(("v2-history-branch", native_id, boundary, revision)))
+    return str(UUID(bytes=digest[:16], version=4))
 
 
 def _owned_dir(stack: ExitStack, path: Path) -> int:
@@ -110,21 +120,53 @@ def _read_binding(stack: ExitStack, scope, session: str, key: str, path: Path) -
     return native_id, path.parent / project
 
 
-def read_bound_history(reservation: dict, storage: Path, read: Callable[[Iterator[dict]], dict]) -> dict:
-    """在准备阶段只读查验已发布的原生主档。
+def read_bound_history(
+    reservation: dict, storage: Path, read: Callable[[Iterator[dict]], _ReadResult],
+) -> Iterator[_ReadResult]:
+    """在准备阶段逐档查验原生主档和同绑定已发布的分叉。
     @param reservation 同一受信 socket 的准备身份。@param storage 账号卷。
-    @param read 从完整核对后的主链读取所需事实。@return 读回的事实，或无法取得来源时的空字典。
+    @param read 消费一份完整主链并读取所需事实。@return 每份有效档案独立读回的事实。
     """
     try:
         with ExitStack() as stack:
             native_id, work = _read_binding(stack, *_binding_path(reservation, storage))
             config = storage / "tui-sessions" / native_id / "home" / ".claude"
             project = _owned_dir(stack, _project_history_dir(config, work))
-            with _owned_file(project, native_id + ".jsonl") as stream:
-                return read(_main_history(stream, work, native_id))
+            names = set(os.listdir(project))
+            branches = {}
+            for name in sorted(names):
+                candidate = name.removesuffix(".jsonl")
+                if candidate == name:
+                    continue
+                try:
+                    if str(UUID(candidate)) != candidate or UUID(candidate).version != 4:
+                        continue
+                    with _owned_file(project, name) as stream:
+                        rows = _main_history(stream, work, candidate)
+                        first = next(rows)
+                        if candidate != native_id:
+                            boundary = first.get(IMPORT_BOUNDARY)
+                            if not isinstance(boundary, str) or not re.fullmatch(r"[0-9a-f]{64}", boundary):
+                                continue
+                            if boundary not in branches:
+                                # 用发布时相同的规则从当前绑定派生，单有相同工作目录的档案不能提供来源。
+                                siblings = set()
+                                for revision in count():
+                                    derived = _branch_id(native_id, boundary, revision)
+                                    if derived + ".jsonl" not in names:
+                                        break
+                                    siblings.add(derived)
+                                branches[boundary] = siblings
+                            if candidate not in branches[boundary]:
+                                continue
+                        result = read(chain((first,), rows))
+                except (KeyError, OSError, TypeError, ValueError):
+                    # 一份损坏档案没有可用来源。其它完整档案仍按本绑定独立核对。
+                    continue
+                yield result
     except (KeyError, OSError, TypeError, ValueError):
         # 来源校验只用于证明已发生的响应。未取得证据的输入沿既有能力边界收口。
-        return {}
+        return
 
 
 def _resume_path(stack: ExitStack, config: Path, work: Path, native_id: str, required: bool,
@@ -203,8 +245,7 @@ def publish_workspace_history(
             if render is None:
                 return str(uuid4())
             # 分叉按登记会话和确认边界定位。一份记录已推进时，保留它并继续查找同一边界的后续记录。
-            digest = bytes.fromhex(_key(("v2-history-branch", native_id, boundary, revision)))
-            candidate = str(UUID(bytes=digest[:16], version=4))
+            candidate = _branch_id(native_id, boundary, revision)
 
 
 def launch_workspace_cli(

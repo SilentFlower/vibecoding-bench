@@ -55,6 +55,8 @@ HISTORY_CACHE = ({"type": "ephemeral", "ttl": "1h"}, {"type": "ephemeral"})
 QUESTION = "NOW：查询新便签并回答。"
 QUESTION_TAIL = "NOW：保留本轮问题第二段。"
 SIGNED_ARCHIVE_QUESTION = "另查一条便签，保留已确认的签名工具历史。"
+SIGNED_FORK_QUESTION = "从已经完成的签名分叉继续查询。"
+SIGNED_FORK_PROJECT = "<environment_context>\n<cwd>/synthetic/shared-notes</cwd>\n</environment_context>"
 CANCELLED_QUESTION = "CANCEL：暂停这道尚未完成的问题。"
 CHANGED_QUESTION = "CHANGE：改问已确认的旧订单号。"
 CHANGED_REPLY = "新问题的答案只来自已确认历史。"
@@ -70,6 +72,7 @@ PAST_ID = "toolu_past_fixture"
 PAST_SECOND_ID = "toolu_past_second_fixture"
 NEW_ID = "toolu_cold_fixture"
 SECOND_ID = "toolu_second_cold_fixture"
+SIGNED_FORK_TOOL_ID = "toolu_signed_fork_fixture"
 RECONNECT_ID = "toolu_reconnect_cold_fixture"
 RECONNECT_MESSAGE_ID = "msg_cold_reconnect"
 INTERRUPTED_PREFIX = "第一条续轮已交付、随后中断的合成文本。"
@@ -78,6 +81,8 @@ REGENERATED_USAGE = (19, 11)
 SLOW_READER_USAGE = (17, 11)
 SLOW_READER_PAUSE_SECONDS = 11
 SIGNED_THINKING = {"type": "thinking", "thinking": "隔离模型的合成思考段。", "signature": "c2lnbmF0dXJlLWZpeHR1cmU="}
+SIGNED_FORK_THINKING = {"type": "thinking", "thinking": "隔离模型在分叉产生的合成思考段。",
+                        "signature": "c2lnbmF0dXJlLWZvcms="}
 ADAPTIVE_THINKING = {"type": "adaptive", "display": "updates"}
 THINKING_UPDATES_BETA = "thinking-display-updates-2026-08-18"
 THINKING_DISPLAY_DEFAULTS = {MODEL: "summarized", "claude-opus-5-5": "omitted"}
@@ -184,11 +189,13 @@ def build_cutover_record(temporary, old, deployment, release):
     return gate
 
 
-def fixture_tool_sse(tool, *, with_signature, second=None, model=MODEL, thinking_text=SIGNED_THINKING["thinking"]):
+def fixture_tool_sse(tool, *, with_signature, second=None, model=MODEL, thinking_text=SIGNED_THINKING["thinking"],
+                     signature=SIGNED_THINKING["signature"], message_id="msg_cold_tool"):
     """交付隔离模型工具流。@param tool 原生工具调用。@param with_signature 是否先交付合成签名块。
     @param second 可选的同轮第二次工具调用。@param model 模型实际回复的身份，可省略。
-    @param thinking_text 合成思考摘要，可为空。@return SSE。"""
-    wire = message_sse(tool, "tool_use", "msg_cold_tool")
+    @param thinking_text 合成思考摘要，可为空。@param signature 隔离签名。@param message_id 原响应 ID。
+    @return SSE。"""
+    wire = message_sse(tool, "tool_use", message_id)
     if not with_signature and second is None and model == MODEL:
         return wire
     events = [json.loads(line[5:]) for line in wire.splitlines() if line.startswith(b"data:")]
@@ -211,7 +218,7 @@ def fixture_tool_sse(tool, *, with_signature, second=None, model=MODEL, thinking
         signed.append({"type": "content_block_delta", "index": 0,
                        "delta": {"type": "thinking_delta", "thinking": thinking_text}})
     signed.extend([
-        {"type": "content_block_delta", "index": 0, "delta": {"type": "signature_delta", "signature": SIGNED_THINKING["signature"]}},
+        {"type": "content_block_delta", "index": 0, "delta": {"type": "signature_delta", "signature": signature}},
         {"type": "content_block_stop", "index": 0},
     ])
     events[1:1] = signed
@@ -582,14 +589,26 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 prefix, wire = fixture_cancelled_tool_sse(tool["name"])
             elif cancel_and_change_question:
                 wire = message_sse({"type": "text", "text": CHANGED_REPLY}, "end_turn", "msg_changed_question")
+            elif bound_signed_history == "fork" and any(b.get("text") == SIGNED_FORK_QUESTION
+                                                         for row in body["messages"] for b in blocks(row)):
+                if find_blocks(body, "tool_use_id", SIGNED_FORK_TOOL_ID):
+                    wire = message_sse({"type": "text", "text": FINAL}, "end_turn", "msg_signed_fork_reply")
+                else:
+                    wire = fixture_tool_sse(
+                        {"type": "tool_use", "id": SIGNED_FORK_TOOL_ID, "name": tool["name"], "input": ARGS},
+                        with_signature=False, model=body["model"], message_id="msg_signed_fork_next_tool",
+                    )
             elif bound_signed_history and any(b.get("text") == SIGNED_ARCHIVE_QUESTION
                                                for row in body["messages"] for b in blocks(row)):
                 if find_blocks(body, "tool_use_id", SECOND_ID):
                     wire = message_sse({"type": "text", "text": FINAL}, "end_turn", "msg_bound_signed_reply")
                 else:
+                    signed = SIGNED_FORK_THINKING if bound_signed_history == "fork" else SIGNED_THINKING
                     wire = fixture_tool_sse(
                         {"type": "tool_use", "id": SECOND_ID, "name": tool["name"], "input": SECOND_ARGS},
-                        with_signature=True, model=body["model"],
+                        with_signature=True, model=body["model"], thinking_text=signed["thinking"],
+                        signature=signed["signature"],
+                        message_id="msg_bound_signed_fork" if bound_signed_history == "fork" else "msg_cold_tool",
                     )
             elif not results and tool and not restart and v1_runtime is None:
                 content = {"type": "tool_use", "id": NEW_ID, "name": tool["name"], "input": ARGS}
@@ -1064,6 +1083,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             if current_image_ending == "image":
                 current[-2], current[-1] = current[-1], current[-2]
         messages.append({"role": "user", "content": current})
+        if bound_signed_history == "fork":
+            messages[0]["content"] = [{"type": "text", "text": messages[0]["content"]},
+                                      {"type": "text", "text": SIGNED_FORK_PROJECT}]
         # 历史中的旧工具结果和当前问题之间保留完成边界，CLI 启动后只提交当前问题。
         declared = [TOOL, PARALLEL_SECOND_TOOL] if parallel_tools or auto_tool_direct_text else [TOOL]
         if explicit_custom_tool_type:
@@ -1657,10 +1679,14 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         verify_model(received, policy=tool_policy or "append", old_content=old_result, current_text_blocks=current_text_blocks,
                      exact_receipts=expected_receipts)
         if bound_signed_history:
+            def restart_bound_sender():
+                nonlocal source
+                source = restart(source, "bound_signed_receipt")
+
             return verify_bound_signed_history(
                 manage, token, foreign, headers, follow, final, received, callbacks, account_token,
                 initial_request_id, continuation_request_id, bound_signed_history,
-                lambda: restart(source, "bound_signed_receipt"), sender_state_after_failure,
+                restart_bound_sender, sender_state_after_failure,
             )
         captures = verify_captures(manage, received, account_token, additional_secrets=(
             (refresh_token, rotated_token, rotated_refresh) if oauth_rotation else ()
@@ -3431,7 +3457,8 @@ def verify_bound_signed_history(manage, token, foreign, headers, follow, reply, 
     )
     response = json.loads(raw)
     expected_tool = {"type": "tool_use", "id": SECOND_ID, "name": TOOL["name"], "input": SECOND_ARGS}
-    assert response["stop_reason"] == "tool_use" and response["content"] == [SIGNED_THINKING, expected_tool]
+    signed = SIGNED_FORK_THINKING if mode == "fork" else SIGNED_THINKING
+    assert response["stop_reason"] == "tool_use" and response["content"] == [signed, expected_tool]
     assert len(received) == 3 and callbacks == [NEW_ID]
     callbacks.append(expected_tool["id"])
     continuation = {**new_body, "messages": [
@@ -3448,7 +3475,8 @@ def verify_bound_signed_history(manage, token, foreign, headers, follow, reply, 
         manage, token, continuation, headers, received, "bound_signature_receipt", trace_startup=True,
         sender_status=sender_status,
     )
-    assert json.loads(raw)["stop_reason"] == "end_turn" and len(received) == 4
+    finished = json.loads(raw)
+    assert finished["stop_reason"] == "end_turn" and len(received) == 4
     for signed_count, (_, model, _) in enumerate(received[2:], start=1):
         assert find_blocks(model, "id", NEW_ID) == [("assistant", {
             "type": "tool_use", "id": NEW_ID, "name": NATIVE_TOOL_NAME, "input": ARGS,
@@ -3456,8 +3484,8 @@ def verify_bound_signed_history(manage, token, foreign, headers, follow, reply, 
         assert find_blocks(model, "tool_use_id", NEW_ID) == [("user", {
             "type": "tool_result", "tool_use_id": NEW_ID, "content": REPLY,
         })]
-        present = find_blocks(model, "signature", SIGNED_THINKING["signature"])
-        assert present == [("assistant", SIGNED_THINKING)] * signed_count
+        present = find_blocks(model, "type", "thinking")
+        assert present == [("assistant", block) for block in (SIGNED_THINKING, signed)[:signed_count]]
     (role, new_result), = find_blocks(received[-1][1], "tool_use_id", SECOND_ID)
     assert role == "user" and new_result["content"].count(SECOND_REPLY) == 1
     duplicate, _ = call(18090, "POST", "/v1/messages", token, continuation, headers)
@@ -3467,10 +3495,120 @@ def verify_bound_signed_history(manage, token, foreign, headers, follow, reply, 
     assert [a["request_id"] for a in attempts] == [initial_id, old_receipt_id, new_id, final_id]
     assert all(a["diagnostic_body_source"] == "interactive_cli" for a in attempts)
     assert attempts[-1]["diagnostic_session_origin"] == ("disk_resume" if mode == "restart" else "live_process")
+    if mode == "fork":
+        return verify_signed_fork_history(
+            manage, token, foreign, headers, continuation, finished, received, callbacks, account_token,
+            binding, archive, attempts, restart_sender, sender_status,
+        )
     return {"mode": mode, "source_model": sources[0][1], "source_message_id": sources[0][0],
             "source_tool_id": NEW_ID, "model_posts": len(received), "client_tool_calls": callbacks,
             "rejections": rejections, "original_history_preserved": True, "duplicate_status": duplicate,
             "attempts": attempts, "wire_final": "unavailable"}
+
+
+def verify_signed_fork_history(manage, token, foreign, headers, continuation, finished, received, callbacks,
+                               account_token, binding, primary, prior_attempts, restart_sender, sender_status):
+    """恢复分叉产出的签名历史，并核对同项目相邻会话。
+    @param manage 管理入口。@param token 原主体。@param foreign 另一主体。@param headers 原会话。
+    @param continuation 完成分叉工具的公开输入。@param finished 完整响应。
+    @param received 隔离模型收件。@param callbacks 已执行的工具。@param account_token 合成凭据。
+    @param binding 原绑定。@param primary 主档。@param prior_attempts 原轮与分叉的实际尝试。
+    @param restart_sender 重启原发送器。@param sender_status 读取发送器。@return 归属及恢复证据。
+    """
+    wait_for(lambda: sender_status().get("idle"))
+    (branch,) = [path for path in primary.parent.glob("*.jsonl") if path != primary]
+    archived = branch.read_bytes()
+    source = [row["message"] for line in archived.splitlines()
+              if (row := json.loads(line)).get("type") == "assistant"
+              and row["message"].get("id") == "msg_bound_signed_fork"]
+    assert len(source) == 2 and {row["model"] for row in source} == {continuation["model"]}
+    assert [block for row in source for block in blocks(row)] == [
+        SIGNED_FORK_THINKING, {"type": "tool_use", "id": SECOND_ID, "name": NATIVE_TOOL_NAME, "input": SECOND_ARGS},
+    ]
+    assert SIGNED_FORK_THINKING["signature"].encode() not in primary.read_bytes()
+    original = {path: path.read_bytes() for path in (binding, primary, branch)}
+    neighbor_headers = {**headers, "x-session-id": str(uuid4())}
+    adjacent = {**continuation, "tools": [], "messages": [{"role": "user", "content": [
+        {"type": "text", "text": SIGNED_FORK_PROJECT}, {"type": "text", "text": "建立同项目的相邻会话。"},
+    ]}]}
+    _, raw, neighbor_id = checked_messages(
+        manage, token, adjacent, neighbor_headers, received, "signed_fork_neighbor_setup",
+        trace_startup=True, sender_status=sender_status,
+    )
+    assert json.loads(raw)["stop_reason"] == "end_turn" and len(received) == 5
+    wait_for(lambda: sender_status().get("idle"))
+    (neighbor_binding,) = [path for path in binding.parent.glob("*.json") if path != binding]
+    neighbor_record = json.loads(neighbor_binding.read_bytes())
+    assert neighbor_record["client_path"] == json.loads(original[binding])["client_path"] == "/synthetic/shared-notes"
+    neighbor_native = neighbor_record["native_session_id"]
+    assert neighbor_native not in (primary.stem, branch.stem)
+    (neighbor_archive,) = (Path("/native/tui-sessions") / neighbor_native / "home/.claude/projects").glob(
+        "*/" + neighbor_native + ".jsonl",
+    )
+    assert neighbor_archive.parent.name == primary.parent.name
+    original.update({path: path.read_bytes() for path in (neighbor_binding, neighbor_archive)})
+    restart_sender()
+    body = {**continuation, "messages": [
+        *continuation["messages"], {"role": "assistant", "content": finished["content"]},
+        {"role": "user", "content": SIGNED_FORK_QUESTION},
+    ]}
+    changed = deepcopy(body)
+    ((_, signature),) = find_blocks(changed, "signature", SIGNED_FORK_THINKING["signature"])
+    signature["signature"] = "Y2hhbmdlZA=="
+    denied = {}
+    for phase, caller, payload, request_headers in (
+        ("neighbor", token, body, neighbor_headers),
+        ("foreign_subject", foreign, body, headers),
+        ("changed_signature", token, changed, headers),
+    ):
+        status, raw, request_id = checked_messages(
+            manage, caller, payload, request_headers, received, "signed_fork_" + phase, expected_status=422,
+            trace_startup=True, sender_status=sender_status,
+        )
+        assert json.loads(raw)["error"]["code"] == "unsupported_parameter" and len(received) == 5
+        assert not manage("GET", "request-diagnostics/" + request_id)["attempts"]
+        denied[phase] = {"request_id": request_id, "http_status": status}
+    _, raw, new_id = checked_messages(
+        manage, token, body, headers, received, "signed_fork_new_question", trace_startup=True,
+        sender_status=sender_status,
+    )
+    response = json.loads(raw)
+    tool = {"type": "tool_use", "id": SIGNED_FORK_TOOL_ID, "name": TOOL["name"], "input": ARGS}
+    assert response["stop_reason"] == "tool_use" and response["content"] == [tool]
+    assert len(received) == 6 and callbacks == [NEW_ID, SECOND_ID]
+    callbacks.append(tool["id"])
+    receipt = {**body, "messages": [
+        *body["messages"], {"role": "assistant", "content": [tool]},
+        {"role": "user", "content": [{"type": "tool_result", "tool_use_id": tool["id"], "content": REPLY}]},
+    ]}
+    marker = ("--name=" + headers["x-session-id"]).encode()
+    (cli,) = [path for path in Path("/proc").glob("[0-9]*/cmdline") if fixture_command_has(path, marker)]
+    os.kill(int(cli.parent.name), SIGKILL)
+    restart_sender()
+    assert not cli.parent.exists()
+    _, raw, receipt_id = checked_messages(
+        manage, token, receipt, headers, received, "signed_fork_receipt", trace_startup=True, sender_status=sender_status,
+    )
+    assert json.loads(raw)["stop_reason"] == "end_turn" and len(received) == 7
+    for _, model, _ in received[-2:]:
+        assert find_blocks(model, "type", "thinking") == [("assistant", SIGNED_THINKING), ("assistant", SIGNED_FORK_THINKING)]
+        assert find_blocks(model, "id", SECOND_ID) == [("assistant", {
+            "type": "tool_use", "id": SECOND_ID, "name": NATIVE_TOOL_NAME, "input": SECOND_ARGS,
+        })]
+        ((role, result),) = find_blocks(model, "tool_use_id", SECOND_ID)
+        assert role == "user" and result["content"].count(SECOND_REPLY) == 1
+    duplicate, _ = call(18090, "POST", "/v1/messages", token, receipt, headers)
+    assert duplicate == 400 and len(received) == 7
+    assert all(path.read_bytes() == saved for path, saved in original.items())
+    attempts = verify_captures(manage, received[-3:], account_token)
+    assert [item["request_id"] for item in attempts] == [neighbor_id, new_id, receipt_id]
+    assert [item["diagnostic_session_origin"] for item in attempts[-2:]] == ["external_import", "disk_resume"]
+    assert all(item["diagnostic_body_source"] == "interactive_cli" for item in attempts)
+    return {"primary_native_id": primary.stem, "source_branch_id": branch.stem, "neighbor_native_id": neighbor_native,
+            "source_model": source[0]["model"], "source_message_id": source[0]["id"], "source_tool_id": SECOND_ID,
+            "rejections": denied, "model_posts": len(received), "client_tool_calls": callbacks,
+            "original_archives_preserved": True, "duplicate_status": duplicate,
+            "attempts": [*prior_attempts, *attempts], "wire_final": "unavailable"}
 
 
 def verify_disable_parallel_tool_use(manage, token, identifier, received, sender_status):
@@ -4601,7 +4739,7 @@ def main():
     scenario.add_argument("--structured-output-contract", action="store_true")
     scenario.add_argument("--external-signed-history-contract", action="store_true",
                           help="核对普通客户端提交的外部签名历史")
-    scenario.add_argument("--bound-signed-history", choices=("live", "restart"),
+    scenario.add_argument("--bound-signed-history", choices=("live", "restart", "fork"),
                           help="核对同一已绑定主档的签名来源及新工具回执")
     scenario.add_argument("--forced-tool-choice-contract",
                           choices=("live", "restart", "restart-metadata-only", "restart-closed-metadata-only"))

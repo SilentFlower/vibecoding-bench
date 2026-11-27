@@ -15,13 +15,12 @@ from runtime_files import atomic_text
 from tui_cache_policy import model_body
 from tui_messages import encode
 from tui_reconnect import digest
-from tui_workspace_launch import WorkspaceLaunchObservation, publish_workspace_history
+from tui_workspace_launch import IMPORT_BOUNDARY, WorkspaceLaunchObservation, publish_workspace_history
 
 
 MCP_SERVER = "flower"
 MCP_PREFIX = f"mcp__{MCP_SERVER}__"
 RESUME_PROMPT = "Continue from where you left off."
-IMPORT_BOUNDARY = "flower2apiImportBoundary"
 SIGNED_THINKING_TYPES = ("thinking", "redacted_thinking")
 _IMAGE_HEADERS = {
     "image/png": (b"\x89PNG\r\n\x1a\n",),
@@ -214,7 +213,7 @@ def _signed_group(blocks):
     return group
 
 
-def _archive_models(rows, requested):
+def _archive_models(rows, fingerprints):
     def response_key(row):
         message = row.get("message", {})
         if row["type"] != "assistant" or not isinstance(message, dict) or message.get("role") != "assistant":
@@ -224,8 +223,6 @@ def _archive_models(rows, requested):
             return response, model
         return None
 
-    expected = {index: digest(group) for index, group in requested.items()}
-    fingerprints = set(expected.values())
     observed = {}
     for identity, response_rows in groupby(rows, response_key):
         if identity is None:
@@ -236,6 +233,16 @@ def _archive_models(rows, requested):
             fingerprint = digest(group)
             if fingerprint in fingerprints:
                 observed.setdefault(fingerprint, set()).add(identity[1])
+    return observed
+
+
+def _bound_signature_models(read_history, requested):
+    expected = {index: digest(_signed_group(content)) for index, content in requested.items()}
+    fingerprints = set(expected.values())
+    observed = {}
+    for archive in read_history(lambda rows: _archive_models(rows, fingerprints)):
+        for fingerprint, models in archive.items():
+            observed.setdefault(fingerprint, set()).update(models)
     return {index: next(iter(models)) for index, fingerprint in expected.items()
             if len(models := observed.get(fingerprint, ())) == 1}
 
@@ -298,7 +305,7 @@ class ColdHistory:
         """识别普通文本、内嵌图像及受支持的闭合历史。
         @param body 已校验的请求。@param system_policy 本轮冻结的账号系统指令动作。
         @param cache_ttl 经账号预留核对的平台 TTL。强制模式仅承接已有历史断点。
-        @param read_history 可选，同一已绑定原生主档的只读回调。
+        @param read_history 可选，同一绑定发布的原生档案只读回调。
         @param signed_models 可选，原工具回执已冻结的签名来源。
         @return 原生输入计划或空。
         """
@@ -372,9 +379,7 @@ class ColdHistory:
             system = system or ""
         tools = {MCP_PREFIX + tool["name"]: tool for tool in declared}
         if requested and signed_models is None and read_history is not None:
-            signed_models = read_history(lambda rows: _archive_models(
-                rows, {index: _signed_group(content) for index, content in requested.items()},
-            ))
+            signed_models = _bound_signature_models(read_history, requested)
         signed_models = signed_models or {}
         if requested.keys() != signed_models.keys():
             return None
