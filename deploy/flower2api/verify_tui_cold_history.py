@@ -2,13 +2,14 @@
 
 import argparse
 from base64 import b64encode
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack, closing, suppress
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from faulthandler import dump_traceback
 from fcntl import LOCK_EX, flock
 from hashlib import sha256
-from http.client import HTTPConnection, HTTPException
+from http.client import HTTPConnection, HTTPException, IncompleteRead
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
@@ -70,6 +71,9 @@ NEW_ID = "toolu_cold_fixture"
 SECOND_ID = "toolu_second_cold_fixture"
 RECONNECT_ID = "toolu_reconnect_cold_fixture"
 RECONNECT_MESSAGE_ID = "msg_cold_reconnect"
+INTERRUPTED_PREFIX = "第一条续轮已交付、随后中断的合成文本。"
+INTERRUPTED_USAGE = (17, 2)
+REGENERATED_USAGE = (19, 11)
 SLOW_READER_USAGE = (17, 11)
 SLOW_READER_PAUSE_SECONDS = 11
 SIGNED_THINKING = {"type": "thinking", "thinking": "隔离模型的合成思考段。", "signature": "c2lnbmF0dXJlLWZpeHR1cmU="}
@@ -307,7 +311,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            history_png=False, history_images=False, history_tool_blocks=False, previous=None, failure_boundaries=False,
            current_text_blocks=False, signed_tool_history=False, signed_tool_response=None, split_history_tools=False,
            v1_runtime=None,
-           parallel_tools=False, reconnect_tool_stream=False, current_images=False, current_image_ending="text",
+           parallel_tools=False, reconnect_tool_stream=False, interrupted_tool_stream=False,
+           current_images=False, current_image_ending="text",
            auto_tool_choice=None, auto_tool_direct_text=False,
            adaptive_thinking_model=None, adaptive_thinking_display="updates", thinking_display_model=None,
            thinking_cli_summaries=None,
@@ -346,6 +351,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param explicit_custom_tool_type 是否通过显式 custom 的客户端声明进行原生工具往返。
     @param previous 可选，旧发行源码、网关、发送器三个离线制品。
     @param failure_boundaries 是否分别在模型收件前后切断隔离连接。
+    @param interrupted_tool_stream 是否截断已开始的工具续轮并结束原 CLI，再用原回执重试。
     @param stock_client 是否通过真实外部 CLI 验证完整 V2 输入与工具回执。
     @param cancel_and_change_question 是否在首轮工具参数未完成时取消并从确认历史改问。
     @param oauth_rotation 是否在原轮等待工具期间通过正式管理入口轮换账号凭据。
@@ -410,7 +416,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         os.chown(directory, 1001, 1001)
     inspect_model_body = (cache_markers or message_system_roles or thinking_display_model or structured_output
                           or forced_tool_choice or no_tool_choice or disable_parallel_tool_use or provider_quota
-                          or external_signed_history)
+                          or external_signed_history or interrupted_tool_stream)
     if inspect_model_body and v1_runtime is None:
         MODEL_BODY_TRACE.touch(mode=0o600, exist_ok=False)
         os.chown(MODEL_BODY_TRACE, 1001, 1001)
@@ -535,6 +541,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             )
             prefix = b""
             middle = b""
+            cut_tool_reply = interrupted_tool_stream and results and len(received) == 2
             if stock_client:
                 wire = stock_model_reply(body, stock_homes, FINAL)
             elif agent_progress:
@@ -582,6 +589,16 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 response_model = None if signed_tool_response == "missing-model" else body["model"]
                 wire = fixture_tool_sse(content, with_signature=signed_tool_history, second=second,
                                         model=response_model, thinking_text=signed_thinking_text)
+            elif cut_tool_reply:
+                complete = message_sse(
+                    {"type": "text", "text": INTERRUPTED_PREFIX}, "end_turn", "msg_cold_interrupted",
+                )
+                events = [json.loads(line[5:]) for line in complete.splitlines() if line.startswith(b"data:")]
+                events[0]["message"]["usage"] = dict(zip(("input_tokens", "output_tokens"), INTERRUPTED_USAGE, strict=True))
+                prefix = b"".join(map(frame, events[:3]))
+                wire = b"".join(map(frame, events[3:]))
+            elif interrupted_tool_stream and results and not find_blocks(body, "tool_use_id", RECONNECT_ID):
+                prefix, middle, wire = fixture_reconnect_sse(tool["name"], usage=REGENERATED_USAGE)
             elif (reconnect_tool_stream or slow_tool_stream) and results and not find_blocks(body, "tool_use_id", RECONNECT_ID):
                 usage = SLOW_READER_USAGE if slow_tool_stream else None
                 prefix, middle, wire = fixture_reconnect_sse(tool["name"], usage=usage)
@@ -612,7 +629,10 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                     self.wfile.write(middle)
                     self.wfile.flush()
                 # 公开读者须实际读到首段并在模型结束前断开。夹具结束时也会释放模型。
-                if not finish_stream.wait(30) or paused_question:
+                if not finish_stream.wait(30) or paused_question or cut_tool_reply:
+                    if cut_tool_reply and finish_stream.is_set():
+                        startup_event("interrupted_upstream_response", model_body_sha256=model_digest,
+                                      advertised_bytes=len(prefix) + len(wire), written_bytes=len(prefix))
                     self.close_connection = True
                     return
             self.wfile.write(wire)
@@ -1096,6 +1116,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         tool = offered[0]
         if parallel_tools:
             result = {"role": "user", "content": fixture_parallel_results(offered, callbacks)}
+        elif interrupted_tool_stream:
+            result = {"role": "user", "content": [interrupted_stream_tool_result(tool, callbacks)]}
         else:
             callbacks.append(tool["id"])
             result = {"role": "user", "content": [{"type": "tool_result", "tool_use_id": tool["id"], "content": REPLY}]}
@@ -1173,7 +1195,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 expected_models = ({} if signed_tool_response == "missing-model"
                                    else dict.fromkeys(expected_ids, body["model"]))
                 assert signed_tool_models == expected_models, signed_tool_models
-        follow = {**body, "stream": reconnect_tool_stream or slow_tool_stream,
+        follow = {**body, "stream": reconnect_tool_stream or slow_tool_stream or interrupted_tool_stream,
                   "messages": [*messages, {"role": "assistant", "content": offered}, result]}
         if auxiliary_mode:
             auxiliary_proof = verify_pending_auxiliary(
@@ -1361,6 +1383,17 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             changed = {**follow, "messages": [*messages, {"role": "assistant", "content": [tampered, *offered[1:]]}, result]}
             changed_signature, response = call(18090, "POST", "/v1/messages", token, changed, headers)
             assert changed_signature == 422 and len(received) == 1, (changed_signature, response, len(received))
+        if interrupted_tool_stream:
+            try:
+                proof = verify_interrupted_tool_stream(
+                    manage, temporary, token, headers, follow, received, callbacks,
+                    finish_stream, continue_tool_stream, initial_request_id, lambda: restart(source, "interrupted_tool_retry"),
+                    sender_state_after_failure,
+                )
+            finally:
+                finish_stream.set()
+            verify_model(received[:2], policy="append", old_content=old_result)
+            return proof
         if reconnect_tool_stream or slow_tool_stream:
             try:
                 if slow_tool_stream:
@@ -2313,13 +2346,180 @@ def read_tool_stream_data_lines(response, count):
     return lines
 
 
-def next_tool_stream_receipt(follow, tool):
-    """提交刚收到的工具 ID。@param follow 原续轮请求。@param tool 完整调用。@return 下一个合法回执。"""
+def next_tool_stream_receipt(follow, tool, *, result=None):
+    """提交刚收到的工具 ID。@param follow 原续轮请求。@param tool 完整调用。
+    @param result 可选的合成工具返回块。@return 下一个合法回执。
+    """
+    if result is None:
+        result = {"type": "tool_result", "tool_use_id": tool["id"], "content": SECOND_REPLY}
     rows = [
         {"role": "assistant", "content": [{"type": "text", "text": RECONNECT_PREFIX}, tool]},
-        {"role": "user", "content": [{"type": "tool_result", "tool_use_id": tool["id"], "content": SECOND_REPLY}]},
+        {"role": "user", "content": [result]},
     ]
     return {**follow, "stream": False, "messages": [*follow["messages"], *rows]}
+
+
+def interrupted_stream_tool_result(tool, callbacks):
+    """执行合成便签查询。@param tool 客户端实际收到的调用。@param callbacks 已执行的调用 ID。
+    @return 查询结果的公开回执块。
+    """
+    notes = {ARGS["key"]: (NEW_ID, ARGS, REPLY), SECOND_ARGS["key"]: (RECONNECT_ID, SECOND_ARGS, SECOND_REPLY)}
+    call_id, args, note = notes[tool["input"]["key"]]
+    assert tool["name"] == TOOL["name"] and tool["id"] == call_id and tool["input"] == args
+    assert call_id not in callbacks
+    callbacks.append(call_id)
+    return {"type": "tool_result", "tool_use_id": call_id, "content": note}
+
+
+def verify_interrupted_tool_stream(manage, temporary, token, headers, follow, received, callbacks,
+                                   finish_stream, continue_tool_stream, initial_request_id, restart_sender, sender_status):
+    """验证已开始交付的流丢失后，仅用原工具回执恢复一次。
+    @param manage 管理入口。@param temporary 本次数据库目录。@param token 调用方。
+    @param headers 原公开会话。@param follow 原回执。
+    @param received 隔离模型实收。@param callbacks 已执行的客户端工具。
+    @param finish_stream 允许隔离模型截断响应。@param continue_tool_stream 放行替代流尾段。
+    @param initial_request_id 首轮公开请求。
+    @param restart_sender 等原轮释放后重启 sender。@param sender_status 失败后读取 sender。
+    @return 中断、恢复、后续工具及用量证据。
+    """
+    marker = ("--name=" + headers["x-session-id"]).encode()
+    (cli,) = [path for path in Path("/proc").glob("[0-9]*/cmdline") if fixture_command_has(path, marker)]
+    (binding,) = Path("/native/tui-workspaces").glob("*.json")
+    saved_binding = binding.read_bytes()
+    native_id = json.loads(saved_binding)["native_session_id"]
+    project = Path("/native/tui-sessions") / native_id / "home/.claude/projects"
+    (original_file,) = project.glob("*/" + native_id + ".jsonl")
+    with closing(HTTPConnection("127.0.0.1", 18090, timeout=30)) as connection:
+        connection.request("POST", "/v1/messages", encoded(follow), {
+            "Authorization": "Bearer " + token, "Content-Type": "application/json",
+            "anthropic-version": "2023-06-01", **headers,
+        })
+        with closing(connection.getresponse()) as response:
+            interrupted_request_id = response.getheader("x-cc2api-request-id")
+            assert response.status == 200 and interrupted_request_id
+            lines = read_tool_stream_data_lines(response, 3)
+            original = [json.loads(line[5:]) for line in lines]
+            assert [event["type"] for event in original] == ["message_start", "content_block_start", "content_block_delta"]
+            assert original[-1]["delta"] == {"type": "text_delta", "text": INTERRUPTED_PREFIX}
+            assert len(received) == 2 and not finish_stream.is_set()
+            startup_event("interrupted_tool_prefix", request_id=interrupted_request_id, data_frames=len(original),
+                          model_posts=len(received), cli_pid=int(cli.parent.name))
+            finish_stream.set()
+            try:
+                tail = response.read()
+            except IncompleteRead as error:
+                tail = error.partial
+                transport_error = type(error).__name__
+            else:
+                raise AssertionError(("原续轮应在终帧前断开", interrupted_request_id, tail))
+            (stream_error,) = [json.loads(line[5:]) for line in tail.splitlines() if line.startswith(b"data:")]
+            assert stream_error["type"] == "error" and stream_error["error"]["type"] == "api_error", tail
+    disconnected_at = monotonic()
+    startup_event("interrupted_tool_response_lost", request_id=interrupted_request_id, transport_error=transport_error)
+    if fixture_command_has(cli, marker):
+        with suppress(ProcessLookupError):
+            os.kill(int(cli.parent.name), SIGKILL)
+    restart_sender()
+    assert not cli.parent.exists() and len(received) == 2
+    saved_history = original_file.read_bytes()
+    sleep(max(0, 6 - (monotonic() - disconnected_at)))
+    retry_wait_ms = round((monotonic() - disconnected_at) * 1000)
+    first_prefix = Event()
+
+    def read_retry(phase, prefix_read):
+        prefix = []
+
+        def hold(response):
+            if response.status == 200:
+                prefix.extend(read_tool_stream_data_lines(response, 3))
+                prefix_read.set()
+
+        _, tail, request_id = checked_messages(
+            manage, token, follow, headers, received, phase, trace_startup=True,
+            sender_status=sender_status, observe_response=hold,
+        )
+        return prefix + [line for line in tail.splitlines(keepends=True) if line.startswith(b"data:")], request_id
+
+    with ThreadPoolExecutor(max_workers=1) as readers:
+        pending = readers.submit(read_retry, "interrupted_tool_retry", first_prefix)
+        try:
+            # 两位读者都看见替代流的前缀后才放行余下工具参数和终帧。
+            assert first_prefix.wait(30), "恢复请求未交付替代流前缀"
+            assert len(received) == 3 and not continue_tool_stream.is_set()
+            shared_lines, shared_id = read_retry("interrupted_tool_concurrent_reader", continue_tool_stream)
+        finally:
+            continue_tool_stream.set()
+        lines, retry_id = pending.result()
+    assert lines == shared_lines and retry_id != shared_id
+    assert len(received) == 3 and original_file.read_bytes() == saved_history and binding.read_bytes() == saved_binding
+    events = [json.loads(line[5:]) for line in lines]
+    assert len(events) == 10 and events[-1]["type"] == "message_stop", events
+    message_id = events[0]["message"]["id"]
+    assert message_id != original[0]["message"]["id"] and events[2]["delta"]["text"] == RECONNECT_PREFIX
+    start = events[4]["content_block"]
+    assert start == {"type": "tool_use", "id": RECONNECT_ID, "name": TOOL["name"], "input": {}}, events
+    tool = {**start, "input": json.loads("".join(event["delta"]["partial_json"] for event in events[5:7]))}
+    assert tool["input"] == SECOND_ARGS and events[-2]["delta"]["stop_reason"] == "tool_use"
+    assert callbacks == [NEW_ID]
+    current_request = next_tool_stream_receipt(follow, tool, result=interrupted_stream_tool_result(tool, callbacks))
+    _, final, next_id = checked_messages(
+        manage, token, current_request, headers, received, "interrupted_tool_next_receipt",
+        trace_startup=True, sender_status=sender_status,
+    )
+    final_message = json.loads(final)
+    assert final_message["stop_reason"] == "end_turn" and final_message["content"] == [{"type": "text", "text": FINAL}]
+    assert len(received) == 4 and callbacks == [NEW_ID, RECONNECT_ID]
+    for _, model, _ in received[1:3]:
+        ((role, original_receipt),) = find_blocks(model, "tool_use_id", NEW_ID)
+        assert role == "user" and original_receipt["content"].count(REPLY) == 1
+    ((role, next_receipt),) = find_blocks(received[-1][1], "tool_use_id", RECONNECT_ID)
+    assert role == "user" and next_receipt["content"].count(SECOND_REPLY) == 1
+    stale, _, stale_id = checked_messages(
+        manage, token, follow, headers, received, "interrupted_tool_stale_receipt", expected_status=400,
+        trace_startup=True, sender_status=sender_status,
+    )
+    assert len(received) == 4
+
+    def observed_usage():
+        with closing(connect(temporary / "gateway.db")) as database:
+            rows = database.execute(
+                "SELECT record_id,input_tokens,output_tokens,partial FROM usage_records WHERE account_id=1 ORDER BY started_at"
+            ).fetchall()
+        return rows if len(rows) >= 4 else None
+
+    usage = wait_for(observed_usage)
+    assert [row[1:] for row in usage] == [(10, 8, 0), (*INTERRUPTED_USAGE, 1), (*REGENERATED_USAGE, 0), (10, 8, 0)], usage
+    attempts = []
+    request_ids = (initial_request_id, interrupted_request_id, retry_id, next_id)
+    origins = ("external_import", "live_process", "disk_resume", "live_process")
+    for request_id, origin, (model_digest, _, _) in zip(request_ids, origins, received, strict=True):
+        reservation, record, (claim,) = cache_marker_claims(manage, request_id)
+        detail = manage("GET", "request-diagnostics/" + request_id)
+        (attempt,) = detail["attempts"]
+        assert attempt["attempt_id"] == reservation and record["attempt_count"] == 1
+        assert detail["request"]["context"]["tui_confirmed_model_responses"] == 1, record
+        assert attempt["context"]["tui_session_origin"] == origin, attempt
+        assert attempt["context"]["tui_body_source"] == "interactive_cli", attempt
+        assert claim["from_interactive_cli"] and claim["uses_native_history"]
+        assert claim["cli_sha256"] == claim["sha256"] == model_digest
+        attempts.append({"request_id": request_id, "attempt_id": reservation, "session_origin": origin,
+                         "model_body_sha256": model_digest, "retry_reason": attempt.get("retry_reason"),
+                         "outcome": record.get("outcome"), "error_stage": record.get("error_stage")})
+    assert attempts[2]["retry_reason"] == "tui_reconnect_regenerated", attempts[2]
+    assert (attempts[1]["outcome"], attempts[1]["error_stage"]) == ("body_error", "upstream_body"), attempts[1]
+    shared = manage("GET", "request-diagnostics/" + shared_id)
+    assert not shared["attempts"] and shared["request"]["outcome"] == "tui_reconnect_stream", shared
+    assert not manage("GET", "request-diagnostics/" + stale_id)["attempts"]
+    return {"model_posts": len(received), "client_tool_calls": callbacks, "usage_records": usage,
+            "interrupted_request_id": interrupted_request_id, "interrupted_message_id": original[0]["message"]["id"],
+            "interrupted_frames": len(original), "interrupted_transport_error": transport_error,
+            "interrupted_stream_error": stream_error["error"]["type"],
+            "regenerated_message_id": message_id, "regenerated_frames": len(events), "retry_wait_ms": retry_wait_ms,
+            "concurrent_reader_request_id": shared_id, "concurrent_reader_attempts": len(shared["attempts"]),
+            "regenerated_tool_id": tool["id"], "stale_receipt_status": stale, "stale_receipt_request_id": stale_id,
+            "original_history_preserved": True, "binding_preserved": True,
+            "receipt_body_sha256": sha256(encoded(follow)).hexdigest(),
+            "attempts": attempts, "wire_final": "unavailable"}
 
 
 def verify_connected_slow_tool_stream(manage, temporary, token, account_token, headers, follow, received, callbacks,
@@ -4262,6 +4462,8 @@ def main():
     scenario.add_argument("--split-history-tools", action="store_true")
     scenario.add_argument("--parallel-new-tools", action="store_true")
     scenario.add_argument("--reconnect-tool-stream", action="store_true")
+    scenario.add_argument("--interrupted-tool-stream", action="store_true",
+                          help="截断已交付部分文本的续轮，退出原 CLI 后重试同一工具回执")
     scenario.add_argument("--slow-tool-stream", action="store_true")
     scenario.add_argument("--cancel-and-change-question", action="store_true")
     scenario.add_argument("--mixed-release", nargs=3, type=Path,
@@ -4320,7 +4522,7 @@ def main():
                      or args.recovery_readiness_rejection
                      or args.structured_output_contract or bool(args.forced_tool_choice_contract) or args.no_tool_choice_contract
                      or args.disable_parallel_tool_use_contract or bool(args.oauth_rotation or args.provider_quota)
-                     or args.slow_tool_stream
+                     or args.slow_tool_stream or args.interrupted_tool_stream
                      or bool(auxiliary_mode or args.agent_progress)
                      or bool(args.thinking_display_contract)
                      or (bool(args.message_system_roles) and args.v1_runtime is None))
@@ -4362,6 +4564,7 @@ def main():
                        split_history_tools=args.split_history_tools,
                        v1_runtime=args.v1_runtime, parallel_tools=args.parallel_new_tools,
                        reconnect_tool_stream=args.reconnect_tool_stream, slow_tool_stream=args.slow_tool_stream,
+                       interrupted_tool_stream=args.interrupted_tool_stream,
                        current_images=args.current_images,
                        cancel_and_change_question=args.cancel_and_change_question,
                        current_image_ending=args.current_image_ending,
