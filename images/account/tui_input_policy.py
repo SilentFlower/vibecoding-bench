@@ -25,6 +25,7 @@ _IDENTITIES = {
 _UUID = re.compile(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", re.I | re.ASCII)
 _BILLING = "x-anthropic-billing-header:"
 CONTEXT_BETA = "context-management-2025-06-27"
+SYSTEM_CLEAR_AT_BETA = "mid-conversation-system-clear-at-2026-08-21"
 
 
 class InputRejection(ValueError):

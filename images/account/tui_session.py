@@ -33,7 +33,7 @@ from tui_cold_history import (
     tool_result_has_images, tool_result_has_text_blocks, tool_result_is_empty,
 )
 from tui_reconnect import ReceiptCheckpoints, digest
-from tui_input_policy import CONTEXT_BETA, InputRejection, native_input
+from tui_input_policy import CONTEXT_BETA, SYSTEM_CLEAR_AT_BETA, InputRejection, native_input
 from tui_messages import (
     BODY_LIMIT,
     MessageInputObservation,
@@ -1034,6 +1034,11 @@ class _Actor:
             beta = headers.get("anthropic-beta", "")
             if CONTEXT_BETA not in {v.strip() for v in beta.split(",")}:
                 headers = {**headers, "anthropic-beta": ",".join(filter(None, (beta, CONTEXT_BETA)))}
+        if handle.needs_system_clear_at_beta:
+            # 兼容正文直接保留 clear_at。CLI 根据自己的输入生成 beta，因此由发送器补齐该字段所需的声明。
+            beta = headers.get("anthropic-beta", sdk_headers.get("anthropic-beta", ""))
+            if SYSTEM_CLEAR_AT_BETA not in {v.strip() for v in beta.split(",")}:
+                headers = {**headers, "anthropic-beta": ",".join(filter(None, (beta, SYSTEM_CLEAR_AT_BETA)))}
         raw, headers = provider_session(
             raw, headers, self.identity[4].removeprefix(TITLE_SESSION_PREFIX).removeprefix(SUGGESTION_SESSION_PREFIX),
             handle.upstream_session_id,
@@ -1258,9 +1263,11 @@ class _Reserved:
         self.raw = raw
         self.model_headers = dict(reservation.get("model_headers") or {})
         self.model_header_policy = reservation.get("model_header_policy") == 1
-        self.preserve_model_beta = self.model_header_policy and (
-            native_input(body, reservation.get("input_format"))
-            or any(row["role"] == "system" for row in body["messages"])
+        is_native = native_input(body, reservation.get("input_format"))
+        system_rows = [row for row in body["messages"] if row["role"] == "system"]
+        self.preserve_model_beta = self.model_header_policy and bool(is_native or system_rows)
+        self.needs_system_clear_at_beta = not is_native and any(
+            row.get("clear_at") in ("never", "next_user_message") for row in system_rows
         )
         self.upstream_session_id = None
         self.reservation = reservation
