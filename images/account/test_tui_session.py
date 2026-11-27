@@ -143,6 +143,36 @@ class SessionTests(unittest.TestCase):
             self.assertEqual(handle.body_source, "account_sender")
             self.assertIsNone(handle.raw)
 
+    def test_cli_thinking_plan_mismatch_is_local_before_model_submission(self):
+        """显示、固定预算或输出上限不符时保留本地校验来源。@return 无。"""
+        adaptive = {"type": "adaptive", "display": "updates"}
+        fixed = {"type": "enabled", "budget_tokens": 1024, "display": "updates"}
+        for expected, actual, max_tokens in (
+            (adaptive, {**adaptive, "display": "summarized"}, 4096),
+            (fixed, {**fixed, "budget_tokens": 1025}, 4096),
+            (fixed, fixed, 4095),
+        ):
+            with self.subTest(thinking=actual, max_tokens=max_tokens), closing(self._driver()) as driver:
+                driver.managed_oauth = True
+                identity = {**self._identity("thinking-guard"), "native_cold_history": True}
+                body = {**self._body(), "model": "claude-sonnet-4-6", "thinking": expected, "max_tokens": 4096}
+                with closing(driver.prepare(identity, encode(body))) as handle:
+                    actor = handle.actor
+                    self.assertIsNotNone(actor.cold_history)
+                    actor.step = SimpleNamespace(native=("turn", 1), native_model=body["model"], claimed=False)
+                    driver.launcher = SimpleNamespace(managed_model_response=Mock())
+                    marker = "<system-reminder>\nprompt.submit hook additional context: " + actor.guard_text
+                    native = {**body, "thinking": actual, "max_tokens": max_tokens, "messages": [
+                        {"role": "user", "content": [{"type": "text", "text": marker + "\n</system-reminder>"}]},
+                    ]}
+                    with self.assertRaises(ModelResponseError) as caught:
+                        actor.serve_model(Mock(headers={}), native, native_raw=encode(native))
+                    self.assertEqual(caught.exception.status, 422)
+                    self.assertEqual(caught.exception.source, "tui_cli_input_guard")
+                    self.assertEqual(json.loads(caught.exception.private_body)["error"]["code"], "unsupported_parameter")
+                    self.assertFalse(actor.step.claimed)
+                    driver.launcher.managed_model_response.assert_not_called()
+
     def test_non_stream_accept_uses_sdk_for_upstream_sse(self):
         """公开非流式请求向模型取流时使用同轮 SDK 的 Accept。@return 无。"""
         for explicit in (False, None):

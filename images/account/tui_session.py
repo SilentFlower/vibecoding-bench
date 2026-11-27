@@ -964,7 +964,8 @@ class _Actor:
                         message = ("CLI 未保留请求的自适应思考显示模式" if thinking["type"] == "adaptive"
                                    else "CLI 未保留请求的固定思考预算或输出上限")
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
-                            "code": "unsupported_parameter", "message": message}}))
+                            "code": "unsupported_parameter", "message": message}}),
+                            source="tui_cli_input_guard")
                     context_management = self.cold_history.context_management
                     if context_management is not None and (
                         native.get("context_management") != context_management
