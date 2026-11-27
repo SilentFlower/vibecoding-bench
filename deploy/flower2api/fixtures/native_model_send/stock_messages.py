@@ -11,6 +11,8 @@ from pathlib import Path
 from subprocess import PIPE, run
 from urllib.parse import urlsplit
 
+from fixtures.native_model_send.socket_owner import loopback_source_inode, owns_socket
+from fixtures.native_model_send.tui_startup_trace import MODEL_BODY_TRACE
 from verify_tui_final_tls import serve, wait_for
 from verify_tui_http_handoff import MODEL, message_sse
 
@@ -60,11 +62,29 @@ def model_reply(body, homes, final):
     }, "tool_use", "msg_stock_read")
 
 
-def verify_stock_client(manage, token, account_id, received, homes, final):
+def observe_stock_delivery(digest, model_peer, proxy_peer, proxy_port, sender_pid):
+    """在模型读取正文时核对同一条连接。@param digest 实收正文摘要。@param model_peer 模型对端端口。
+    @param proxy_peer 账号代理第一跳对端端口。@param proxy_port 账号代理监听端口。
+    @param sender_pid 已启动的账号发送器进程。@return 本次认领及套接字证据。
+    """
+    (claim,) = [row for row in map(json.loads, MODEL_BODY_TRACE.read_text().splitlines()) if row["sha256"] == digest]
+    cli_pid = claim["cli_pid"]
+    inode = loopback_source_inode(proxy_peer, proxy_port)
+    assert cli_pid != sender_pid
+    owners = [kind for kind, pid in (("account_sender", sender_pid), ("interactive_cli", cli_pid))
+              if owns_socket(pid, inode)]
+    (owner,) = owners
+    return {"claim": claim, "model_peer_port": model_peer, "account_proxy_peer_port": proxy_peer,
+            "account_proxy_port": proxy_port, "socket_inode": inode, "connection_owner": owner,
+            "connection_owner_pid": sender_pid if owner == "account_sender" else cli_pid, "sender_pid": sender_pid}
+
+
+def verify_stock_client(manage, token, account_id, received, homes, final, deliveries):
     """用固定 CLI 和自有便签验证三种 V2 策略下的原版输入和回执。
     @param manage 合成管理入口。@param token 公开入口测试令牌。@param account_id 被测账号。
     @param received 隔离模型收件。@param homes 各策略的私有测试工作区。
-    @param final 隔离模型的最终答复。@return 按策略关联客户端、尝试和实际分支。
+    @param final 隔离模型的最终答复。@param deliveries 同次模型实收时记录的认领和连接。
+    @return 按策略关联客户端、尝试和实际分支。
     """
     requests = []
     hop_headers = {"transfer-encoding", "content-length", "connection", "server", "date"}
@@ -157,14 +177,21 @@ def verify_stock_client(manage, token, account_id, received, homes, final):
                 assert attempt["request_id"] == request_id and attempt["attempt_id"] == reservation
                 assert context["kernel"] == "tui_v2"
                 assert context["tui_body_source"] == "account_sender", (policy, context)
+                delivery = deliveries[digest]
+                claim = delivery["claim"]
+                assert claim["reservation_id"] == reservation and claim["sha256"] == digest, (request_id, delivery)
+                assert claim["input_format"] == "claude_code" and not claim["uses_native_history"], (request_id, claim)
+                assert claim["cli_sha256"] and claim["cli_sha256"] != digest and not claim["cli_json_matches_submission"], claim
+                assert not claim["from_interactive_cli"] and delivery["connection_owner"] == "account_sender", delivery
                 attempts.append({"request_id": request_id, "reservation_id": reservation, "model_sha256": digest,
                                  "client_body_sha256": client_digest, "http_status": status,
                                  "client_identity": client_identity,
                                  "confirmed_model_responses": root["tui_confirmed_model_responses"],
                                  "body_source": context["tui_body_source"],
-                                 "session_origin": context["tui_session_origin"]})
+                                 "session_origin": context["tui_session_origin"], "delivery": delivery})
             assert [attempt["session_origin"] for attempt in attempts] == ["new_session", "live_process"], attempts
             cases[policy] = {"model_posts": len(posts), "client_read_calls": 1, "tool_id": TOOL_ID,
                              "exact_messages_body": True, "attempts": attempts}
     assert len({attempt["reservation_id"] for case in cases.values() for attempt in case["attempts"]}) == 6
+    assert len(deliveries) == len(received) == 6 and not list(Path("/flows/api").iterdir())
     return {"client_version": version, "cases": cases, "model_posts": len(received), "wire_final": "unavailable"}

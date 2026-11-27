@@ -36,6 +36,7 @@ from fixtures.native_model_send.fixture_tunnel import _relay
 from fixtures.native_model_send.stock_messages import (
     POLICIES as STOCK_POLICIES,
     model_reply as stock_model_reply,
+    observe_stock_delivery,
     verify_stock_client,
 )
 from fixtures.native_model_send.tui_startup_trace import MODEL_BODY_TRACE, THINKING_SUMMARIES_SETTING, startup_event
@@ -434,7 +435,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     for directory in (Path("/run/v3/tui-v2"), Path("/native"), Path("/flows/api")):
         directory.mkdir(mode=0o700, parents=True, exist_ok=True)
         os.chown(directory, 1001, 1001)
-    inspect_model_body = (cache_markers or message_system_roles or thinking_display_model or structured_output
+    inspect_model_body = (stock_client or cache_markers or message_system_roles or thinking_display_model or structured_output
                           or forced_tool_choice or no_tool_choice or disable_parallel_tool_use or provider_quota
                           or external_signed_history or interrupted_tool_stream)
     if inspect_model_body and v1_runtime is None and not installed_runtime:
@@ -445,6 +446,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     copy2(temporary / "ca.der", config.with_name("verification-ca.der"))
     received, callbacks, proxy_targets = [], [], []
     model_tunnels, model_client_hellos, model_connection_posts = {}, [], []
+    stock_deliveries = {}
     quota_reads = []
     quota_reset = time_ns() // 1_000_000_000
     quota_windows = {"5h": quota_reset + 3600, "7d": quota_reset + 6 * 86400, "7d_oi": quota_reset + 5 * 86400}
@@ -517,6 +519,12 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             model_digest = sha256(raw).hexdigest()
             if model_connection_contract:
                 model_connection_posts.append((self.client_address[1], model_digest))
+            if stock_client:
+                peer = self.client_address[1]
+                assert model_digest not in stock_deliveries
+                stock_deliveries[model_digest] = observe_stock_delivery(
+                    model_digest, peer, model_tunnels[peer], proxy.server_port, source.pid,
+                )
             is_auxiliary = False
             if auxiliary_sample is not None:
                 sample = auxiliary_sample["body"]
@@ -775,7 +783,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 startup_event("proxy_connect_accepted", peer_port=self.client_address[1])
             with create_connection(("127.0.0.1", receiver.server_port), timeout=10) as target:
                 peer_port = target.getsockname()[1]
-                if model_connection_contract:
+                if model_connection_contract or stock_client:
                     model_tunnels[peer_port] = self.client_address[1]
                 if trace_startup:
                     startup_event("proxy_model_tcp_connected", peer_port=peer_port)
@@ -1008,7 +1016,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         token, foreign = (manage("POST", "tokens", {"name": name, "allowed_accounts": str(identifier)})["token"]
                           for name in ("cold-history-owner", "cold-history-foreign"))
         if stock_client:
-            return verify_stock_client(manage, token, identifier, received, stock_homes, FINAL)
+            return verify_stock_client(manage, token, identifier, received, stock_homes, FINAL, stock_deliveries)
         if agent_progress:
             return verify_agent_progress(manage, token, foreign, received, temporary / "gateway.db", agent_progress,
                                          checked_messages, wait_for)
@@ -5590,6 +5598,7 @@ def main():
     previous = args.mixed_release
     cache_markers = args.cache_markers or args.cache_marker_capabilities is not None
     trace_startup = (args.initial_idle_model_connection or args.trace_initial_startup or args.trace_recovery_resend or cache_markers
+                     or args.stock_client
                      or args.model_connection_contract is not None or bool(args.external_signed_history)
                      or args.bound_signed_history is not None
                      or args.history_tool_images is not None or args.tool_receipt_images is not None

@@ -103,8 +103,11 @@ def main():
             native_raw = args[0] if args else options.get("native_raw")
             # 摘要取自已认领的提交，不能用 CLI 回调的存在推断出站正文来自 CLI。
             evidence = {"reservation_id": submission.handle.reservation["reservation_id"],
+                        "cli_pid": actor.process.pid,
+                        "input_format": submission.handle.reservation.get("input_format"),
                         "uses_native_history": actor.cold_history is not None,
                         "from_interactive_cli": submission.body == native_raw,
+                        "cli_json_matches_submission": json.loads(submission.body) == native,
                         "cli_tool_choice": native.get("tool_choice"),
                         "cli_has_output_format": "format" in (native.get("output_config") or {}),
                         "cli_tool_names": [tool.get("name") for tool in native.get("tools") or []],
