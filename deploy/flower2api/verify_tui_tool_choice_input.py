@@ -15,7 +15,7 @@ from tempfile import TemporaryDirectory
 from urllib.parse import urlsplit
 from uuid import uuid4
 
-from verify_tui_cold_history import MODEL, QuietHandler, SECOND_TOOL, TOOL, blocks, response_json
+from verify_tui_cold_history import MODEL, QuietHandler, SECOND_TOOL, TOOL, blocks, response_json, same_json_value
 from verify_tui_concurrency import CLEAN_ENV, VERSION, Terminal, wait_for
 from verify_tui_final_tls import serve
 from verify_tui_http_handoff import message_sse
@@ -118,7 +118,10 @@ def verify(binary, folder):
             native = {tool["name"]: tool for tool in body["tools"]}
             assert native.keys() == expected and "tool_choice" not in body, (label, body)
             source_tools = {first: TOOL, second: SECOND_TOOL}
-            assert all(native[name]["input_schema"] == source_tools[name]["input_schema"] for name in expected)
+            for name in expected:
+                assert same_json_value(native[name]["input_schema"], source_tools[name]["input_schema"]), (
+                    label, name, native[name]["input_schema"],
+                )
             assert sum(QUESTION in b.get("text", "") for r in body["messages"] if r["role"] == "user"
                        for b in blocks(r)) == 1
             system = body["system"]

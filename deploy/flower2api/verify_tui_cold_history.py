@@ -4758,15 +4758,16 @@ def verify_forced_tool_choice(manage, token, identifier, received, sender_status
             assert not claim["from_interactive_cli"] and not claim["uses_native_history"], (phase, claim)
             assert claim["cli_sha256"] and claim["cli_sha256"] != digest, (phase, claim)
             assert claim["cli_tool_choice"] is None, (phase, claim)
-            assert model["tool_choice"] == body["tool_choice"] and model["tools"] == tools, (phase, model)
+            assert same_json_value(model["tool_choice"], body["tool_choice"]), (phase, model["tool_choice"])
+            assert same_json_value(model["tools"], tools), (phase, model["tools"])
             assert model["thinking"] == body["thinking"], (phase, model)
             proof.update(provider_path="account_sender", model_body_sha256=digest, model_tool_choice=model["tool_choice"],
                          model_tools=[tool["name"] for tool in model["tools"]],
                          cli_body_sha256=claim["cli_sha256"], cli_tool_choice=claim["cli_tool_choice"],
                          cli_tool_names=claim["cli_tool_names"])
-        result = [(r["role"], b) for r in body["messages"] for b in blocks(r) if b["type"] in ("tool_use", "tool_result")]
-        observed = [(r["role"], b) for r in model["messages"] for b in blocks(r) if b["type"] in ("tool_use", "tool_result")]
-        assert observed == result, (phase, observed)
+        result = [[r["role"], b] for r in body["messages"] for b in blocks(r) if b["type"] in ("tool_use", "tool_result")]
+        observed = [[r["role"], b] for r in model["messages"] for b in blocks(r) if b["type"] in ("tool_use", "tool_result")]
+        assert same_json_value(observed, result), (phase, observed)
         proof["tool_history"] = observed
         return raw, proof
 
@@ -4806,8 +4807,10 @@ def verify_forced_tool_choice(manage, token, identifier, received, sender_status
                         step["recovered_native_session_id"] = new_id
                 tool_reply = json.loads(raw)
                 expected = {"type": "tool_use", "id": tool_id, "name": name, "input": args}
-                assert tool_reply["stop_reason"] == "tool_use" and tool_reply["content"] == [expected], (phase, tool_reply)
-                tool_proofs[-1]["public_tool"] = expected
+                assert tool_reply["stop_reason"] == "tool_use" and same_json_value(tool_reply["content"], [expected]), (
+                    phase, tool_reply,
+                )
+                tool_proofs[-1]["public_tool"] = tool_reply["content"][0]
                 receipt = {"type": "tool_result", "tool_use_id": tool_id, "content": REPLY}
                 messages = [*messages, {"role": "assistant", "content": tool_reply["content"]},
                             {"role": "user", "content": [receipt]}]
@@ -5797,9 +5800,9 @@ def verify_automatic_model_tools(model_request, declared):
     @param model_request 隔离模型实收正文。@param declared 公开工具声明。@return 实收工具名。
     """
     assert "tool_choice" not in model_request, model_request.get("tool_choice")
-    actual = [(tool["name"], tool["description"], tool["input_schema"]) for tool in model_request["tools"]]
-    expected = [("mcp__flower__" + tool["name"], tool["description"], tool["input_schema"]) for tool in declared]
-    assert actual == expected, actual
+    actual = [[tool["name"], tool["description"], tool["input_schema"]] for tool in model_request["tools"]]
+    expected = [["mcp__flower__" + tool["name"], tool["description"], tool["input_schema"]] for tool in declared]
+    assert same_json_value(actual, expected), actual
     return [name for name, _, _ in actual]
 
 
