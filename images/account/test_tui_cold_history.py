@@ -1,9 +1,11 @@
 """核对冷导入边界、记录归属和工具声明。"""
 
+from base64 import b64decode
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
 from copy import deepcopy
 from functools import partial
+from hashlib import sha256
 import json
 from os import close, openpty
 from pathlib import Path
@@ -25,6 +27,11 @@ PNG_DATA = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMC
 
 class ColdHistoryTests(TestCase):
     """使用合成输入测试固定 CLI 的历史合同。"""
+
+    def test_png_fixture_matches_verified_sample(self):
+        """核对图像测试实际共用的已验证 PNG 字节。@return 无。"""
+        self.assertEqual(sha256(b64decode(PNG_DATA, validate=True)).hexdigest(),
+                         "5e3d382db4dd83d59aa5742793ad6b7903409e865c83bcbc54835049f043bc15")
 
     def setUp(self):
         """建立带已完成工具组的对话。@return 无。"""

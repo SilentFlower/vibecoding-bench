@@ -1,7 +1,7 @@
 """用真实网关、账号事件源与 2.1.293 CLI 验收公开 Messages 冷导入。"""
 
 import argparse
-from base64 import b64encode
+from base64 import b64decode, b64encode
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack, closing, suppress
 from copy import deepcopy
@@ -29,7 +29,7 @@ from threading import Event, Timer
 from time import monotonic, monotonic_ns, sleep, time_ns
 from urllib.parse import parse_qs, urlencode, urlsplit
 from uuid import UUID, uuid4
-from zlib import compress, crc32
+from zlib import compress, crc32, decompress
 
 from fixtures.native_model_send.agent_progress import model_reply as agent_progress_model_reply, verify_agent_progress
 from fixtures.native_model_send.fixture_tunnel import _relay
@@ -5527,6 +5527,23 @@ def verify_output_effort(manage, token, account_token, headers, received):
 def fixture_image_blocks(*, all_formats):
     """构造内嵌图像块。@param all_formats 是否加入 JPEG、GIF、WebP。@return 合成图像块。"""
     images = {"image/png": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII="}
+    png = b64decode(images["image/png"], validate=True)
+    assert png[:8] == b"\x89PNG\r\n\x1a\n", "PNG 正例缺少文件签名"
+    offset = 8
+    for kind in (b"IHDR", b"IDAT", b"IEND"):
+        size = int.from_bytes(png[offset:offset + 4], "big")
+        end = offset + 8 + size
+        assert end + 4 <= len(png) and png[offset + 4:offset + 8] == kind, ("PNG 正例块损坏", kind)
+        assert crc32(png[offset + 4:end]) == int.from_bytes(png[end:end + 4], "big"), ("PNG 正例 CRC 不匹配", kind)
+        content = png[offset + 8:end]
+        if kind == b"IHDR":
+            assert content == pack(">IIBBBBB", 1, 1, 8, 4, 0, 0, 0)
+        elif kind == b"IDAT":
+            assert decompress(content) == b"\x01\xff\xff", "PNG 正例像素不匹配"
+        else:
+            assert not content
+        offset = end + 4
+    assert offset == len(png), "PNG 正例在 IEND 后有多余字节"
     if all_formats:
         images.update({
             "image/jpeg": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwc"
