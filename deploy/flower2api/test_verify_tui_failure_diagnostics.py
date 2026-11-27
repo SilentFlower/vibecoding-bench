@@ -61,6 +61,37 @@ class FailureDiagnosticTests(TestCase):
         self.assertEqual(diagnostic_resend["since"], "2026-11-26T19:29:13.300+00:00")
         self.assertEqual(diagnostic_resend["until"], "2026-11-26T19:29:13.401+00:00")
 
+    def test_changed_signature_409_preserves_public_and_prepare_evidence(self):
+        """改签名意外返回 409 时记录原请求并保持 422 断言。@return 无。"""
+        record = {"request_id": "signed-rejection", "finished_at": "已结束", "status_code": 409,
+                  "error_stage": "request", "attempt_count": 0,
+                  "context": {"tui_reservation_id": "signed-reservation"}}
+        response = Mock(status=409)
+        response.getheader.side_effect = lambda name: record["request_id"] if name == "x-cc2api-request-id" else None
+        response.read.return_value = b'{"error":{"type":"invalid_request_error","code":"tool_recovery_unconfirmed"}}'
+        connection = Mock()
+        connection.getresponse.return_value = response
+        manage = Mock(side_effect=[{"items": [record]}, {"request": record, "attempts": []}])
+        with (
+            patch.object(transport, "HTTPConnection", return_value=connection) as request,
+            patch.object(fixture, "stderr", StringIO()) as trace,
+            self.assertRaises(AssertionError) as failed,
+        ):
+            fixture.checked_messages(manage, "合成令牌", {}, {"x-session-id": "会话"}, [("首轮", {}, None)],
+                                     "changed_signature", expected_status=422)
+        self.assertEqual(failed.exception.args[0], ("changed_signature", 409, 422, "signed-rejection"))
+        request.assert_called_once()
+        client, diagnostic = map(json.loads, trace.getvalue().splitlines())
+        self.assertEqual(client["response_error"]["code"], "tool_recovery_unconfirmed")
+        self.assertEqual(client["client_stage"], "response_complete")
+        self.assertEqual((client["model_posts_before"], client["model_posts_during"]), (1, 0))
+        self.assertEqual(diagnostic["observation_id"], client["observation_id"])
+        self.assertEqual((diagnostic["correlation"], diagnostic["request_id"]), ("response_request_id", "signed-rejection"))
+        observed, = diagnostic["requests"]
+        self.assertEqual(observed["diagnostic_context"]["tui_reservation_id"], "signed-reservation")
+        self.assertEqual((observed["error_stage"], observed["attempt_count"]), ("request", 0))
+        self.assertEqual(observed["attempts"], [])
+
     def test_failure_window_excludes_later_request_in_same_session(self):
         """模拟查询前的真实后发顺序，保留失败所在毫秒的候选。@return 无。"""
         start = datetime(2026, 11, 26, 19, 29, 13, 609123, tzinfo=timezone.utc)

@@ -1437,8 +1437,12 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         if signed_tool_history:
             tampered = {**signed_block, "signature": "Y2hhbmdlZA=="}
             changed = {**follow, "messages": [*messages, {"role": "assistant", "content": [tampered, *offered[1:]]}, result]}
-            changed_signature, response = call(18090, "POST", "/v1/messages", token, changed, headers)
+            changed_signature, response, changed_signature_request_id = checked_messages(
+                manage, token, changed, headers, received, "changed_signature", expected_status=422,
+                trace_startup=trace_startup, sender_status=sender_state_after_failure,
+            )
             assert changed_signature == 422 and len(received) == 1, (changed_signature, response, len(received))
+            changed_signature_body = response
         if interrupted_tool_stream:
             try:
                 proof = verify_interrupted_tool_stream(
@@ -1634,15 +1638,24 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             expected_status=422 if rejected_signed_recovery else 200, trace_startup=trace_startup,
             sender_status=sender_state_after_failure, trace_recovery_resend=trace_recovery_resend,
         )
+        if signed_tool_history:
+            # 在原样回执收到响应后读回诊断，避免为预期中的改签名拒绝增加一次等待。
+            signature_rejection = signed_receipt_rejection(
+                manage, "changed_signature", changed_signature_request_id, headers["x-session-id"],
+                changed_signature, changed_signature_body,
+            )
         if rejected_signed_recovery:
             # 缺少已记录的助手模型时在准备阶段拒绝恢复，保留原签名和归属。
             assert status == 422 and len(received) == 1, (status, raw, len(received))
             assert json.loads(raw)["error"]["code"] == "unsupported_parameter", raw
-            assert not manage("GET", "request-diagnostics/" + continuation_request_id)["attempts"]
+            receipt_rejection = signed_receipt_rejection(
+                manage, "recovered_receipt", continuation_request_id, headers["x-session-id"], status, raw,
+            )
             assert original_file.read_bytes() == original_history
             (first_attempt,) = verify_captures(manage, received, account_token)
             proof = {"cold_recovery_status": status, "changed_signature_status": changed_signature,
-                     "receipt_request_id": continuation_request_id, "receipt_attempts": 0,
+                     "changed_signature_rejection": signature_rejection, "receipt_rejection": receipt_rejection,
+                     "receipt_request_id": continuation_request_id, "receipt_attempts": receipt_rejection["attempt_count"],
                      "recorded_signed_tool_models": signed_tool_models,
                      "model_posts": len(received), "original_history_preserved": True, "attempt": first_attempt}
             if adaptive_thinking_model:
@@ -1955,6 +1968,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 hydrated, [(row["role"], [block["type"] for block in blocks(row)]) for row in received[1][1]["messages"]],
             )
             proof.update(observed_signature_preserved=True, changed_signature_status=changed_signature,
+                         changed_signature_rejection=signature_rejection,
                          signed_reply=hydrated[0][1], recorded_signed_tool_models=signed_tool_models)
         if toggle_pending_policy:
             proof["pending_policy"] = "append"
@@ -2284,6 +2298,26 @@ def report_request_diagnostics(manage, phase, request_id, session_id, started_at
         event["requests"].append(item)
     print(json.dumps(event, ensure_ascii=False), file=stderr, flush=True)
     return event
+
+
+def signed_receipt_rejection(manage, phase, request_id, session_id, status, raw):
+    """核对签名回执公开拒绝与发送前诊断。
+    @param manage 管理入口。@param phase 夹具阶段。@param request_id 公开响应头中的请求 ID。
+    @param session_id 合成会话。@param status 公开 HTTP 状态。@param raw 公开正文。
+    @return 同一公开请求的拒绝证据。
+    """
+    assert request_id
+    error = json.loads(raw)["error"]
+    evidence = report_request_diagnostics(manage, phase, request_id, session_id, None,
+                                         event_name="signed_receipt_rejection_diagnostics")
+    (record,) = evidence["requests"]
+    context = record["diagnostic_context"]
+    assert record["request_id"] == request_id and record["status_code"] == status == 422
+    assert record["attempt_count"] == 0 and not record["attempts"]
+    assert context["tui_reservation_id"]
+    return {"request_id": request_id, "reservation_id": context["tui_reservation_id"], "http_status": status,
+            "response_error": error, "error_stage": record["error_stage"], "native_rejection": record["native_rejection"],
+            "attempt_count": record["attempt_count"], "response_sha256": sha256(raw).hexdigest()}
 
 
 def verify_cancelled_question(manage, token, headers, history, received, release_model, sender_state, trace_startup):
