@@ -41,6 +41,7 @@ from fixtures.native_model_send.stock_messages import (
     observe_stock_delivery,
     verify_stock_client,
 )
+from fixtures.native_model_send.tui_cache_capability_probe import CACHE_MARKER_INPUT_TRACE
 from fixtures.native_model_send.tui_startup_trace import (
     CANCEL_LAUNCH_PROBE, MODEL_BODY_TRACE, THINKING_SUMMARIES_SETTING, startup_event,
 )
@@ -480,6 +481,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     if inspect_model_body and v1_runtime is None and not installed_runtime:
         MODEL_BODY_TRACE.touch(mode=0o600, exist_ok=False)
         os.chown(MODEL_BODY_TRACE, 1001, 1001)
+    if cache_capability in ("native-default", "native-no-auto"):
+        CACHE_MARKER_INPUT_TRACE.touch(mode=0o600, exist_ok=False)
+        os.chown(CACHE_MARKER_INPUT_TRACE, 1001, 1001)
     certificates(temporary, extra_dns_names=(oauth_host,) if oauth_rotation else ())
     config = Path("/run/v3/sender.json")
     copy2(temporary / "ca.der", config.with_name("verification-ca.der"))
@@ -5455,6 +5459,31 @@ def cache_marker_claims(manage, request_id):
     return reservation, record, [claim for claim in claims if claim["reservation_id"] == reservation]
 
 
+def verify_cache_marker_inputs(reservation, expected, tools, case):
+    """按预留核对两条 CLI 输入回调的实际标记。@param reservation 公共请求对应的预留。
+    @param expected 客户端按位置提供的标记。@param tools 原工具声明。@param case 能力模式和用例名。
+    @return 该预留的提示词与 MCP 标记事件。
+    """
+    events = [event for event in map(json.loads, CACHE_MARKER_INPUT_TRACE.read_text().splitlines())
+              if event["reservation_id"] == reservation]
+    prompts = [event for event in events if event["stage"] == "probe_prompt_cache_markers"]
+    mcp_tools = [event for event in events if event["stage"] == "probe_mcp_cache_marker"]
+    expected_prompt = {str(index): marker for index, marker in enumerate(expected["text"]) if marker is not None}
+    expected_tools = {(index, tool["name"]): marker
+                      for index, (tool, marker) in enumerate(zip(tools, expected.get("tool", ()), strict=True))
+                      if marker is not None}
+    evidence = {"prompt": prompts, "mcp_tools": mcp_tools}
+    observed_tools = {(event["offset"], event["name"]) for event in mcp_tools}
+    # 工具列表可以重读，每次实际返回的标记都须对应本轮声明。
+    assert ([event["markers"] for event in prompts] == ([expected_prompt] if expected_prompt else [])
+            and observed_tools == set(expected_tools)
+            and all(event["marker"] == event["meta_marker"] == expected_tools[(event["offset"], event["name"])]
+                    for event in mcp_tools)), (
+        "CLI 缓存标记输入证据不匹配", case, reservation, expected_prompt, expected_tools, evidence,
+    )
+    return evidence
+
+
 def verify_cache_capabilities(manage, token, account_id, headers, received, mode):
     """比对当前块与工具声明的显式断点。@param manage 管理入口。@param token 合成令牌。
     @param account_id 测试账号。@param headers 公开头。@param received 模型实收。@param mode 对照模式。
@@ -5541,12 +5570,16 @@ def verify_cache_capabilities(manage, token, account_id, headers, received, mode
                 observed["tool"] = [tool.get("cache_control") for tool in projected]
             else:
                 assert not projected
+            if mode != "baseline":
+                evidence["cli_input_markers"] = verify_cache_marker_inputs(
+                    reservation, expected, targets.get("tool", ()), (mode, name),
+                )
             if from_cli:
                 # 固定 CLI 默认只标记当前用户末块。关闭自动缓存后，两类显式标记均无出站表示。
                 automatic = None if mode == "native-no-auto" else {"type": "ephemeral", "ttl": "1h"}
                 native_expected = {key: [None, None] for key in targets}
                 native_expected["text"] = [None, automatic]
-                assert observed == native_expected, (mode, name, observed)
+                assert observed == native_expected, ("CLI 出站缓存标记不匹配", mode, name, observed)
             else:
                 assert observed == expected, (mode, name, observed)
             evidence.update(from_interactive_cli=from_cli, uses_native_history=claim["uses_native_history"],
