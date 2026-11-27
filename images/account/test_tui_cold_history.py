@@ -590,6 +590,20 @@ class ColdHistoryTests(TestCase):
         result["cache_control"] = {"type": "ephemeral", "ttl": "unsupported"}
         self.assertIsNone(plan.resume_receipts(messages))
 
+    def test_outer_cache_marker_requires_original_json_error_flag(self):
+        """核对缺省和布尔错误标志，拒绝等值数字冒充布尔。@return 无。"""
+        for fields, changed in (({"is_error": False}, 0), ({"is_error": True}, 1), ({}, False)):
+            with self.subTest(fields=fields, changed=changed):
+                body = deepcopy(self.body)
+                result = body["messages"][2]["content"][0]
+                result.update(fields, cache_control={"type": "ephemeral"})
+                plan = ColdHistory.from_request(body)
+                self.assertIsNotNone(plan)
+                self.assertTrue(plan.matches_history_cache_markers(body))
+                modeled = deepcopy(body)
+                modeled["messages"][2]["content"][0]["is_error"] = changed
+                self.assertFalse(plan.matches_history_cache_markers(modeled))
+
     def test_completed_empty_results_keep_content_shape_when_resumed(self):
         """核对空结果的三种入站形状、旧归属及回执冻结。@return 无。"""
         for fields in ({}, {"content": []}, {"content": ""}, {"is_error": True}):

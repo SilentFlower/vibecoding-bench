@@ -696,12 +696,14 @@ class ColdHistory:
                     # 只核对计划已载入的前缀。仍在线交回的工具结果不属于该前缀。
                     if inner is None or (index < len(history) and offset < len(history[index][1]))]
 
-        # 自动断点关闭后只允许已确认的历史标记。按消息和块位置匹配可区分重复文本。
+        # 按位置区分重复文本，并按 JSON 值核对标记块中的布尔字段。
         return ("cache_control" not in native
                 and not any("cache_control" in block for field in ("system", "tools")
                             for block in native.get(field, []) if isinstance(block, dict))
-                and positions((row["role"], _blocks(row)) for row in native["messages"])
-                == positions(history))
+                and same_json_value(
+                    positions((row["role"], _blocks(row)) for row in native["messages"]),
+                    positions(history),
+                ))
 
     def import_session(
         self, config, work, native_id, *, replay_resources: ExitStack | None = None,
