@@ -33,6 +33,7 @@ from uuid import UUID, uuid4
 from zlib import compress, crc32, decompress
 
 from fixtures.native_model_send.agent_progress import model_reply as agent_progress_model_reply, verify_agent_progress
+from fixtures.native_model_send.direct_egress_identity import model_body_identity
 from fixtures.native_model_send.fixture_tunnel import _relay
 from fixtures.native_model_send.stock_messages import (
     POLICIES as STOCK_POLICIES,
@@ -367,7 +368,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            auxiliary_mode=None,
            auxiliary_kind="title", auxiliary_sample=None, agent_progress=None, stock_client=False,
            cancel_and_change_question=False, cancel_before_response_headers=None,
-           oauth_rotation=False, provider_quota=None, slow_tool_stream=False,
+           oauth_rotation=False, observe_oauth_delivery=None, provider_quota=None, slow_tool_stream=False,
            model_connection_contract=None, external_signed_history=False, bound_signed_history=None, history_tool_images=None,
            tool_receipt_images=None, explicit_custom_tool_type=False, history_empty_tool_result=None,
            empty_tool_receipt=None, tool_receipt_text_blocks=None, tool_receipt_nested_cache=None,
@@ -399,6 +400,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param cancel_and_change_question 是否在首轮工具参数未完成时取消并从确认历史改问。
     @param cancel_before_response_headers 可选首轮公开格式，取消 CLI 启动中的 SSE 或 JSON 请求。
     @param oauth_rotation 是否在原轮等待工具期间通过正式管理入口轮换账号凭据。
+    @param observe_oauth_delivery 可选，从模型接收端核对内置直发候选的实际连接和受管许可。
     @param provider_quota 可选的公开 SSE 或 JSON 供应商限流和被动额度对照。
     @param current_text_blocks 是否验证本轮文本块顺序及边界归属。
     @param signed_tool_history 是否核对隔离模型原工具轮的签名块。
@@ -471,7 +473,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         os.chown(CANCEL_LAUNCH_PROBE, 1001, 1001)
     inspect_model_body = (stock_client or cache_markers or message_system_roles or thinking_display_model or structured_output
                           or forced_tool_choice or no_tool_choice or disable_parallel_tool_use or provider_quota
-                          or external_signed_history or interrupted_tool_stream)
+                          or external_signed_history or interrupted_tool_stream or observe_oauth_delivery is not None)
     if inspect_model_body and v1_runtime is None and not installed_runtime:
         MODEL_BODY_TRACE.touch(mode=0o600, exist_ok=False)
         os.chown(MODEL_BODY_TRACE, 1001, 1001)
@@ -480,7 +482,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     copy2(temporary / "ca.der", config.with_name("verification-ca.der"))
     received, callbacks, proxy_targets = [], [], []
     model_tunnels, model_client_hellos, model_connection_posts = {}, [], []
-    stock_deliveries = {}
+    model_deliveries = {}
     quota_reads = []
     quota_reset = time_ns() // 1_000_000_000
     quota_windows = {"5h": quota_reset + 3600, "7d": quota_reset + 6 * 86400, "7d_oi": quota_reset + 5 * 86400}
@@ -556,10 +558,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             model_digest = sha256(raw).hexdigest()
             if model_connection_contract:
                 model_connection_posts.append((self.client_address[1], model_digest))
-            if stock_client:
+            if stock_client or observe_oauth_delivery is not None:
                 peer = self.client_address[1]
-                assert model_digest not in stock_deliveries
-                stock_deliveries[model_digest] = observe_stock_delivery(
+                assert model_digest not in model_deliveries
+                inspect_delivery = observe_oauth_delivery or observe_stock_delivery
+                model_deliveries[model_digest] = inspect_delivery(
                     model_digest, peer, model_tunnels[peer], proxy.server_port, source.pid,
                 )
             is_auxiliary = False
@@ -831,7 +834,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 startup_event("proxy_connect_accepted", peer_port=self.client_address[1])
             with create_connection(("127.0.0.1", receiver.server_port), timeout=10) as target:
                 peer_port = target.getsockname()[1]
-                if model_connection_contract or stock_client:
+                if model_connection_contract or stock_client or observe_oauth_delivery is not None:
                     model_tunnels[peer_port] = self.client_address[1]
                 if trace_startup:
                     startup_event("proxy_model_tcp_connected", peer_port=peer_port)
@@ -1067,7 +1070,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         token, foreign = (manage("POST", "tokens", {"name": name, "allowed_accounts": str(identifier)})["token"]
                           for name in ("cold-history-owner", "cold-history-foreign"))
         if stock_client:
-            return verify_stock_client(manage, token, identifier, received, stock_homes, FINAL, stock_deliveries)
+            return verify_stock_client(manage, token, identifier, received, stock_homes, FINAL, model_deliveries)
         if agent_progress:
             return verify_agent_progress(manage, token, foreign, received, temporary / "gateway.db", agent_progress,
                                          checked_messages, wait_for)
@@ -2100,6 +2103,24 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                  if "cache_control" in item else item for item in expected_receipts]
         verify_model(received, policy=tool_policy or "append", old_content=old_result, current_text_blocks=current_text_blocks,
                      exact_receipts=expected_receipts, max_tokens=body["max_tokens"])
+        if observe_oauth_delivery is not None:
+            assert refresh_calls == [True] and callbacks == [NEW_ID]
+            assert final["stop_reason"] == "end_turn" and final["content"] == [{"type": "text", "text": FINAL}]
+            attempts = _verify_direct_oauth_attempts(
+                manage, identifier, (initial_request_id, continuation_request_id), received,
+                credential_observations, model_deliveries, recover_pending=recover_pending,
+            )
+            report = {
+                "model_posts": len(received), "client_tool_calls": callbacks, "refresh_calls": len(refresh_calls),
+                "foreign_receipt_status": wrong_subject, "wrong_session_status": wrong_session,
+                "changed_tool_arguments_status": wrong_arguments, "duplicate_receipt_status": duplicate,
+                "attempts": attempts, "wire_final": "unavailable",
+            }
+            if recover_pending:
+                assert binding_file.read_bytes() == original_binding and original_file.read_bytes() == original_history
+                report.update(original_history_preserved=True, original_binding_preserved=True)
+            assert all(secret not in json.dumps(report) for secret in (account_token, refresh_token, rotated_token, rotated_refresh))
+            return report
         if bound_signed_history:
             def restart_bound_sender():
                 nonlocal source
@@ -5909,6 +5930,33 @@ def verify_model(received, *, policy, old_content, current_text_blocks=False, ex
     else:
         (reply,) = find_blocks(second, "tool_use_id", NEW_ID)
         assert reply[0] == "user" and REPLY in json.dumps(reply[1], ensure_ascii=False)
+
+
+def _verify_direct_oauth_attempts(manage, account, requests, received, credentials, deliveries, *, recover_pending):
+    assert [row["credential"] for row in credentials] == ["initial", "rotated"], credentials
+    attempts = []
+    for request_id, (digest, body, _tls), credential in zip(requests, received, credentials, strict=True):
+        detail = manage("GET", "request-diagnostics/" + request_id)
+        (attempt,) = detail["attempts"]
+        context = detail["request"]["context"]
+        reservation = context["tui_reservation_id"]
+        delivery = deliveries[digest]
+        assert credential["model_body_sha256"] == delivery["model_body_sha256"] == digest
+        assert context["tui_confirmed_model_responses"] == 1
+        assert attempt["attempt_id"] == reservation and attempt["account_id"] == account
+        assert attempt["context"]["tui_body_source"] == delivery["connection_owner"] == "interactive_cli"
+        assert delivery["permit"]["reservation_id"] == reservation
+        assert delivery["permit"]["body_identity"] == {**model_body_identity(body), "billing_cch": "00000"}
+        attempts.append({
+            "request_id": request_id, "reservation_id": reservation, "credential": credential["credential"],
+            "session_origin": attempt["context"]["tui_session_origin"], "delivery": delivery,
+        })
+    assert len({a["reservation_id"] for a in attempts}) == 2
+    assert len({a["delivery"]["tunnel"]["cli_pid"] for a in attempts}) == (2 if recover_pending else 1)
+    assert [a["session_origin"] for a in attempts] == [
+        "external_import", "disk_resume" if recover_pending else "live_process",
+    ]
+    return attempts
 
 
 def verify_captures(manage, received, account_token, *, additional_secrets=()):
