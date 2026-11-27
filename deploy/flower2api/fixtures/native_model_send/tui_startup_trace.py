@@ -13,6 +13,7 @@ from traceback import extract_tb
 MODEL_BODY_TRACE = Path("/run/v3/tui-v2/.fixture-model-body.jsonl")
 CANCEL_LAUNCH_PROBE = MODEL_BODY_TRACE.with_name(".fixture-cancel-before-headers")
 THINKING_SUMMARIES_SETTING = ".fixture-show-thinking-summaries.json"
+DISABLE_THINKING_SETTING = ".fixture-disable-thinking"
 
 
 def startup_event(stage, **fields):
@@ -67,6 +68,7 @@ def main():
     claim_model = _Actor._claim_model
     summary_setting = Path(__file__).with_name(THINKING_SUMMARIES_SETTING)
     thinking_summaries = json.loads(summary_setting.read_text()) if summary_setting.is_file() else None
+    disable_thinking = Path(__file__).with_name(DISABLE_THINKING_SETTING)
 
     def trace_send(self, writer, connection, handle, command):
         startup_event("source_send", reservation_id=handle.reservation["reservation_id"])
@@ -84,6 +86,9 @@ def main():
             arguments[position] = json.dumps(settings)
             options["arguments"] = arguments
             startup_event("cli_thinking_summaries_setting", reservation_id=ident, enabled=thinking_summaries)
+        if disable_thinking.is_file():
+            options["environment"] = {**options["environment"], "MAX_THINKING_TOKENS": "0"}
+            startup_event("fixture_disable_thinking", reservation_id=ident)
         startup_event("cli_launch", reservation_id=ident)
         release = CANCEL_LAUNCH_PROBE / "release"
         if CANCEL_LAUNCH_PROBE.is_dir() and not release.exists():

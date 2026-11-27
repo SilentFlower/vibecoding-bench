@@ -920,6 +920,7 @@ class _Actor:
         @param native 内层 CLI 用于配对的请求。@param native_raw CLI 已提交的原始正文。
         @return 本次模型提交的输入，未匹配时为空。
         """
+        inferred_thinking = None
         with self.driver.lock, self.changed:
             step, handle = self.step, self.claim
             pending = not (
@@ -1000,6 +1001,17 @@ class _Actor:
                     if handle.kind != "continuation" and not output_history.matches_recovered_signatures(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
                             "code": "unsupported_parameter", "message": "CLI 未保留已核对的签名工具历史"}}))
+                elif handle.api_context is not None:
+                    offered = {v.strip() for v in sdk_headers.get("anthropic-beta", "").split(",")}
+                    thinking = handle.thinking if handle.thinking is not None else native.get("thinking", {})
+                    clears = any(edit["type"] == "clear_thinking_20251015" for edit in handle.api_context.get("edits", []))
+                    # 历史管理的本地能力拒绝发生在消费原工具组的恢复许可之前。
+                    if CONTEXT_BETA not in offered or (clears and thinking.get("type") not in ("enabled", "adaptive")):
+                        raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
+                            "code": "unsupported_parameter", "message": "本轮 CLI 不支持请求的历史管理策略"}}),
+                            source="tui_cli_input_guard")
+                    if clears and handle.thinking is None:
+                        inferred_thinking = thinking
                 if handle.kind == "recovered" and not self.driver.checkpoints.submit(
                     self.identity, self.receipt_revision, handle.request_digest, True
                 ):
@@ -1024,15 +1036,9 @@ class _Actor:
             return _ModelSubmission(step, handle, native_raw, headers, account_token)
         # 旧进程仍校验启动 AT。文件模式的令牌已经与原生步骤绑定。
         if handle.api_context is not None:
-            offered = {v.strip() for v in sdk_headers.get("anthropic-beta", "").split(",")}
-            thinking = handle.thinking if handle.thinking is not None else native.get("thinking", {})
-            clears = any(edit["type"] == "clear_thinking_20251015" for edit in handle.api_context.get("edits", []))
-            if CONTEXT_BETA not in offered or (clears and thinking.get("type") not in ("enabled", "adaptive")):
-                raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
-                    "code": "unsupported_parameter", "message": "本轮 CLI 不支持请求的历史管理策略"}}))
-            if clears and handle.thinking is None:
+            if inferred_thinking is not None:
                 # 只有清理思考且客户端省略 thinking 时，复用同一原版步骤实际启用的配置。
-                raw = _json({**json.loads(raw), "thinking": thinking}).encode()
+                raw = _json({**json.loads(raw), "thinking": inferred_thinking}).encode()
             beta = headers.get("anthropic-beta", "")
             if CONTEXT_BETA not in {v.strip() for v in beta.split(",")}:
                 headers = {**headers, "anthropic-beta": ",".join(filter(None, (beta, CONTEXT_BETA)))}

@@ -37,7 +37,7 @@ use futures_util::StreamExt;
 use futures_util::stream::{empty, once as stream_once, unfold};
 use regex::Regex;
 use reqwest::redirect::Policy;
-use reqwest::{Body as RequestBody, Client, StatusCode};
+use reqwest::{Body as RequestBody, Client, Response as PrivateResponse, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
@@ -209,6 +209,13 @@ pub(super) fn tui_delegates_json(headers: &HeaderMap) -> bool {
 pub(super) fn tui_projection_marker(headers: &HeaderMap, name: &str, expected: &str) -> bool {
     let mut values = headers.get_all(name).iter();
     values.next().is_some_and(|value| value == expected) && values.next().is_none()
+}
+
+/// 核对账号源在模型认领前发出的 CLI 输入拒绝。@param response 已绑定的私有响应。
+/// @return 是否有受信的单值来源和匹配的 HTTP 状态。
+pub(super) fn tui_cli_input_rejected(response: &PrivateResponse) -> bool {
+    response.status() == StatusCode::UNPROCESSABLE_ENTITY
+        && tui_projection_marker(response.headers(), TUI_ERROR_SOURCE, TUI_CLI_INPUT_GUARD)
 }
 
 /// 读取已绑定 sender 的单值失败阶段。@param headers 私有响应头。

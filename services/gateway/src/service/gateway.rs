@@ -3140,7 +3140,8 @@ impl GatewayService {
                         runtime_transport::TUI_SUBMISSION_LEDGER
                             | runtime_transport::TUI_WORKSPACE_BIND
                     )
-                );
+                ) || (!fixture
+                    && runtime_transport::tui_cli_input_rejected(&response));
                 let file_rejected_before_model = failed_token.is_some()
                     && response.status() == StatusCode::SERVICE_UNAVAILABLE
                     && runtime_transport::tui_projection_marker(
@@ -4449,13 +4450,7 @@ impl GatewayService {
         rejected_before_model: bool,
         repaired: bool,
     ) -> Result<Response, AppError> {
-        let cli_input_rejected = !fixture
-            && response.status() == StatusCode::UNPROCESSABLE_ENTITY
-            && runtime_transport::tui_projection_marker(
-                response.headers(),
-                runtime_transport::TUI_ERROR_SOURCE,
-                runtime_transport::TUI_CLI_INPUT_GUARD,
-            );
+        let cli_input_rejected = !fixture && runtime_transport::tui_cli_input_rejected(&response);
         let rejected_before_model = rejected_before_model || cli_input_rejected;
         // 账号端在模型提交前终止时，这次预留不会再产生 TLS 快照。
         let capture_state = if capture_state == Some("queued") && rejected_before_model {
