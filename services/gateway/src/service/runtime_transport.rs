@@ -98,6 +98,7 @@ const TUI_ACCOUNT_MODEL: &str = "x-v3-tui-account-model";
 pub(super) const TUI_SIGNATURE_REPAIR: &str = "x-v3-tui-signature-repair";
 pub(super) const TUI_REPAIR_ATTEMPT: &str = "x-v3-tui-repair-attempt";
 pub(super) const TUI_ERROR_SOURCE: &str = "x-v3-tui-error-source";
+pub(super) const TUI_CLI_INPUT_GUARD: &str = "tui_cli_input_guard";
 pub(super) const TUI_SENDER_CONFIG: &str = "tui_sender_config";
 pub(super) const TUI_PREPARE_LEDGER: &str = "tui_prepare_ledger";
 pub(super) const TUI_PREPARE_BIND: &str = "tui_prepare_bind";

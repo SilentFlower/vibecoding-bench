@@ -976,7 +976,8 @@ class _Actor:
                     output_history = self.recovery_history or self.cold_history
                     if not output_history.matches_history_cache_markers(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
-                            "code": "unsupported_parameter", "message": "CLI 未保留历史缓存标记"}}))
+                            "code": "unsupported_parameter", "message": "CLI 未保留历史缓存标记"}}),
+                            source="tui_cli_input_guard")
                     if not output_history.matches_history_tool_images(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
                             "code": "unsupported_parameter", "message": "CLI 未保留历史工具结果中的图文"}}))

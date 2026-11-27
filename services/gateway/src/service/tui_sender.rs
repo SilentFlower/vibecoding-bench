@@ -42,13 +42,12 @@ use crate::service::runtime_transport::{
     tui_input_rejection, tui_model_headers, tui_projection_marker, valid_tui_account_token,
 };
 use crate::service::runtime_transport::{
-    TUI_BODY_SOURCE, TUI_CAPTURE, TUI_CLI_SUBMISSION, TUI_ERROR_SOURCE, TUI_FINAL_CAPTURE,
-    TUI_INSTRUCTION_LOCATION,
-    TUI_MODEL_ACCEPT_OMITTED, TUI_MODEL_HEADER_POLICY, TUI_PREPARE_BIND, TUI_PREPARE_EXCHANGE,
-    TUI_PREPARE_LEDGER, TUI_PROMPT_SUGGESTION,
-    TUI_REPAIR_ATTEMPT, TUI_SEND_CLAIM, TUI_SENDER_CONFIG, TUI_SESSION_ORIGIN, TUI_SIGNATURE_REPAIR,
-    TUI_SUBMISSION_LEDGER, TUI_SYSTEM_PROMPT_POLICY, TUI_TITLE_SESSION_MAPPING, TUI_WORKSPACE_BIND,
-    TuiReceiptProbe, TuiV2Unavailable,
+    TUI_BODY_SOURCE, TUI_CAPTURE, TUI_CLI_INPUT_GUARD, TUI_CLI_SUBMISSION, TUI_ERROR_SOURCE,
+    TUI_FINAL_CAPTURE, TUI_INSTRUCTION_LOCATION, TUI_MODEL_ACCEPT_OMITTED, TUI_MODEL_HEADER_POLICY,
+    TUI_PREPARE_BIND, TUI_PREPARE_EXCHANGE, TUI_PREPARE_LEDGER, TUI_PROMPT_SUGGESTION,
+    TUI_REPAIR_ATTEMPT, TUI_SEND_CLAIM, TUI_SENDER_CONFIG, TUI_SESSION_ORIGIN,
+    TUI_SIGNATURE_REPAIR, TUI_SUBMISSION_LEDGER, TUI_SYSTEM_PROMPT_POLICY,
+    TUI_TITLE_SESSION_MAPPING, TUI_WORKSPACE_BIND, TuiReceiptProbe, TuiV2Unavailable,
 };
 use crate::service::session_policy_block;
 use crate::service::tui_sender_response;
@@ -1694,6 +1693,9 @@ impl TuiSender {
                 }
                 Some("local_provider_backoff") if status == StatusCode::TOO_MANY_REQUESTS => {
                     Some("local_provider_backoff")
+                }
+                Some(TUI_CLI_INPUT_GUARD) if status == StatusCode::UNPROCESSABLE_ENTITY => {
+                    Some(TUI_CLI_INPUT_GUARD)
                 }
                 Some("local_provider_event") => Some("local_provider_event"),
                 _ => None,

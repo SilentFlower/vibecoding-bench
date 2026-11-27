@@ -4449,6 +4449,14 @@ impl GatewayService {
         rejected_before_model: bool,
         repaired: bool,
     ) -> Result<Response, AppError> {
+        let cli_input_rejected = !fixture
+            && response.status() == StatusCode::UNPROCESSABLE_ENTITY
+            && runtime_transport::tui_projection_marker(
+                response.headers(),
+                runtime_transport::TUI_ERROR_SOURCE,
+                runtime_transport::TUI_CLI_INPUT_GUARD,
+            );
+        let rejected_before_model = rejected_before_model || cli_input_rejected;
         // 账号端在模型提交前终止时，这次预留不会再产生 TLS 快照。
         let capture_state = if capture_state == Some("queued") && rejected_before_model {
             Some("not_submitted")
@@ -4544,6 +4552,9 @@ impl GatewayService {
             {
                 if repaired {
                     attempt.tui_thinking_removed();
+                }
+                if cli_input_rejected {
+                    attempt.tui_cli_input_rejected();
                 }
                 attempt.tui_sources(body_source, session_origin, instruction_location);
                 attempt.tui_capture(attempt_id, capture_state);

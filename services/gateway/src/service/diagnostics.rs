@@ -34,6 +34,7 @@ use crate::model::request_diagnostics::{
 use crate::service::native_capture;
 use crate::service::request_session::RequestSession;
 use crate::service::rewriter::extract_session_id_from_body;
+use crate::service::runtime_transport::TUI_CLI_INPUT_GUARD;
 use crate::service::system_update::InferenceCutover;
 use crate::service::tui_backend::TUI_V2;
 use crate::service::usage::UsageCapture;
@@ -903,6 +904,16 @@ impl AttemptTrace {
         }
     }
 
+    /// 保留已执行的 CLI 尝试及模型发送前守卫阶段。@return 无。
+    pub(super) fn tui_cli_input_rejected(&mut self) {
+        if let Some(record) = self.record.as_mut() {
+            record.error_stage = Some(TUI_CLI_INPUT_GUARD.into());
+            if let Some(context) = record.context.as_mut() {
+                context.submitted_model = None;
+            }
+        }
+    }
+
     /// 记录同一次实际提交的冻结定位，保留诊断的旁路语义。
     /// @param location 原已核验发送通道提供的非秘密定位。
     /// @return 无。
@@ -1063,6 +1074,8 @@ impl AttemptTrace {
         }
         record.outcome = if end != "complete" {
             end.into()
+        } else if record.error_stage.as_deref() == Some(TUI_CLI_INPUT_GUARD) {
+            "local_rejected".into()
         } else if record.error_type.as_deref() == Some("session_policy_refusal")
             || record.status_code.is_some_and(|value| value >= 400)
         {
@@ -1080,6 +1093,7 @@ impl AttemptTrace {
             "success" => None,
             "cancelled" if self.trace.interrupted_by_update(end) => Some("system_update".into()),
             "transport_error" => Some("transport".into()),
+            _ if record.error_stage.is_some() => record.error_stage,
             "upstream_rejected" => Some("upstream_headers".into()),
             _ => Some("upstream_body".into()),
         };
@@ -1342,7 +1356,7 @@ mod tests {
     use crate::store::diagnostics_store::DiagnosticsStore;
     use crate::store::scheduling_store::SchedulingStore;
     use axum::body::{Body, Bytes, to_bytes};
-    use axum::http::{HeaderMap, HeaderValue};
+    use axum::http::{HeaderMap, HeaderValue, StatusCode};
     use axum::response::{IntoResponse, Response};
     use flate2::Compression;
     use flate2::write::GzEncoder;
@@ -1538,6 +1552,70 @@ mod tests {
         assert_eq!(detail.request.outcome, "transport_error");
         assert_eq!(detail.request.context.unwrap().tui_confirmed_model_responses, Some(2));
         assert!(detail.attempts.is_empty());
+    }
+
+    /// 同形的 422 按可信来源记录阶段，两组均保留原尝试。@return 无。
+    #[tokio::test]
+    async fn tui_cli_input_rejection_preserves_the_attempt_and_model_count() {
+        let store = store().await;
+        for (local, outcome, stage, confirmed) in [
+            (true, "local_rejected", "tui_cli_input_guard", 0),
+            (false, "upstream_rejected", "upstream_headers", 1),
+        ] {
+            let trace = TraceContext::new(store.clone());
+            let guard = RequestTraceGuard::new(trace.clone());
+            let id = trace.lock().request.request_id.clone();
+            let reservation = Uuid::new_v4().to_string();
+            let response = CURRENT_TRACE
+                .scope(trace, async {
+                    tui_reservation(&reservation);
+                    observe_tui_model(if local {
+                        TuiModelObservation::RejectedBeforeSend
+                    } else {
+                        TuiModelObservation::ResponseReceived
+                    });
+                    let mut attempt =
+                        prepare_tui_attempt(&account(), &json!({"model":"claude-sonnet-5"}))
+                            .unwrap();
+                    if local {
+                        attempt.tui_cli_input_rejected();
+                    }
+                    attempt.tui_capture(reservation.clone(), None);
+                    attempt.commit();
+                    let response = (StatusCode::UNPROCESSABLE_ENTITY, "同一正文").into_response();
+                    attempt.headers(422, response.headers(), vec![]);
+                    guard.wrap(attempt.wrap(response))
+                })
+                .await;
+            assert_eq!(
+                to_bytes(response.into_body(), 1024).await.unwrap(),
+                "同一正文"
+            );
+            store.flush().await.unwrap();
+            let detail = store.detail(&id).await.unwrap();
+            assert_eq!(detail.request.outcome, outcome);
+            assert_eq!(detail.request.error_stage.as_deref(), Some(stage));
+            assert_eq!(detail.request.status_code, Some(422));
+            assert_eq!(detail.request.attempt_count, 1);
+            assert!(detail.request.native_rejection.is_none());
+            let context = detail.request.context.unwrap();
+            assert_eq!(context.tui_confirmed_model_responses, Some(confirmed));
+            assert_eq!(
+                context.tui_reservation_id.as_deref(),
+                Some(reservation.as_str())
+            );
+            let [attempt] = detail.attempts.as_slice() else {
+                panic!("必须保留一次尝试")
+            };
+            assert_eq!(attempt.attempt_id, reservation);
+            assert_eq!(attempt.request_id, id);
+            assert_eq!(attempt.outcome, outcome);
+            assert_eq!(attempt.error_stage.as_deref(), Some(stage));
+            assert_eq!(
+                attempt.context.as_ref().unwrap().submitted_model.is_none(),
+                local
+            );
+        }
     }
 
     /// 入站会话按原值冻结，异常值及重复头保持未知，两种日志模式均可查询。
