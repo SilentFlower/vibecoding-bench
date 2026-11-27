@@ -311,7 +311,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            history_png=False, history_images=False, history_tool_blocks=False, previous=None, failure_boundaries=False,
            current_text_blocks=False, signed_tool_history=False, signed_tool_response=None, split_history_tools=False,
            v1_runtime=None,
-           parallel_tools=False, reconnect_tool_stream=False, interrupted_tool_stream=False,
+           parallel_tools=False, reconnect_tool_stream=False, interrupted_tool_stream=None,
            current_images=False, current_image_ending="text",
            auto_tool_choice=None, auto_tool_direct_text=False,
            adaptive_thinking_model=None, adaptive_thinking_display="updates", thinking_display_model=None,
@@ -351,7 +351,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param explicit_custom_tool_type 是否通过显式 custom 的客户端声明进行原生工具往返。
     @param previous 可选，旧发行源码、网关、发送器三个离线制品。
     @param failure_boundaries 是否分别在模型收件前后切断隔离连接。
-    @param interrupted_tool_stream 是否截断已开始的工具续轮并结束原 CLI，再用原回执重试。
+    @param interrupted_tool_stream 截断位置，按下一工具首帧是否交付核对原回执重试。
     @param stock_client 是否通过真实外部 CLI 验证完整 V2 输入与工具回执。
     @param cancel_and_change_question 是否在首轮工具参数未完成时取消并从确认历史改问。
     @param oauth_rotation 是否在原轮等待工具期间通过正式管理入口轮换账号凭据。
@@ -590,13 +590,17 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 wire = fixture_tool_sse(content, with_signature=signed_tool_history, second=second,
                                         model=response_model, thinking_text=signed_thinking_text)
             elif cut_tool_reply:
-                complete = message_sse(
-                    {"type": "text", "text": INTERRUPTED_PREFIX}, "end_turn", "msg_cold_interrupted",
-                )
-                events = [json.loads(line[5:]) for line in complete.splitlines() if line.startswith(b"data:")]
-                events[0]["message"]["usage"] = dict(zip(("input_tokens", "output_tokens"), INTERRUPTED_USAGE, strict=True))
-                prefix = b"".join(map(frame, events[:3]))
-                wire = b"".join(map(frame, events[3:]))
+                if interrupted_tool_stream == "after-tool-start":
+                    prefix, remaining, terminal = fixture_reconnect_sse(tool["name"], usage=INTERRUPTED_USAGE)
+                    wire = remaining + terminal
+                else:
+                    complete = message_sse(
+                        {"type": "text", "text": INTERRUPTED_PREFIX}, "end_turn", "msg_cold_interrupted",
+                    )
+                    events = [json.loads(line[5:]) for line in complete.splitlines() if line.startswith(b"data:")]
+                    events[0]["message"]["usage"] = dict(zip(("input_tokens", "output_tokens"), INTERRUPTED_USAGE, strict=True))
+                    prefix = b"".join(map(frame, events[:3]))
+                    wire = b"".join(map(frame, events[3:]))
             elif interrupted_tool_stream and results and not find_blocks(body, "tool_use_id", RECONNECT_ID):
                 prefix, middle, wire = fixture_reconnect_sse(tool["name"], usage=REGENERATED_USAGE)
             elif (reconnect_tool_stream or slow_tool_stream) and results and not find_blocks(body, "tool_use_id", RECONNECT_ID):
@@ -1195,7 +1199,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 expected_models = ({} if signed_tool_response == "missing-model"
                                    else dict.fromkeys(expected_ids, body["model"]))
                 assert signed_tool_models == expected_models, signed_tool_models
-        follow = {**body, "stream": reconnect_tool_stream or slow_tool_stream or interrupted_tool_stream,
+        follow = {**body, "stream": reconnect_tool_stream or slow_tool_stream or interrupted_tool_stream is not None,
                   "messages": [*messages, {"role": "assistant", "content": offered}, result]}
         if auxiliary_mode:
             auxiliary_proof = verify_pending_auxiliary(
@@ -1388,7 +1392,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 proof = verify_interrupted_tool_stream(
                     manage, temporary, token, headers, follow, received, callbacks,
                     finish_stream, continue_tool_stream, initial_request_id, lambda: restart(source, "interrupted_tool_retry"),
-                    sender_state_after_failure,
+                    sender_state_after_failure, after_tool_start=interrupted_tool_stream == "after-tool-start",
                 )
             finally:
                 finish_stream.set()
@@ -2372,7 +2376,8 @@ def interrupted_stream_tool_result(tool, callbacks):
 
 
 def verify_interrupted_tool_stream(manage, temporary, token, headers, follow, received, callbacks,
-                                   finish_stream, continue_tool_stream, initial_request_id, restart_sender, sender_status):
+                                   finish_stream, continue_tool_stream, initial_request_id, restart_sender, sender_status,
+                                   *, after_tool_start):
     """验证已开始交付的流丢失后，仅用原工具回执恢复一次。
     @param manage 管理入口。@param temporary 本次数据库目录。@param token 调用方。
     @param headers 原公开会话。@param follow 原回执。
@@ -2380,6 +2385,7 @@ def verify_interrupted_tool_stream(manage, temporary, token, headers, follow, re
     @param finish_stream 允许隔离模型截断响应。@param continue_tool_stream 放行替代流尾段。
     @param initial_request_id 首轮公开请求。
     @param restart_sender 等原轮释放后重启 sender。@param sender_status 失败后读取 sender。
+    @param after_tool_start 是否已交付下一工具编号及半段参数。
     @return 中断、恢复、后续工具及用量证据。
     """
     marker = ("--name=" + headers["x-session-id"]).encode()
@@ -2397,10 +2403,18 @@ def verify_interrupted_tool_stream(manage, temporary, token, headers, follow, re
         with closing(connection.getresponse()) as response:
             interrupted_request_id = response.getheader("x-cc2api-request-id")
             assert response.status == 200 and interrupted_request_id
-            lines = read_tool_stream_data_lines(response, 3)
+            lines = read_tool_stream_data_lines(response, 6 if after_tool_start else 3)
             original = [json.loads(line[5:]) for line in lines]
-            assert [event["type"] for event in original] == ["message_start", "content_block_start", "content_block_delta"]
-            assert original[-1]["delta"] == {"type": "text_delta", "text": INTERRUPTED_PREFIX}
+            assert [event["type"] for event in original[:3]] == ["message_start", "content_block_start", "content_block_delta"]
+            text = RECONNECT_PREFIX if after_tool_start else INTERRUPTED_PREFIX
+            assert original[2]["delta"] == {"type": "text_delta", "text": text}
+            if after_tool_start:
+                assert original[4]["content_block"] == {"type": "tool_use", "id": RECONNECT_ID,
+                                                         "name": TOOL["name"], "input": {}}
+                partial = original[5]["delta"]
+                argument_prefix = partial["partial_json"]
+                assert partial["type"] == "input_json_delta" and argument_prefix and not argument_prefix.endswith("}")
+                assert encoded(SECOND_ARGS).decode().startswith(argument_prefix)
             assert len(received) == 2 and not finish_stream.is_set()
             startup_event("interrupted_tool_prefix", request_id=interrupted_request_id, data_frames=len(original),
                           model_posts=len(received), cli_pid=int(cli.parent.name))
@@ -2424,6 +2438,61 @@ def verify_interrupted_tool_stream(manage, temporary, token, headers, follow, re
     saved_history = original_file.read_bytes()
     sleep(max(0, 6 - (monotonic() - disconnected_at)))
     retry_wait_ms = round((monotonic() - disconnected_at) * 1000)
+
+    def usage_rows(count):
+        with closing(connect(temporary / "gateway.db")) as database:
+            rows = database.execute(
+                "SELECT record_id,input_tokens,output_tokens,partial FROM usage_records WHERE account_id=1 ORDER BY started_at"
+            ).fetchall()
+        return rows if len(rows) >= count else None
+
+    def observe_attempt(request_id, origin, model_digest):
+        reservation, record, (claim,) = cache_marker_claims(manage, request_id)
+        detail = manage("GET", "request-diagnostics/" + request_id)
+        (attempt,) = detail["attempts"]
+        assert attempt["attempt_id"] == reservation and record["attempt_count"] == 1
+        assert detail["request"]["context"]["tui_confirmed_model_responses"] == 1, record
+        assert attempt["context"]["tui_session_origin"] == origin, attempt
+        assert attempt["context"]["tui_body_source"] == "interactive_cli", attempt
+        assert claim["from_interactive_cli"] and claim["uses_native_history"]
+        assert claim["cli_sha256"] == claim["sha256"] == model_digest
+        return {"request_id": request_id, "attempt_id": reservation, "session_origin": origin,
+                "model_body_sha256": model_digest, "retry_reason": attempt.get("retry_reason"),
+                "outcome": record.get("outcome"), "error_stage": record.get("error_stage")}
+
+    proof = {"interrupted_request_id": interrupted_request_id, "interrupted_message_id": original[0]["message"]["id"],
+             "interrupted_frames": len(original), "interrupted_transport_error": transport_error,
+             "interrupted_stream_error": stream_error["error"]["type"], "retry_wait_ms": retry_wait_ms,
+             "receipt_body_sha256": sha256(encoded(follow)).hexdigest(), "wire_final": "unavailable"}
+    def observe_interruption():
+        attempt = observe_attempt(interrupted_request_id, "live_process", received[1][0])
+        assert (attempt["outcome"], attempt["error_stage"]) == ("body_error", "upstream_body"), attempt
+        return attempt
+
+    if after_tool_start:
+        rejections = []
+        for phase in ("interrupted_outstanding_tool", "interrupted_outstanding_tool_repeat"):
+            status, raw, request_id = checked_messages(
+                manage, token, follow, headers, received, phase, expected_status=409, trace_startup=True,
+                sender_status=sender_status,
+            )
+            error_code = json.loads(raw)["error"]["code"]
+            detail = manage("GET", "request-diagnostics/" + request_id)
+            assert error_code == "outstanding_tool" and not detail["attempts"]
+            reservation = detail["request"]["context"]["tui_reservation_id"]
+            rejections.append({"request_id": request_id, "reservation_id": reservation,
+                               "status": status, "error_code": error_code,
+                               "attempt_count": len(detail["attempts"])})
+        assert rejections[0]["request_id"] != rejections[1]["request_id"]
+        assert len(received) == 2 and callbacks == [NEW_ID]
+        assert original_file.read_bytes() == saved_history and binding.read_bytes() == saved_binding
+        usage = wait_for(lambda: usage_rows(2))
+        assert [row[1:] for row in usage] == [(10, 8, 0), (INTERRUPTED_USAGE[0], 1, 1)], usage
+        return {**proof, "model_posts": len(received), "client_tool_calls": callbacks, "usage_records": usage,
+                "next_tool_id": original[4]["content_block"]["id"], "retry_rejections": rejections,
+                "partial_argument_chars": len(argument_prefix),
+                "attempts": [observe_attempt(initial_request_id, "external_import", received[0][0]), observe_interruption()],
+                "original_history_preserved": True, "binding_preserved": True}
     first_prefix = Event()
 
     def read_retry(phase, prefix_read):
@@ -2480,46 +2549,24 @@ def verify_interrupted_tool_stream(manage, temporary, token, headers, follow, re
     )
     assert len(received) == 4
 
-    def observed_usage():
-        with closing(connect(temporary / "gateway.db")) as database:
-            rows = database.execute(
-                "SELECT record_id,input_tokens,output_tokens,partial FROM usage_records WHERE account_id=1 ORDER BY started_at"
-            ).fetchall()
-        return rows if len(rows) >= 4 else None
-
-    usage = wait_for(observed_usage)
+    usage = wait_for(lambda: usage_rows(4))
     assert [row[1:] for row in usage] == [(10, 8, 0), (*INTERRUPTED_USAGE, 1), (*REGENERATED_USAGE, 0), (10, 8, 0)], usage
-    attempts = []
-    request_ids = (initial_request_id, interrupted_request_id, retry_id, next_id)
-    origins = ("external_import", "live_process", "disk_resume", "live_process")
-    for request_id, origin, (model_digest, _, _) in zip(request_ids, origins, received, strict=True):
-        reservation, record, (claim,) = cache_marker_claims(manage, request_id)
-        detail = manage("GET", "request-diagnostics/" + request_id)
-        (attempt,) = detail["attempts"]
-        assert attempt["attempt_id"] == reservation and record["attempt_count"] == 1
-        assert detail["request"]["context"]["tui_confirmed_model_responses"] == 1, record
-        assert attempt["context"]["tui_session_origin"] == origin, attempt
-        assert attempt["context"]["tui_body_source"] == "interactive_cli", attempt
-        assert claim["from_interactive_cli"] and claim["uses_native_history"]
-        assert claim["cli_sha256"] == claim["sha256"] == model_digest
-        attempts.append({"request_id": request_id, "attempt_id": reservation, "session_origin": origin,
-                         "model_body_sha256": model_digest, "retry_reason": attempt.get("retry_reason"),
-                         "outcome": record.get("outcome"), "error_stage": record.get("error_stage")})
+    attempts = [
+        observe_attempt(initial_request_id, "external_import", received[0][0]),
+        observe_interruption(),
+        observe_attempt(retry_id, "disk_resume", received[2][0]),
+        observe_attempt(next_id, "live_process", received[3][0]),
+    ]
     assert attempts[2]["retry_reason"] == "tui_reconnect_regenerated", attempts[2]
-    assert (attempts[1]["outcome"], attempts[1]["error_stage"]) == ("body_error", "upstream_body"), attempts[1]
     shared = manage("GET", "request-diagnostics/" + shared_id)
     assert not shared["attempts"] and shared["request"]["outcome"] == "tui_reconnect_stream", shared
     assert not manage("GET", "request-diagnostics/" + stale_id)["attempts"]
-    return {"model_posts": len(received), "client_tool_calls": callbacks, "usage_records": usage,
-            "interrupted_request_id": interrupted_request_id, "interrupted_message_id": original[0]["message"]["id"],
-            "interrupted_frames": len(original), "interrupted_transport_error": transport_error,
-            "interrupted_stream_error": stream_error["error"]["type"],
-            "regenerated_message_id": message_id, "regenerated_frames": len(events), "retry_wait_ms": retry_wait_ms,
+    return {**proof, "model_posts": len(received), "client_tool_calls": callbacks, "usage_records": usage,
+            "regenerated_message_id": message_id, "regenerated_frames": len(events),
             "concurrent_reader_request_id": shared_id, "concurrent_reader_attempts": len(shared["attempts"]),
             "regenerated_tool_id": tool["id"], "stale_receipt_status": stale, "stale_receipt_request_id": stale_id,
             "original_history_preserved": True, "binding_preserved": True,
-            "receipt_body_sha256": sha256(encoded(follow)).hexdigest(),
-            "attempts": attempts, "wire_final": "unavailable"}
+            "attempts": attempts}
 
 
 def verify_connected_slow_tool_stream(manage, temporary, token, account_token, headers, follow, received, callbacks,
@@ -4462,8 +4509,9 @@ def main():
     scenario.add_argument("--split-history-tools", action="store_true")
     scenario.add_argument("--parallel-new-tools", action="store_true")
     scenario.add_argument("--reconnect-tool-stream", action="store_true")
-    scenario.add_argument("--interrupted-tool-stream", action="store_true",
-                          help="截断已交付部分文本的续轮，退出原 CLI 后重试同一工具回执")
+    scenario.add_argument("--interrupted-tool-stream", nargs="?", const="before-tool",
+                          choices=("before-tool", "after-tool-start"),
+                          help="截断已开始交付的续轮，按下一工具首帧是否交付核对原回执重试")
     scenario.add_argument("--slow-tool-stream", action="store_true")
     scenario.add_argument("--cancel-and-change-question", action="store_true")
     scenario.add_argument("--mixed-release", nargs=3, type=Path,
@@ -4522,7 +4570,7 @@ def main():
                      or args.recovery_readiness_rejection
                      or args.structured_output_contract or bool(args.forced_tool_choice_contract) or args.no_tool_choice_contract
                      or args.disable_parallel_tool_use_contract or bool(args.oauth_rotation or args.provider_quota)
-                     or args.slow_tool_stream or args.interrupted_tool_stream
+                     or args.slow_tool_stream or args.interrupted_tool_stream is not None
                      or bool(auxiliary_mode or args.agent_progress)
                      or bool(args.thinking_display_contract)
                      or (bool(args.message_system_roles) and args.v1_runtime is None))
