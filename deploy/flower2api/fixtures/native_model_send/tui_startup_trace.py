@@ -6,11 +6,12 @@ import json
 import os
 from pathlib import Path
 import sys
-from time import monotonic_ns
+from time import monotonic_ns, sleep
 from traceback import extract_tb
 
 
 MODEL_BODY_TRACE = Path("/run/v3/tui-v2/.fixture-model-body.jsonl")
+CANCEL_LAUNCH_PROBE = MODEL_BODY_TRACE.with_name(".fixture-cancel-before-headers")
 THINKING_SUMMARIES_SETTING = ".fixture-show-thinking-summaries.json"
 
 
@@ -27,7 +28,10 @@ def main():
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import fixture_tui_source as source
     import tui_sender_launch as launcher
+    from runtime_files import atomic_json
     from tui_session import SessionDriver, _Actor
+
+    blocked_reservation = None
 
     class TracedDriver(SessionDriver):
         """沿原驱动准备预留，记录进入与完成时间。"""
@@ -44,6 +48,18 @@ def main():
             startup_event("source_prepared", reservation_id=ident)
             return handle
 
+        def _retire(self, actor):
+            super()._retire(actor)
+            ident = actor.reservation["reservation_id"]
+            if ident == blocked_reservation:
+                process = actor.process
+                atomic_json(CANCEL_LAUNCH_PROBE / "retired.json", {
+                    "reservation_id": ident, "monotonic_ns": monotonic_ns(),
+                    "pid": process.pid if process is not None else None,
+                    "returncode": process.returncode if process is not None else None,
+                    "retired": actor.retired.is_set(), "process_slots_in_use": self.capacity.snapshot().in_use,
+                })
+
     send_handle = source.AccountSource._send_handle
     launch_session = launcher.launch_session
     callback = _Actor.callback
@@ -57,6 +73,7 @@ def main():
         return send_handle(self, writer, connection, handle, command)
 
     def trace_launch(reservation, command, **options):
+        nonlocal blocked_reservation
         ident = reservation["reservation_id"]
         if thinking_summaries is not None:
             # 只给隔离测试 CLI 的正式启动参数增加受支持设置，保留原有会话钩子。
@@ -68,6 +85,15 @@ def main():
             options["arguments"] = arguments
             startup_event("cli_thinking_summaries_setting", reservation_id=ident, enabled=thinking_summaries)
         startup_event("cli_launch", reservation_id=ident)
+        release = CANCEL_LAUNCH_PROBE / "release"
+        if CANCEL_LAUNCH_PROBE.is_dir() and not release.exists():
+            # 保留真实启动调用，等待客户端先关闭公开连接。
+            blocked_reservation = ident
+            atomic_json(CANCEL_LAUNCH_PROBE / "blocked.json", {
+                "reservation_id": ident, "monotonic_ns": monotonic_ns(),
+            })
+            while not release.exists():
+                sleep(0.05)
         try:
             process = launch_session(reservation, command, **options)
         except Exception as error:
@@ -78,6 +104,10 @@ def main():
                           function=location.name, line=location.lineno)
             raise
         startup_event("cli_spawned", reservation_id=ident)
+        if ident == blocked_reservation:
+            atomic_json(CANCEL_LAUNCH_PROBE / "spawned.json", {
+                "reservation_id": ident, "monotonic_ns": monotonic_ns(), "pid": process.pid,
+            })
         if options.get("recover_incomplete_history"):
             mode, session = process.args[-2:]
             startup_event("cli_legacy_recovery_started", reservation_id=ident, cli_pid=process.pid,

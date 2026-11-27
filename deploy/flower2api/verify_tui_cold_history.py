@@ -39,7 +39,9 @@ from fixtures.native_model_send.stock_messages import (
     observe_stock_delivery,
     verify_stock_client,
 )
-from fixtures.native_model_send.tui_startup_trace import MODEL_BODY_TRACE, THINKING_SUMMARIES_SETTING, startup_event
+from fixtures.native_model_send.tui_startup_trace import (
+    CANCEL_LAUNCH_PROBE, MODEL_BODY_TRACE, THINKING_SUMMARIES_SETTING, startup_event,
+)
 from verify_tui_concurrency import frame
 from verify_tui_final_tls import call, encoded, serve, stop, wait_for
 from verify_tui_http_handoff import MODEL, message_sse, message_sse_frames
@@ -338,7 +340,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            disable_parallel_tool_use=False,
            auxiliary_mode=None,
            auxiliary_kind="title", auxiliary_sample=None, agent_progress=None, stock_client=False,
-           cancel_and_change_question=False, oauth_rotation=False, provider_quota=None, slow_tool_stream=False,
+           cancel_and_change_question=False, cancel_before_response_headers=None,
+           oauth_rotation=False, provider_quota=None, slow_tool_stream=False,
            model_connection_contract=None, external_signed_history=False, bound_signed_history=None, history_tool_images=None,
            tool_receipt_images=None, explicit_custom_tool_type=False, history_empty_tool_result=None,
            empty_tool_receipt=None, tool_receipt_text_blocks=None, tool_receipt_nested_cache=None,
@@ -367,6 +370,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param interrupted_tool_stream 截断位置，按下一工具首帧是否交付核对原回执重试。
     @param stock_client 是否通过真实外部 CLI 验证完整 V2 输入与工具回执。
     @param cancel_and_change_question 是否在首轮工具参数未完成时取消并从确认历史改问。
+    @param cancel_before_response_headers 可选首轮公开格式，取消 CLI 启动中的 SSE 或 JSON 请求。
     @param oauth_rotation 是否在原轮等待工具期间通过正式管理入口轮换账号凭据。
     @param provider_quota 可选的公开 SSE 或 JSON 供应商限流和被动额度对照。
     @param current_text_blocks 是否验证本轮文本块顺序及边界归属。
@@ -435,6 +439,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     for directory in (Path("/run/v3/tui-v2"), Path("/native"), Path("/flows/api")):
         directory.mkdir(mode=0o700, parents=True, exist_ok=True)
         os.chown(directory, 1001, 1001)
+    if cancel_before_response_headers:
+        CANCEL_LAUNCH_PROBE.mkdir(mode=0o700)
+        os.chown(CANCEL_LAUNCH_PROBE, 1001, 1001)
     inspect_model_body = (stock_client or cache_markers or message_system_roles or thinking_display_model or structured_output
                           or forced_tool_choice or no_tool_choice or disable_parallel_tool_use or provider_quota
                           or external_signed_history or interrupted_tool_stream)
@@ -903,8 +910,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         source = start_sender(previous[2] if previous else sender)
         control = start_gateway(previous[1] if previous else gateway, release)
 
+        def sender_status():
+            return json.loads(call(8091, "GET", "/internal/status", secret)[1])
+
         def sender_state():
-            return json.loads(call(8091, "GET", "/internal/status", secret)[1]).get("tui_v2", {})
+            return sender_status().get("tui_v2", {})
 
         def sender_state_after_failure():
             # 首先保留公开故障。这次额外读取有独立预算，不能把夹具失败再挂住 30 秒。
@@ -1023,6 +1033,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         session_id = auxiliary_sample["headers"]["x-claude-code-session-id"] if auxiliary_sample else str(uuid4())
         headers = {"x-session-id": session_id, "User-Agent": "flower2api-cold-history-fixture/1"}
         messages = [{"role": role, "content": text} for role, text in HISTORY]
+        if cancel_before_response_headers:
+            return verify_cancel_before_headers(
+                manage, token, headers, messages, received, sender_status, sender_state_after_failure,
+                cancel_before_response_headers,
+            )
         if cancel_and_change_question:
             try:
                 return verify_cancelled_question(
@@ -2806,6 +2821,100 @@ def signed_receipt_rejection(manage, phase, request_id, session_id, status, raw)
     return {"request_id": request_id, "reservation_id": context["tui_reservation_id"], "http_status": status,
             "response_error": error, "error_stage": record["error_stage"], "native_rejection": record["native_rejection"],
             "attempt_count": record["attempt_count"], "response_sha256": sha256(raw).hexdigest()}
+
+
+def verify_cancel_before_headers(
+    manage, token, headers, history, received, sender_status, sender_state_after_failure, public_format,
+):
+    """核对首响前取消后的真实进程退出和同会话发问。
+    @param manage 管理入口。@param token 合成公开令牌。@param headers 隔离会话。
+    @param history 客户端已确认的历史。@param received 隔离模型实收。
+    @param sender_status 真实发送器的进程及预留状态。
+    @param sender_state_after_failure 原失败日志后的短预算状态读取。
+    @param public_format 原公开请求的响应格式。@return 两轮观察证据。
+    """
+    original = {"model": MODEL, "max_tokens": 128, "stream": public_format == "sse", "tools": [TOOL],
+                "messages": [*history, {"role": "user", "content": CANCELLED_QUESTION}]}
+    since = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+    try:
+        checked_messages(
+            manage, token, original, headers, received, "cancel_before_headers", trace_startup=True,
+            sender_status=sender_state_after_failure,
+        )
+        raise AssertionError("启动闸门尚未开放时已经收到首响应头")
+    except TimeoutError:
+        blocked = json.loads((CANCEL_LAUNCH_PROBE / "blocked.json").read_bytes())
+        failure = report_request_diagnostics(
+            manage, "cancel_before_headers_reservation", None, headers["x-session-id"], since,
+            failed_at=datetime.now(timezone.utc),
+        )
+        (candidate,) = failure["requests"]
+        assert candidate["diagnostic_context"]["tui_reservation_id"] == blocked["reservation_id"]
+        busy = sender_status()
+        assert busy["active"] > 0 and busy["tui_v2"]["ready"] and not busy["tui_v2"]["idle"], busy
+        assert not received
+    finally:
+        launch_released_ns = monotonic_ns()
+        (CANCEL_LAUNCH_PROBE / "release").touch()
+
+    retired = wait_for(lambda: json.loads((CANCEL_LAUNCH_PROBE / "retired.json").read_bytes()))
+    assert retired["reservation_id"] == blocked["reservation_id"] and retired["retired"]
+    assert retired["process_slots_in_use"] == 0 and retired["monotonic_ns"] >= launch_released_ns
+    spawned_path = CANCEL_LAUNCH_PROBE / "spawned.json"
+    spawned = json.loads(spawned_path.read_bytes()) if spawned_path.exists() else None
+    if spawned is not None:
+        assert spawned["reservation_id"] == retired["reservation_id"] and spawned["pid"] == retired["pid"]
+        assert launch_released_ns <= spawned["monotonic_ns"] <= retired["monotonic_ns"]
+        assert retired["returncode"] is not None and not Path(f"/proc/{retired['pid']}").exists()
+
+    def sender_idle():
+        state = sender_status()
+        return state if state["active"] == 0 and state["tui_v2"]["ready"] and state["tui_v2"]["idle"] else None
+
+    idle = wait_for(sender_idle)
+    assert not received
+    fresh = {**original, "stream": False, "tools": [],
+             "messages": [*history, {"role": "user", "content": CHANGED_QUESTION}]}
+    status, raw, fresh_id = checked_messages(
+        manage, token, fresh, headers, received, "same_session_after_header_cancel", trace_startup=True,
+    )
+    assert json.loads(raw)["content"] == [{"type": "text", "text": FINAL}]
+    ((digest, model, _),) = received
+    user_texts = [block.get("text") for row in model["messages"] if row["role"] == "user" for block in blocks(row)]
+    assert user_texts.count(CHANGED_QUESTION) == 1 and CANCELLED_QUESTION not in user_texts
+    wait_for(sender_idle)
+
+    request_id = candidate["request_id"]
+    cancelled = manage("GET", "request-diagnostics/" + request_id)
+    ended = cancelled["request"]
+    assert ended["request_id"] == request_id and ended["finished_at"]
+    assert (ended["outcome"], ended["error_stage"], ended["status_code"]) == ("cancelled", "downstream_headers", None)
+    assert ended["context"]["tui_reservation_id"] == retired["reservation_id"]
+    assert ended["context"].get("tui_confirmed_model_responses") is None
+    assert ended["attempt_count"] == 0 and not cancelled["attempts"]
+    (next_request,) = report_request_diagnostics(
+        manage, "same_session_after_header_cancel", fresh_id, headers["x-session-id"], since,
+        event_name="header_cancel_followup_diagnostics",
+    )["requests"]
+    context = next_request["diagnostic_context"]
+    assert next_request["account_id"] == ended["account_id"] and fresh_id != request_id
+    assert next_request["attempt_count"] == context["tui_confirmed_model_responses"] == 1
+    assert context["tui_reservation_id"] != retired["reservation_id"]
+    assert [(attempt["attempt_id"], attempt["request_id"]) for attempt in next_request["attempts"]] == [
+        (context["tui_reservation_id"], fresh_id),
+    ]
+    assert len(received) == 1
+    return {
+        "public_format": public_format, "account_id": ended["account_id"], "session_id": headers["x-session-id"],
+        "original": {"request_id": request_id, "client_http_status": None, "client_request_id": None,
+                     "reservation_id": retired["reservation_id"], "error_stage": ended["error_stage"],
+                     "attempt_count": ended["attempt_count"], "model_posts": 0},
+        "launch_blocked": blocked, "launch_released_ns": launch_released_ns, "spawned": spawned, "retired": retired,
+        "sender": {"active_before_release": busy["active"], "active_after": idle["active"], "idle_after": idle["tui_v2"]["idle"]},
+        "next": {"http_status": status, "request_id": fresh_id, "reservation_id": context["tui_reservation_id"],
+                 "attempt_count": next_request["attempt_count"], "model_posts": 1, "model_body_sha256": digest},
+        "wire_final": "unavailable",
+    }
 
 
 def verify_cancelled_question(manage, token, headers, history, received, release_model, sender_state, trace_startup):
@@ -5564,6 +5673,8 @@ def main():
                           help="截断已开始交付的续轮，按下一工具首帧是否交付核对原回执重试")
     scenario.add_argument("--slow-tool-stream", action="store_true")
     scenario.add_argument("--cancel-and-change-question", action="store_true")
+    scenario.add_argument("--cancel-before-response-headers", nargs="?", const="sse", choices=("sse", "json"),
+                          help="让首轮在 CLI 启动中取消，核对原预留释放及同账号后续请求")
     scenario.add_argument("--mixed-release", nargs=3, type=Path,
                           metavar=("OLD_SOURCE", "OLD_GATEWAY", "OLD_SENDER"))
     scenario.add_argument("--mixed-image-peers", nargs=2, type=Path, help=argparse.SUPPRESS)
@@ -5630,6 +5741,7 @@ def main():
     previous = args.mixed_release
     cache_markers = args.cache_markers or args.cache_marker_capabilities is not None
     trace_startup = (args.initial_idle_model_connection or args.trace_initial_startup or args.trace_recovery_resend or cache_markers
+                     or args.cancel_before_response_headers is not None
                      or args.stock_client
                      or args.model_connection_contract is not None or bool(args.external_signed_history)
                      or args.bound_signed_history is not None
@@ -5692,6 +5804,7 @@ def main():
                        interrupted_tool_stream=args.interrupted_tool_stream,
                        current_images=args.current_images,
                        cancel_and_change_question=args.cancel_and_change_question,
+                       cancel_before_response_headers=args.cancel_before_response_headers,
                        current_image_ending=args.current_image_ending,
                        auto_tool_choice=args.auto_tool_choice, receipt_auto_tool_choice=args.receipt_auto_tool_choice,
                        prior_auto_source=args.prior_auto_source,
