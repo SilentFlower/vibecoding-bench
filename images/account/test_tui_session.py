@@ -1479,6 +1479,23 @@ class SessionTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 tool_receipts(received(wrong), history_digest(history), registered)
 
+    def test_live_receipt_preserves_original_tool_argument_types(self):
+        """工具参数内的布尔值与数字不能替换，键序与同值数字表示可沿用。@return 无。"""
+        history = self._body()["messages"]
+        original = {"type": "tool_use", "id": "tool_typed", "name": "LookupNote",
+                    "input": {"options": {"include_archived": False, "count": 1}}}
+        result = {"type": "tool_result", "tool_use_id": original["id"], "content": "合成回执"}
+
+        def receive(options):
+            return [*history, {"role": "assistant", "content": [{**original, "input": {"options": options}}]},
+                    {"role": "user", "content": [result]}]
+
+        previous = history_digest(history)
+        matching = {"count": 1.0, "include_archived": False}
+        self.assertEqual(tool_receipts(receive(matching), previous, [original]), {original["id"]: result})
+        with self.assertRaisesRegex(ValueError, "原轮助手内容或工具声明发生变化"):
+            tool_receipts(receive({**matching, "include_archived": 0}), previous, [original])
+
     def test_consecutive_tool_turns_deliver_only_the_current_receipts(self):
         """连续两轮工具结果均能开启原进程的下一步，同轮重复回调仍被拒绝。@return 无。"""
         request = {

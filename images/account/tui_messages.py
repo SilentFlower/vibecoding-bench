@@ -53,6 +53,20 @@ def encode(value):
     ).encode()
 
 
+def same_json_value(actual, expected):
+    """核对回执及已冻结输入中的 JSON 值。
+    @param actual 实际值。@param expected 已记录的值。@return 忽略对象键序后的语义是否相同。
+    """
+    # Python 认为 False 等于 0。工具字段中的布尔类型必须参与比较。
+    if isinstance(actual, bool) or isinstance(expected, bool):
+        return actual is expected
+    if isinstance(actual, dict) and isinstance(expected, dict):
+        return actual.keys() == expected.keys() and all(same_json_value(actual[key], expected[key]) for key in expected)
+    if type(actual) is type(expected) and isinstance(actual, (list, tuple)):
+        return len(actual) == len(expected) and all(same_json_value(a, b) for a, b in zip(actual, expected, strict=True))
+    return actual == expected
+
+
 def valid_model_header_value(value):
     """校验私有帧中的 HTTP 字节表示。@param value 协议头值。@return 是否可无损发送。"""
     return isinstance(value, str) and all(c == "\t" or 32 <= ord(c) <= 255 and ord(c) != 127 for c in value)
@@ -444,7 +458,7 @@ def tool_receipts(messages, previous, expected, *, input_format=None, checkpoint
                 and "caller" not in block):
             # 只在比较快照里补齐直接调用标记，向模型发送的历史仍沿用客户端正文。
             block["caller"] = original["caller"]
-    if offered != expected:
+    if not same_json_value(offered, expected):
         raise ValueError("原轮助手内容或工具声明发生变化")
     ids = {b["id"] for b in expected if b["type"] == "tool_use"}
     results = {}

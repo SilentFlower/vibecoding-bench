@@ -13,7 +13,7 @@ from uuid import uuid4
 
 from runtime_files import atomic_text
 from tui_cache_policy import model_body
-from tui_messages import encode
+from tui_messages import encode, same_json_value
 from tui_reconnect import digest
 from tui_workspace_launch import IMPORT_BOUNDARY, WorkspaceLaunchObservation, publish_workspace_history
 
@@ -503,10 +503,13 @@ class ColdHistory:
 
     def matches_receipt_plan(self, plan):
         """核对同一工具轮的根输入。@param plan 客户端回传的根轮计划。@return 是否匹配原轮。"""
-        if self == plan:
+        if plan is None:
+            return False
+        received = vars(plan)
+        if same_json_value(vars(self), received):
             return True
         return bool(self.tools) and any(
-            replace(self, tool_choice=choice) == plan
+            same_json_value({**vars(self), "tool_choice": choice}, received)
             for choice in equivalent_auto_tool_choices(self.tool_choice)
         )
 

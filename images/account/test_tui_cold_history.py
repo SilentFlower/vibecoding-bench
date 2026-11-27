@@ -949,6 +949,21 @@ class ColdHistoryTests(TestCase):
                 self.assertFalse(plan.matches_tool_choice({**native, "tool_choice": other}))
                 self.assertIsNone(ColdHistory.from_request({**self.body, "tool_choice": other}))
 
+    def test_hot_receipt_plan_distinguishes_schema_boolean_from_number(self):
+        """自动工具选择等价时，声明中的布尔值仍必须属于原根轮。@return 无。"""
+        body = deepcopy(self.body)
+        body["tools"][0]["input_schema"] = {
+            "type": "object", "properties": {"options": {"type": "object", "additionalProperties": False}},
+        }
+        original = ColdHistory.from_request(body)
+        changed = deepcopy(body)
+        changed["tool_choice"] = {"type": "auto", "disable_parallel_tool_use": False}
+        options = {"additionalProperties": False, "type": "object"}
+        changed["tools"][0]["input_schema"]["properties"]["options"] = options
+        self.assertTrue(original.matches_receipt_plan(ColdHistory.from_request(changed)))
+        options["additionalProperties"] = 0
+        self.assertFalse(original.matches_receipt_plan(ColdHistory.from_request(changed)))
+
     def test_explicit_none_tool_choice_requires_empty_tools_at_both_boundaries(self):
         """无工具的显式 none 只接受模型请求的等价表示。@return 无。"""
         choice = {"type": "none"}
