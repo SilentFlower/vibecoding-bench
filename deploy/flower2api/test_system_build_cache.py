@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import re
+from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
@@ -56,6 +57,28 @@ class BuildCacheTests(unittest.TestCase):
                         exported = arguments[arguments.index('--cache-to') + 1]
                         self.assertIn('scope=synthetic-scope-' + role, exported)
                         self.assertIn('ignore-error=true', exported)
+
+    def test_verification_build_preserves_precompiled_target(self) -> None:
+        """额外 CA 只切换两个最终目标，两个构建驱动保留预编译阶段。@return None。"""
+        from verify_forwarding import build_verification
+
+        for driver in (('docker', 'build'), ('docker', 'buildx', 'build')):
+            with self.subTest(driver=driver), TemporaryDirectory() as folder:
+                manifest = Path(folder) / 'manifest.json'
+
+                def build(release, output):
+                    """向验证包装器传入同批构建的三个目标。"""
+                    for target in ('compiled-artifacts', 'control', 'account'):
+                        manage.command(*driver, '--target', target, 'snapshot')
+                    output.write_text(json.dumps({'release': release}))
+
+                with patch.object(manage, 'build', side_effect=build), patch.object(manage, 'command') as command:
+                    build_verification('test-extra-ca', manifest)
+                self.assertEqual([call.args for call in command.call_args_list], [
+                    (*driver, '--target', target, 'snapshot')
+                    for target in ('compiled-artifacts', 'verification-control', 'verification-account')
+                ])
+                self.assertIn('v3-verification: extra CA', json.loads(manifest.read_text())['verification_only'])
 
     def test_invalid_configuration_stops_before_snapshot_or_docker(self) -> None:
         """名称注入和非法开关在产生任何构建副作用前拒绝。@return None。"""
