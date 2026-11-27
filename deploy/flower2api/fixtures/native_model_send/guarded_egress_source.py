@@ -243,10 +243,9 @@ class _LiveProjection:
         self.actor = actor
         self.step = actor.step
         self.next_index = 0
-        self.text_index = None
+        self.text_indices = {}
         self.text_digest = sha256()
         self.tools = {}
-        self.open_indices = set()
         self._emit({"type": "message_start", "message": {
             "id": "msg_" + uuid4().hex, "role": "assistant", "type": "message", "model": self.step.native_model,
             "content": [], "stop_reason": None, "stop_sequence": None,
@@ -262,22 +261,13 @@ class _LiveProjection:
     def _start(self, block):
         index = self.next_index
         self.next_index += 1
-        self.open_indices.add(index)
         self._emit({"type": "content_block_start", "index": index, "content_block": block})
         return index
 
-    def _stop(self, index):
-        self._emit({"type": "content_block_stop", "index": index})
-        self.open_indices.remove(index)
-
     def add(self, chunk):
         """发布实际文本或工具参数分片。@param chunk 官方增量。@return 无。"""
-        kind = chunk["kind"]
+        kind, native_index = chunk["kind"], chunk["index"]
         if kind == "tool":
-            if self.text_index is not None:
-                self._stop(self.text_index)
-                self.text_index = None
-            native_index = chunk["index"]
             if native_index in self.tools:
                 raise ValueError("同一原生工具索引重复开始")
             name = _public_tool_name(self.actor, chunk)
@@ -285,14 +275,14 @@ class _LiveProjection:
             self.tools[native_index] = (index, chunk["id"], sha256())
             return
         if kind == "text":
-            if self.text_index is None:
-                self.text_index = self._start({"type": "text", "text": ""})
-            index, digest = self.text_index, self.text_digest
+            if native_index not in self.text_indices:
+                self.text_indices[native_index] = self._start({"type": "text", "text": ""})
+            index, digest = self.text_indices[native_index], self.text_digest
             text = chunk["text"]
             delta = {"type": "text_delta", "text": text}
         else:
             # 官方工具分片带原生索引。多个工具同时打开时仍只更新各自的公开块。
-            index, _, digest = self.tools[chunk["index"]]
+            index, _, digest = self.tools[native_index]
             text = chunk["json"]
             delta = {"type": "input_json_delta", "partial_json": text}
         digest.update(text.encode())
@@ -302,7 +292,8 @@ class _LiveProjection:
         """确认交付内容及累计用量，再让原终态回调收口。@param result 官方步骤结果。@return 无。"""
         if result["reason"] != ("tool_use" if self.tools else "end_turn"):
             raise ValueError("流式内容与同一步的结束原因不符")
-        if self.text_digest.digest() != sha256(result["answer"].encode()).digest():
+        # 工具轮的终态 answer 按显示需要在独立文本块之间插入换行。逐块交付使用原生索引和实际分片。
+        if not self.tools and self.text_digest.digest() != sha256(result["answer"].encode()).digest():
             raise ValueError("公开增量与官方步骤完整结果不符")
         completed_tools = {}
         for part in result["frames"]:
@@ -314,8 +305,8 @@ class _LiveProjection:
             index: (identifier, digest.digest()) for index, (identifier, digest) in completed_tools.items()
         }:
             raise ValueError("公开工具组与官方步骤完整结果不符")
-        for index in sorted(self.open_indices):
-            self._stop(index)
+        for index in range(self.next_index):
+            self._emit({"type": "content_block_stop", "index": index})
         self._emit({"type": "message_delta", "delta": {"stop_reason": result["reason"], "stop_sequence": None},
                     "usage": result["usage"]})
         terminal = {"type": "message_stop"}

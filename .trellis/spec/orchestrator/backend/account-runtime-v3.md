@@ -183,8 +183,9 @@ Bash 在第 43 秒结束时跨过两次分段等待，第三次查询立即获�
 
 - `tool_receipts(messages, previous, expected)` 在原会话的历史和完整工具组匹配后，按工具 ID 交付结果。
 - 上轮登记的 `tool_use.caller` 恰为 `{"type":"direct"}` 时，允许客户端在回传该块时省略顶层 `caller`。兼容只作用于比较快照。发给提供方的请求保留客户端的字段写法及既有缓存策略。
+- 原版 Claude Code 会将交错的文本和工具归为先文本后工具。`input_format=claude_code` 的 `tool_receipts` 在登记块全为 `text` 或 `tool_use` 时允许这一归并，文本次序、工具次序及各块内容逐项相同。活跃与持久回执都使用此比较，签名块及普通 Messages 沿各自原顺序比较。模型正文仍由实际发送进程构造。
 - 显式 `null`、非直接调用来源、工具 ID、名称、执行参数或签名发生变化时，沿原错误路径拒绝。省略工具输入中的同名业务字段仍属于参数变化。
-- `test_tool_receipts_allow_missing_direct_caller_only` 核对正反例。公开接口验收分别使用显式和缺省会话 ID，回填并行工具组并继续下一轮，核对每次成功回填的单次模型提交、工具 ID 及缓存断点。
+- `test_tool_receipts_allow_missing_direct_caller_only` 核对正反例。公开接口验收分别使用显式和缺省会话 ID，回填并行工具组并继续下一轮，核对每次成功回填的单次模型提交、工具 ID 及缓存断点。`test_cli_groups_interleaved_read_and_glob_text_before_its_receipts` 核对文本与工具归并的活跃及持久快照，`verify_tui_installed_direct_stock.py --case mixed-interleaved` 验收真实客户端回传。
 
 ## Scenario: US 宿主管理工具继承既有口令例外
 

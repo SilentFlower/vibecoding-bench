@@ -446,10 +446,10 @@ def tool_receipts(messages, previous, expected, *, input_format=None, checkpoint
     offered = [_snapshot(b) for b in _blocks(messages[pos])]
     if checkpoint:
         offered = [receipt_snapshot(b) for b in offered]
-    if (input_format == "claude_code" and any(b.get("name") in ("Agent", "Task") for b in expected)
+    if (input_format == "claude_code"
             and all(b["type"] in ("text", "tool_use") for b in expected)
             and [b["type"] for b in offered] != [b["type"] for b in expected]):
-        # 2.1.293 把并发工具之间的文本放到工具组前。只重建比较顺序，逐块继续核对。
+        # 原版客户端把并发工具之间的文本放到工具组前。只重建比较顺序，逐块继续核对。
         expected = [b for b in expected if b["type"] == "text"] + [
             b for b in expected if b["type"] == "tool_use"
         ]

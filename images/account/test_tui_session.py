@@ -29,6 +29,7 @@ from tui_messages import (
     history_digest,
     input_message,
     provider_session,
+    receipt_snapshot,
     tool_receipts,
     wire_events,
 )
@@ -1003,6 +1004,37 @@ class SessionTests(unittest.TestCase):
         messages[-2]["content"] = [text, signed, first, second]
         with self.assertRaises(ValueError):
             tool_receipts(messages, history, [signed, *expected], input_format="claude_code")
+
+    def test_cli_groups_interleaved_read_and_glob_text_before_its_receipts(self):
+        """原版客户端可按同类原序归并文本与工具，活跃和磁盘比较均保留字段校验。@return 无。"""
+        first_text = {"type": "text", "text": "第一段"}
+        second_text = {"type": "text", "text": "工具之间的第二段"}
+        read = {"type": "tool_use", "id": "read", "name": "Read", "input": {"file_path": "fixture.txt"}}
+        glob = {"type": "tool_use", "id": "glob", "name": "Glob", "input": {"pattern": "fixture-*.txt"}}
+        expected = [first_text, read, second_text, glob]
+        history = self._body()["messages"]
+        results = [{"type": "tool_result", "tool_use_id": identifier, "content": "合成结果"}
+                   for identifier in ("glob", "read")]
+
+        def messages(content):
+            return [*history, {"role": "assistant", "content": content}, {"role": "user", "content": results}]
+
+        for checkpoint in (False, True):
+            with self.subTest(checkpoint=checkpoint):
+                frozen = [{**block, "text": sha256(block["text"].encode()).hexdigest()}
+                          if block["type"] == "text" else block for block in expected]
+                if checkpoint:
+                    frozen = [receipt_snapshot(block) for block in frozen]
+                previous = history_digest(history)
+                grouped = [first_text, second_text, read, glob]
+                self.assertEqual(set(tool_receipts(messages(grouped), previous, frozen,
+                                                  input_format="claude_code", checkpoint=checkpoint)), {"read", "glob"})
+                for changed in ([second_text, first_text, read, glob], [first_text, second_text, glob, read],
+                                [first_text, second_text, read, {**glob, "input": {"pattern": "other.txt"}}]):
+                    with self.assertRaises(ValueError):
+                        tool_receipts(messages(changed), previous, frozen, input_format="claude_code", checkpoint=checkpoint)
+                with self.assertRaises(ValueError):
+                    tool_receipts(messages(grouped), previous, frozen, checkpoint=checkpoint)
 
     def test_open_group_waits_until_tool_order_is_known(self):
         """同提示兄弟仍可能到达；组封闭且唯一时早于父终态认领。@return 无。"""

@@ -32,12 +32,15 @@ from tui_messages import wire_events
 
 TEXT_A = "A：先读到这段。"
 TEXT_B = "B：这是模型放行后的结尾。"
+MIDDLE_A = "第二个工具之前"
+MIDDLE_B = "的独立说明。"
 ARGS_A = '{"file_path":'
 SECOND_TOOL_ID = "toolu_stock_read_second_fixture"
 SECOND_NOTE = "第二个调用独立读取的合成便签。"
 SECOND_FILE = "fixture-second-note.txt"
-STOCK_TOOLS = {"read": ("Read",), "mixed": ("Read",), "mixed-distinct": ("Glob", "Read")}
-MIXED_CASES = {"mixed", "mixed-distinct"}
+STOCK_TOOLS = {"read": ("Read",), "mixed": ("Read",), "mixed-distinct": ("Glob", "Read"),
+               "mixed-interleaved": ("Glob", "Read")}
+MIXED_CASES = {"mixed", "mixed-distinct", "mixed-interleaved"}
 
 
 class ModelTimes:
@@ -95,8 +98,7 @@ def model_reply(body, homes, final, *, case):
         assert sorted(tool["name"] for tool in body["tools"]) == list(STOCK_TOOLS[case]), body["tools"]
         (home,) = homes
         if case in MIXED_CASES:
-            content = [{"type": "text", "text": TEXT_A + TEXT_B}, *stock_calls(home, case)]
-            return mixed_model_reply(content)
+            return mixed_model_reply(_mixed_blocks(home, case))
         arguments = {"file_path": str(home / "fixture-note.txt")}
         wire = fixture.message_sse({"type": "tool_use", "id": TOOL_ID, "name": "Read", "input": arguments},
                                    "tool_use", "msg_stock_direct_read")
@@ -117,11 +119,28 @@ def stock_calls(home, case):
     """返回外部客户端将执行的调用。@param home 合成便签目录。@param case 场景。@return 工具块。"""
     calls = [{"type": "tool_use", "id": TOOL_ID, "name": "Read", "input": {"file_path": str(home / "fixture-note.txt")}}]
     if case in MIXED_CASES:
-        second_name, arguments = ("Glob", {"pattern": SECOND_FILE, "path": str(home)}) if case == "mixed-distinct" else (
+        second_name, arguments = ("Glob", {"pattern": SECOND_FILE, "path": str(home)}) if "Glob" in STOCK_TOOLS[case] else (
             "Read", {"file_path": str(home / SECOND_FILE)},
         )
         calls.append({"type": "tool_use", "id": SECOND_TOOL_ID, "name": second_name, "input": arguments})
     return calls
+
+
+def _mixed_blocks(home, case):
+    result = [{"type": "text", "text": TEXT_A + TEXT_B}, *stock_calls(home, case)]
+    if case == "mixed-interleaved":
+        result.insert(2, {"type": "text", "text": MIDDLE_A + MIDDLE_B})
+    return result
+
+
+def _mixed_fragments(block):
+    if block["type"] == "text":
+        text = block["text"]
+        prefix = TEXT_A if text.startswith(TEXT_A) else MIDDLE_A
+        return "text", [prefix, text.removeprefix(prefix)]
+    encoded = fixture.encoded(block["input"]).decode()
+    key, separator, value = encoded.partition(":")
+    return "partial_json", [key + separator, value]
 
 
 def mixed_model_reply(blocks):
@@ -132,11 +151,9 @@ def mixed_model_reply(blocks):
         start, begin, delta, end, reason, stop = [event for _, event in wire_events(BytesIO(wire))]
         if not events:
             events.append(start)
-        delta_field = "text" if block["type"] == "text" else "partial_json"
-        prefix = TEXT_A if delta_field == "text" else delta["delta"][delta_field].partition(":")[0] + ":"
-        suffix = delta["delta"][delta_field].removeprefix(prefix)
+        delta_field, fragments = _mixed_fragments(block)
         events.extend([{**begin, "index": index}, *({**delta, "index": index,
-            "delta": {**delta["delta"], delta_field: part}} for part in (prefix, suffix)), {**end, "index": index}])
+            "delta": {**delta["delta"], delta_field: part}} for part in fragments), {**end, "index": index}])
     return b"".join(map(fixture.frame, [*events, reason, stop]))
 
 
@@ -324,6 +341,7 @@ def check(manage, token, account_id, received, homes, final, deliveries, *, case
         actual_tool_calls = 1
     if case in MIXED_CASES:
         expected = stock_calls(home, case)
+        expected_blocks = _mixed_blocks(home, case)
         assert model_times.client_tool_prefix_ns is not None, fragments
         assert (model_times.released_ns < model_times.model_tool_prefix_ns <= model_times.client_tool_prefix_ns
                 < model_times.tool_released_ns <= model_times.posts[0]["model_end_ns"])
@@ -331,23 +349,37 @@ def check(manage, token, account_id, received, homes, final, deliveries, *, case
         assert [{key: call[key] for key in ("type", "id", "name", "input")} for call in offered] == expected, offered
         first_events = stream_events[:next(i + 1 for i, event in enumerate(stream_events) if event["type"] == "message_stop")]
         assert [event["content_block"]["type"] for event in first_events if event["type"] == "content_block_start"] == [
-            "text", "tool_use", "tool_use",
+            block["type"] for block in expected_blocks
         ], first_events
-        assert [event["index"] for event in first_events if event["type"] == "content_block_stop"] == [0, 1, 2], first_events
-        assert "".join(event.get("delta", {}).get("text", "") for event in first_events) == TEXT_A + TEXT_B, first_events
-        for i, call in enumerate(expected, start=1):
+        assert [event["index"] for event in first_events if event["type"] == "content_block_stop"] == list(
+            range(len(expected_blocks))
+        ), first_events
+        assert first_events[-2]["delta"]["stop_reason"] == "tool_use"
+        for i, block in enumerate(expected_blocks):
             start, = [event["content_block"] for event in first_events
                       if event["type"] == "content_block_start" and event["index"] == i]
-            assert (start["id"], start["name"]) == (call["id"], call["name"]), start
-            wire_args = [event["delta"]["partial_json"] for event in first_events
-                         if event["type"] == "content_block_delta" and event["index"] == i]
-            encoded = fixture.encoded(call["input"]).decode()
-            key, separator, value = encoded.partition(":")
-            assert wire_args == [key + separator, value], wire_args
-        for document in (requests[1][0], received[1][1]):
+            empty = {"input": {}} if block["type"] == "tool_use" else {"text": ""}
+            assert fixture.same_json_value(start, {**block, **empty}), start
+            field, fragments_expected = _mixed_fragments(block)
+            observed = [event["delta"][field] for event in first_events
+                        if event["type"] == "content_block_delta" and event["index"] == i]
+            assert observed == fragments_expected, observed
+        receipt_history = {}
+        for stage, document in (("client", requests[1][0]), ("model", received[1][1])):
+            if case == "mixed-interleaved":
+                assistant = [{"type": "text", "text": block["text"]} if block["type"] == "text"
+                             else {key: block[key] for key in ("type", "id", "name", "input")}
+                             for row in document["messages"] if row["role"] == "assistant"
+                             for block in row["content"] if block["type"] in ("text", "tool_use")]
+                texts = [block for block in expected_blocks if block["type"] == "text"]
+                grouped = [*texts, *expected]
+                assert fixture.same_json_value(assistant, grouped) or (
+                    stage == "model" and fixture.same_json_value(assistant, expected_blocks)
+                ), (stage, assistant)
+                receipt_history[stage] = [block["type"] for block in assistant]
             results = _tool_blocks(document, "tool_result")
             assert len(results) == len(expected), results
-            for call, note in zip(expected, (NOTE, SECOND_FILE if case == "mixed-distinct" else SECOND_NOTE), strict=True):
+            for call, note in zip(expected, (NOTE, SECOND_FILE if "Glob" in STOCK_TOOLS[case] else SECOND_NOTE), strict=True):
                 (result_block,) = [block for block in results if block["tool_use_id"] == call["id"]]
                 assert not result_block.get("is_error")
                 assert json.dumps(result_block["content"], ensure_ascii=False).count(note) == 1, result_block
@@ -417,7 +449,8 @@ def check(manage, token, account_id, received, homes, final, deliveries, *, case
             "model_tail_released_ns": model_times.released_ns if prefix_observed else None,
             "attempts": attempts, "final_tls_capture": "unavailable",
             **({"first_client_events": first_events, "tool_ids": [call["id"] for call in expected],
-                "tool_executions": executions, "model_tool_prefix_ns": model_times.model_tool_prefix_ns,
+                "tool_executions": executions, "receipt_history": receipt_history,
+                "model_tool_prefix_ns": model_times.model_tool_prefix_ns,
                 "client_tool_prefix_ns": model_times.client_tool_prefix_ns,
                 "model_tool_tail_released_ns": model_times.tool_released_ns} if case in MIXED_CASES else {})}
 
