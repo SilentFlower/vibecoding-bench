@@ -2161,13 +2161,17 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                  "proxy_connections": len(proxy_targets), "attempts": captures}
         if history_tool_images:
             assert all(attempt["diagnostic_body_source"] == "interactive_cli" for attempt in captures), captures
-            modeled = [find_blocks(model, "tool_use_id", PAST_ID) for _, model, _ in received]
-            assert modeled == [[("user", historical_result)]] * 2, modeled
-            proof["history_tool_images"] = {"tool_use_id": PAST_ID,
-                                            "is_error": historical_result.get("is_error"),
-                                            "formats": [block["source"]["media_type"] for block in old_result
+            observed_results = []
+            for _, model, _ in received:
+                (role, observed), = find_blocks(model, "tool_use_id", PAST_ID)
+                assert role == "user" and same_json_value(observed, historical_result), (role, observed)
+                observed_results.append(observed)
+            observed = observed_results[0]
+            proof["history_tool_images"] = {"tool_use_id": observed["tool_use_id"],
+                                            "is_error": observed.get("is_error"),
+                                            "formats": [block["source"]["media_type"] for block in observed["content"]
                                                         if block["type"] == "image"],
-                                            "content_sha256": sha256(encoded(old_result)).hexdigest(),
+                                            "content_sha256": sha256(encoded(observed["content"])).hexdigest(),
                                             "changed_order_http": changed_history_images}
         elif not (tool_receipt_images or history_empty_tool_result or exact_tool_receipts):
             proof["old_tool_calls"] = 0

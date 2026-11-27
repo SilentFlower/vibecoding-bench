@@ -167,7 +167,7 @@ def _matches_history_results(native, expected):
     ids = {block["tool_use_id"] for _, block in expected}
     observed = [(row["role"], block) for row in native["messages"] for block in _blocks(row)
                 if block.get("type") == "tool_result" and block.get("tool_use_id") in ids]
-    return observed == expected
+    return same_json_value(observed, expected)
 
 
 def _marked_blocks(content):

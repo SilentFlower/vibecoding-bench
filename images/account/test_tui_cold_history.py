@@ -634,6 +634,10 @@ class ColdHistoryTests(TestCase):
         changed_result["content"].reverse()
         self.assertFalse(plan.matches_history_tool_images(changed))
         changed_result["content"] = deepcopy(result["content"])
+        changed_result["is_error"] = 0
+        self.assertFalse(plan.matches_history_tool_images(changed))
+        del changed_result["is_error"]
+        self.assertFalse(plan.matches_history_tool_images(changed))
         changed_result["is_error"] = True
         self.assertFalse(plan.matches_history_tool_images(changed))
         self.assertIsNone(ColdHistory.from_request(changed))
@@ -644,8 +648,11 @@ class ColdHistoryTests(TestCase):
         changed_result["content"][1]["source"] = {"type": "url", "url": "https://example.invalid/image.png"}
         self.assertFalse(plan.matches_history_tool_images(changed))
         self.assertIsNone(ColdHistory.from_request(changed))
+        explicit = deepcopy(body)
         del result["is_error"]
-        self.assertTrue(ColdHistory.from_request(body).matches_history_tool_images(body))
+        implicit = ColdHistory.from_request(body)
+        self.assertTrue(implicit.matches_history_tool_images(body))
+        self.assertFalse(implicit.matches_history_tool_images(explicit))
 
     def test_forced_ttl_preserves_nested_history_and_validates_effective_order(self):
         """平台强制 TTL 沿旧合同只改直接断点，按出站顺序校验混合前缀。@return 无。"""
