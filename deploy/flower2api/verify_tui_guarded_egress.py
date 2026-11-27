@@ -16,8 +16,8 @@ from uuid import uuid4
 import verify_tui_cold_history as fixture
 
 
-def install():
-    """只在一次性容器中安装有明确模式边界的试接。@return 无。"""
+def install(*, observe_failure=False):
+    """在一次性容器安装直发试接。@param observe_failure 是否读取官方失败事件。@return 无。"""
     if not Path("/.dockerenv").is_file() or {name for _, name in if_nameindex()} != {"lo"}:
         raise RuntimeError("直发试接只允许在仅回环的验收容器运行")
     root = Path("/opt/flower/tui")
@@ -31,11 +31,29 @@ def install():
     body = mod.read_text()
     start = body.index("        await post($, 'end',")
     end = body.index("        if (pending)", start)
-    mod.write_text(body[:start] + """
+    adjusted = body[:start] + """
         await post($, 'direct-result', { turn: e.turnId, step: e.index, reason: response.stopReason,
           answer: response.answer, usage: response.usage,
           frames: (pending ?? []).filter(item => ['tool', 'input'].includes(item.kind)) })
-""" + body[end:])
+""" + body[end:]
+    if observe_failure:
+        register = "export function register(on) {"
+        assert adjusted.count(register) == 1
+        adjusted = adjusted.replace(register, register + """
+  on('classic.StopFailure', async ($, e, next) => {
+    const fields = Object.keys(e).filter(key => e[key] !== undefined).sort()
+    const summary = { fields, error: e.error, text: e.last_assistant_message }
+    $.ui.log('R1-STOP-FAILURE|' + JSON.stringify(summary) + '|R1-END', {to: 'debug'})
+    return next(e)
+  })
+""")
+        runtime = source.read_text()
+        launch = "    return ORIGINAL_LAUNCH(*args, environment=settings, **options)"
+        assert runtime.count(launch) == 1
+        source.write_text(runtime.replace(launch, """
+    options["arguments"] = [*options["arguments"], "--debug-file", str(config_dir / "stop-failure.log")]
+""" + launch))
+    mod.write_text(adjusted)
 
 
 class ModelPath(fixture.QuietHandler):
@@ -48,6 +66,46 @@ class ModelPath(fixture.QuietHandler):
             fixture.startup_event("isolated_direct_beta_query", path=urlsplit(self.path).path)
             self.path = "/v1/messages"
         return parsed
+
+
+class RejectedModel(ModelPath):
+    """在合成拒绝的 HTTP 回包里增加可定位的响应头。"""
+
+    def send_response(self, code, message=None):
+        """交付隔离回包状态和标记。@param code HTTP 状态。@param message 状态文本。@return 无。"""
+        super().send_response(code, message)
+        if code == 400:
+            self.send_header("x-fixture-provider-status", "isolated-provider-http-header")
+
+
+def check_provider_error(manage, token, identifier, received, sender_status, restart, *, source_observer):
+    """核对真实直发错误与官方失败事件。@return 本次公开请求、实收与失败事件。"""
+    assert not source_observer and not restart
+    headers = {"x-session-id": str(uuid4()), "User-Agent": "flower2api-direct-guarded-lab/1"}
+    body = {"model": fixture.MODEL, "max_tokens": 128, "stream": False, "thinking": {"type": "disabled"},
+            "messages": [{"role": "user", "content": fixture.REJECT_MODEL_REQUEST}]}
+    started = fixture.datetime.now(fixture.timezone.utc).isoformat(timespec="milliseconds")
+    status, raw, request_id = fixture.checked_messages(
+        manage, token, body, headers, received, "guarded_provider_error", expected_status=502,
+        trace_startup=True, sender_status=sender_status,
+    )
+    assert len(received) == 1
+
+    def read_failure():
+        for log in Path("/native/tui-sessions").glob("*/home/.claude/stop-failure.log"):
+            for line in log.read_text(errors="replace").splitlines():
+                if "R1-STOP-FAILURE|" in line and "|R1-END" in line:
+                    return json.loads(line.split("R1-STOP-FAILURE|", 1)[1].split("|R1-END", 1)[0])
+        return None
+
+    event = fixture.wait_for(read_failure)
+    assert event["error"] == "unknown" and event["text"] == "API Error: 400 隔离模型明确拒绝合成请求", event
+    assert {"status", "headers", "body", "error_details"}.isdisjoint(event["fields"]), event
+    evidence = fixture.report_request_diagnostics(manage, "guarded_provider_error", request_id,
+                                                  headers["x-session-id"], started)
+    return {"public_status": status, "public_error": json.loads(raw)["error"], "request_id": request_id,
+            "model_status": 400, "model_posts": len(received), "model_body_sha256": received[0][0],
+            "stop_failure": event, "diagnostics": evidence, "wire_final": "unavailable"}
 
 
 def check(manage, token, identifier, received, sender_status, restart, *, source_observer, mode):
@@ -104,15 +162,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--gateway", required=True, type=Path)
     parser.add_argument("--sender", default=Path("/usr/local/bin/account-sender"), type=Path)
-    parser.add_argument("--case", choices=("text", "tool"), required=True)
+    parser.add_argument("--case", choices=("text", "tool", "provider-error"), required=True)
     args = parser.parse_args()
-    install()
+    failure = args.case == "provider-error"
+    install(observe_failure=failure)
     with patch.multiple(
-        fixture, QuietHandler=ModelPath, verify_structured_tool_round=partial(check, mode=args.case)
+        fixture, QuietHandler=RejectedModel if failure else ModelPath,
+        verify_structured_tool_round=check_provider_error if failure else partial(check, mode=args.case),
     ), TemporaryDirectory(prefix="guarded-direct-first-") as folder:
         result = fixture.verify(
             args.gateway, args.sender, Path(folder), installed_runtime=True, structured_output="live",
-            trace_startup=True, model_connection_contract="server-close",
+            trace_startup=True, model_connection_contract="server-close", failure_boundaries=failure,
         )
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
