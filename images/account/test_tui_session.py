@@ -1621,8 +1621,9 @@ class SessionTests(unittest.TestCase):
 
     def test_verified_refusal_finishes_before_cli_requests_another_step(self):
         """真实拒答交付完整终帧，普通文本按完整回合收尾，重复回调不增加投递。@return 无。"""
-        for reason in ("refusal", "end_turn"):
-            with self.subTest(reason=reason), closing(self._driver()) as driver, ThreadPoolExecutor(1) as pool:
+        cases = (("refusal", "refusal", True), ("refusal", None, False), ("end_turn", "end_turn", True))
+        for reason, native_reason, has_text in cases:
+            with self.subTest(reason=reason, has_text=has_text), closing(self._driver()) as driver, ThreadPoolExecutor(1) as pool:
                 driver.launcher = Mock()
                 with closing(driver.prepare(self._identity(reason), encode(self._body()))) as handle:
                     actor = handle.actor
@@ -1633,12 +1634,17 @@ class SessionTests(unittest.TestCase):
                                 self.assertTrue(actor.changed.wait_for(lambda: actor.step is not None, 2))
                             turn = {"turn": "test", "step": 0, "model": "chosen"}
                             actor.callback("/begin", turn)
-                            events = [
-                                {"type": "message_start", "message": {}},
+                            with self.assertRaises(ValueError):
+                                actor.callback("/end", {**turn, "reason": native_reason})
+                            content = [
                                 {"type": "content_block_start", "index": 0,
                                  "content_block": {"type": "text", "text": "usage policy [reasoning_extraction]"}},
                                 {"type": "content_block_stop", "index": 0},
-                                {"type": "message_delta", "delta": {"stop_reason": reason}},
+                            ] if has_text else []
+                            events = [
+                                {"type": "message_start", "message": {"usage": {"input_tokens": 10}}},
+                                *content,
+                                {"type": "message_delta", "delta": {"stop_reason": reason}, "usage": {"output_tokens": 8}},
                                 {"type": "message_stop"},
                             ]
                             wire = b"".join(b"data: " + encode(e) + b"\n\n" for e in events)
@@ -1649,7 +1655,9 @@ class SessionTests(unittest.TestCase):
                             marker = f"<system-reminder>\nprompt.submit hook additional context: {actor.guard_text}\n</system-reminder>"
                             native = {**self._body(), "messages": [{"role": "user", "content": [{"type": "text", "text": marker}]}]}
                             actor.serve_model(Mock(), native)
-                            actor.callback("/end", {**turn, "reason": reason})
+                            with self.assertRaises(ValueError):
+                                actor.callback("/end", {**turn, "reason": "max_tokens" if native_reason is None else None})
+                            actor.callback("/end", {**turn, "reason": native_reason})
                             self.assertEqual(actor.finished, reason == "refusal")
                             if reason == "refusal":
                                 self.assertEqual(b"".join(output.result(2)), wire)

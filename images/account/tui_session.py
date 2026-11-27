@@ -645,7 +645,12 @@ class _Actor:
                     or self.step.native != (data.get("turn"), data.get("step"))
                     or self.finished
                     or not self.step.stopped
-                    or self.step.reason != data.get("reason")
+                ):
+                    raise ValueError("原版 CLI 未确认相同模型响应的终态")
+                native_reason = data.get("reason")
+                # 原版 CLI 对空内容拒答可能省略结束原因。仅在同一步的原模型流已确认拒答时接受该确认。
+                if self.step.reason != native_reason and not (
+                    native_reason is None and self.step.reason == "refusal" and not self.step.blocks
                 ):
                     raise ValueError("原版 CLI 未确认相同模型响应的终态")
                 if (
