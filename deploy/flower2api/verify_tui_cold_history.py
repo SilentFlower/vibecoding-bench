@@ -89,6 +89,8 @@ SIGNED_FORK_THINKING = {"type": "thinking", "thinking": "隔离模型在分叉�
 ADAPTIVE_THINKING = {"type": "adaptive", "display": "updates"}
 THINKING_UPDATES_BETA = "thinking-display-updates-2026-08-18"
 THINKING_DISPLAY_DEFAULTS = {MODEL: "summarized", "claude-opus-5-5": "omitted"}
+CONTEXT_MANAGEMENT_BETA = "context-management-2025-06-27"
+KEEP_ALL_THINKING = {"edits": [{"type": "clear_thinking_20251015", "keep": "all"}]}
 STRUCTURED_FORMAT = {"type": "json_schema", "schema": {
     "type": "object", "properties": {"fixture_order_status": {"type": "string", "enum": ["ready"]}},
     "required": ["fixture_order_status"], "additionalProperties": False,
@@ -190,6 +192,22 @@ def build_cutover_record(temporary, old, deployment, release):
         path.write_text(json.dumps(value))
         path.chmod(0o600)
     return gate
+
+
+def pending_mixed_tool_scope(database, session_id):
+    """读出旧轮仍在等待的实际归属。@param database 隔离网关数据库。@param session_id 公开会话。
+    @return 原轮 ID、账号、主体、会话和绑定摘要。
+    """
+    with closing(connect(database)) as connection:
+        (row,) = connection.execute(
+            "SELECT id,account_id,principal_id,session_id,binding FROM tui_native_turns WHERE session_id=? AND tools=?",
+            (session_id, json.dumps([NEW_ID])),
+        ).fetchall()
+    turn, account, principal, session, binding = row
+    _, environment, generation, _ = binding.split(":", 3)
+    return {"turn_id": turn, "account_id": account, "principal_id": principal, "session_id": session,
+            "environment_id": environment, "generation": int(generation),
+            "binding_sha256": sha256(binding.encode()).hexdigest()}
 
 
 def fixture_tool_sse(tool, *, with_signature, second=None, model=MODEL, thinking_text=SIGNED_THINKING["thinking"],
@@ -320,7 +338,8 @@ def fixture_thinking_display_sse(body, *, message_id="msg_cold_thinking_display"
 
 def verify(gateway, sender, temporary, *, restart_history=False, text_input=False, system_policy=False,
            toggle_pending_policy=False, tool_policy=None, recover_pending=False, output_effort=False,
-           history_png=False, history_images=False, history_tool_blocks=False, previous=None, failure_boundaries=False,
+           history_png=False, history_images=False, history_tool_blocks=False, previous=None, mixed_context_keep_all=None,
+           failure_boundaries=False,
            current_text_blocks=False, signed_tool_history=False, signed_tool_response=None, split_history_tools=False,
            v1_runtime=None,
            parallel_tools=False, reconnect_tool_stream=False, interrupted_tool_stream=None,
@@ -366,6 +385,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param tool_receipt_images 核对本轮实际工具调用的图文回执及拒绝边界。
     @param explicit_custom_tool_type 是否通过显式 custom 的客户端声明进行原生工具往返。
     @param previous 可选，旧发行源码、网关、发送器三个离线制品。
+    @param mixed_context_keep_all 可选，混版交接时显式保留全部思考的模型。
     @param failure_boundaries 是否分别在模型收件前后切断隔离连接。
     @param interrupted_tool_stream 截断位置，按下一工具首帧是否交付核对原回执重试。
     @param stock_client 是否通过真实外部 CLI 验证完整 V2 输入与工具回执。
@@ -563,7 +583,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 if rejected:
                     response_json(self, QUOTA_REJECTION, status=429, headers={**quota, "Retry-After": str(QUOTA_RETRY_SECONDS)})
                     return
-            if v1_runtime is not None or message_system_roles or adaptive_thinking_model or fixed_thinking_model:
+            if (v1_runtime is not None or message_system_roles or adaptive_thinking_model or fixed_thinking_model
+                    or mixed_context_keep_all):
                 model_betas.append(self.headers.get("anthropic-beta", ""))
             if failure_boundaries and any(block.get("text") == DROP_REPLY
                                           for row in body["messages"] for block in blocks(row)):
@@ -1267,6 +1288,10 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                         thinking={"type": "enabled", "budget_tokens": 1536, "display": fixed_thinking_display})
             if fixed_thinking_display == "updates":
                 headers["anthropic-beta"] = THINKING_UPDATES_BETA
+        if mixed_context_keep_all:
+            body.update(model=mixed_context_keep_all, max_tokens=4096, thinking=ADAPTIVE_THINKING,
+                        context_management=KEEP_ALL_THINKING)
+            headers["anthropic-beta"] = CONTEXT_MANAGEMENT_BETA
         if recover_pending:
             body["output_config"] = {"effort": "medium"}
         with ExitStack() as initial_connections:
@@ -1366,13 +1391,23 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             assert received[0][1]["tools"][0]["name"] == TOOL["name"]
             assert not sender_state().get("idle")
             old_binding = {key: binding[key] for key in ("account_id", "environment_id", "generation", "release_id", "endpoint")}
+            if mixed_context_keep_all:
+                (principal,) = [item["id"] for item in manage("GET", "tokens")["data"] if item["token"] == token]
+                original_scope = pending_mixed_tool_scope(temporary / "gateway.db", session_id)
+                assert (original_scope["account_id"], original_scope["principal_id"], original_scope["session_id"]) == (
+                    identifier, principal, session_id,
+                ), (original_scope, identifier, principal, session_id)
+                assert original_scope["generation"] == old_binding["generation"]
+                assert original_scope["environment_id"] == old_binding["environment_id"]
             gate = build_cutover_record(temporary, old_binding, deployment, next_release)
             stop(control)
             start_gateway(gateway, next_release, V3_UPDATE_GATE_DIR=str(gate), V3_ACCOUNT_RELEASE=next_release)
             fresh = {**body, "stream": False, "messages": [{"role": "user", "content": AFTER_RESTART}]}
+            fresh_headers = headers if mixed_context_keep_all else {**headers, "x-session-id": str(uuid4())}
             lookup_boundary = len(lookups)
-            premature, refuse = call(18090, "POST", "/v1/messages", token, fresh,
-                                     {**headers, "x-session-id": str(uuid4())})
+            premature, refuse, blocked_request_id = checked_messages(
+                manage, token, fresh, fresh_headers, received, "mixed_before_drain", expected_status=503,
+            )
             assert premature == 503 and len(received) == 1, (premature, refuse, len(received))
             assert any("tui_previous_release" not in lookup for lookup in lookups[lookup_boundary:])
         if toggle_pending_policy:
@@ -1416,6 +1451,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         wrong_arguments, rejection = call(18090, "POST", "/v1/messages", token, changed_arguments_body, headers)
         rejected = wrong_subject, wrong_session, wrong_arguments, len(received)
         assert rejected == (400, 400, 422, 1), (rejected, rejection)
+        if mixed_context_keep_all:
+            assert pending_mixed_tool_scope(temporary / "gateway.db", session_id) == original_scope
         partial_statuses = {}
         if parallel_tools:
             second_result = result["content"][0]
@@ -1923,6 +1960,11 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             with closing(connect(temporary / "gateway.db")) as database:
                 wait_for(lambda: database.execute("SELECT count(*) FROM tui_native_turns WHERE tools IN (?, ?)",
                                                  (json.dumps([NEW_ID]), "!" + json.dumps([NEW_ID]))).fetchone()[0] == 0)
+            if mixed_context_keep_all:
+                idle_status, _, idle_request_id = checked_messages(
+                    manage, token, fresh, fresh_headers, received, "mixed_before_new_binding", expected_status=503,
+                )
+                assert idle_status == 503 and len(received) == 2
             stop(source)
             if previous[0] is not None:
                 install_source()
@@ -1931,7 +1973,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             binding["tui_predecessors"] = [old_binding]
             start_sender()
             wait_for(lambda: sender_state().get("ready") and sender_state().get("idle"))
-            status, raw = call(18090, "POST", "/v1/messages", token, fresh, {**headers, "x-session-id": str(uuid4())})
+            next_headers = fresh_headers if mixed_context_keep_all else {**headers, "x-session-id": str(uuid4())}
+            status, raw, new_request_id = checked_messages(manage, token, fresh, next_headers, received, "mixed_new_round")
             assert status == 200 and len(received) == 3, (status, raw, len(received))
             if summarized_thinking:
                 verify_client_thinking_reply(raw, False, body["model"], SIGNED_THINKING["thinking"])
@@ -1962,6 +2005,48 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 assert new_attempt["diagnostic_body_source"] == "interactive_cli"
                 proof["fixed_thinking"] = {"thinking": body["thinking"], "max_tokens": body["max_tokens"],
                                            "old_attempts": old_attempts}
+            if mixed_context_keep_all:
+                assert all(model["context_management"] == KEEP_ALL_THINKING and model["thinking"] == ADAPTIVE_THINKING
+                           and model["model"] == mixed_context_keep_all for _, model, _ in received)
+                assert len(model_betas) == 3 and all(
+                    CONTEXT_MANAGEMENT_BETA in {part.strip() for part in beta.split(",")} for beta in model_betas
+                ), model_betas
+                ((role, old_call),) = find_blocks(received[1][1], "id", NEW_ID)
+                assert role == "assistant" and old_call == tool and old_receipt == result["content"][0]
+                attempts = []
+                for index, (request_id, expected_source) in enumerate((
+                    (initial_request_id, "account_sender"), (continuation_request_id, "account_sender"),
+                    (new_request_id, "interactive_cli"),
+                )):
+                    detail = manage("GET", "request-diagnostics/" + request_id)
+                    request = detail["request"]
+                    (attempt,) = detail["attempts"]
+                    reservation = request["context"]["tui_reservation_id"]
+                    assert request["original_session_id"] == session_id
+                    assert request["account_id"] == attempt["account_id"] == identifier
+                    assert request["context"]["tui_confirmed_model_responses"] == 1
+                    assert attempt["request_id"] == request_id and attempt["attempt_id"] == reservation
+                    assert attempt["context"]["tui_body_source"] == expected_source, attempt
+                    attempts.append({
+                        "request_id": request_id, "reservation_id": reservation, "body_source": expected_source,
+                        "model_body_sha256": received[index][0],
+                        "session_origin": attempt["context"]["tui_session_origin"],
+                    })
+                assert len({attempt["reservation_id"] for attempt in attempts}) == 3
+                assert attempts[1]["session_origin"] == "live_process"
+                assert new_attempt["request_id"] == new_request_id
+                for request_id in (blocked_request_id, idle_request_id):
+                    detail = manage("GET", "request-diagnostics/" + request_id)
+                    assert detail["request"]["status_code"] == 503 and detail["attempts"] == [], detail
+                proof["mixed_context_keep_all"] = {
+                    "model": mixed_context_keep_all, "thinking": ADAPTIVE_THINKING,
+                    "context_management": KEEP_ALL_THINKING, "model_betas": model_betas,
+                    "original_scope": original_scope, "new_generation": binding["generation"],
+                    "tool_use_id": tool["id"], "attempts": attempts,
+                    "blocked_before_drain": {"request_id": blocked_request_id, "model_posts": 0},
+                    "blocked_before_new_binding": {"request_id": idle_request_id, "http_status": idle_status, "model_posts": 0},
+                    "same_fresh_body_sha256": sha256(encoded(fresh)).hexdigest(),
+                }
             return proof
         expected_receipts = result["content"] if exact_tool_receipts else ()
         if tool_receipt_outer_cache and history_cache_ttl:
@@ -5678,6 +5763,8 @@ def main():
     scenario.add_argument("--mixed-release", nargs=3, type=Path,
                           metavar=("OLD_SOURCE", "OLD_GATEWAY", "OLD_SENDER"))
     scenario.add_argument("--mixed-image-peers", nargs=2, type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--mixed-context-keep-all", choices=tuple(THINKING_DISPLAY_DEFAULTS),
+                        help="混版排空时核对显式 keep:all 的原回执和同会话新轮")
     scenario.add_argument("--failure-boundaries", action="store_true")
     scenario.add_argument("--v1-runtime", type=Path)
     args = parser.parse_args()
@@ -5739,6 +5826,10 @@ def main():
             or Path("/run/v3/sender.json").exists() or any(Path("/native").glob("*"))):
         raise RuntimeError("请在空白的 docker --network none 账号容器中运行")
     previous = args.mixed_release
+    if args.mixed_context_keep_all and not (previous or args.mixed_image_peers):
+        parser.error("--mixed-context-keep-all 需要混版排空场景")
+    if args.mixed_context_keep_all and (args.fixed_thinking_model or args.adaptive_thinking_model):
+        parser.error("混版 keep:all 用例包含固定的自适应思考模式")
     cache_markers = args.cache_markers or args.cache_marker_capabilities is not None
     trace_startup = (args.initial_idle_model_connection or args.trace_initial_startup or args.trace_recovery_resend or cache_markers
                      or args.cancel_before_response_headers is not None
@@ -5795,6 +5886,7 @@ def main():
                        tool_receipt_outer_cache=args.tool_receipt_outer_cache,
                        explicit_custom_tool_type=args.explicit_custom_tool_type,
                        previous=previous,
+                       mixed_context_keep_all=args.mixed_context_keep_all,
                        failure_boundaries=args.failure_boundaries, current_text_blocks=args.current_text_blocks,
                        signed_tool_history=args.signed_tool_history or bool(args.bound_signed_history),
                        signed_tool_response=args.signed_tool_response,

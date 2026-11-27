@@ -94,8 +94,10 @@ def check_package(image, role):
     return {"id": inspection["Id"], "revision": revision}
 
 
-def verify_images(images, cli):
-    """用已安装的旧、新制品各启动一套实际角色。@param images 固定角色镜像。@param cli 固定 CLI 卷。@return 脱敏证据。"""
+def verify_images(images, cli, *, context_keep_all=None):
+    """用已安装的旧、新制品各启动一套实际角色。@param images 固定角色镜像。@param cli 固定 CLI 卷。
+    @param context_keep_all 可选，测试显式保留全部思考的模型。@return 脱敏证据。
+    """
     identities = {role: check_package(image, role.split("-", 1)[1]) for role, image in images.items()}
     old, new = (identities[role]["revision"] for role in ("old-control", "new-control"))
     if old == new or old != identities["old-account"]["revision"] or new != identities["new-account"]["revision"]:
@@ -129,9 +131,12 @@ def verify_images(images, cli):
         for role, identity in identities.items():
             start("container:" + anchor, identity["id"], "/usr/local/bin/python3", ["-I", str(SCRIPT), "--peer", role],
                   "1001:1001" if ROLES[role] == ACCOUNT else "0:0")
-        result = run(["docker", "exec", anchor, "python3", "-B", "/checkout/deploy/flower2api/verify_tui_cold_history.py",
-                      "--shared-state", str(STATE), "--gateway", "/lab/bin/new-control", "--sender", "/lab/bin/new-account",
-                      "--mixed-image-peers", "/lab/bin/old-control", "/lab/bin/old-account"], text=True, stdout=PIPE)
+        command = ["docker", "exec", anchor, "python3", "-B", "/checkout/deploy/flower2api/verify_tui_cold_history.py",
+                   "--shared-state", str(STATE), "--gateway", "/lab/bin/new-control", "--sender", "/lab/bin/new-account",
+                   "--mixed-image-peers", "/lab/bin/old-control", "/lab/bin/old-account"]
+        if context_keep_all:
+            command.extend(["--mixed-context-keep-all", context_keep_all])
+        result = run(command, text=True, stdout=PIPE)
         if result.returncode:
             for identifier in containers[1:]:
                 run(["docker", "logs", identifier], stdout=sys.stderr, check=False)
@@ -149,13 +154,15 @@ def main():
     for role in ROLES:
         parser.add_argument("--" + role)
     parser.add_argument("--cli", type=Path)
+    parser.add_argument("--mixed-context-keep-all", choices=("claude-sonnet-4-6", "claude-opus-5-5"))
     args = parser.parse_args()
     if args.peer:
         return peer(args.peer)
     images = {role: getattr(args, role.replace("-", "_")) for role in ROLES}
     if not all(images.values()) or args.cli is None:
         parser.error("须同时提供两个发行的四个镜像和固定 CLI 目录")
-    print(json.dumps(verify_images(images, args.cli.resolve(strict=True)), ensure_ascii=False))
+    print(json.dumps(verify_images(images, args.cli.resolve(strict=True), context_keep_all=args.mixed_context_keep_all),
+                     ensure_ascii=False))
     return 0
 
 
