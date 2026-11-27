@@ -164,7 +164,19 @@ class ModelResponseError(RuntimeError):
         )
         if public_fields:
             error = {"type": data["type"], "message": data["message"]}
-        self.body = encode({"type": "error", "error": error})
+        envelope = {"type": "error", "error": error}
+        if complete and 400 <= status < 600 and public_fields and value.get("type") == "error" and source in (
+            "local_provider_http", "managed_oauth_http",
+        ):
+            # 只保留已完整接收的 Messages 标准字段。其余错误详情继续留在提供方。
+            request_id = value.get("request_id")
+            if isinstance(request_id, str) and re.fullmatch(r"req_[A-Za-z0-9]{1,124}", request_id):
+                envelope["request_id"] = request_id
+            details = data.get("details")
+            code = details.get("error_code") if isinstance(details, dict) else None
+            if isinstance(code, str) and re.fullmatch(r"[A-Za-z0-9_]+", code):
+                error["details"] = {"error_code": code}
+        self.body = encode(envelope)
         if not isinstance(data, dict):
             data = value if isinstance(value, dict) and value.get("type") == "error" else {}
         evidence = {
@@ -172,8 +184,8 @@ class ModelResponseError(RuntimeError):
             if isinstance(data.get(key), str)
         }
         self.private_body = self.body
-        if public_fields and evidence != error:
-            self.private_body = encode({"type": "error", "error": evidence})
+        if public_fields and (private_error := {**evidence, **error}) != error:
+            self.private_body = encode({**envelope, "error": private_error})
         elif not public_fields and evidence:
             # 旧网关只交付 error 的公开字段。原始残缺信封只用于新网关判断会话策略。
             self.private_body = encode({

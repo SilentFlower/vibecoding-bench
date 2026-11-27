@@ -2612,6 +2612,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - CLI 回环模型请求沿原账号 sender 授权路径送到固定供应商。该次请求交付 CLI 实际生成的 JSON 实体。调试快照的正文摘要取自这一实体，`wire_final.status` 为 `unavailable`。
 - 原工具组等待期间，受信管理入口 `POST /admin/accounts/{id}/oauth-credentials/resolve` 可用 `force_refresh: true` 验证原账号刷新通道。合法回执保留原工具归属和原轮输入，实际模型续轮按同一账号已落库的新 AT 重新解析。原进程内续轮和原进程丢失后的磁盘恢复均适用完整 OAuth 文件协议。模型请求调试快照保留正文摘要与会话归属，凭据值须脱敏。
 - 受管模型的 HTTP 429 在公开 Messages 保留状态、错误正文和有效 `Retry-After`。诊断以同一预留记录一次确认的模型响应及 `upstream_rejected / upstream_headers`。受管模型的 200 和真实 429 都可从完整响应额度头被动更新原账号对应窗口，比例换算为百分比，缺省窗口保留已记录值。账本和工作区的本地拒绝各沿原阶段记录。
+- 现行账号发送路径的首帧前 HTTP 模型错误保留既有状态、类型和消息。完整的上游 Messages 错误信封可保留顶层 `request_id` 和 `error.details.error_code`。请求 ID 沿现有关联格式 `req_` 加 ASCII 字母数字，总长至多 128。结构化错误码接受非空 ASCII 字母、数字或下划线；其它详情字段继续过滤。返回的 JSON 请求 ID 属于上游，`X-CC2API-Request-Id` 仍属于公开网关。格式错误、截断及本地拒绝继续使用已有错误信封。用 `verify_tui_http_error_contract.py --path account --error-metadata valid|invalid` 在公开 JSON 和 SSE 首帧前验证模型一次投递、绑定预留及错误字段。[Claude API 错误合同](https://platform.claude.com/docs/en/api/errors#request-id)
 - 账户、会话、模型、替代的调用方参数或连接归属变更均沿原预留和回执门槛处理。冷导入只协商当前支持的普通输入形状。其他形状继续沿该发行既有入口合同。
 
 ### 4. Validation & Error Matrix

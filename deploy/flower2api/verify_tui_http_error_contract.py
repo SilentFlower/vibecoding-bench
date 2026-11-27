@@ -133,12 +133,13 @@ def verify_stream_hooks(reservation_id, stages, model_digest):
 
 
 def check(manage, token, identifier, received, sender_status, restart, *, source_observer, path, error, emitted,
-          public_stream, stages):
+          public_stream, stages, expected_metadata=None):
     """关联公开回包与原模型拒绝。@param manage 管理入口。@param token 合成凭据。
     @param identifier 当前账号。@param received 模型收件。@param sender_status 诊断读取。
     @param restart 重启选项。@param source_observer 额外事件源观测。
     @param path 验证路线。@param error 期望的旧公开错误。@param emitted 模型实发的错误。
     @param public_stream 是否提交公开 stream:true。@param stages 代理及模型接收时点。
+    @param expected_metadata 当前路径应公开交付的标准错误元数据。
     @return 请求、尝试、实收与钩子记录。
     """
     assert not source_observer and not restart
@@ -169,7 +170,8 @@ def check(manage, token, identifier, received, sender_status, restart, *, source
     (model_error,) = emitted
     public = json.loads(raw)
     if path == "account":
-        assert public == {"type": "error", "error": error}, public
+        expected = expected_metadata or {"type": "error", "error": error}
+        assert public == expected, public
         assert row["diagnostic_context"]["tui_confirmed_model_responses"] == 1, row
     elif public_stream:
         assert isinstance(public.get("error"), str) and public["error"], public
@@ -203,14 +205,31 @@ def main():
     parser.add_argument("--error-type", choices=ERROR_TYPES, required=True)
     parser.add_argument("--stream", action="store_true", help="公开请求使用 stream:true，核对首帧前的 JSON 错误")
     parser.add_argument("--gateway", type=Path, required=True)
+    parser.add_argument("--sender", type=Path, default=Path("/usr/local/bin/account-sender"))
+    parser.add_argument("--source-account", action="store_true", help="用当前源码安装账号事件源")
+    parser.add_argument("--error-metadata", choices=("valid", "invalid"), help="核对标准错误关联与结构化错误码")
     args = parser.parse_args()
     assert Path("/.dockerenv").is_file() and {name for _, name in if_nameindex()} == {"lo"}
+    if args.path == "cli" and (args.source_account or args.error_metadata):
+        parser.error("错误元数据用例和候选账号源码需要 --path account")
     if args.path == "cli":
         install_turn_hooks(public_stream=args.stream)
+    elif args.source_account:
+        fixture.install_source()
     error = {"type": args.error_type, "message": ERROR_MESSAGE}
     # 让原状态、消息、长度与响应头保持相同。公开错误类型的差异来自正文。
     padding = "x" * (len(max(ERROR_TYPES, key=len)) - len(args.error_type))
     payload = {"type": "error", "error": {**error, "details": {"tag": "isolated-provider-detail", "padding": padding}}}
+    expected_metadata = None
+    if args.error_metadata == "valid":
+        request_id = "req_01SyntheticMessagesError"
+        details = {"error_code": "synthetic_invalid_parameter"}
+        payload["request_id"] = request_id
+        payload["error"]["details"].update(details)
+        expected_metadata = {"type": "error", "error": {**error, "details": details}, "request_id": request_id}
+    elif args.error_metadata == "invalid":
+        payload["request_id"] = "req_非法"
+        payload["error"]["details"]["error_code"] = {"private": "isolated-provider-detail"}
     emit = fixture.response_json
     emitted = []
     observe = fixture.startup_event
@@ -236,10 +255,11 @@ def main():
         fixture, QuietHandler=FixedDateModel, response_json=model_reply, startup_event=trace,
         verify_structured_tool_round=partial(
             check, path=args.path, error=error, emitted=emitted, public_stream=args.stream, stages=stages,
+            expected_metadata=expected_metadata,
         ),
     ), TemporaryDirectory(prefix="http-error-contract-") as folder:
         result = fixture.verify(
-            args.gateway, Path("/usr/local/bin/account-sender"), Path(folder), installed_runtime=True,
+            args.gateway, args.sender, Path(folder), installed_runtime=True,
             structured_output="live", trace_startup=True, failure_boundaries=True, model_connection_contract="server-close",
         )
     print(json.dumps(result, ensure_ascii=False, indent=2))

@@ -567,6 +567,14 @@ pub struct DiagnosticPage {
     pub counts: DiagnosticCounts,
 }
 
+/// 核对 Claude API 的标准请求 ID。@param value 响应标识。@return 是否符合已有公开格式。
+pub(crate) fn is_anthropic_request_id(value: &str) -> bool {
+    value.len() <= 128
+        && value
+            .strip_prefix("req_")
+            .is_some_and(|rest| !rest.is_empty() && rest.bytes().all(|b| b.is_ascii_alphanumeric()))
+}
+
 /// 规范化响应关联 ID，非标准头值只保存散列。
 /// @param value 外部响应标识或管理员筛选条件。
 /// @return 可持久化、可反查的受控标识。
@@ -574,11 +582,7 @@ pub(crate) fn normalize_correlation_id(value: &str) -> String {
     if let Ok(uuid) = Uuid::parse_str(value) {
         return uuid.to_string();
     }
-    if value.len() <= 128
-        && value
-            .strip_prefix("req_")
-            .is_some_and(|rest| !rest.is_empty() && rest.bytes().all(|b| b.is_ascii_alphanumeric()))
-    {
+    if is_anthropic_request_id(value) {
         return value.to_owned();
     }
     if value

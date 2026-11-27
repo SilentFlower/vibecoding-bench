@@ -2086,6 +2086,26 @@ class SessionTests(unittest.TestCase):
             },
         )
 
+    def test_standard_http_error_metadata_requires_complete_provider_response(self):
+        """按错误来源与完整性筛选公开字段，保留私有分类字段。@return 无。"""
+        detail = {"error_code": "synthetic_parameter", "internal": "private"}
+        error = {"type": "invalid_request_error", "message": "合成拒绝", "details": detail, "code": "private_code"}
+        payload = {"type": "error", "request_id": "req_01Synthetic", "error": error}
+        for source, status, complete, allowed in (
+            ("managed_oauth_http", 400, True, True), ("local_provider_http", 429, True, True),
+            ("managed_oauth_http", 400, False, False), ("managed_oauth_http", 302, True, False),
+            ("tui_cli_input_guard", 422, True, False),
+        ):
+            with self.subTest(source=source, status=status, complete=complete):
+                response = ModelResponseError(status, encode(payload), source=source, complete=complete)
+                public = {"type": "error", "error": {"type": error["type"], "message": error["message"]}}
+                if allowed:
+                    public["request_id"] = payload["request_id"]
+                    public["error"]["details"] = {"error_code": detail["error_code"]}
+                self.assertEqual(json.loads(response.body), public)
+                self.assertEqual(json.loads(response.private_body),
+                                 {**public, "error": {**public["error"], "code": "private_code"}})
+
 
 if __name__ == "__main__":
     unittest.main()

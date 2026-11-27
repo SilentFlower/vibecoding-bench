@@ -18,6 +18,7 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::error::AppError;
+use crate::model::request_diagnostics::is_anthropic_request_id;
 use crate::service::session_policy_block;
 
 // opt-in 改写按单个完整 JSON 或一个 SSE 事件聚合原始字节。这是本地缓冲输入预算。
@@ -128,11 +129,28 @@ pub(super) async fn project_observed(
     let reason = policy_account
         .filter(|_| !matches!(status.as_u16(), 401 | 429))
         .zip(evidence.and_then(session_policy_block::classify));
-    let mut response = (
-        error_status,
-        axum::Json(messages_error(error.as_ref(), error_status)),
-    )
-        .into_response();
+    let mut public = messages_error(error.as_ref(), error_status);
+    if !status.is_success()
+        && policy_account.is_some()
+        && let Some(source) = error.as_ref().filter(|value| value["type"] == "error")
+    {
+        if let Some(request_id) = source["request_id"]
+            .as_str()
+            .filter(|id| is_anthropic_request_id(id))
+        {
+            public["request_id"] = json!(request_id);
+        }
+        if let Some(code) = source
+            .pointer("/error/details/error_code")
+            .and_then(Value::as_str)
+            .filter(|code| {
+                !code.is_empty() && code.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+            })
+        {
+            public["error"]["details"] = json!({"error_code": code});
+        }
+    }
+    let mut response = (error_status, axum::Json(public)).into_response();
     if let Some((account, reason)) = reason {
         session_policy_block::remember_current(account, reason).await?;
         response
@@ -744,6 +762,39 @@ data: "usage":{"output_tokens":4,"cache_read_input_tokens":5,"cache_creation_inp
                     .is_some_and(|message| !message.is_empty())
             );
             assert!(value.get("id").is_none());
+        }
+    }
+
+    /// 公开首帧前的错误只沿已绑定提供方保留标准元数据。@return 无。
+    #[tokio::test]
+    async fn http_errors_keep_only_standard_provider_metadata() {
+        for (account, request_id, code, preserve) in [
+            (Some(1), "req_01Synthetic", "synthetic_code", true),
+            (None, "req_01Synthetic", "synthetic_code", false),
+            (Some(1), "req_非法", "bad code", false),
+        ] {
+            let provider = json!({
+                "type":"error", "request_id":request_id,
+                "error":{"type":"invalid_request_error","message":"合成拒绝",
+                    "details":{"error_code":code,"internal":"private"}}
+            });
+            let response = project_observed(
+                StatusCode::BAD_REQUEST,
+                "application/json",
+                Body::from(provider.to_string()),
+                account,
+            )
+            .await
+            .unwrap();
+            assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+            let body = response.into_body().collect().await.unwrap().to_bytes();
+            let public: Value = serde_json::from_slice(&body).unwrap();
+            let mut expected = error_body("invalid_request_error", "合成拒绝");
+            if preserve {
+                expected["request_id"] = json!(request_id);
+                expected["error"]["details"] = json!({"error_code": code});
+            }
+            assert_eq!(public, expected);
         }
     }
 }
