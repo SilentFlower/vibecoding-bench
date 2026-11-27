@@ -3718,7 +3718,24 @@ def verify_message_system_roles(manage, token, account, received, model_betas, *
                     result["diagnostic_instruction_location"] = observed
             else:
                 result["provider_path"] = "native293"
-            model_system = model_body.get("system", [])
+            model_system = blocks({"content": model_body.get("system", [])})
+            if fixed:
+                marker = root["text"]
+                occurrences = {
+                    "system_header": sum(block["text"].count(marker) for block in model_system if block["type"] == "text"),
+                    "user": 0,
+                    "other_messages": 0,
+                }
+                for row in model_body["messages"]:
+                    location = "user" if row["role"] == "user" else "other_messages"
+                    occurrences[location] += sum(block["text"].count(marker) for block in blocks(row)
+                                                 if block["type"] == "text")
+                expected_location = "user" if policy == "user_reminder" else "system_header"
+                expected_occurrences = dict.fromkeys(occurrences, 0)
+                if "system" in body:
+                    expected_occurrences[expected_location] = 1
+                assert occurrences == expected_occurrences, (label, occurrences, expected_occurrences)
+                result["root_text_occurrences"] = occurrences
             identity_rows = [block.get("text", "") for block in model_system if isinstance(block, dict)]
             metadata = model_body.get("metadata", {}).get("user_id")
             model_identity = json.loads(metadata) if isinstance(metadata, str) and metadata.startswith("{") else {}
