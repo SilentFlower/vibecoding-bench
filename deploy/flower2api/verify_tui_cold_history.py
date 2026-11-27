@@ -1844,6 +1844,10 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                         manage("PUT", "settings", {budget_key: previous_budget})
                         proof["replay"] = verify_lost_receipt_replay(manage, token, follow, headers, received, callbacks,
                                                                     request_id, model_reply, replay_unknown_receipt)
+                    if replay_unknown_receipt:
+                        proof["original_terminal"] = verify_unknown_receipt_terminal(
+                            manage, request_id, reservation, (502, "cancelled", "upstream_body"),
+                        )
                     assert len(received) == 2 and callbacks == [NEW_ID]
                     assert original_file.read_bytes() == original_history and binding_file.read_bytes() == original_binding
                 return proof
@@ -2594,6 +2598,36 @@ def verify_lost_receipt_replay(manage, token, body, headers, received, callbacks
             "new_model_posts": len(received) - model_posts_before, "client_tool_calls": len(callbacks)}
 
 
+def verify_unknown_receipt_terminal(manage, request_id, reservation, expected_attempt):
+    """在后台尝试收口后核对原公开 502。@param manage 管理入口。@param request_id 原公开请求。
+    @param reservation 原预留。@param expected_attempt 尝试的状态、结果及阶段。@return 根和尝试终态。
+    """
+    def finished_attempt():
+        detail = manage("GET", "request-diagnostics/" + request_id)
+        attempts = detail["attempts"]
+        assert len(attempts) <= 1, detail
+        if attempts and attempts[0].get("finished_at") and detail["request"].get("finished_at"):
+            return detail
+
+    original = wait_for(finished_attempt)
+    record = original["request"]
+    assert (record["request_id"], record["status_code"], record["outcome"], record["error_stage"]) == (
+        request_id, 502, "transport_error", "tui_send_http",
+    ), original
+    assert record["context"]["tui_reservation_id"] == reservation
+    assert record["attempt_count"] == 1 and record.get("native_rejection") is None, original
+    (attempt,) = original["attempts"]
+    assert (attempt["request_id"], attempt["attempt_id"]) == (request_id, reservation), original
+    assert (attempt["status_code"], attempt["outcome"], attempt["error_stage"]) == expected_attempt, original
+    return {"request_id": request_id, "reservation_id": reservation, "status_code": record["status_code"],
+            "outcome": record["outcome"], "error_stage": record["error_stage"], "finished_at": record["finished_at"],
+            "attempt_count": record["attempt_count"],
+            "confirmed_model_responses": record["context"].get("tui_confirmed_model_responses"),
+            "attempt": {field: attempt[field] for field in (
+                "attempt_id", "request_id", "status_code", "outcome", "error_stage", "finished_at",
+            )}, "session_origin": (attempt.get("context") or {}).get("tui_session_origin")}
+
+
 def verify_unknown_receipt_replay(manage, database, token, body, headers, received, callbacks,
                                   model_prefix, model_terminal, original_request, reservation, mode,
                                   gateway_trace, model_reply):
@@ -2637,6 +2671,8 @@ def verify_unknown_receipt_replay(manage, database, token, body, headers, receiv
     content_type = None
     response_headers_ns = None
     replay_sent = None
+    second_reader_id = None
+    second_reader_lines = []
     model_posts_before = len(received)
 
     def request_sent():
@@ -2652,6 +2688,14 @@ def verify_unknown_receipt_replay(manage, database, token, body, headers, receiv
             if not body["stream"]:
                 model_terminal.set()
 
+    def read_second_prefix(response):
+        nonlocal second_reader_id
+        assert response.status == 200 and response.getheader("Content-Type").split(";", 1)[0] == "text/event-stream"
+        second_reader_id = response.getheader("x-cc2api-request-id")
+        second_reader_lines.extend(read_tool_stream_data_lines(response, 3))
+        assert second_reader_lines == prefix and not model_terminal.is_set() and len(received) == 2
+        model_terminal.set()
+
     def response_headers(response):
         nonlocal response_id, content_type, response_headers_ns
         response_id = response.getheader("x-cc2api-request-id")
@@ -2660,7 +2704,10 @@ def verify_unknown_receipt_replay(manage, database, token, body, headers, receiv
         if mode == "live" and body["stream"] and response.status == 200:
             prefix.extend(read_tool_stream_data_lines(response, 3))
             assert not model_terminal.is_set() and len(received) == 2
-            model_terminal.set()
+            # 原客户端等 502 已结束。两个独立重交都接到原流前缀后，再允许模型生成终帧。
+            status, tail = call(18090, "POST", "/v1/messages", token, body, headers, observe_headers=read_second_prefix)
+            assert status == 200 and second_reader_id and second_reader_id not in (original_request, response_id)
+            second_reader_lines.extend(line for line in tail.splitlines(keepends=True) if line.startswith(b"data:"))
 
     try:
         status, raw = call(18090, "POST", "/v1/messages", token, body, headers,
@@ -2679,6 +2726,8 @@ def verify_unknown_receipt_replay(manage, database, token, body, headers, receiv
     if body["stream"]:
         assert media_type == "text/event-stream", content_type
         lines = prefix + [line for line in raw.splitlines(keepends=True) if line.startswith(b"data:")]
+        if mode == "live":
+            assert second_reader_id and second_reader_lines == lines, (second_reader_id, second_reader_lines, lines)
         events = [json.loads(line[5:]) for line in lines]
         assert [event["type"] for event in events] == [
             "message_start", "content_block_start", "content_block_delta", "content_block_stop",
@@ -2696,37 +2745,37 @@ def verify_unknown_receipt_replay(manage, database, token, body, headers, receiv
         message_id = reply["id"]
     assert message_id.startswith("msg_")
 
-    def final_attempts():
-        original = manage("GET", "request-diagnostics/" + original_request)
-        replay = manage("GET", "request-diagnostics/" + response_id)
-        if original["attempts"] and replay["request"].get("finished_at"):
-            return original, replay
+    def finished_reader(request_id):
+        replay = manage("GET", "request-diagnostics/" + request_id)
+        if replay["request"].get("finished_at"):
+            return replay
 
-    original, replay = wait_for(final_attempts)
-    original_record = original["request"]
-    assert (original_record["status_code"], original_record["outcome"], original_record["error_stage"]) == (
-        502, "transport_error", "tui_send_http",
-    ), original
-    assert original_record["context"]["tui_reservation_id"] == reservation
-    assert original_record["context"]["tui_confirmed_model_responses"] == 1
-    assert original_record["attempt_count"] == 1 and original_record.get("native_rejection") is None, original
-    (attempt,) = original["attempts"]
-    assert (attempt["request_id"], attempt["attempt_id"], attempt["status_code"]) == (original_request, reservation, 200)
-    outcome = replay["request"]["outcome"]
+    reader_ids = [response_id] + ([second_reader_id] if second_reader_id else [])
     expected_outcomes = {"tui_reconnect_stream"} if mode == "live" else {"tui_reconnect_cached"}
     if mode == "live" and not body["stream"]:
         # 首个私有 JSON 回包聚合期间，缓存写者可在重交读者完成订阅前发布完整响应。
         expected_outcomes.add("tui_reconnect_cached")
-    assert replay["attempts"] == [] and outcome in expected_outcomes, replay
+    reader_proofs = []
+    for reader_id in reader_ids:
+        replay = wait_for(lambda: finished_reader(reader_id))
+        outcome = replay["request"]["outcome"]
+        assert replay["request"]["status_code"] == 200 and replay["attempts"] == [] and outcome in expected_outcomes, replay
+        reader = {"request_id": reader_id, "http_status": 200, "outcome": outcome, "attempt_count": 0}
+        if body["stream"]:
+            frames = second_reader_lines if reader_id == second_reader_id else lines
+            reader.update(sse_frames=len(frames), sse_data_sha256=sha256(b"".join(frames)).hexdigest())
+        reader_proofs.append(reader)
     rows = wait_for(usage)
     assert rows == [(10, 8, 0), (10, 8, 0)], rows
-    return {"mode": mode, "request_id": response_id, "http_status": status, "outcome": outcome,
+    original = verify_unknown_receipt_terminal(manage, original_request, reservation, (200, "success", None))
+    assert original["confirmed_model_responses"] == 1
+    return {"mode": mode, "request_id": response_id, "http_status": status, "outcome": reader_proofs[0]["outcome"],
             "attempt_count": 0, "new_model_posts": len(received) - model_posts_before,
             "client_tool_calls": len(callbacks), "public_message_id": message_id, "content_type": media_type,
             "json_response_sha256": None if body["stream"] else sha256(raw).hexdigest(),
-            "frames_before_model_terminal": len(prefix), "late_original_attempt": attempt["attempt_id"],
-            "session_origin": attempt["context"]["tui_session_origin"],
-            "original_model_responses_after_replay": 1,
+            "frames_before_model_terminal": len(prefix), "late_original_attempt": reservation,
+            "session_origin": original["session_origin"], "original_model_responses_after_replay": 1,
+            "original_terminal": original, "readers": reader_proofs,
             "original_receipt_sha256": received[1][0], "usage": rows,
             "completion": completion, "replay_sent_ns": replay_sent, "response_headers_ns": response_headers_ns}
 
