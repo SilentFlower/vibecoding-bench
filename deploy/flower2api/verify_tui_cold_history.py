@@ -1359,7 +1359,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             assert len(received) == 1
             expected_token = rotated_token
             startup_event("oauth_credential_rotated", model_posts=len(received), refresh_count=len(refresh_calls))
-        if recover_pending or tool_receipt_images or exact_tool_receipts:
+        if recover_pending or tool_receipt_images or exact_tool_receipts or replay_unknown_receipt:
             marker = ("--name=" + headers["x-session-id"]).encode()
             original, = [int(path.parent.name) for path in Path("/proc").glob("[0-9]*/cmdline")
                          if fixture_command_has(path, marker)]
@@ -1699,9 +1699,10 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             previous_budget = manage("GET", "settings")[budget_key]
             manage("PUT", "settings", {budget_key: "3"})
             started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+            phase = "recovered_receipt_slow_model" if recover_pending else "live_receipt_slow_model"
             try:
                 status, raw, request_id = checked_messages(
-                    manage, token, follow, headers, received, "recovered_receipt_slow_model", expected_status=502,
+                    manage, token, follow, headers, received, phase, expected_status=502,
                     trace_startup=trace_startup, sender_status=sender_state_after_failure,
                 )
                 returned = monotonic()
@@ -1710,7 +1711,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 ((role, receipt),) = find_blocks(received[-1][1], "tool_use_id", NEW_ID)
                 assert role == "user" and REPLY in json.dumps(receipt, ensure_ascii=False)
                 evidence = report_request_diagnostics(
-                    manage, "recovered_receipt_slow_model", request_id, headers["x-session-id"], started_at,
+                    manage, phase, request_id, headers["x-session-id"], started_at,
                 )
                 record, = evidence["requests"]
                 assert (record["status_code"], record["error_stage"], record["outcome"]) == (
@@ -1720,7 +1721,12 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 assert "tui_confirmed_model_responses" not in record["diagnostic_context"], record
                 reservation = record["diagnostic_context"]["tui_reservation_id"]
                 assert str(UUID(reservation)) == reservation
-                assert len(received) == 2 and callbacks == [NEW_ID] and original_file.read_bytes() == original_history
+                assert len(received) == 2 and callbacks == [NEW_ID]
+                if recover_pending:
+                    assert original_file.read_bytes() == original_history
+                else:
+                    assert fixture_command_has(Path(f"/proc/{original}/cmdline"), marker)
+                    assert original_file.read_bytes().startswith(original_history)
                 verify_model(received, policy="append", old_content=old_result, current_text_blocks=current_text_blocks)
                 proof = {"http_status": status, "model_received_before_public_return_ms": round((returned - arrival) * 1000),
                          "model_posts": len(received), "client_tool_calls": len(callbacks), "old_tool_calls": 0,
@@ -1737,7 +1743,16 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                         manage, temporary / "gateway.db", token, follow, headers, received, callbacks,
                         slow_tool_prefix, slow_tool_terminal, request_id, reservation, replay_unknown_receipt,
                     )
-                    assert original_file.read_bytes() == original_history
+                    retained_history = original_file.read_bytes()
+                    assert binding_file.read_bytes() == original_binding
+                    if recover_pending:
+                        assert retained_history == original_history
+                    else:
+                        assert retained_history.startswith(original_history)
+                        assert proof["replay"]["session_origin"] == "live_process", proof["replay"]
+                    proof["original_cli_alive_at_502"] = not recover_pending
+                    proof["original_history_bytes_equal"] = retained_history == original_history
+                    proof["original_binding_preserved"] = True
                 else:
                     sleep(max(0, arrival + SLOW_MODEL_DELAY - monotonic()))
                 return proof
@@ -2517,6 +2532,7 @@ def verify_unknown_receipt_replay(manage, database, token, body, headers, receiv
     return {"mode": mode, "request_id": response_id, "http_status": status, "outcome": expected_outcome,
             "attempt_count": 0, "new_model_posts": 0, "public_message_id": events[0]["message"]["id"],
             "frames_before_model_terminal": len(prefix), "late_original_attempt": attempt["attempt_id"],
+            "session_origin": attempt["context"]["tui_session_origin"],
             "original_model_responses_after_replay": 1,
             "original_receipt_sha256": received[1][0], "usage": rows}
 
@@ -5216,7 +5232,7 @@ def main():
     fault.add_argument("--recovery-readiness-rejection", action="store_true")
     fault.add_argument("--recovery-slow-model", action="store_true")
     fault.add_argument("--replay-unknown-receipt", choices=("live", "complete"),
-                       help="收到回执提交未知的 502 后，主动接回同一次生成")
+                       help="回执收到 502 后接回同一次生成。可加 --recover-pending-tool 先重启 CLI 和发送器")
     scenario = parser.add_mutually_exclusive_group()
     scenario.add_argument("--restart-history", action="store_true")
     scenario.add_argument("--text-input", action="store_true")
@@ -5317,10 +5333,12 @@ def main():
     if args.trace_recovery_resend and not (args.recover_pending_tool or args.model_connection_contract == "restart"):
         parser.error("--trace-recovery-resend 需要 --recover-pending-tool 或 --model-connection-contract restart")
     if (args.recovery_ledger_contention or args.recovery_ledger_deadline or args.recovery_workspace_rejection
-        or args.recovery_readiness_rejection or args.recovery_slow_model or args.replay_unknown_receipt) and (
+        or args.recovery_readiness_rejection or args.recovery_slow_model) and (
         not args.recover_pending_tool or args.signed_tool_history
     ):
         parser.error("恢复故障注入需要可提交的 --recover-pending-tool 原回执")
+    if args.replay_unknown_receipt and args.signed_tool_history:
+        parser.error("--replay-unknown-receipt 使用普通未签名工具回执")
     if (not Path("/.dockerenv").exists() or {name for _, name in if_nameindex()} != {"lo"}
             or Path("/run/v3/sender.json").exists() or any(Path("/native").glob("*"))):
         raise RuntimeError("请在空白的 docker --network none 账号容器中运行")
