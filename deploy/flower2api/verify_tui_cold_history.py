@@ -1642,6 +1642,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                     503, "tui_workspace_bind", "local_rejected",
                 ), record
                 assert record["attempt_count"] == 0 and record["attempts"] == [], record
+                assert record["diagnostic_context"]["tui_confirmed_model_responses"] == 0, record
                 reservation = record["diagnostic_context"]["tui_reservation_id"]
                 assert str(UUID(reservation)) == reservation
                 with closing(connect(temporary / "gateway.db")) as database:
@@ -2115,6 +2116,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 assert rejected_request != continuation_request_id
                 proof["recovered_pending_tool"]["workspace_rejection"] = {
                     "http_status": rejection_status, "error_stage": record["error_stage"],
+                    "outcome": record["outcome"],
+                    "confirmed_model_responses": record["diagnostic_context"]["tui_confirmed_model_responses"],
                     "attempt_count": record["attempt_count"], "request_id": rejected_request,
                     "reservation_id": reservation, "receipt_reopened": True,
                 }

@@ -110,8 +110,11 @@ def verify_hooks():
     return {"http_reply": reply, "turn": turn, "stop_failure": stop, "session_rows": session_rows}
 
 
-def verify_stream_hooks(reservation_id):
-    """验证公开首帧前的真实 CLI 请求。@param reservation_id 原公开预留。@return 模型状态与物理归属。"""
+def verify_stream_hooks(reservation_id, stages, model_digest):
+    """验证公开首帧前的真实 CLI 请求。@param reservation_id 原公开预留。
+    @param stages 代理连接和模型收件。@param model_digest 模型实收正文摘要。
+    @return 模型状态与物理归属。
+    """
     offer, reply = [event for event in read_events() if event.get("model")]
     assert (offer["phase"], offer["origin"], offer["method"]) == ("offer", "engine", "POST"), offer
     assert (reply["phase"], reply["status"], reply["header"], reply["isStreaming"], reply["textLength"]) == (
@@ -121,16 +124,22 @@ def verify_stream_hooks(reservation_id):
     (tunnel,) = map(json.loads, Path("/tmp/flower-direct-tunnels.jsonl").read_text().splitlines())
     assert permit["allowed"] and permit["reservation_id"] == tunnel["reservation_id"] == reservation_id
     assert permit["cli_pid"] == tunnel["cli_pid"]
-    return {"http_reply": reply, "permit": permit, "tunnel": tunnel}
+    (connect,) = stages["proxy_connect_accepted"]
+    (connection,) = stages["proxy_model_tcp_connected"]
+    (post,) = stages["model_received"]
+    assert tunnel["account_proxy_peer_port"] == connect["peer_port"]
+    assert connection["peer_port"] == post["peer_port"] and post["model_body_sha256"] == model_digest
+    return {"http_reply": reply, "permit": permit, "tunnel": tunnel, "model_received": post}
 
 
 def check(manage, token, identifier, received, sender_status, restart, *, source_observer, path, error, emitted,
-          public_stream):
+          public_stream, stages):
     """关联公开回包与原模型拒绝。@param manage 管理入口。@param token 合成凭据。
     @param identifier 当前账号。@param received 模型收件。@param sender_status 诊断读取。
     @param restart 重启选项。@param source_observer 额外事件源观测。
     @param path 验证路线。@param error 期望的旧公开错误。@param emitted 模型实发的错误。
-    @param public_stream 是否提交公开 stream:true。@return 请求、尝试、实收与钩子记录。
+    @param public_stream 是否提交公开 stream:true。@param stages 代理及模型接收时点。
+    @return 请求、尝试、实收与钩子记录。
     """
     assert not source_observer and not restart
     session = str(uuid4())
@@ -144,7 +153,8 @@ def check(manage, token, identifier, received, sender_status, restart, *, source
 
     def observe_response(response):
         response_headers["content_type"] = response.getheader("content-type")
-        response_headers["latency_ms"] = (monotonic_ns() - start) // 1_000_000
+        response_headers["monotonic_ns"] = monotonic_ns()
+        response_headers["latency_ms"] = (response_headers["monotonic_ns"] - start) // 1_000_000
 
     status, raw, request_id = fixture.checked_messages(
         manage, token, body, headers, received, phase, expected_status=400 if path == "account" else 502,
@@ -155,22 +165,30 @@ def check(manage, token, identifier, received, sender_status, restart, *, source
     assert row["request_id"] == request_id and row["status_code"] == status, row
     reservation_id = row["diagnostic_context"]["tui_reservation_id"]
     assert reservation_id and response_headers["content_type"].startswith("application/json"), response_headers
-    if path == "account" or not public_stream:
-        (attempt,) = row["attempts"]
-        assert attempt["request_id"] == request_id and attempt["status_code"] == status
-        assert attempt["attempt_id"] == reservation_id and row["attempt_count"] == 1, row
     (model_digest, _, tls), = received
     (model_error,) = emitted
     public = json.loads(raw)
     if path == "account":
         assert public == {"type": "error", "error": error}, public
+        assert row["diagnostic_context"]["tui_confirmed_model_responses"] == 1, row
     elif public_stream:
         assert isinstance(public.get("error"), str) and public["error"], public
     else:
         assert public["error"]["type"] == "api_error", public
     hooks = None
     if path == "cli":
-        hooks = verify_stream_hooks(reservation_id) if public_stream else verify_hooks()
+        hooks = verify_stream_hooks(reservation_id, stages, model_digest) if public_stream else verify_hooks()
+    if path == "cli" and public_stream:
+        assert hooks["model_received"]["monotonic_ns"] < response_headers["monotonic_ns"], hooks
+        # 实收与试接钩子是独立证据，Gateway 没有得到同一响应的结构化投影。
+        assert (row["outcome"], row["error_stage"]) == ("transport_error", "tui_send_http"), (row, hooks)
+        assert row["attempt_count"] == 0 and row["attempts"] == [], row
+        assert row["native_rejection"] is None, row
+        assert row["diagnostic_context"].get("tui_confirmed_model_responses") is None, row
+    else:
+        (attempt,) = row["attempts"]
+        assert attempt["request_id"] == request_id and attempt["status_code"] == status
+        assert attempt["attempt_id"] == reservation_id and row["attempt_count"] == 1, row
     return {"path": path, "stream": public_stream, "http_status": status, "public_body": public,
             "request_id": request_id, "reservation_id": reservation_id, "public_headers": response_headers,
             "model_posts": len(received), "model_request_sha256": model_digest, "model_tls": tls,
@@ -195,6 +213,13 @@ def main():
     payload = {"type": "error", "error": {**error, "details": {"tag": "isolated-provider-detail", "padding": padding}}}
     emit = fixture.response_json
     emitted = []
+    observe = fixture.startup_event
+    stages = {name: [] for name in ("proxy_connect_accepted", "proxy_model_tcp_connected", "model_received")}
+
+    def trace(stage, **data):
+        if stage in stages:
+            stages[stage].append({"monotonic_ns": monotonic_ns(), **data})
+        observe(stage, **data)
 
     def model_reply(handler, value, *, status=200, headers=None):
         if status == 400 and handler.path == "/v1/messages" and value == {"type": "error", "error": {
@@ -208,8 +233,10 @@ def main():
         emit(handler, value, status=status, headers=headers)
 
     with patch.multiple(
-        fixture, QuietHandler=FixedDateModel, response_json=model_reply,
-        verify_structured_tool_round=partial(check, path=args.path, error=error, emitted=emitted, public_stream=args.stream),
+        fixture, QuietHandler=FixedDateModel, response_json=model_reply, startup_event=trace,
+        verify_structured_tool_round=partial(
+            check, path=args.path, error=error, emitted=emitted, public_stream=args.stream, stages=stages,
+        ),
     ), TemporaryDirectory(prefix="http-error-contract-") as folder:
         result = fixture.verify(
             args.gateway, Path("/usr/local/bin/account-sender"), Path(folder), installed_runtime=True,

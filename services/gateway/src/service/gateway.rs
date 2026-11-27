@@ -4479,23 +4479,23 @@ impl GatewayService {
             .get(runtime_transport::TUI_INSTRUCTION_LOCATION)
             .and_then(|header| header.to_str().ok())
             .and_then(TuiInstructionLocation::from_wire);
+        let model_response_received = body_source.is_some_and(|source| {
+            runtime_transport::tui_projection_marker(
+                response.headers(),
+                runtime_transport::TUI_BODY_SOURCE,
+                source.as_str(),
+            )
+        }) || runtime_transport::tui_failure_stage(
+            response.headers(),
+            &["local_provider_http", "managed_oauth_http"],
+        )
+        .is_some();
         if !fixture {
             if rejected_before_model {
                 diagnostics::observe_tui_model(
                     diagnostics::TuiModelObservation::RejectedBeforeSend,
                 );
-            } else if body_source.is_some_and(|source| {
-                runtime_transport::tui_projection_marker(
-                    response.headers(),
-                    runtime_transport::TUI_BODY_SOURCE,
-                    source.as_str(),
-                )
-            }) || runtime_transport::tui_failure_stage(
-                response.headers(),
-                &["local_provider_http", "managed_oauth_http"],
-            )
-            .is_some()
-            {
+            } else if model_response_received {
                 // 私有头已经收到模型证据，公开投影或正文读取随后仍可能失败。
                 diagnostics::observe_tui_model(
                     diagnostics::TuiModelObservation::ResponseReceived,
@@ -4515,6 +4515,18 @@ impl GatewayService {
                 .extensions_mut()
                 .remove::<runtime_transport::TuiGatewayIds>()
                 .is_some();
+        if !fixture
+            && response.status() == StatusCode::BAD_GATEWAY
+            && !projected
+            && !model_response_received
+            && !rejected_before_model
+        {
+            // Sender 可以在已发出 Unix send 后返回裸 502。只有私有 HTTP 头时，实际模型提交待核对。
+            diagnostics::tui_submission_unknown();
+            if let Some(mut attempt) = wire_attempt.take() {
+                attempt.transport_error();
+            }
+        }
         if projected || wire_attempt.is_some() {
             // 诊断反馈仍使用实际正文终态。收到 HTTP 200 只代表已经打开响应。
             if let Some(mut attempt) =
