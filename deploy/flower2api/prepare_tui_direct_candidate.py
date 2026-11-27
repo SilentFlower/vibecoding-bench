@@ -54,12 +54,15 @@ def main():
     }
     return next(e)
   })
-""").replace(step, """    responseStep = { turn: e.turnId, step: e.index, rows: new Set() }
-""" + step).replace(terminal, terminal + """        const responseRows = responseStep.rows
+""").replace(step, """    responseStep = { turn: e.turnId, step: e.index, rows: new Set(), refused: false }
+""" + step).replace(terminal, terminal + """        const observedResponse = responseStep
         responseStep = null
 """)
-        .replace(result, result + "          archive_rows: response.stopReason === 'refusal' ? [...responseRows] : [],\n")
-        .replace(position, position + """      if (['text', 'tool', 'input'].includes(chunk.kind)) {
+        .replace(result, result + """          archive_rows: response.stopReason === 'refusal' ? [...observedResponse.rows] : [],
+          observed_refusal: observedResponse.refused,
+""")
+        .replace(position, position + """      if (chunk.kind === 'stop') responseStep.refused = chunk.stopReason === 'refusal'
+      if (['text', 'tool', 'input'].includes(chunk.kind)) {
         await post($, 'direct-chunk', { turn: e.turnId, step: e.index, chunk })
       }
 """))

@@ -23,15 +23,18 @@ TEXT = "这是隔离模型实际交付的一段话。"
 REFUSAL_DETAILS = {"type": "refusal", "category": "general_harms", "explanation": "隔离模型实际给出的合成说明。"}
 
 
-def _model_reply(body, _homes, final, *, reason, text, details):
+def _model_reply(body, _homes, final, *, reason, text, details, empty_content):
     if fixture.find_blocks(body, "text", NEXT_QUESTION):
         return fixture.message_sse({"type": "text", "text": final}, "end_turn", "msg_direct_terminal_next")
     wire = fixture.message_sse({"type": "text", "text": text}, reason, "msg_direct_terminal")
-    if details is None:
+    if details is None and not empty_content:
         return wire
     events = [event for _, event in wire_events(BytesIO(wire)) if event is not None]
-    (terminal,) = [event for event in events if event["type"] == "message_delta"]
-    terminal["delta"]["stop_details"] = details
+    if empty_content:
+        events = [event for event in events if "index" not in event]
+    if details is not None:
+        (terminal,) = [event for event in events if event["type"] == "message_delta"]
+        terminal["delta"]["stop_details"] = details
     return b"".join(map(fixture.frame, events))
 
 
@@ -111,6 +114,68 @@ def _check(manage, token, account, received, _homes, final, deliveries, *, reaso
             "model_posts": len(received), "wire_final": "unavailable"}
 
 
+def _check_empty_refusal_retry(manage, token, account, received, _homes, final, deliveries, *, stream):
+    session_id = str(uuid4())
+    foreign = manage("POST", "tokens", {"name": "independent-empty-refusal-caller",
+                                       "allowed_accounts": str(account)})["token"]
+    cases = {}
+
+    def post(label, credential, sid, question, expected_status):
+        body = {"model": fixture.MODEL, "max_tokens": 128, "stream": stream, "thinking": {"type": "disabled"},
+                "metadata": {"user_id": json.dumps({"session_id": sid})},
+                "messages": [{"role": "user", "content": question}]}
+        headers = {"x-session-id": sid, "User-Agent": "flower2api-direct-terminal/1"}
+        before = len(received)
+        status, raw, request_id = fixture.checked_messages(
+            manage, credential, body, headers, received, label, expected_status=expected_status, trace_startup=True,
+        )
+
+        def finished():
+            detail = manage("GET", "request-diagnostics/" + request_id)
+            return detail if detail["request"].get("finished_at") else None
+
+        detail = fixture.wait_for(finished)
+        row = cases[label] = {"status": status, "request_id": request_id, "model_posts": len(received) - before}
+        if status == 400:
+            assert json.loads(raw)["error"]["code"] == "session_policy_blocked"
+            assert detail["attempts"] == [] and row["model_posts"] == 0, detail
+            return
+        ((digest, sent, _),) = received[before:]
+        (attempt,) = detail["attempts"]
+        reservation = detail["request"]["context"]["tui_reservation_id"]
+        delivery = deliveries[digest]
+        assert attempt["account_id"] == account and attempt["request_id"] == request_id
+        assert reservation == attempt["attempt_id"] == delivery["permit"]["reservation_id"]
+        assert delivery["connection_owner"] == "interactive_cli", delivery
+        assert delivery["permit"]["body_identity"] == {**model_body_identity(sent), "billing_cch": "00000"}
+        tokens = attempt["tokens"]
+        row.update(reservation_id=reservation, tokens=tokens, delivery=delivery)
+        if status == 502:
+            assert json.loads(raw) == {"type": "error", "error": {
+                "type": "api_error", "message": "V2 模型响应无效或提前终止",
+            }}
+            assert tokens["input_tokens"] is None and tokens["output_tokens"] is None, attempt
+            return
+        if stream:
+            reply = MessageJSON(BODY_LIMIT)
+            for _, event in wire_events(BytesIO(raw)):
+                if event is not None:
+                    reply.add(event)
+            raw = reply.finish()
+        result = json.loads(raw)
+        assert result["stop_reason"] == "end_turn" and result["content"] == [{"type": "text", "text": final}], result
+        assert (tokens["input_tokens"], tokens["output_tokens"]) == (10, 8), attempt
+
+    post("empty_refusal", token, session_id, QUESTION, 502)
+    post("same_session_retry", token, session_id, QUESTION, 400)
+    post("other_caller", foreign, session_id, NEXT_QUESTION, 200)
+    post("other_session", token, str(uuid4()), NEXT_QUESTION, 200)
+    manage("PUT", "settings", {"session_policy_block_enabled": "false"})
+    post("policy_disabled", token, session_id, QUESTION, 502)
+    assert len(received) == len({row["reservation_id"] for row in cases.values() if "reservation_id" in row}) == 4
+    return {"stream": stream, "cases": cases, "model_posts": len(received), "wire_final": "unavailable"}
+
+
 def main():
     """以已安装的交互 CLI 在回环隔离环境读回真正的公开终态。@return 脱敏证据。"""
     parser = ArgumentParser(description=__doc__)
@@ -118,19 +183,25 @@ def main():
     parser.add_argument("--representation", choices=("sse", "json"), required=True)
     parser.add_argument("--stop-details", action="store_true")
     parser.add_argument("--empty-text", action="store_true")
+    parser.add_argument("--empty-refusal-retry", action="store_true")
     args = parser.parse_args()
     if (args.stop_details or args.empty_text) and args.reason != "refusal":
         parser.error("--stop-details 和 --empty-text 用于拒答对照")
+    if args.empty_refusal_retry and (args.reason != "refusal" or args.empty_text or args.stop_details):
+        parser.error("--empty-refusal-retry 使用独立的空内容拒答")
     text = "" if args.empty_text else TEXT
     details = REFUSAL_DETAILS if args.stop_details else None
+    stream = args.representation == "sse"
+    check = (partial(_check_empty_refusal_retry, stream=stream) if args.empty_refusal_retry else
+             partial(_check, reason=args.reason, stream=stream, text=text, details=details))
     assert Path("/.dockerenv").is_file() and {name for _, name in if_nameindex()} == {"lo"}
     assert Path("/opt/flower/tui/fixture-installed-direct").is_file()
     with (
         patch.multiple(
             fixture, STOCK_POLICIES=("append",), QuietHandler=ObservedModel, observe_stock_delivery=observe_delivery,
-            stock_model_reply=partial(_model_reply, reason=args.reason, text=text, details=details),
-            verify_stock_client=partial(_check, reason=args.reason, stream=args.representation == "sse",
-                                        text=text, details=details),
+            stock_model_reply=partial(_model_reply, reason=args.reason, text=text, details=details,
+                                      empty_content=args.empty_refusal_retry),
+            verify_stock_client=check,
         ),
         TemporaryDirectory() as folder,
     ):

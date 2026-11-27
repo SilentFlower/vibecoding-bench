@@ -491,9 +491,20 @@ def callback(actor, path, data):
     elif path == "/direct-result":
         buffered_stream = POLICY_MODE.is_file() and POLICY_MODE.read_text() == CANDIDATE_MODE
         with actor.changed:
-            if (not actor.step or not actor.step.claimed or (actor.claim.stream and not buffered_stream)
+            if (not actor.step or not actor.claim or not actor.step.claimed or (actor.claim.stream and not buffered_stream)
                     or actor.step.native != (data["turn"], data["step"])):
                 raise ValueError("缺少同一文本模型步骤")
+            if (INSTALLED_PROBE.is_file() and buffered_stream and data.get("observed_refusal") is True
+                    and data.get("reason") is None and not data.get("usage")
+                    and data.get("answer") == "" and actor.direct_stream is None):
+                # 同一步的拒答事件是现有会话策略的证据。公开响应保留交付失败，实际用量仍缺省。
+                envelope = {"type": "error", "error": {"type": "api_error", "message": "V2 模型响应无效或提前终止"}}
+                failure = session.ModelResponseError(502, json.dumps(envelope).encode(), source="local_provider_event")
+                evidence = {**envelope, "_tui_policy_evidence": {"stop_reason": "refusal"}}
+                failure.private_body = json.dumps(evidence).encode()
+                report("direct_empty_refusal_evidence", reservation_id=actor.claim.reservation["reservation_id"])
+                actor.abort(failure)
+                return {}
             actor.direct_result = data
         if data["reason"] in EARLY_TEXT_STOPS and INSTALLED_PROBE.is_file():
             projection = actor.direct_stream or _LiveProjection(actor)
