@@ -41,19 +41,25 @@ def main():
     step = "    const stream = next(e)\n"
     position = "      const chunk = item.value\n"
     terminal = "        const response = item.value\n"
-    assert all(mod_code.count(marker) == 1 for marker in (register, step, position, terminal))
+    result = "          answer: response.answer, usage: response.usage,\n"
+    assert all(mod_code.count(marker) == 1 for marker in (register, step, position, terminal, result))
     mod.write_text(mod_code.replace(register, register + """  let responseStep = null
   on('session.append', { door: 'response' }, async ($, e, next) => {
     // 官方增量可读思考文字，完整签名和不透明内容来自同一步的助手追加事件。
     if (responseStep && !e.agentId && e.message.role === 'assistant') {
+      const { turn, step, rows } = responseStep
+      if (typeof e.uuid === 'string') rows.add(e.uuid)
       const blocks = e.message.content.filter(b => ['thinking', 'redacted_thinking'].includes(b.type))
-      if (blocks.length) await post($, 'direct-chunk', { ...responseStep, chunk: { kind: 'signed', blocks } })
+      if (blocks.length) await post($, 'direct-chunk', { turn, step, chunk: { kind: 'signed', blocks } })
     }
     return next(e)
   })
-""").replace(step, """    responseStep = { turn: e.turnId, step: e.index }
-""" + step).replace(terminal, terminal + """        responseStep = null
-""").replace(position, position + """      if (['text', 'tool', 'input'].includes(chunk.kind)) {
+""").replace(step, """    responseStep = { turn: e.turnId, step: e.index, rows: new Set() }
+""" + step).replace(terminal, terminal + """        const responseRows = responseStep.rows
+        responseStep = null
+""")
+        .replace(result, result + "          archive_rows: response.stopReason === 'refusal' ? [...responseRows] : [],\n")
+        .replace(position, position + """      if (['text', 'tool', 'input'].includes(chunk.kind)) {
         await post($, 'direct-chunk', { turn: e.turnId, step: e.index, chunk })
       }
 """))

@@ -20,15 +20,22 @@ from verify_tui_installed_direct_stock import observe_delivery
 QUESTION = "请给出隔离终态的对照文本。"
 NEXT_QUESTION = "请处理一次新的合成便签请求。"
 TEXT = "这是隔离模型实际交付的一段话。"
+REFUSAL_DETAILS = {"type": "refusal", "category": "general_harms", "explanation": "隔离模型实际给出的合成说明。"}
 
 
-def _model_reply(body, _homes, final, *, reason):
+def _model_reply(body, _homes, final, *, reason, text, details):
     if fixture.find_blocks(body, "text", NEXT_QUESTION):
         return fixture.message_sse({"type": "text", "text": final}, "end_turn", "msg_direct_terminal_next")
-    return fixture.message_sse({"type": "text", "text": TEXT}, reason, "msg_direct_terminal")
+    wire = fixture.message_sse({"type": "text", "text": text}, reason, "msg_direct_terminal")
+    if details is None:
+        return wire
+    events = [event for _, event in wire_events(BytesIO(wire)) if event is not None]
+    (terminal,) = [event for event in events if event["type"] == "message_delta"]
+    terminal["delta"]["stop_details"] = details
+    return b"".join(map(fixture.frame, events))
 
 
-def _check(manage, token, account, received, _homes, final, deliveries, *, reason, stream):
+def _check(manage, token, account, received, _homes, final, deliveries, *, reason, stream, text, details):
     body = {"model": fixture.MODEL, "max_tokens": 128, "stream": stream, "thinking": {"type": "disabled"},
             "messages": [{"role": "user", "content": QUESTION}]}
     headers = {"x-session-id": str(uuid4()), "User-Agent": "flower2api-direct-terminal/1"}
@@ -37,19 +44,22 @@ def _check(manage, token, account, received, _homes, final, deliveries, *, reaso
         body["metadata"] = {"user_id": json.dumps({"session_id": headers["x-session-id"]})}
     attempts = []
 
-    def post(label, request, expected_reason, text, session_headers=headers):
+    def post(label, request, expected_reason, text, session_headers=headers, *, expected_details=None):
         before = len(received)
         status, raw, request_id = fixture.checked_messages(manage, token, request, session_headers, received, label,
                                                            trace_startup=True)
         if stream:
             reply = MessageJSON(BODY_LIMIT)
-            for _, event in wire_events(BytesIO(raw)):
-                if event is not None:
-                    reply.add(event)
+            events = [event for _, event in wire_events(BytesIO(raw)) if event is not None]
+            assert [event["type"] for event in events[-2:]] == ["message_delta", "message_stop"], events
+            assert fixture.same_json_value(events[-2]["delta"].get("stop_details"), expected_details), events
+            for event in events:
+                reply.add(event)
             result = json.loads(reply.finish())
         else:
             result = json.loads(raw)
         assert result["stop_reason"] == expected_reason and result["stop_sequence"] is None, result
+        assert fixture.same_json_value(result.get("stop_details"), expected_details), result
         assert result["content"] == [{"type": "text", "text": text}], result
         assert (result["usage"]["input_tokens"], result["usage"]["output_tokens"]) == (10, 8), result
         ((digest, model, _tls),) = received[before:]
@@ -71,10 +81,11 @@ def _check(manage, token, account, received, _homes, final, deliveries, *, reaso
         question = NEXT_QUESTION if before else QUESTION
         assert [role for role, _ in fixture.find_blocks(model, "text", question)] == ["user"]
         attempts.append({"request_id": request_id, "reservation_id": attempt["attempt_id"],
-                         "status": status, "stop_reason": result["stop_reason"], "delivery": delivery})
+                         "status": status, "stop_reason": result["stop_reason"],
+                         "stop_details": result.get("stop_details"), "content": result["content"], "delivery": delivery})
         return result
 
-    offer = post("direct_text_stop", body, reason, TEXT)
+    offer = post("direct_text_stop", body, reason, text, expected_details=details)
     follow = {**body, "messages": [*body["messages"], {"role": "assistant", "content": offer["content"]},
                                   {"role": "user", "content": NEXT_QUESTION}]}
     proof = {}
@@ -105,14 +116,21 @@ def main():
     parser = ArgumentParser(description=__doc__)
     parser.add_argument("--reason", choices=("end_turn", "refusal", "max_tokens"), required=True)
     parser.add_argument("--representation", choices=("sse", "json"), required=True)
+    parser.add_argument("--stop-details", action="store_true")
+    parser.add_argument("--empty-text", action="store_true")
     args = parser.parse_args()
+    if (args.stop_details or args.empty_text) and args.reason != "refusal":
+        parser.error("--stop-details 和 --empty-text 用于拒答对照")
+    text = "" if args.empty_text else TEXT
+    details = REFUSAL_DETAILS if args.stop_details else None
     assert Path("/.dockerenv").is_file() and {name for _, name in if_nameindex()} == {"lo"}
     assert Path("/opt/flower/tui/fixture-installed-direct").is_file()
     with (
         patch.multiple(
             fixture, STOCK_POLICIES=("append",), QuietHandler=ObservedModel, observe_stock_delivery=observe_delivery,
-            stock_model_reply=partial(_model_reply, reason=args.reason),
-            verify_stock_client=partial(_check, reason=args.reason, stream=args.representation == "sse"),
+            stock_model_reply=partial(_model_reply, reason=args.reason, text=text, details=details),
+            verify_stock_client=partial(_check, reason=args.reason, stream=args.representation == "sse",
+                                        text=text, details=details),
         ),
         TemporaryDirectory() as folder,
     ):

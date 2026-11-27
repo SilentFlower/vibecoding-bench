@@ -12,7 +12,7 @@ from select import select
 from socket import if_nameindex
 import ssl
 import sys
-from threading import Lock, local
+from threading import Lock, Thread, local
 from time import monotonic, monotonic_ns, sleep, time_ns
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -44,6 +44,7 @@ TUNNELS = Path("/tmp/flower-direct-tunnels.jsonl")
 CANDIDATE_MODE = "candidate-response"
 STOCK_TOOLS = {"Read", "Glob"}
 EARLY_TEXT_STOPS = {"max_tokens", "refusal"}
+ARCHIVE_WAIT_SECONDS = 3
 MANAGED_BINDING_LOCK = Lock()
 managed_binding = None
 launch_context = local()
@@ -219,7 +220,7 @@ class Callback(session._Callback):
 def _observe_after_archive(actor, data):
     config = actor.credential_dir
     assert config is not None
-    until = monotonic() + 3
+    until = monotonic() + ARCHIVE_WAIT_SECONDS
     while monotonic() < until:
         for archive in config.glob("projects/*/*.jsonl"):
             for line in archive.read_bytes().splitlines():
@@ -230,6 +231,42 @@ def _observe_after_archive(actor, data):
                     return raw
         sleep(0.03)
     raise ValueError("实际原生响应未出现在本会话归档")
+
+
+def _refusal_details(actor, rows, model):
+    until = monotonic() + ARCHIVE_WAIT_SECONDS
+    while not actor.dead.is_set() and monotonic() < until:
+        for archive in actor.credential_dir.glob("projects/*/*.jsonl"):
+            try:
+                with archive.open("rb") as file:
+                    for line in file:
+                        try:
+                            row = json.loads(line)
+                        except (UnicodeDecodeError, json.JSONDecodeError):
+                            continue
+                        if not isinstance(row, dict) or row.get("type") != "assistant" or row.get("uuid") not in rows:
+                            continue
+                        raw = row.get("message")
+                        if isinstance(raw, dict) and raw.get("stop_reason") == "refusal" and raw.get("model") == model:
+                            details = raw.get("stop_details")
+                            return details if isinstance(details, dict) else None
+            except OSError:
+                continue
+        actor.dead.wait(0.03)
+    return None
+
+
+def _finish_refusal(actor, projection, result, rows, model):
+    # 追加事件先于档案落盘。释放回调后再取同一步的助手行，已经交付的文本可以继续被客户端读取。
+    details = _refusal_details(actor, rows, model)
+    if actor.dead.is_set():
+        return
+    try:
+        projection.finish(result, stop_details=details)
+    except (ValueError, KeyError, OSError, RuntimeError) as error:
+        report("direct_refusal_finish_failed", reservation_id=actor.reservation["reservation_id"],
+               kind=type(error).__name__)
+        actor.abort()
 
 
 def _deliver(actor, result, message, parts):
@@ -328,8 +365,8 @@ class _LiveProjection:
         digest.update(text.encode())
         self._emit({"type": "content_block_delta", "index": index, "delta": delta})
 
-    def finish(self, result):
-        """确认交付内容及累计用量，再让原终态回调收口。@param result 官方步骤结果。@return 无。"""
+    def finish(self, result, *, stop_details=None):
+        """确认内容及累计用量。@param result 官方步骤结果。@param stop_details 同轮拒答详情。@return 无。"""
         reason = result["reason"]
         if reason not in ({"tool_use"} if self.tools else {"end_turn", *EARLY_TEXT_STOPS}):
             raise ValueError("流式内容与同一步的结束原因不符")
@@ -352,8 +389,10 @@ class _LiveProjection:
         for index in range(self.next_index):
             if index not in self.closed:
                 self._emit({"type": "content_block_stop", "index": index})
-        self._emit({"type": "message_delta", "delta": {"stop_reason": result["reason"], "stop_sequence": None},
-                    "usage": result["usage"]})
+        delta = {"stop_reason": reason, "stop_sequence": None}
+        if stop_details is not None:
+            delta["stop_details"] = stop_details
+        self._emit({"type": "message_delta", "delta": delta, "usage": result["usage"]})
         terminal = {"type": "message_stop"}
         self.actor._observe(self.step, terminal)
         with self.actor.changed:
@@ -435,6 +474,14 @@ def callback(actor, path, data):
         return _authorize_http(actor, data)
     if path == "/direct-http-reply" and POLICY_MODE.is_file() and POLICY_MODE.read_text() == CANDIDATE_MODE:
         return _project_http_rejection(actor, data)
+    if getattr(actor, "direct_refusal", None) == (actor.step, actor.claim):
+        # CLI 可在拒答后自行发起下一步。原公开预留已认领，保留已确认拒答供原请求收尾。
+        if path == "/begin":
+            raise session._StaleReceipt("已确认原生步骤拒答")
+        if path == "/direct-result" and actor.step.native == (data.get("turn"), data.get("step")):
+            return {}
+        if path == "/failed" or (path == "/complete" and data.get("turn") == actor.step.native[0]):
+            return {}
     if path == "/begin":
         actor.direct_result = None
         actor.direct_http_reply = None
@@ -450,8 +497,16 @@ def callback(actor, path, data):
             actor.direct_result = data
         if data["reason"] in EARLY_TEXT_STOPS and INSTALLED_PROBE.is_file():
             projection = actor.direct_stream or _LiveProjection(actor)
-            projection.finish(data)
             actor.direct_result = None
+            rows = data.get("archive_rows")
+            model = (data.get("usage") or {}).get("model")
+            if data["reason"] == "refusal" and rows and model:
+                with actor.changed:
+                    actor.direct_refusal = (actor.step, actor.claim)
+                Thread(target=_finish_refusal, args=(actor, projection, data, rows, model),
+                       daemon=True).start()
+            else:
+                projection.finish(data)
             return {}
         if data["reason"] == "tool_use":
             if actor.direct_stream is not None:
