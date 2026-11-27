@@ -29,6 +29,12 @@ const NORMALIZATION_UNIT_LIMIT: usize = 10 * 1024 * 1024;
 type Object<'a> = HashMap<String, &'a RawValue>;
 const INVALID_RESPONSE: &str = "V2 本机事件源响应无效或提前终止";
 
+/// 私有拒答证据随公开错误返回到网关诊断，HTTP 状态由同次受管回包独立确认。
+#[derive(Clone)]
+pub(super) struct RefusalProjectionFailure {
+    pub(super) upstream_status: Option<u16>,
+}
+
 /// 按来源的响应信封生成独立消息 ID，并将确定的错误收口成 Messages 格式。
 /// @param status 来源 HTTP 状态。@param content_type 已核验类型。@param body 原来源分片。
 /// @return 可直接交付的 HTTP 响应。
@@ -121,11 +127,10 @@ pub(super) async fn project_observed(
     let error = bytes.and_then(|body| serde_json::from_slice::<Value>(&body).ok());
     // JSON 主轮可能在首个事件后已发送 200。此时常规拒答已由流观察器记录，
     // 唯有源端为残缺错误保留的私有字段需要在这里分类，避免把原始详情交付客户。
-    let evidence = error.as_ref().and_then(|value| {
-        value
-            .get("_tui_policy_evidence")
-            .or_else(|| (!status.is_success()).then_some(value))
-    });
+    let private_evidence = error
+        .as_ref()
+        .and_then(|value| value.get("_tui_policy_evidence"));
+    let evidence = private_evidence.or_else(|| error.as_ref().filter(|_| !status.is_success()));
     let reason = policy_account
         .filter(|_| !matches!(status.as_u16(), 401 | 429))
         .zip(evidence.and_then(session_policy_block::classify));
@@ -151,6 +156,19 @@ pub(super) async fn project_observed(
         }
     }
     let mut response = (error_status, axum::Json(public)).into_response();
+    if status == StatusCode::BAD_GATEWAY
+        && policy_account.is_some()
+        && private_evidence.and_then(|value| value["stop_reason"].as_str()) == Some("refusal")
+    {
+        let upstream_status = (error
+            .as_ref()
+            .and_then(|value| value["_tui_upstream_http_status"].as_u64())
+            == Some(200))
+        .then_some(200);
+        response
+            .extensions_mut()
+            .insert(RefusalProjectionFailure { upstream_status });
+    }
     if let Some((account, reason)) = reason {
         session_policy_block::remember_current(account, reason).await?;
         response
@@ -795,6 +813,48 @@ data: "usage":{"output_tokens":4,"cache_read_input_tokens":5,"cache_creation_inp
                 expected["error"]["details"] = json!({"error_code": code});
             }
             assert_eq!(public, expected);
+        }
+    }
+
+    /// 私有空拒答证据可保留实际 HTTP 状态。缺失或其他类型的值不参与诊断。@return 无。
+    #[tokio::test]
+    async fn empty_refusal_does_not_publish_private_status_or_evidence() {
+        let public = error_body("api_error", "V2 模型响应无效或提前终止");
+        for (account, reason, upstream_status, expected) in [
+            (Some(1), Some("refusal"), json!(200), Some(Some(200))),
+            (Some(1), Some("refusal"), Value::Null, Some(None)),
+            (Some(1), Some("refusal"), json!(200.0), Some(None)),
+            (Some(1), Some("refusal"), json!("200"), Some(None)),
+            (Some(1), Some("refusal"), json!(502), Some(None)),
+            (Some(1), Some("end_turn"), json!(200), None),
+            (Some(1), None, json!(200), None),
+            (None, Some("refusal"), json!(200), None),
+        ] {
+            let mut private = public.clone();
+            if let Some(reason) = reason {
+                private["_tui_policy_evidence"] = json!({"stop_reason": reason});
+            }
+            if !upstream_status.is_null() {
+                private["_tui_upstream_http_status"] = upstream_status;
+            }
+            let response = project_observed(
+                StatusCode::BAD_GATEWAY,
+                "application/json",
+                Body::from(private.to_string()),
+                account,
+            )
+            .await
+            .unwrap();
+            assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+            assert_eq!(
+                response
+                    .extensions()
+                    .get::<RefusalProjectionFailure>()
+                    .map(|failure| failure.upstream_status),
+                expected
+            );
+            let body = response.into_body().collect().await.unwrap().to_bytes();
+            assert_eq!(serde_json::from_slice::<Value>(&body).unwrap(), public);
         }
     }
 }

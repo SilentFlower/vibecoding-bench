@@ -385,6 +385,37 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - Gateway 现有真实 HTTP 回归：`gateway_usage_records_real_responses_once_without_telemetry` 验证 JSON/SSE/gzip/取消、缓存/count_tokens 与费用次数；签名重试、OAuth 恢复、setup 换号及 `gateway_hello_probe_reuses_resolved_upstream_session` 核对独立尝试、实际画像和会话归属。
 - `raw_body_header_order_and_upstream_error_survive_bridge`：sender 证据保留尝试 UUID，上游业务 headers 不泄漏该 UUID，原字节/头顺序不变。执行 `cargo fmt --check` 与完整 `cargo test --locked`；协议改写变化复用完整测试中的 CCH 回归或补定向验证。
 
+## V2 受管直发零块拒答的诊断
+
+### 1. 适用范围
+
+- 同一已认领模型步骤明确报告 `refusal`，缺少可交付内容及同轮用量，账号事件源以 `502/api_error` 结束公开 JSON 或 SSE 请求。
+
+### 2. 接口
+
+- 受管 Mod 向会话绑定的 `POST /direct-http-reply` 回报 `{"ticket":"…","status":200}`。事件源以当前步骤、预留及一次性票据核对回包。管理详情通过 `GET /admin/request-diagnostics/:request_id` 读取同次记录。
+
+### 3. 契约
+
+- 已绑定事件源的私有 502 使用 `local_provider_event`，并在 `_tui_policy_evidence.stop_reason` 提供 `refusal`。经同次回包票据确认的 HTTP 200 可以写入整数 `_tui_upstream_http_status`。公开 JSON 错误信封过滤这两个私有字段。
+- 根 `status_code=502`。根与尝试阶段为 `transport_error/tui_response_projection`。同一预留的一次尝试记录 `stop_reason=refusal`，模型响应确认计数增加一次。
+
+### 4. 验证和错误矩阵
+
+- 同次票据的实际 HTTP 200 → 尝试 `status_code=200`。
+- 票据无效、旧运行件省略状态、状态值类型不符 → 尝试 `status_code=null`。可独立确认拒答时仍保留 `refusal`。
+- 真实上游 HTTP 502 → 尝试 `status_code=502`，阶段 `upstream_headers`。提供方正文中同名字段无私有归属。
+
+### 5. 观察示例
+
+- 模型 HTTP 200 后发出零块拒答，网关公开 502，管理端分别读取根的 502、尝试的 200 和 `refusal`。缺少同轮用量时各 token 字段为空。缺少可核验的模型响应头耗时和请求 ID 时两项为空。
+- 启用会话封禁后，原主体同会话重试使用既有 `400/session_policy_blocked` 和零新增模型投递。普通空 `end_turn` 通过公开失败的原分支记账，后续同会话问题仍可提交。
+
+### 6. 回归入口
+
+- `verify_tui_installed_direct_stop.py --reason refusal --representation json --empty-refusal-retry`，并将表示切换到 `sse`。逐一核对公开状态、同预留尝试状态、停止原因、空用量、实际投递和后续封禁。
+- 响应投影与诊断 Rust 测试覆盖缺失及畸形状态、上游真 502 和没有模型证据的私有 502。
+
 ## Scenario: Messages 响应的有界事件观察
 
 ### 1. Scope / Trigger

@@ -20,25 +20,30 @@ from verify_tui_installed_direct_stock import observe_delivery
 QUESTION = "请给出隔离终态的对照文本。"
 NEXT_QUESTION = "请处理一次新的合成便签请求。"
 TEXT = "这是隔离模型实际交付的一段话。"
+SECOND_TEXT = "这是第二个原始文本块。\n保留块内换行。"
 REFUSAL_DETAILS = {"type": "refusal", "category": "general_harms", "explanation": "隔离模型实际给出的合成说明。"}
 
 
-def _model_reply(body, _homes, final, *, reason, text, details, empty_content):
+def _model_reply(body, _homes, final, *, reason, text, details, empty_content, second_text=None):
     if fixture.find_blocks(body, "text", NEXT_QUESTION):
         return fixture.message_sse({"type": "text", "text": final}, "end_turn", "msg_direct_terminal_next")
     wire = fixture.message_sse({"type": "text", "text": text}, reason, "msg_direct_terminal")
-    if details is None and not empty_content:
+    if details is None and not empty_content and second_text is None:
         return wire
     events = [event for _, event in wire_events(BytesIO(wire)) if event is not None]
     if empty_content:
         events = [event for event in events if "index" not in event]
+    if second_text is not None:
+        second = fixture.message_sse({"type": "text", "text": second_text}, reason, "msg_direct_terminal")
+        events[-2:-2] = [{**event, "index": 1} for _, event in wire_events(BytesIO(second))
+                         if event is not None and "index" in event]
     if details is not None:
         (terminal,) = [event for event in events if event["type"] == "message_delta"]
         terminal["delta"]["stop_details"] = details
     return b"".join(map(fixture.frame, events))
 
 
-def _check(manage, token, account, received, _homes, final, deliveries, *, reason, stream, text, details):
+def _check(manage, token, account, received, _homes, final, deliveries, *, reason, stream, content, details):
     body = {"model": fixture.MODEL, "max_tokens": 128, "stream": stream, "thinking": {"type": "disabled"},
             "messages": [{"role": "user", "content": QUESTION}]}
     headers = {"x-session-id": str(uuid4()), "User-Agent": "flower2api-direct-terminal/1"}
@@ -47,7 +52,7 @@ def _check(manage, token, account, received, _homes, final, deliveries, *, reaso
         body["metadata"] = {"user_id": json.dumps({"session_id": headers["x-session-id"]})}
     attempts = []
 
-    def post(label, request, expected_reason, text, session_headers=headers, *, expected_details=None):
+    def post(label, request, expected_reason, expected_content, session_headers=headers, *, expected_details=None):
         before = len(received)
         status, raw, request_id = fixture.checked_messages(manage, token, request, session_headers, received, label,
                                                            trace_startup=True)
@@ -55,6 +60,8 @@ def _check(manage, token, account, received, _homes, final, deliveries, *, reaso
             reply = MessageJSON(BODY_LIMIT)
             events = [event for _, event in wire_events(BytesIO(raw)) if event is not None]
             assert [event["type"] for event in events[-2:]] == ["message_delta", "message_stop"], events
+            if not expected_content:
+                assert not any(event["type"].startswith("content_block_") for event in events), events
             assert fixture.same_json_value(events[-2]["delta"].get("stop_details"), expected_details), events
             for event in events:
                 reply.add(event)
@@ -63,7 +70,7 @@ def _check(manage, token, account, received, _homes, final, deliveries, *, reaso
             result = json.loads(raw)
         assert result["stop_reason"] == expected_reason and result["stop_sequence"] is None, result
         assert fixture.same_json_value(result.get("stop_details"), expected_details), result
-        assert result["content"] == [{"type": "text", "text": text}], result
+        assert result["content"] == expected_content, result
         assert (result["usage"]["input_tokens"], result["usage"]["output_tokens"]) == (10, 8), result
         ((digest, model, _tls),) = received[before:]
         def completed_request():
@@ -88,9 +95,10 @@ def _check(manage, token, account, received, _homes, final, deliveries, *, reaso
                          "stop_details": result.get("stop_details"), "content": result["content"], "delivery": delivery})
         return result
 
-    offer = post("direct_text_stop", body, reason, text, expected_details=details)
+    offer = post("direct_text_stop", body, reason, content, expected_details=details)
     follow = {**body, "messages": [*body["messages"], {"role": "assistant", "content": offer["content"]},
                                   {"role": "user", "content": NEXT_QUESTION}]}
+    final_content = [{"type": "text", "text": final}]
     proof = {}
     if reason == "refusal":
         # 现有策略封禁记录来自模型拒答。另用无关新会话核对账号仍可处理正常请求。
@@ -105,9 +113,9 @@ def _check(manage, token, account, received, _homes, final, deliveries, *, reaso
         fresh_id = str(uuid4())
         fresh = {**body, "messages": [{"role": "user", "content": NEXT_QUESTION}],
                  "metadata": {"user_id": json.dumps({"session_id": fresh_id})}}
-        post("direct_text_stop_next", fresh, "end_turn", final, {**headers, "x-session-id": fresh_id})
+        post("direct_text_stop_next", fresh, "end_turn", final_content, {**headers, "x-session-id": fresh_id})
     else:
-        post("direct_text_stop_next", follow, "end_turn", final)
+        post("direct_text_stop_next", follow, "end_turn", final_content)
         assert [role for role, _ in fixture.find_blocks(received[1][1], "text", TEXT)] == ["assistant"]
     assert len(received) == len({a["reservation_id"] for a in attempts}) == 2
     return {**proof, "reason": reason, "stream": stream, "attempts": attempts,
@@ -154,7 +162,15 @@ def _check_empty_refusal_retry(manage, token, account, received, _homes, final, 
             assert json.loads(raw) == {"type": "error", "error": {
                 "type": "api_error", "message": "V2 模型响应无效或提前终止",
             }}
-            assert tokens["input_tokens"] is None and tokens["output_tokens"] is None, attempt
+            root = detail["request"]
+            assert root["status_code"] == 502 and root["context"]["tui_confirmed_model_responses"] == 1, root
+            assert attempt["status_code"] == 200 and attempt["stop_reason"] == "refusal", attempt
+            assert root["error_stage"] == attempt["error_stage"] == "tui_response_projection", detail
+            assert root["outcome"] == attempt["outcome"] == "transport_error", detail
+            assert attempt["ttft_ms"] is None and attempt["upstream_request_id"] is None, attempt
+            assert all(value is None for value in tokens.values()), attempt
+            row.update(upstream_status=attempt["status_code"], stop_reason=attempt["stop_reason"],
+                       error_stage=attempt["error_stage"], confirmed=root["context"]["tui_confirmed_model_responses"])
             return
         if stream:
             reply = MessageJSON(BODY_LIMIT)
@@ -182,25 +198,34 @@ def main():
     parser.add_argument("--reason", choices=("end_turn", "refusal", "max_tokens"), required=True)
     parser.add_argument("--representation", choices=("sse", "json"), required=True)
     parser.add_argument("--stop-details", action="store_true")
-    parser.add_argument("--empty-text", action="store_true")
-    parser.add_argument("--empty-refusal-retry", action="store_true")
+    shapes = parser.add_mutually_exclusive_group()
+    shapes.add_argument("--empty-text", action="store_true", help="验收单个空字符串文本块的拒答")
+    shapes.add_argument("--empty-content", action="store_true", help="验收零内容块拒答的成功交付")
+    shapes.add_argument("--two-text-blocks", action="store_true", help="逐块验收含两个原始文本块的拒答")
+    shapes.add_argument("--empty-refusal-retry", action="store_true", help="复跑零内容块交付失败后的封禁对照")
     args = parser.parse_args()
-    if (args.stop_details or args.empty_text) and args.reason != "refusal":
-        parser.error("--stop-details 和 --empty-text 用于拒答对照")
-    if args.empty_refusal_retry and (args.reason != "refusal" or args.empty_text or args.stop_details):
+    if args.reason != "refusal" and (
+        args.stop_details or args.empty_text or args.empty_content or args.two_text_blocks or args.empty_refusal_retry
+    ):
+        parser.error("详情及内容形状选项只用于拒答对照")
+    if args.empty_refusal_retry and args.stop_details:
         parser.error("--empty-refusal-retry 使用独立的空内容拒答")
     text = "" if args.empty_text else TEXT
+    content = [] if args.empty_content else [{"type": "text", "text": text}]
+    second_text = SECOND_TEXT if args.two_text_blocks else None
+    if second_text is not None:
+        content.append({"type": "text", "text": second_text})
     details = REFUSAL_DETAILS if args.stop_details else None
     stream = args.representation == "sse"
     check = (partial(_check_empty_refusal_retry, stream=stream) if args.empty_refusal_retry else
-             partial(_check, reason=args.reason, stream=stream, text=text, details=details))
+             partial(_check, reason=args.reason, stream=stream, content=content, details=details))
     assert Path("/.dockerenv").is_file() and {name for _, name in if_nameindex()} == {"lo"}
     assert Path("/opt/flower/tui/fixture-installed-direct").is_file()
     with (
         patch.multiple(
             fixture, STOCK_POLICIES=("append",), QuietHandler=ObservedModel, observe_stock_delivery=observe_delivery,
             stock_model_reply=partial(_model_reply, reason=args.reason, text=text, details=details,
-                                      empty_content=args.empty_refusal_retry),
+                                      empty_content=args.empty_content or args.empty_refusal_retry, second_text=second_text),
             verify_stock_client=check,
         ),
         TemporaryDirectory() as folder,

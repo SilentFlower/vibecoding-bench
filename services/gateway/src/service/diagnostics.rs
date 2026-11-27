@@ -46,6 +46,7 @@ use crate::store::diagnostics_store::{ActiveDiagnostic, DiagnosticEvent, Diagnos
 pub(crate) mod agy;
 
 const TUI_SEND_HTTP: &str = "tui_send_http";
+const TUI_RESPONSE_PROJECTION: &str = "tui_response_projection";
 
 /// 在同一请求入口冻结日志级别与拒绝正文范围。
 #[derive(Clone, Copy, Default)]
@@ -923,6 +924,15 @@ impl AttemptTrace {
         }
     }
 
+    /// 保存已确认的拒答及交付失败。@param upstream_status 同次模型回包实际状态。@return 无。
+    pub(super) fn tui_refusal_projection_failed(&mut self, upstream_status: Option<u16>) {
+        if let Some(record) = self.record.as_mut() {
+            record.error_stage = Some(TUI_RESPONSE_PROJECTION.into());
+            record.status_code = upstream_status;
+            record.stop_reason = Some("refusal".into());
+        }
+    }
+
     /// 记录同一次实际提交的冻结定位，保留诊断的旁路语义。
     /// @param location 原已核验发送通道提供的非秘密定位。
     /// @return 无。
@@ -1067,7 +1077,7 @@ impl AttemptTrace {
                 .message_id
                 .as_deref()
                 .map(|id| identity_hash(record.account_id, "message", id));
-            record.stop_reason = observed.stop_reason;
+            record.stop_reason = observed.stop_reason.or(record.stop_reason);
             if observed.observation_error.is_some() {
                 self.trace.store.observation_failed();
             }
@@ -1083,7 +1093,10 @@ impl AttemptTrace {
         }
         record.outcome = if end != "complete" {
             end.into()
-        } else if record.error_stage.as_deref() == Some(TUI_SEND_HTTP) {
+        } else if matches!(
+            record.error_stage.as_deref(),
+            Some(TUI_SEND_HTTP | TUI_RESPONSE_PROJECTION)
+        ) {
             "transport_error".into()
         } else if record.error_stage.as_deref() == Some(TUI_CLI_INPUT_GUARD) {
             "local_rejected".into()
@@ -1351,10 +1364,11 @@ fn identity_hash(account: i64, kind: &str, value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        CURRENT_LOG_MODE, CURRENT_TRACE, RequestTraceGuard, TUI_SEND_HTTP, TraceContext,
-        TuiModelObservation, begin_attempt, claude_request_session, error_stage, identity_hash,
-        local_outcome, native_rejection, now, observe_tui_model, prepare_tui_attempt,
-        profile_selection, selected_account, session_context, tui_reservation, tui_submission_unknown,
+        CURRENT_LOG_MODE, CURRENT_TRACE, RequestTraceGuard, TUI_RESPONSE_PROJECTION, TUI_SEND_HTTP,
+        TraceContext, TuiModelObservation, begin_attempt, claude_request_session, error_stage,
+        identity_hash, local_outcome, native_rejection, now, observe_tui_model,
+        prepare_tui_attempt, profile_selection, selected_account, session_context, tui_reservation,
+        tui_submission_unknown,
     };
     use crate::error::AppError;
     use crate::model::account::Account;
@@ -1567,11 +1581,18 @@ mod tests {
 
     /// 同样的私有 502 可保留一次尝试，并按来源记录根及尝试终态。@return 无。
     #[tokio::test]
-    async fn tui_502_projection_without_model_evidence_preserves_attempt() {
+    async fn tui_502_projection_preserves_model_status_and_refusal_evidence() {
         let store = store().await;
-        for (confirmed, outcome, stage) in [
-            (None, "transport_error", TUI_SEND_HTTP),
-            (Some(1), "upstream_rejected", "upstream_headers"),
+        for (confirmed, upstream_status, outcome, stage) in [
+            (None, None, "transport_error", TUI_SEND_HTTP),
+            (Some(1), Some(502), "upstream_rejected", "upstream_headers"),
+            (
+                Some(1),
+                Some(200),
+                "transport_error",
+                TUI_RESPONSE_PROJECTION,
+            ),
+            (Some(1), None, "transport_error", TUI_RESPONSE_PROJECTION),
         ] {
             let trace = TraceContext::new(store.clone());
             let guard = RequestTraceGuard::new(trace.clone());
@@ -1586,6 +1607,9 @@ mod tests {
                         tui_submission_unknown();
                         attempt.tui_submission_unknown();
                     }
+                    if stage == TUI_RESPONSE_PROJECTION {
+                        attempt.tui_refusal_projection_failed(upstream_status);
+                    }
                     attempt.tui_capture(reservation.clone(), None);
                     attempt.commit();
                     if confirmed.is_none() {
@@ -1595,7 +1619,7 @@ mod tests {
                         );
                     }
                     let response = (StatusCode::BAD_GATEWAY, "同一正文").into_response();
-                    if confirmed.is_some() {
+                    if stage == "upstream_headers" {
                         attempt.headers(502, response.headers(), vec![]);
                     }
                     guard.wrap(attempt.wrap(response))
@@ -1627,9 +1651,19 @@ mod tests {
             };
             assert_eq!(attempt.attempt_id, reservation);
             assert_eq!(attempt.request_id, id);
-            assert_eq!(attempt.status_code, confirmed.map(|_| 502));
+            assert_eq!(attempt.status_code, upstream_status);
             assert_eq!(attempt.outcome, outcome);
             assert_eq!(attempt.error_stage.as_deref(), Some(stage));
+            assert_eq!(
+                attempt.stop_reason.as_deref(),
+                (stage == TUI_RESPONSE_PROJECTION).then_some("refusal")
+            );
+            if stage == TUI_RESPONSE_PROJECTION {
+                assert!(attempt.ttft_ms.is_none());
+                assert!(attempt.upstream_request_id.is_none());
+                assert!(attempt.tokens.input_tokens.is_none());
+                assert!(attempt.tokens.output_tokens.is_none());
+            }
         }
     }
 

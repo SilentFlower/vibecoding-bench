@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 from functools import partial
 from hashlib import file_digest
 import json
-from os import chown, kill
+from os import kill
 from pathlib import Path
 from shutil import copy2
 from signal import SIGTERM
@@ -21,11 +21,15 @@ from fixtures.native_model_send.direct_egress_identity import model_body_identit
 from verify_tui_public_sse import ModelStream
 
 
-MOD_BINDING = "import { endpoint, bearer } from './runtime/binding.js'\n"
 CANDIDATE_MODE = "candidate-response"
 PERMIT_HOOK = """
-    let replyTicket
+    let replyTicket, endpoint, bearer
     if (model) {
+      const bindingPath = await $.env.get('FLOWER_TUI_DIRECT_BINDING')
+      if (typeof bindingPath !== 'string') return {deny: '隔离模型缺少本会话授权'}
+      const binding = JSON.parse(await $.fs.read(bindingPath))
+      endpoint = binding.endpoint
+      bearer = binding.bearer
       const permit = await $.http.fetch(endpoint + '/direct-http-permit', {
         method: 'POST',
         headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + bearer},
@@ -41,12 +45,17 @@ PERMIT_HOOK = """
     }
 """
 REPLY_HOOK = """
-      if (replyTicket && value.status === 400) {
-        await $.http.fetch(endpoint + '/direct-http-reply', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + bearer},
-          body: JSON.stringify({ticket: replyTicket, status: value.status}),
-        })
+      if (replyTicket && (value.status === 200 || value.status === 400)) {
+        try {
+          await $.http.fetch(endpoint + '/direct-http-reply', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + bearer},
+            body: JSON.stringify({ticket: replyTicket, status: value.status}),
+          })
+        } catch (error) {
+          // 成功响应的状态观察缺失时，保留 CLI 已取得的模型响应。
+          if (value.status === 400) throw error
+        }
       }
 """
 MOD_RECOVERY = """
@@ -61,9 +70,6 @@ def install_permit(mode):
     copy2(fixture_path / "direct_egress_identity.py", root)
     (root / "fixture-direct-permit").write_text(mode)
     module = Path(f"/opt/{core.POLICY_MARKET}/{core.POLICY_PLUGIN}/hooks/observe.js")
-    runtime = module.parent / "runtime"
-    runtime.mkdir(mode=0o700)
-    chown(runtime, 1001, 1001)
     source = module.read_text()
     target = "    const reply = await next(e)"
     assert source.count(target) == 1 and source.endswith("  })\n\n}\n")
@@ -72,7 +78,7 @@ def install_permit(mode):
         response = "        hasErrorBody: value.text?.includes('隔离模型明确拒绝合成请求') ?? false})"
         assert source.count(response) == 1
         source = source.replace(response, response + "\n" + REPLY_HOOK)
-    module.write_text(MOD_BINDING + source.removesuffix("  })\n\n}\n") + MOD_RECOVERY + "\n}\n")
+    module.write_text(source.removesuffix("  })\n\n}\n") + MOD_RECOVERY + "\n}\n")
 
 
 class ObservedModel(core.ObservedModel):

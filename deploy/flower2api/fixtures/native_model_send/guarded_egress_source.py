@@ -12,11 +12,10 @@ from select import select
 from socket import if_nameindex
 import ssl
 import sys
-from threading import Lock, Thread, local
+from threading import Thread, local
 from time import monotonic, monotonic_ns, sleep, time_ns
 from urllib.parse import urlsplit
 from uuid import uuid4
-from weakref import ref
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import frozen_tui_source as source
@@ -45,8 +44,6 @@ CANDIDATE_MODE = "candidate-response"
 STOCK_TOOLS = {"Read", "Glob"}
 EARLY_TEXT_STOPS = {"max_tokens", "refusal"}
 ARCHIVE_WAIT_SECONDS = 3
-MANAGED_BINDING_LOCK = Lock()
-managed_binding = None
 launch_context = local()
 
 
@@ -60,6 +57,9 @@ def _monitor(actor, command):
     try:
         return ORIGINAL_MONITOR(actor, command)
     finally:
+        if binding := getattr(launch_context, "binding", None):
+            binding.unlink(missing_ok=True)
+            del launch_context.binding
         del launch_context.actor
 
 
@@ -98,29 +98,6 @@ def _stock_arguments(arguments, mod, options):
     return selected
 
 
-def _await_managed_binding(actor):
-    if managed_binding is None:
-        return
-    process, previous_ref = managed_binding
-    if process.poll() is not None:
-        return
-    previous = previous_ref() if previous_ref is not None else None
-    if actor is None or previous is None:
-        raise RuntimeError("隔离受管绑定仍归活跃 CLI")
-    with previous.changed:
-        retiring = previous.dead.is_set() or (previous.finished and not previous.expected)
-    if not retiring:
-        raise RuntimeError("隔离受管绑定仍归活跃 CLI")
-    # 公开终态可先于原 CLI 退场。仅等待已完成或取消的会话归还绑定，活跃工具轮保持原归属。
-    deadline_ns = actor.reservation["deadline_unix_ms"] * 1_000_000
-    reservation = actor.reservation["reservation_id"]
-    report("direct_binding_retiring", reservation_id=reservation, previous_cli_pid=process.pid)
-    if (not previous.retired.wait(max(0, (deadline_ns - time_ns()) / 1_000_000_000))
-            or process.poll() is None or actor.dead.is_set() or time_ns() >= deadline_ns):
-        raise RuntimeError("当前预留结束前未取得隔离受管绑定")
-    report("direct_binding_retired", reservation_id=reservation, previous_cli_pid=process.pid)
-
-
 def launch(*args, environment, **options):
     """保留原工作区启动器与网络守卫，只替换测试实例的官方代理与端点设置。@return 子进程。"""
     config_dir = options["config_dir"]
@@ -132,25 +109,24 @@ def launch(*args, environment, **options):
                 "HTTPS_PROXY": f"http://127.0.0.1:{context.port}", "NODE_EXTRA_CA_CERTS": str(ca),
                 "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", "DISABLE_AUTOUPDATER": "1",
                 "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "0"}
-    global managed_binding
     if POLICY_MODE.is_file():
         arguments = options["arguments"]
         mod = Path(arguments[arguments.index("--plugin-dir") + 1])
-        managed = Path("/opt/flower-http-test/flower-http-policy/hooks/runtime/binding.js")
-        actor = getattr(launch_context, "actor", None)
-        with MANAGED_BINDING_LOCK:
-            _await_managed_binding(actor)
-            try:
-                atomic_text(managed, (mod / "hooks/binding.js").read_text())
-                if INSTALLED_PROBE.is_file():
-                    options["arguments"] = _stock_arguments(arguments, mod, options)
-            except OSError as error:
-                report("direct_permit_launch_failed", error=type(error).__name__, errno=error.errno,
-                       uid=getuid(), gid=getgid())
-                raise
-            process = ORIGINAL_LAUNCH(*args, environment=settings, **options)
-            managed_binding = (process, ref(actor) if actor is not None else None)
-            return process
+        actor = launch_context.actor
+        if actor.port != context.port:
+            raise ValueError("隔离网络端口与当前 CLI 会话不匹配")
+        # 受管插件由所有 CLI 共同加载。每个进程只拿到自己沙箱内的绑定文件路径。
+        binding = mod / "hooks" / f"direct-binding-{uuid4().hex}.json"
+        try:
+            atomic_text(binding, json.dumps({"endpoint": f"http://127.0.0.1:{actor.port}", "bearer": actor.bearer}))
+            launch_context.binding = binding
+            settings["FLOWER_TUI_DIRECT_BINDING"] = str(binding)
+            if INSTALLED_PROBE.is_file():
+                options["arguments"] = _stock_arguments(arguments, mod, options)
+        except OSError as error:
+            report("direct_permit_launch_failed", error=type(error).__name__, errno=error.errno,
+                   uid=getuid(), gid=getgid())
+            raise
     return ORIGINAL_LAUNCH(*args, environment=settings, **options)
 
 
@@ -233,37 +209,74 @@ def _observe_after_archive(actor, data):
     raise ValueError("实际原生响应未出现在本会话归档")
 
 
-def _refusal_details(actor, rows, model):
+def _refusal_archive(actor, rows, model, *, whole_response):
     until = monotonic() + ARCHIVE_WAIT_SECONDS
-    while not actor.dead.is_set() and monotonic() < until:
+    requested = set(rows)
+
+    def active():
+        return not actor.dead.is_set() and monotonic() < until
+
+    while active():
         for archive in actor.credential_dir.glob("projects/*/*.jsonl"):
+            if not active():
+                return ()
+            messages = {}
             try:
                 with archive.open("rb") as file:
-                    for line in file:
+                    lines = iter(file)
+                    while active() and (line := next(lines, None)) is not None:
+                        # 单次读取可能跨过截止，晚到的档案不能用于确认终态。
+                        if not active():
+                            return ()
                         try:
                             row = json.loads(line)
                         except (UnicodeDecodeError, json.JSONDecodeError):
                             continue
-                        if not isinstance(row, dict) or row.get("type") != "assistant" or row.get("uuid") not in rows:
+                        if not isinstance(row, dict) or row.get("type") != "assistant":
+                            continue
+                        uuid = row.get("uuid")
+                        if not isinstance(uuid, str) or uuid not in requested:
                             continue
                         raw = row.get("message")
-                        if isinstance(raw, dict) and raw.get("stop_reason") == "refusal" and raw.get("model") == model:
-                            details = raw.get("stop_details")
-                            return details if isinstance(details, dict) else None
+                        if not isinstance(raw, dict) or raw.get("model") != model:
+                            continue
+                        reason = raw.get("stop_reason")
+                        if reason == "refusal" and not whole_response:
+                            return (raw,) if active() else ()
+                        if not whole_response or reason not in (None, "refusal") or not isinstance(raw.get("content"), list):
+                            continue
+                        messages[uuid] = raw
+                        if len(messages) == len(requested):
+                            # 用实际追加事件的顺序组合档案，确保各行来自同一模型回复。
+                            ordered = [messages[uuid] for uuid in rows]
+                            message_id = ordered[0].get("id")
+                            if (isinstance(message_id, str) and message_id
+                                    and all(msg.get("id") == message_id for msg in ordered)
+                                    and any(msg.get("stop_reason") == "refusal" for msg in ordered)):
+                                return ordered if active() else ()
             except OSError:
                 continue
-        actor.dead.wait(0.03)
-    return None
+        actor.dead.wait(max(0, min(0.03, until - monotonic())))
+    return ()
 
 
 def _finish_refusal(actor, projection, result, rows, model):
     # 追加事件先于档案落盘。释放回调后再取同一步的助手行，已经交付的文本可以继续被客户端读取。
-    details = _refusal_details(actor, rows, model)
-    if actor.dead.is_set():
-        return
     try:
-        projection.finish(result, stop_details=details)
-    except (ValueError, KeyError, OSError, RuntimeError) as error:
+        multiple_texts = len(projection.text_indices) > 1
+        archive = _refusal_archive(actor, rows, model, whole_response=multiple_texts)
+        if actor.dead.is_set():
+            return
+        terminal = next((msg for msg in archive if msg.get("stop_reason") == "refusal"), {})
+        details = terminal.get("stop_details")
+        text_digests = None
+        if multiple_texts and archive:
+            texts = [block["text"] for msg in archive for block in msg["content"] if block["type"] == "text"]
+            if not all(isinstance(text, str) for text in texts):
+                raise ValueError("档案里的原始文本块无效")
+            text_digests = [sha256(text.encode()).hexdigest() for text in texts]
+        projection.finish(result, stop_details=details if isinstance(details, dict) else None, text_digests=text_digests)
+    except (ValueError, KeyError, TypeError, OSError, RuntimeError) as error:
         report("direct_refusal_finish_failed", reservation_id=actor.reservation["reservation_id"],
                kind=type(error).__name__)
         actor.abort()
@@ -318,6 +331,9 @@ class _LiveProjection:
 
     def _emit(self, event):
         self.actor._observe(self.step, event)
+        self._publish(event)
+
+    def _publish(self, event):
         with self.actor.changed:
             self.actor._publish([_frame(event)])
 
@@ -365,13 +381,16 @@ class _LiveProjection:
         digest.update(text.encode())
         self._emit({"type": "content_block_delta", "index": index, "delta": delta})
 
-    def finish(self, result, *, stop_details=None):
-        """确认内容及累计用量。@param result 官方步骤结果。@param stop_details 同轮拒答详情。@return 无。"""
+    def finish(self, result, *, stop_details=None, text_digests=None):
+        """确认内容及累计用量。@param result 官方步骤结果。@param stop_details 同轮拒答详情。
+        @param text_digests 同一拒答的档案文本块摘要。@return 无。
+        """
         reason = result["reason"]
         if reason not in ({"tool_use"} if self.tools else {"end_turn", *EARLY_TEXT_STOPS}):
             raise ValueError("流式内容与同一步的结束原因不符")
-        # 工具轮的终态 answer 按显示需要在独立文本块之间插入换行。逐块交付使用原生索引和实际分片。
-        if not self.tools and self.text_digest.digest() != sha256(result["answer"].encode()).digest():
+        if reason == "refusal" and len(self.text_indices) > 1 and text_digests is None:
+            raise ValueError("多块拒答缺少同一步的原始档案")
+        if text_digests is None and not self.tools and self.text_digest.digest() != sha256(result["answer"].encode()).digest():
             raise ValueError("公开增量与官方步骤完整结果不符")
         completed_tools = {}
         for part in result["frames"]:
@@ -386,9 +405,20 @@ class _LiveProjection:
         if self.closed:
             # 签名来源使用官方步骤汇报的实际响应模型。开场用于展示的请求模型可能与它不同。
             self.step.response_model = result["usage"].get("model")
-        for index in range(self.next_index):
-            if index not in self.closed:
-                self._emit({"type": "content_block_stop", "index": index})
+        closing = [{"type": "content_block_stop", "index": index}
+                   for index in range(self.next_index) if index not in self.closed]
+        if text_digests is None:
+            for event in closing:
+                self._emit(event)
+        else:
+            # CLI 的展示答案包含块间换行。先逐块核对原始摘要，再发布关闭帧。
+            for event in closing:
+                self.actor._observe(self.step, event)
+            projected = [block["text"] for block in self.step.blocks if block["type"] == "text"]
+            if projected != text_digests:
+                raise ValueError("公开文本块与同一步的原始档案不符")
+            for event in closing:
+                self._publish(event)
         delta = {"stop_reason": reason, "stop_sequence": None}
         if stop_details is not None:
             delta["stop_details"] = stop_details
@@ -450,11 +480,12 @@ def _authorize_http(actor, data):
         return {"allowed": allowed}
 
 
-def _project_http_rejection(actor, data):
+def _observe_http_response(actor, data):
     with actor.changed:
         step, handle = actor.step, actor.claim
+        status = data.get("status")
         if (
-            type(data.get("status")) is not int or data["status"] != 400
+            type(status) is not int or status not in (200, 400)
             or not isinstance(data.get("ticket"), str)
             or not _valid_attempt(actor, step, handle)
             or getattr(actor, "direct_http_reply", None) != (step, handle, data["ticket"])
@@ -462,6 +493,9 @@ def _project_http_rejection(actor, data):
         ):
             raise session._StaleReceipt("直发响应不属于当前模型步骤")
         actor.direct_http_reply = None
+        if status == 200:
+            actor.direct_http_ok = (step, handle)
+            return {}
         # 状态来自同次受管 HTTP 回包。正文继续沿公共通用错误格式生成。
         report("direct_http_rejection", reservation_id=handle.reservation["reservation_id"], status=400)
         actor.abort(session.ModelResponseError(400, b"", source="managed_oauth_http"))
@@ -473,7 +507,7 @@ def callback(actor, path, data):
     if path == "/direct-http-permit" and POLICY_MODE.is_file():
         return _authorize_http(actor, data)
     if path == "/direct-http-reply" and POLICY_MODE.is_file() and POLICY_MODE.read_text() == CANDIDATE_MODE:
-        return _project_http_rejection(actor, data)
+        return _observe_http_response(actor, data)
     if getattr(actor, "direct_refusal", None) == (actor.step, actor.claim):
         # CLI 可在拒答后自行发起下一步。原公开预留已认领，保留已确认拒答供原请求收尾。
         if path == "/begin":
@@ -485,6 +519,7 @@ def callback(actor, path, data):
     if path == "/begin":
         actor.direct_result = None
         actor.direct_http_reply = None
+        actor.direct_http_ok = None
         actor.direct_stream = None
     elif path == "/direct-chunk" and INSTALLED_PROBE.is_file():
         return _direct_chunk(actor, data)
@@ -501,6 +536,8 @@ def callback(actor, path, data):
                 envelope = {"type": "error", "error": {"type": "api_error", "message": "V2 模型响应无效或提前终止"}}
                 failure = session.ModelResponseError(502, json.dumps(envelope).encode(), source="local_provider_event")
                 evidence = {**envelope, "_tui_policy_evidence": {"stop_reason": "refusal"}}
+                if actor.direct_http_ok == (actor.step, actor.claim):
+                    evidence["_tui_upstream_http_status"] = 200
                 failure.private_body = json.dumps(evidence).encode()
                 report("direct_empty_refusal_evidence", reservation_id=actor.claim.reservation["reservation_id"])
                 actor.abort(failure)

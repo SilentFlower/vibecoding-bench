@@ -85,6 +85,7 @@ use crate::service::tui_native_drain::{
     NativeTurn, active_agent_account, continuation_account, recovery_row, summary_account,
 };
 use crate::service::tui_reconnect::{self, BeforeHeaders, Reconnects, Reservation};
+use crate::service::tui_sender_response::RefusalProjectionFailure;
 use crate::service::tui_tool_history::{
     self, SERVER_SESSION_PREFIX, SUGGESTION_SESSION_PREFIX, TITLE_SESSION_PREFIX,
 };
@@ -4521,6 +4522,13 @@ impl GatewayService {
                         trace.transport_error();
                     }
                 })?;
+        let refusal_projection = response
+            .extensions_mut()
+            .remove::<RefusalProjectionFailure>()
+            .filter(|_| !fixture && provider_error_source == Some("local_provider_event"));
+        if refusal_projection.is_some() && !model_response_received {
+            diagnostics::observe_tui_model(diagnostics::TuiModelObservation::ResponseReceived);
+        }
         let projected = !fixture
             && response
                 .extensions_mut()
@@ -4549,6 +4557,9 @@ impl GatewayService {
                 if cli_input_rejected {
                     attempt.tui_cli_input_rejected();
                 }
+                if let Some(failure) = &refusal_projection {
+                    attempt.tui_refusal_projection_failed(failure.upstream_status);
+                }
                 if submission_unknown {
                     attempt.tui_submission_unknown();
                     // 与裸私有 502 一致，账号调度仍收到传输失败反馈。
@@ -4559,7 +4570,7 @@ impl GatewayService {
                 attempt.tui_sources(body_source, session_origin, instruction_location);
                 attempt.tui_capture(attempt_id, capture_state);
                 attempt.commit_native(started);
-                if !submission_unknown {
+                if !submission_unknown && refusal_projection.is_none() {
                     attempt.headers(
                         response.status().as_u16(),
                         response.headers(),
@@ -4572,7 +4583,9 @@ impl GatewayService {
                 return Ok(response);
             }
         }
-        request.response_headers(account.id, response.status().as_u16());
+        if refusal_projection.is_none() {
+            request.response_headers(account.id, response.status().as_u16());
+        }
         Ok(response)
     }
 
