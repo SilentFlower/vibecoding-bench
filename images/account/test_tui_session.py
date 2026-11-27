@@ -175,6 +175,36 @@ class SessionTests(unittest.TestCase):
                     self.assertFalse(actor.step.claimed)
                     driver.launcher.managed_model_response.assert_not_called()
 
+    def test_cli_tool_preservation_guards_are_local_before_model_submission(self):
+        """工具选择或历史保真检查失败时标明本地来源。@return 无。"""
+        for name in (
+            "matches_tool_choice",
+            "matches_history_tool_images",
+            "matches_history_empty_tool_results",
+            "matches_history_tool_text_blocks",
+            "matches_recovered_signatures",
+        ):
+            with self.subTest(name=name), closing(self._driver()) as driver:
+                driver.managed_oauth = True
+                identity = {**self._identity("tool-preservation-guard"), "native_cold_history": True}
+                body = {**self._body(), "model": "claude-sonnet-4-6"}
+                with closing(driver.prepare(identity, encode(body))) as handle:
+                    actor = handle.actor
+                    self.assertIsNotNone(actor.cold_history)
+                    actor.step = SimpleNamespace(native=("turn", 1), native_model=body["model"], claimed=False)
+                    driver.launcher = SimpleNamespace(managed_model_response=Mock())
+                    with (
+                        patch.object(actor, "_main_request", return_value=True),
+                        patch.object(type(actor.cold_history), name, return_value=False) as guard,
+                        self.assertRaises(ModelResponseError) as caught,
+                    ):
+                        actor.serve_model(Mock(headers={}), body, native_raw=encode(body))
+                    guard.assert_called_once_with(body)
+                    self.assertEqual((caught.exception.status, caught.exception.source), (422, "tui_cli_input_guard"))
+                    self.assertEqual(json.loads(caught.exception.private_body)["error"]["code"], "unsupported_parameter")
+                    self.assertFalse(actor.step.claimed)
+                    driver.launcher.managed_model_response.assert_not_called()
+
     def test_non_stream_accept_uses_sdk_for_upstream_sse(self):
         """公开非流式请求向模型取流时使用同轮 SDK 的 Accept。@return 无。"""
         for explicit in (False, None):

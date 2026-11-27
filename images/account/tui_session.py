@@ -983,7 +983,8 @@ class _Actor:
                                 source="tui_cli_input_guard")
                     if not self.cold_history.matches_tool_choice(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
-                            "code": "unsupported_parameter", "message": "CLI 未保留请求的工具选择"}}))
+                            "code": "unsupported_parameter", "message": "CLI 未保留请求的工具选择"}}),
+                            source="tui_cli_input_guard")
                     output_history = self.recovery_history or self.cold_history
                     if not output_history.matches_history_cache_markers(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
@@ -991,16 +992,20 @@ class _Actor:
                             source="tui_cli_input_guard")
                     if not output_history.matches_history_tool_images(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
-                            "code": "unsupported_parameter", "message": "CLI 未保留历史工具结果中的图文"}}))
+                            "code": "unsupported_parameter", "message": "CLI 未保留历史工具结果中的图文"}}),
+                            source="tui_cli_input_guard")
                     if not output_history.matches_history_empty_tool_results(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
-                            "code": "unsupported_parameter", "message": "CLI 未保留空工具结果"}}))
+                            "code": "unsupported_parameter", "message": "CLI 未保留空工具结果"}}),
+                            source="tui_cli_input_guard")
                     if not output_history.matches_history_tool_text_blocks(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
-                            "code": "unsupported_parameter", "message": "CLI 未保留工具结果中的原始文本块"}}))
+                            "code": "unsupported_parameter", "message": "CLI 未保留工具结果中的原始文本块"}}),
+                            source="tui_cli_input_guard")
                     if handle.kind != "continuation" and not output_history.matches_recovered_signatures(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
-                            "code": "unsupported_parameter", "message": "CLI 未保留已核对的签名工具历史"}}))
+                            "code": "unsupported_parameter", "message": "CLI 未保留已核对的签名工具历史"}}),
+                            source="tui_cli_input_guard")
                 elif handle.api_context is not None:
                     offered = {v.strip() for v in sdk_headers.get("anthropic-beta", "").split(",")}
                     thinking = handle.thinking if handle.thinking is not None else native.get("thinking", {})
