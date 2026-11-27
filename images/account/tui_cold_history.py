@@ -212,7 +212,7 @@ def _signed_thinking(block):
             and bool(block["signature"]))
 
 
-def _signed_group(blocks):
+def _signed_group(blocks, *, native_names=False):
     group = []
     for block in blocks:
         if block["type"] in SIGNED_THINKING_TYPES:
@@ -221,7 +221,7 @@ def _signed_group(blocks):
             name = block["name"]
             if not isinstance(name, str):
                 raise ValueError("原生助手工具名称必须为字符串")
-            tool = {**block, "name": name.removeprefix(MCP_PREFIX)}
+            tool = {**block, "name": name.removeprefix(MCP_PREFIX) if native_names else name}
             if tool.get("caller") == {"type": "direct"}:
                 tool.pop("caller")
             group.append(tool)
@@ -243,7 +243,9 @@ def _archive_models(rows, fingerprints):
         if identity is None:
             continue
         # 一个响应的原生归档可把签名和工具分成相邻行。冷导入行没有响应 ID。
-        group = _signed_group(block for row in response_rows for block in _blocks(row["message"]))
+        group = _signed_group(
+            (block for row in response_rows for block in _blocks(row["message"])), native_names=True,
+        )
         if any(block["type"] in SIGNED_THINKING_TYPES for block in group):
             fingerprint = digest(group)
             if fingerprint in fingerprints:
@@ -566,21 +568,18 @@ class ColdHistory:
         @param signed_tool_models 账号亲自观测并按工具 ID 保存的模型名。@return 本次原生恢复计划。
         """
         history = []
+        receipt_calls = []
         for index, row in enumerate(messages):
             role = row["role"]
             if role not in ("user", "assistant"):
                 return None
             content = _blocks(row)
             if role == "assistant" and index > len(self.history):
-                renamed = []
                 for block in content:
                     if block["type"] == "tool_use":
-                        name = MCP_PREFIX + block["name"]
-                        if name not in self.tools:
+                        if MCP_PREFIX + block["name"] not in self.tools:
                             return None
-                        block = {**block, "name": name}
-                    renamed.append(block)
-                content = renamed
+                        receipt_calls.append(block)
             if role == "user":
                 # 原生历史会保留成功结果的内嵌图文。CLI 会剥掉错误结果的图片。
                 if any(block["type"] == "tool_result" and tool_result_has_images(block)
@@ -607,6 +606,15 @@ class ColdHistory:
                 models[index] = model
         if not _closed_history(history, result_types=(str, list), signed_rows=models):
             return None
+        receipt_ids = {block["id"] for block in receipt_calls}
+        # 签名组使用公开工具名核对，发布档案时统一加一层 CLI 前缀。
+        for index, row in enumerate(history):
+            if index not in models and row["role"] == "assistant":
+                row["content"] = [
+                    {**block, "name": MCP_PREFIX + block["name"]}
+                    if block["type"] == "tool_use" and block["id"] in receipt_ids else block
+                    for block in row["content"]
+                ]
         # 交互 CLI 从闭合的工具结果开始读取。新模型步骤仍由受管 PTY 标记认领。
         return replace(self, history=history, prompt=RESUME_PROMPT, current_blocks=(),
                        recovered_models=tuple(models.items()))
@@ -616,7 +624,7 @@ class ColdHistory:
         if not self.recovered_models:
             return True
 
-        def signed_groups(rows):
+        def signed_groups(rows, *, native_names=False):
             groups, current = [], []
             for row in rows:
                 if row["role"] == "assistant":
@@ -626,10 +634,10 @@ class ColdHistory:
                     current = []
             if current:
                 groups.append(current)
-            return [digest(_signed_group(content)) for content in groups
+            return [digest(_signed_group(content, native_names=native_names)) for content in groups
                     if any(block["type"] in SIGNED_THINKING_TYPES for block in content)]
 
-        return signed_groups(native["messages"]) == signed_groups(self.history)
+        return signed_groups(native["messages"], native_names=True) == signed_groups(self.history)
 
     def _reminder(self):
         return f"<system-reminder>\n{self.system}\n</system-reminder>"
@@ -658,7 +666,7 @@ class ColdHistory:
             role, content = history[index]
             history[index] = role, [
                 {**block, "name": MCP_PREFIX + block["name"]}
-                if block["type"] == "tool_use" and not block["name"].startswith(MCP_PREFIX) else block
+                if block["type"] == "tool_use" else block
                 for block in content
             ]
         return history

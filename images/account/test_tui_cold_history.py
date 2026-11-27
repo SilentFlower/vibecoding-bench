@@ -926,6 +926,46 @@ class ColdHistoryTests(TestCase):
         self.assertIsNone(ColdHistory.from_request(changed, read_history=sources(archive)))
         self.assertIsNone(ColdHistory.from_receipt_boundary(changed, boundary))
 
+    def test_signed_history_retains_client_mcp_namespace(self):
+        """签名来源、导入和出站均保留客户端命名空间。@return 无。"""
+        body = deepcopy(self.body)
+        name = "mcp__flower__LookupNote"
+        native_name = "mcp__flower__" + name
+        body["tools"][0]["name"] = name
+        signature = {"type": "thinking", "thinking": "合成思考", "signature": "合成签名"}
+        tool, = body["messages"][1]["content"]
+        tool["name"] = name
+        body["messages"][1]["content"].insert(0, signature)
+        model = "claude-opus-5-5"
+        archive = [{"type": "assistant", "message": {"role": "assistant", "id": "msg_archive", "model": model,
+                    "content": [signature, {**tool, "name": native_name}]}}]
+
+        def read_history(read):
+            return [read(iter(archive))]
+
+        plan = ColdHistory.from_request(body, read_history=read_history)
+        self.assertIsNotNone(plan)
+        self.assertEqual(ColdHistory.from_receipt_boundary(body, plan.receipt_boundary()), plan)
+        for wrong_name in ("LookupNote", "mcp__notes__LookupNote", native_name):
+            with self.subTest(name=wrong_name):
+                changed = deepcopy(body)
+                changed["messages"][1]["content"][1]["name"] = wrong_name
+                self.assertIsNone(ColdHistory.from_request(changed, read_history=read_history))
+
+        current = {**tool, "id": "toolu_new"}
+        messages = [*body["messages"], {"role": "assistant", "content": [signature, current]},
+                    {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_new", "content": "回执"}]}]
+        resumed = plan.resume_receipts(messages, signed_tool_models={"toolu_new": model})
+        self.assertIsNotNone(resumed)
+        for history in (plan, resumed):
+            archived = [{"role": role, "content": content} for role, content in history._grouped_history()]
+            groups = [row["content"] for row in archived if row["role"] == "assistant"
+                      and any(block["type"] == "thinking" for block in row["content"])]
+            self.assertTrue(all(group[1]["name"] == native_name for group in groups))
+            self.assertTrue(history.matches_recovered_signatures({"messages": archived}))
+            groups[-1][1] = {**groups[-1][1], "name": name}
+            self.assertFalse(history.matches_recovered_signatures({"messages": archived}))
+
     def test_bound_signature_discards_corrupt_archive_alongside_healthy_archive(self):
         """归档中无关工具名类型错误时仅丢弃该档的全部签名来源。@return 无。"""
         body = deepcopy(self.body)
