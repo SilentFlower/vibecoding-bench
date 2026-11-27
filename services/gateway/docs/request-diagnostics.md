@@ -80,3 +80,5 @@ SQLite/PostgreSQL 使用独立请求与尝试表，启动幂等建表；后台�
 `attempts[].capture_status` 为 `disabled`、`saved`、`dropped`、`failed` 或 `timeout`；旧记录为空。`timeout` 表示保存结果待核对，后台写入仍受并发上限约束。单份超限时保留前缀并标记截断。轮转后读取显示文件缺失。采集从开启后生效，历史记录保持原有摘要。
 
 `GET /admin/request-diagnostics/:request_id/captures/:attempt_id` 只读取属于该请求的尝试，响应使用 `Cache-Control: no-store`。正文以转义文本显示。
+
+V2 请求采集使用独立的后台保存名额。名额耗尽时，尝试保留 `capture_status=dropped`，详情接口返回 `state=missing` 和未进入保存队列的原因。该状态只描述采集。当尝试已排队而文件尚未保存时，仍按该尝试读取实际快照。

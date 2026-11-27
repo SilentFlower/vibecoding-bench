@@ -3400,6 +3400,7 @@ async fn request_native_capture(
         .iter()
         .find(|attempt| attempt.attempt_id == attempt_id)
         .ok_or(AppError::NotFound)?;
+    let tui = attempt.context.as_ref().and_then(|c| c.kernel.as_deref()) == Some("tui_v2");
     let value = if attempt.capture_status.as_deref() == Some("disabled") {
         serde_json::json!({"state":"disabled", "message":"本次请求发生时账号内容采集已关闭，设置对后续请求生效"})
     } else if attempt.capture_status.as_deref() == Some("not_submitted") {
@@ -3413,10 +3414,10 @@ async fn request_native_capture(
         "native280_cc_prepared" | "native293_cc_prepared"
     ) {
         runtime_bridge::native_capture(attempt.account_id, &attempt.attempt_id).await?
-    } else if attempt.context.as_ref().and_then(|c| c.kernel.as_deref()) == Some("tui_v2")
-        && attempt.capture_status.as_deref() == Some("queued")
-    {
+    } else if tui && attempt.capture_status.as_deref() == Some("queued") {
         runtime_bridge::tui_capture(attempt.account_id, &attempt.attempt_id).await?
+    } else if tui && attempt.capture_status.as_deref() == Some("dropped") {
+        serde_json::json!({"state":"missing", "message":"本次 V2 请求采集未进入保存队列"})
     } else {
         serde_json::json!({"state":"unsupported", "message":"此尝试使用其他转发方式"})
     };
