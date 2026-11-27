@@ -67,8 +67,10 @@ def launch(*args, environment, **options):
 
 
 def _valid_attempt(actor, step, handle):
+    probe_sse = (handle and handle.stream and not handle.tools and POLICY_MODE.is_file()
+                 and POLICY_MODE.read_text() == "observe-sse")
     return (step and step.native and handle and actor.process and not actor.dead.is_set()
-            and len(handle.tools) <= 1 and not handle.stream and actor.oauth_file
+            and len(handle.tools) <= 1 and (not handle.stream or probe_sse) and actor.oauth_file
             and handle.expires_at and handle.expires_at > time_ns() // 1_000_000
             and all(CONFIG["binding"][key] == handle.reservation[key]
                     for key in ("account_id", "environment_id", "generation")))

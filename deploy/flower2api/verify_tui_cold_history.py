@@ -341,7 +341,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            model_connection_contract=None, external_signed_history=False, bound_signed_history=None, history_tool_images=None,
            tool_receipt_images=None, explicit_custom_tool_type=False, history_empty_tool_result=None,
            empty_tool_receipt=None, tool_receipt_text_blocks=None, tool_receipt_nested_cache=None,
-           tool_receipt_outer_cache=None):
+           tool_receipt_outer_cache=None, model_stream_probe=None):
     """核对公开工具回执、CLI 正文与 HTTPS 实收。@param gateway 验证网关。@param sender 验证发送器。
     @param temporary 本次测试私有目录。@param restart_history 是否验证进程重启和历史分支。
     @param text_input 是否验证四种文本系统提示词形状。
@@ -407,6 +407,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param message_system_roles 消息级系统角色对照或普通 API 固定回归模式。
     @param structured_output 是否核对普通 API 的结构化输出和实际发送路径。
     @param installed_runtime 结构化工具轮使用镜像内置事件源和管理诊断。
+    @param model_stream_probe 可选，仅分段发送隔离模型的首轮文本响应。
     @param forced_tool_choice 核对强制工具选择及同进程或重启回执。
     @param no_tool_choice 是否核对无工具时的显式 none 和保留声明的兼容路径。
     @param disable_parallel_tool_use 是否核对禁并行的公开策略与模型实收。
@@ -657,6 +658,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 if structured_output and body.get("output_config", {}).get("format") == STRUCTURED_FORMAT:
                     text = STRUCTURED_REPLY
                 wire = message_sse({"type": "text", "text": text}, "end_turn", "msg_cold_reply")
+            if model_stream_probe is not None:
+                assert not prefix and not middle
+                wire = model_stream_probe.prepare(wire)
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Content-Length", str(len(prefix) + len(middle) + len(wire)))
@@ -681,7 +685,10 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                       advertised_bytes=len(prefix) + len(wire), written_bytes=len(prefix))
                     self.close_connection = True
                     return
-            self.wfile.write(wire)
+            if model_stream_probe is not None:
+                model_stream_probe.write(self, wire)
+            else:
+                self.wfile.write(wire)
             if slow_tool_stream and middle:
                 self.wfile.flush()
                 startup_event("slow_reader_model_finished", model_posts=len(received))
