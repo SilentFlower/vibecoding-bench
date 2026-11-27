@@ -1770,6 +1770,11 @@ impl GatewayService {
             .run(
                 async move { self.handle_request(req, Some(&token)).await },
                 cutover,
+                || {
+                    count_tokens_app_error_response(
+                        runtime_transport::tui_submission_unknown_error(),
+                    )
+                },
             )
             .await
     }
@@ -3093,7 +3098,11 @@ impl GatewayService {
                     trace.commit_native(started);
                 }
                 let response = prepared
-                    .submit_with_account_credentials(ttfb_deadline, credentials)
+                    .submit_with_account_credentials(
+                        ttfb_deadline,
+                        credentials,
+                        delivery.as_ref().and(before_headers.as_ref()),
+                    )
                     .await
                     .inspect_err(|error| {
                         if matches!(error, AppError::BadGateway(_)) {

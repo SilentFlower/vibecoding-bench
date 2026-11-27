@@ -65,6 +65,7 @@ use crate::service::request_session::valid_id;
 use crate::service::rewriter::{CacheControlTtlRewrite, MessageCacheControlRewrite};
 use crate::service::runtime_background::{BACKGROUND_HEADER, BackgroundPurpose};
 use crate::service::tui_backend::TUI_V2;
+use crate::service::tui_reconnect::BeforeHeaders;
 #[cfg(target_os = "linux")]
 use crate::service::tui_sender::TuiSender;
 use crate::service::tui_sender_response;
@@ -219,6 +220,11 @@ pub(super) fn tui_failure_stage(
         .iter()
         .copied()
         .find(|stage| tui_projection_marker(headers, TUI_ERROR_SOURCE, stage))
+}
+
+/// 构造已发出私有提交但尚未确认回复时使用的公开错误。@return 提交状态未知的错误。
+pub(super) fn tui_submission_unknown_error() -> AppError {
+    AppError::BadGateway("V2 请求提交状态未知".into())
 }
 
 /// 内部响应模式，供公开路由采用正文终态记账。
@@ -1615,23 +1621,24 @@ impl TuiReservation {
         mut self,
         ttfb_timeout: Duration,
     ) -> Result<reqwest::Response, AppError> {
-        self.submit_with_account_credentials(Instant::now() + ttfb_timeout, None)
+        self.submit_with_account_credentials(Instant::now() + ttfb_timeout, None, None)
             .await
     }
 
     /// 提交原预留，按原来源协商的凭据协议发放本轮凭据。
-    /// @param ttfb_deadline 回包头截止。@param credentials 敏感私有凭据头。@return 原 sender 响应。
+    /// @param ttfb_deadline 公开回包头截止。@param credentials 敏感私有凭据头。
+    /// @param reconnect 已登记可重连的工具回复。@return 原 sender 响应。
     pub(super) async fn submit_with_account_credentials(
         &mut self,
         ttfb_deadline: Instant,
         credentials: Option<HeaderValue>,
+        reconnect: Option<&BeforeHeaders>,
     ) -> Result<reqwest::Response, AppError> {
         if self.managed_oauth != credentials.is_some() {
             return Err(AppError::ServiceUnavailable("V2 账号凭据协议未确认".into()));
         }
         // 发出请求后，断连或超时也可能已有 sender 接管。交由 sender 收尾，避免误取消原轮。
         self.submission_started = true;
-        let unknown = || AppError::BadGateway("V2 请求提交状态未知".into());
         // 即使附带受信采集元数据，提交仍使用不可重放的流。
         let request = self
             .request("send")
@@ -1667,10 +1674,21 @@ impl TuiReservation {
         } else {
             ttfb_deadline
         };
-        let response = timeout_at(reply_deadline, request.send())
-            .await
-            .map_err(|_| unknown())?
-            .map_err(|_| unknown())?;
+        let private_deadline = Instant::now() + Duration::from_millis(REQUEST_BUDGET_MS);
+        let sending = request.send();
+        tokio::pin!(sending);
+        let response = match timeout_at(reply_deadline, &mut sending).await {
+            Ok(response) => response,
+            Err(_) => {
+                let reconnect = reconnect.ok_or_else(tui_submission_unknown_error)?;
+                // 公开 502 后继续同一个不可重放的 HTTP future，保留正在生成的回复。
+                reconnect.public_timeout().await;
+                timeout_at(private_deadline, &mut sending)
+                    .await
+                    .map_err(|_| tui_submission_unknown_error())?
+            }
+        }
+        .map_err(|_| tui_submission_unknown_error())?;
         // 定时器与响应可能同时就绪，须按实际观察时间核对迟到的私有回包。
         let observed = Instant::now();
         if observed >= reply_deadline
@@ -1682,7 +1700,8 @@ impl TuiReservation {
                         TUI_SUBMISSION_LEDGER,
                     )))
         {
-            return Err(unknown());
+            let reconnect = reconnect.ok_or_else(tui_submission_unknown_error)?;
+            reconnect.public_timeout().await;
         }
         self.repair_pending = self.signature_repair
             && response.status() == StatusCode::BAD_REQUEST
@@ -4787,7 +4806,7 @@ mod tests {
         let mut legacy_relay = reservation("legacy-relay");
         legacy_relay.signature_repair = true;
         let first = legacy_relay
-            .submit_with_account_credentials(Instant::now() + Duration::from_secs(2), None)
+            .submit_with_account_credentials(Instant::now() + Duration::from_secs(2), None, None)
             .await
             .unwrap();
         assert_eq!(first.status(), StatusCode::BAD_REQUEST);
@@ -4883,7 +4902,7 @@ mod tests {
                 prepared.admission_deadline = deadline;
             }
             let (result, ()) = tokio::join!(
-                prepared.submit_with_account_credentials(deadline, None),
+                prepared.submit_with_account_credentials(deadline, None, None),
                 async {
                     assert_eq!(sent.recv().await.unwrap(), id);
                     let release = late_reply.recv().await.unwrap();
@@ -4913,7 +4932,7 @@ mod tests {
         unknown.continuation = true;
         unknown.admission_deadline = deadline;
         let failed = unknown
-            .submit_with_account_credentials(deadline, None)
+            .submit_with_account_credentials(deadline, None, None)
             .await;
         assert!(matches!(failed, Err(AppError::BadGateway(_))));
         assert_eq!(sent.recv().await.unwrap(), "unknown");

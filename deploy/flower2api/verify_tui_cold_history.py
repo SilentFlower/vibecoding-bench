@@ -329,7 +329,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            thinking_cli_summaries=None,
            recovery_ledger_contention=False, recovery_ledger_deadline=False, recovery_workspace_rejection=False,
            recovery_readiness_rejection=False,
-           recovery_slow_model=False, initial_idle_model_connection=False, trace_startup=False, cache_markers=False,
+           recovery_slow_model=False, replay_unknown_receipt=None,
+           initial_idle_model_connection=False, trace_startup=False, cache_markers=False,
            trace_recovery_resend=False,
            history_cache_markers=False, history_cache_ttl=None, history_cache_scope=None,
            cache_capability=None, message_system_roles=False,
@@ -396,6 +397,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param recovery_workspace_rejection 可选的工作区绑定故障，核对拒绝及原回执再次认领。
     @param recovery_readiness_rejection 是否在预留前触发账本就绪拒绝并复交原回执。
     @param recovery_slow_model 是否验证隔离模型收件后的公开超时和诊断归属。
+    @param replay_unknown_receipt 在原响应生成中或缓存完成后主动重交同一回执。
     @param initial_idle_model_connection 是否先占用一个未握手的模型 TCP 连接。
     @param trace_startup 是否记录隔离启动阶段。
     @param trace_recovery_resend 是否在隔离夹具中对合法恢复回执的 503 原样补发一次并分别取证。
@@ -453,6 +455,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     auxiliary_reply = SUGGESTION_REPLY if suggestion else TITLE_REPLY
     auxiliary_text = SUGGESTION_REPLY if suggestion else TITLE_TEXT
     slow_tool_arrivals = []
+    slow_tool_prefix = Event()
+    slow_tool_terminal = Event()
     model_betas = []
     summarized_thinking = (
         (adaptive_thinking_model is not None and adaptive_thinking_display == "summarized")
@@ -554,7 +558,10 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 return
             tool = next((t for t in body.get("tools", []) if t.get("description") == TOOL["description"]), None)
             results = find_blocks(body, "tool_use_id", NEW_ID)
-            if recovery_slow_model and results:
+            paused_receipt = replay_unknown_receipt and results and len(received) == 2
+            if paused_receipt:
+                slow_tool_arrivals.append(monotonic())
+            elif recovery_slow_model and results:
                 slow_tool_arrivals.append(monotonic())
                 sleep(SLOW_MODEL_DELAY)
             restart = any(b.get("text") == AFTER_RESTART for row in body["messages"] for b in blocks(row))
@@ -658,6 +665,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 if structured_output and body.get("output_config", {}).get("format") == STRUCTURED_FORMAT:
                     text = STRUCTURED_REPLY
                 wire = message_sse({"type": "text", "text": text}, "end_turn", "msg_cold_reply")
+            if paused_receipt:
+                first, second, third, wire = wire.split(b"\n\n", 3)
+                prefix = b"\n\n".join((first, second, third, b""))
             if model_stream_probe is not None:
                 assert not prefix and not middle
                 wire = model_stream_probe.prepare(wire)
@@ -669,6 +679,13 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             for name, value in quota.items():
                 self.send_header(name, value)
             self.end_headers()
+            if paused_receipt:
+                # 先交付模型 HTTP 头，账户端仍持有生成流。公开网关等待的是首个 SSE 数据帧。
+                self.wfile.flush()
+                startup_event("unknown_receipt_model_headers", model_body_sha256=model_digest, model_posts=len(received))
+                if not slow_tool_prefix.wait(15):
+                    self.close_connection = True
+                    return
             if prefix:
                 self.wfile.write(prefix)
                 self.wfile.flush()
@@ -679,7 +696,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                     self.wfile.write(middle)
                     self.wfile.flush()
                 # 公开读者须实际读到首段并在模型结束前断开。夹具结束时也会释放模型。
-                if not finish_stream.wait(30) or paused_question or cut_tool_reply:
+                terminal_gate = slow_tool_terminal if paused_receipt else finish_stream
+                if not terminal_gate.wait(30) or paused_question or cut_tool_reply:
                     if cut_tool_reply and finish_stream.is_set():
                         startup_event("interrupted_upstream_response", model_body_sha256=model_digest,
                                       advertised_bytes=len(prefix) + len(wire), written_bytes=len(prefix))
@@ -769,6 +787,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         receiver.socket = tls.wrap_socket(receiver.socket, server_side=True, do_handshake_on_connect=False)
         serve(stack, receiver)
         stack.callback(finish_stream.set)
+        stack.callback(slow_tool_prefix.set)
+        stack.callback(slow_tool_terminal.set)
         proxy = serve(stack, TracedServer(Proxy, "proxy_tcp_accepted") if trace_startup
                       else ThreadingHTTPServer(("127.0.0.1", 0), Proxy))
         registry = serve(stack, ThreadingHTTPServer(("127.0.0.1", 0), Registry))
@@ -1291,7 +1311,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 expected_models = ({} if signed_tool_response == "missing-model"
                                    else dict.fromkeys(expected_ids, body["model"]))
                 assert signed_tool_models == expected_models, signed_tool_models
-        follow = {**body, "stream": reconnect_tool_stream or slow_tool_stream or interrupted_tool_stream is not None,
+        follow = {**body, "stream": (reconnect_tool_stream or slow_tool_stream or interrupted_tool_stream is not None
+                                   or replay_unknown_receipt is not None),
                   "messages": [*messages, {"role": "assistant", "content": offered}, result]}
         if auto_tool_choice:
             other_auto = receipt_auto_tool_choice or ("explicit-false" if auto_tool_choice == "bare" else "bare")
@@ -1673,13 +1694,13 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                     denied, _ = call(18090, "POST", "/v1/messages", caller, request_body, request_headers)
                     after_restore.append(denied)
                 assert after_restore == [400, 400, 422] and len(received) == 1, after_restore
-        if recovery_slow_model:
+        if recovery_slow_model or replay_unknown_receipt:
             budget_key = "v3_admission_wait_seconds"
             previous_budget = manage("GET", "settings")[budget_key]
             manage("PUT", "settings", {budget_key: "3"})
             started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
             try:
-                status, _, request_id = checked_messages(
+                status, raw, request_id = checked_messages(
                     manage, token, follow, headers, received, "recovered_receipt_slow_model", expected_status=502,
                     trace_startup=trace_startup, sender_status=sender_state_after_failure,
                 )
@@ -1688,7 +1709,6 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 assert request_id and arrival < returned < arrival + SLOW_MODEL_DELAY and len(received) == 2
                 ((role, receipt),) = find_blocks(received[-1][1], "tool_use_id", NEW_ID)
                 assert role == "user" and REPLY in json.dumps(receipt, ensure_ascii=False)
-                sleep(max(0, arrival + SLOW_MODEL_DELAY - monotonic()))
                 evidence = report_request_diagnostics(
                     manage, "recovered_receipt_slow_model", request_id, headers["x-session-id"], started_at,
                 )
@@ -1702,12 +1722,25 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 assert str(UUID(reservation)) == reservation
                 assert len(received) == 2 and callbacks == [NEW_ID] and original_file.read_bytes() == original_history
                 verify_model(received, policy="append", old_content=old_result, current_text_blocks=current_text_blocks)
-                return {"http_status": status, "model_received_before_public_return_ms": round((returned - arrival) * 1000),
-                        "model_posts": len(received), "client_tool_calls": len(callbacks), "old_tool_calls": 0,
-                        "request_id": request_id, "reservation_id": reservation, "outcome": record["outcome"],
-                        "error_stage": record["error_stage"], "attempt_count": record["attempt_count"],
-                        "confirmed_model_responses": record["diagnostic_context"].get("tui_confirmed_model_responses"),
-                        "original_history_preserved": True}
+                proof = {"http_status": status, "model_received_before_public_return_ms": round((returned - arrival) * 1000),
+                         "model_posts": len(received), "client_tool_calls": len(callbacks), "old_tool_calls": 0,
+                         "request_id": request_id, "reservation_id": reservation, "outcome": record["outcome"],
+                         "error_stage": record["error_stage"], "attempt_count": record["attempt_count"],
+                         "confirmed_model_responses": record["diagnostic_context"].get("tui_confirmed_model_responses"),
+                         "original_history_preserved": True}
+                if replay_unknown_receipt:
+                    assert json.loads(raw) == {
+                        "type": "error", "error": {"type": "upstream_error", "message": "Upstream request failed"},
+                    }, raw
+                    manage("PUT", "settings", {budget_key: previous_budget})
+                    proof["replay"] = verify_unknown_receipt_replay(
+                        manage, temporary / "gateway.db", token, follow, headers, received, callbacks,
+                        slow_tool_prefix, slow_tool_terminal, request_id, reservation, replay_unknown_receipt,
+                    )
+                    assert original_file.read_bytes() == original_history
+                else:
+                    sleep(max(0, arrival + SLOW_MODEL_DELAY - monotonic()))
+                return proof
             finally:
                 manage("PUT", "settings", {budget_key: previous_budget})
         rejected_signed_recovery = signed_tool_history and recover_pending and signed_tool_response == "missing-model"
@@ -2404,6 +2437,88 @@ def report_request_diagnostics(manage, phase, request_id, session_id, started_at
         event["requests"].append(item)
     print(json.dumps(event, ensure_ascii=False), file=stderr, flush=True)
     return event
+
+
+def verify_unknown_receipt_replay(manage, database, token, body, headers, received, callbacks,
+                                  model_prefix, model_terminal, original_request, reservation, mode):
+    """公开 502 后读取同一次合法工具回执的回复。@param manage 管理入口。
+    @param database 隔离用量库。@param token 原调用方。@param body 原回执。@param headers 原会话。
+    @param received 实际模型收件。@param callbacks 已执行的工具。
+    @param model_prefix 放行模型首段。@param model_terminal 放行模型终帧。
+    @param original_request 原公开请求。@param reservation 原预留。@param mode 生成中或已完成。
+    @return 公开响应、尝试及用量证据。
+    """
+    def usage():
+        with closing(connect(database)) as db:
+            rows = db.execute("SELECT input_tokens,output_tokens,partial FROM usage_records ORDER BY started_at").fetchall()
+        # 接回过程也会写入部分用量。两条用量均收口后，缓存才已完成。
+        return rows if len(rows) == 2 and all(partial == 0 for _, _, partial in rows) else None
+
+    if mode == "complete":
+        model_prefix.set()
+        model_terminal.set()
+        wait_for(usage)
+
+    prefix = []
+    response_id = None
+
+    def request_sent():
+        startup_event("unknown_receipt_replay_sent", mode=mode, original_request_id=original_request,
+                      reservation_id=reservation, model_posts=len(received), terminal_released=model_terminal.is_set())
+        if mode == "live":
+            assert not model_terminal.is_set()
+            model_prefix.set()
+
+    def response_headers(response):
+        nonlocal response_id
+        response_id = response.getheader("x-cc2api-request-id")
+        if mode == "live" and response.status == 200:
+            prefix.extend(read_tool_stream_data_lines(response, 3))
+            assert not model_terminal.is_set() and len(received) == 2
+            model_terminal.set()
+
+    try:
+        status, raw = call(18090, "POST", "/v1/messages", token, body, headers,
+                           observe_headers=response_headers, observe_request_sent=request_sent)
+    finally:
+        model_prefix.set()
+        model_terminal.set()
+    assert status == 200 and response_id and response_id != original_request, (status, response_id, raw)
+    assert len(received) == 2 and callbacks == [NEW_ID]
+    lines = prefix + [line for line in raw.splitlines(keepends=True) if line.startswith(b"data:")]
+    events = [json.loads(line[5:]) for line in lines]
+    assert [event["type"] for event in events] == [
+        "message_start", "content_block_start", "content_block_delta", "content_block_stop",
+        "message_delta", "message_stop",
+    ]
+    assert events[2]["delta"]["text"] == FINAL and events[-2]["delta"]["stop_reason"] == "end_turn"
+    assert events[0]["message"]["id"].startswith("msg_")
+
+    def final_attempts():
+        original = manage("GET", "request-diagnostics/" + original_request)
+        replay = manage("GET", "request-diagnostics/" + response_id)
+        if original["attempts"] and replay["request"].get("finished_at"):
+            return original, replay
+
+    original, replay = wait_for(final_attempts)
+    original_record = original["request"]
+    assert (original_record["status_code"], original_record["outcome"], original_record["error_stage"]) == (
+        502, "transport_error", "tui_send_http",
+    ), original
+    assert original_record["context"]["tui_reservation_id"] == reservation
+    assert original_record["context"]["tui_confirmed_model_responses"] == 1
+    assert original_record["attempt_count"] == 1 and original_record.get("native_rejection") is None, original
+    (attempt,) = original["attempts"]
+    assert (attempt["request_id"], attempt["attempt_id"], attempt["status_code"]) == (original_request, reservation, 200)
+    expected_outcome = "tui_reconnect_stream" if mode == "live" else "tui_reconnect_cached"
+    assert replay["attempts"] == [] and replay["request"]["outcome"] == expected_outcome, replay
+    rows = wait_for(usage)
+    assert rows == [(10, 8, 0), (10, 8, 0)], rows
+    return {"mode": mode, "request_id": response_id, "http_status": status, "outcome": expected_outcome,
+            "attempt_count": 0, "new_model_posts": 0, "public_message_id": events[0]["message"]["id"],
+            "frames_before_model_terminal": len(prefix), "late_original_attempt": attempt["attempt_id"],
+            "original_model_responses_after_replay": 1,
+            "original_receipt_sha256": received[1][0], "usage": rows}
 
 
 def signed_receipt_rejection(manage, phase, request_id, session_id, status, raw):
@@ -5100,6 +5215,8 @@ def main():
                        choices=("mismatched-key", "missing-directory", "missing-binding"))
     fault.add_argument("--recovery-readiness-rejection", action="store_true")
     fault.add_argument("--recovery-slow-model", action="store_true")
+    fault.add_argument("--replay-unknown-receipt", choices=("live", "complete"),
+                       help="收到回执提交未知的 502 后，主动接回同一次生成")
     scenario = parser.add_mutually_exclusive_group()
     scenario.add_argument("--restart-history", action="store_true")
     scenario.add_argument("--text-input", action="store_true")
@@ -5200,7 +5317,7 @@ def main():
     if args.trace_recovery_resend and not (args.recover_pending_tool or args.model_connection_contract == "restart"):
         parser.error("--trace-recovery-resend 需要 --recover-pending-tool 或 --model-connection-contract restart")
     if (args.recovery_ledger_contention or args.recovery_ledger_deadline or args.recovery_workspace_rejection
-        or args.recovery_readiness_rejection or args.recovery_slow_model) and (
+        or args.recovery_readiness_rejection or args.recovery_slow_model or args.replay_unknown_receipt) and (
         not args.recover_pending_tool or args.signed_tool_history
     ):
         parser.error("恢复故障注入需要可提交的 --recover-pending-tool 原回执")
@@ -5217,6 +5334,7 @@ def main():
                      or args.tool_receipt_text_blocks is not None
                      or args.explicit_custom_tool_type
                      or args.recovery_readiness_rejection
+                     or args.replay_unknown_receipt is not None
                      or bool(args.structured_output_contract or args.forced_tool_choice_contract) or args.no_tool_choice_contract
                      or args.disable_parallel_tool_use_contract or bool(args.oauth_rotation or args.provider_quota)
                      or args.slow_tool_stream or args.interrupted_tool_stream is not None
@@ -5284,6 +5402,7 @@ def main():
                        recovery_workspace_rejection=args.recovery_workspace_rejection,
                        recovery_readiness_rejection=args.recovery_readiness_rejection,
                        recovery_slow_model=args.recovery_slow_model,
+                       replay_unknown_receipt=args.replay_unknown_receipt,
                        initial_idle_model_connection=args.initial_idle_model_connection, trace_startup=trace_startup,
                        trace_recovery_resend=args.trace_recovery_resend,
                        cache_markers=cache_markers, history_cache_markers=args.history_cache_markers,

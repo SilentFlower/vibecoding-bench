@@ -1051,7 +1051,7 @@ impl PrimePollerService {
         drop(config);
         // 发送开始后由 sender 持有单次预留。私有首包超时仍保留提交状态未知。
         let mut response = prepared
-            .submit_with_account_credentials(deadline, credentials)
+            .submit_with_account_credentials(deadline, credentials, None)
             .await?;
         runtime_transport::recover_tui_oauth_after_response(
             &self.account_svc,

@@ -200,8 +200,33 @@ impl Reconnects {
     }
 }
 
-#[derive(Clone, Default)]
-pub(super) struct BeforeHeaders(Arc<Mutex<Option<(Weak<Reply>, Arc<Delivery>)>>>);
+#[derive(Clone)]
+pub(super) struct BeforeHeaders {
+    submitted: Arc<Mutex<Option<PendingSubmission>>>,
+    state: watch::Sender<HeaderWait>,
+}
+
+struct PendingSubmission {
+    reply: Weak<Reply>,
+    delivery: Arc<Delivery>,
+    trace: Option<diagnostics::TraceContext>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum HeaderWait {
+    Waiting,
+    Expired,
+    Detached,
+}
+
+impl Default for BeforeHeaders {
+    fn default() -> Self {
+        Self {
+            submitted: Default::default(),
+            state: watch::channel(HeaderWait::Waiting).0,
+        }
+    }
+}
 
 struct PendingHeaders {
     operation: Option<Pin<Box<dyn Future<Output = Response> + Send>>>,
@@ -241,24 +266,57 @@ async fn no_readers(mut readers: watch::Receiver<Readers>) {
 impl BeforeHeaders {
     /// 在实际提交边界登记可接回的唯一生成。@param writer 本轮写者。@param delivery 数据库步骤。
     pub(super) fn submitted(&self, writer: &Writer, delivery: &Arc<Delivery>) {
-        *self.0.lock().unwrap() = Some((Arc::downgrade(&writer.reply), delivery.clone()));
+        *self.submitted.lock().unwrap() = Some(PendingSubmission {
+            reply: Arc::downgrade(&writer.reply),
+            delivery: delivery.clone(),
+            trace: diagnostics::current_trace(),
+        });
+    }
+
+    /// 公共等待已到期时，等原读者离开，再收取同一个私有响应。@return 无。
+    pub(super) async fn public_timeout(&self) {
+        let mut state = self.state.subscribe();
+        self.state.send_if_modified(|state| {
+            if *state != HeaderWait::Waiting {
+                return false;
+            }
+            *state = HeaderWait::Expired;
+            true
+        });
+        let _ = state.wait_for(|state| *state == HeaderWait::Detached).await;
     }
 
     /// 在公开连接上执行，只有已提交的工具轮才在连接断开时继续等待原回复。
-    /// @param future 已鉴权请求。@param cutover 维护取消信号。@return 公开响应。
+    /// @param future 已鉴权请求。@param cutover 维护取消信号。
+    /// @param timeout 已确定的公开超时响应。@return 公开响应。
     pub(super) async fn run(
         self,
         future: impl Future<Output = Response> + Send + 'static,
         cutover: Option<InferenceCutover>,
+        timeout: impl FnOnce() -> Response,
     ) -> Response {
+        let mut state = self.state.subscribe();
         let mut pending = PendingHeaders {
             operation: Some(Box::pin(future)),
             owner: self,
             cutover,
         };
-        let response = pending.operation.as_mut().unwrap().await;
-        pending.operation.take();
-        response
+        tokio::select! {
+            response = pending.operation.as_mut().unwrap() => {
+                pending.operation.take();
+                response
+            }
+            _ = state.wait_for(|state| *state == HeaderWait::Expired) => {
+                let trace = pending.owner.submitted.lock().unwrap().as_ref()
+                    .and_then(|submitted| submitted.trace.clone());
+                let response = timeout();
+                match trace {
+                    Some(trace) => trace.finish_tui_header_timeout(response),
+                    None => response,
+                }
+                // PendingHeaders 在返回前把同一个私有请求移交给后台。
+            }
+        }
     }
 }
 
@@ -267,7 +325,10 @@ impl Drop for PendingHeaders {
         let Some(operation) = self.operation.take() else {
             return;
         };
-        let Some((reply, delivery)) = self.owner.0.lock().unwrap().take() else {
+        let Some(PendingSubmission {
+            reply, delivery, ..
+        }) = self.owner.submitted.lock().unwrap().take()
+        else {
             return;
         };
         let Some(reply) = reply.upgrade() else { return };
@@ -276,6 +337,7 @@ impl Drop for PendingHeaders {
             out.disconnected = true;
             out.original.take();
         }
+        self.owner.state.send_replace(HeaderWait::Detached);
         let mut cutover = self.cutover.take();
         tokio::spawn(async move {
             let cancel = async {

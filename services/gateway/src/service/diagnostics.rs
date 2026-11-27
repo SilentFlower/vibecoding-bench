@@ -203,6 +203,27 @@ impl TraceContext {
         self.state.lock().unwrap_or_else(|error| error.into_inner())
     }
 
+    fn mark_tui_submission_unknown(&self) {
+        let mut state = self.lock();
+        state.tui_submission_unknown = true;
+        state.request.error_stage = Some("tui_send_http".into());
+        state.request.native_rejection = None;
+        if let Some(context) = state.request.context.as_mut()
+            && context.tui_confirmed_model_responses == Some(0)
+        {
+            context.tui_confirmed_model_responses = None;
+        }
+    }
+
+    /// 结束超时的公开请求诊断，同时保留后台尝试对原请求的关联。
+    /// @param response 已确定的公开 502。@return 带有原请求 ID 的响应。
+    pub(super) fn finish_tui_header_timeout(&self, response: Response) -> Response {
+        self.mark_tui_submission_unknown();
+        let response = RequestTraceGuard::new(self.clone()).wrap(response);
+        self.finish("complete");
+        response
+    }
+
     /// 为重试保留本地 HTTP 根和原生成关联，零次上游尝试。
     /// @param account_id 原账号。@param request_id 原生成根。@param attempt_id 原尝试。
     /// @param submission_state 已观察到的发送状态。@return 无。
@@ -454,7 +475,12 @@ pub(crate) fn retry_reason(reason: &'static str) {
 /// @param stage 代码内固定阶段。
 /// @return 无返回值。
 pub(crate) fn error_stage(stage: &'static str) {
-    let _ = CURRENT_TRACE.try_with(|trace| trace.lock().request.error_stage = Some(stage.into()));
+    let _ = CURRENT_TRACE.try_with(|trace| {
+        let mut state = trace.lock();
+        if state.request.finished_at.is_none() {
+            state.request.error_stage = Some(stage.into());
+        }
+    });
 }
 
 /// 写入隔离验证的单调时钟事件。@param stage 固定阶段。@param id 已分配的 sender 预留 ID。
@@ -543,17 +569,7 @@ pub(super) fn observe_tui_model(observation: TuiModelObservation) {
 
 /// 记录已发起私有提交后失去响应头的边界。@return 无。
 pub(super) fn tui_submission_unknown() {
-    let _ = CURRENT_TRACE.try_with(|trace| {
-        let mut state = trace.lock();
-        state.tui_submission_unknown = true;
-        state.request.error_stage = Some("tui_send_http".into());
-        state.request.native_rejection = None;
-        if let Some(context) = state.request.context.as_mut()
-            && context.tui_confirmed_model_responses == Some(0)
-        {
-            context.tui_confirmed_model_responses = None;
-        }
-    });
+    let _ = CURRENT_TRACE.try_with(TraceContext::mark_tui_submission_unknown);
 }
 
 /// 记录 sender 已验证的本地拒绝及采集归属，保持零上游尝试。
@@ -896,7 +912,10 @@ impl AttemptTrace {
         };
         let mut state = self.trace.lock();
         state.request.attempt_count = state.request.attempt_count.saturating_add(1);
-        state.request.error_stage = None;
+        if state.request.finished_at.is_none() {
+            // 晚到的尝试仍可补记。原公开响应已有终态时保留其失败阶段。
+            state.request.error_stage = None;
+        }
         record.ordinal = state.request.attempt_count;
         record.retry_reason = state.next_retry.take().map(str::to_owned);
         record.started_at = timestamp;
@@ -1159,6 +1178,10 @@ impl RequestTraceGuard {
         }
         {
             let mut state = self.trace.lock();
+            // 首响应头超时已独立交付公开 502，后台拿到的原响应只更新实际尝试。
+            if state.request.finished_at.is_some() {
+                return response;
+            }
             state.request.status_code = Some(response.status().as_u16());
             state.request.response_request_id = response
                 .headers()
