@@ -11,6 +11,7 @@ from fcntl import LOCK_EX, flock
 from hashlib import sha256
 from http.client import HTTPConnection, HTTPException, IncompleteRead
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from itertools import groupby
 import json
 import os
 from pathlib import Path
@@ -722,7 +723,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 wire = fixture_thinking_display_sse(body, message_id="msg_cold_reply")
             else:
                 text = FINAL
-                if structured_output and body.get("output_config", {}).get("format") == STRUCTURED_FORMAT:
+                if structured_output and same_json_value(body.get("output_config", {}).get("format"), STRUCTURED_FORMAT):
                     text = STRUCTURED_REPLY
                 wire = message_sse({"type": "text", "text": text}, "end_turn", "msg_cold_reply")
             if model_stream_probe is not None:
@@ -4845,6 +4846,20 @@ def verify_forced_tool_choice(manage, token, identifier, received, sender_status
     return {"wire_final": "unavailable", "restarted": restart is not None, "cases": cases, "model_posts": len(received)}
 
 
+def same_json_value(actual, expected):
+    """按 JSON 类型比较值，忽略对象键序并保留数组元素顺序。
+    @param actual 已解码的实收值。@param expected 已解码的预期值。@return 语义是否相同。
+    """
+    # Python 把布尔值当整数比较，JSON Schema 的关键字则区分布尔值和数字。
+    if isinstance(actual, bool) or isinstance(expected, bool):
+        return actual is expected
+    if isinstance(actual, dict) and isinstance(expected, dict):
+        return actual.keys() == expected.keys() and all(same_json_value(actual[key], expected[key]) for key in expected)
+    if isinstance(actual, list) and isinstance(expected, list):
+        return len(actual) == len(expected) and all(same_json_value(a, b) for a, b in zip(actual, expected, strict=True))
+    return actual == expected
+
+
 def verify_structured_tool_round(manage, token, identifier, received, sender_status, restart, *, source_observer):
     """核对带结构化输出的工具轮及已认领原生轮的兼容边界。
     @param manage 管理入口。@param token 合成令牌。@param identifier 账号 ID。
@@ -4892,7 +4907,7 @@ def verify_structured_tool_round(manage, token, identifier, received, sender_sta
         assert attempt["request_id"] == request_id and attempt["attempt_id"] == reservation
         assert attempt["context"]["tui_body_source"] == source
         output = model.get("output_config", {})
-        assert output == body["output_config"], (label, output)
+        assert same_json_value(output, body["output_config"]), (label, output)
         proof.update(provider_path=source, session_origin=attempt["context"]["tui_session_origin"],
                      model_body_sha256=digest, model_output_config=output)
         if claims is not None:
@@ -4982,6 +4997,36 @@ def verify_structured_tool_round(manage, token, identifier, received, sender_sta
             "restarted": restart is not None, "source_observer": source_observer, "wire_final": "unavailable"}
 
 
+def structured_sse_text(raw, phase):
+    """按公开文本块的生命周期重组流式回复。
+    @param raw 公开 SSE 字节。@param phase 用例名。@return 重组文本及停止原因。
+    """
+    frames = [json.loads(line[5:]) for line in raw.splitlines() if line.startswith(b"data:")]
+    events = [event for event in frames if event["type"] != "ping"]
+    assert len(events) >= 5 and (events[0]["type"], events[-2]["type"], events[-1]["type"]) == (
+        "message_start", "message_delta", "message_stop",
+    ), (phase, events)
+    parts = []
+    for index, (actual_index, group) in enumerate(groupby(events[1:-2], key=lambda event: event.get("index"))):
+        block_events = list(group)
+        assert actual_index == index and all(type(event.get("index")) is int for event in block_events), (
+            phase, index, block_events,
+        )
+        assert len(block_events) >= 2 and (block_events[0]["type"], block_events[-1]["type"]) == (
+            "content_block_start", "content_block_stop",
+        ), (phase, index, block_events)
+        start = block_events[0]["content_block"]
+        assert start["type"] == "text" and isinstance(start["text"], str), (phase, index, start)
+        parts.append(start["text"])
+        for event in block_events[1:-1]:
+            delta = event.get("delta", {})
+            assert event["type"] == "content_block_delta" and delta.get("type") == "text_delta" and isinstance(
+                delta.get("text"), str,
+            ), (phase, index, event)
+            parts.append(delta["text"])
+    return "".join(parts), events[-2]["delta"]["stop_reason"]
+
+
 def verify_structured_output(manage, token, identifier, received):
     """核对三种账号动作下的普通结构化输出。
     @param manage 管理入口。@param token 合成令牌。@param identifier 账号 ID。
@@ -5052,7 +5097,7 @@ def verify_structured_output(manage, token, identifier, received):
                     ), (phase, attempt)
                     assert native["model"] == MODEL and native["max_tokens"] == 128 and not native.get("tools"), phase
                     output = native.get("output_config", {})
-                    assert ("format" not in output if from_cli else output == config), (phase, output)
+                    assert ("format" not in output if from_cli else same_json_value(output, config)), (phase, output)
                     root = native["system"]
                     root_blocks = [root] if isinstance(root, str) else [block["text"] for block in root]
                     user_texts = [b.get("text", "") for row in native["messages"] if row["role"] == "user"
@@ -5069,12 +5114,7 @@ def verify_structured_output(manage, token, identifier, received):
                     if policy == "replace":
                         assert root_blocks[2:] == [system], (phase, root_blocks)
                     if stream:
-                        events = [json.loads(line[5:]) for line in raw.splitlines() if line.startswith(b"data:")]
-                        assert events[-1]["type"] == "message_stop", (phase, events[-1])
-                        (terminal,) = [event["delta"] for event in events if event["type"] == "message_delta"]
-                        text = "".join(event["delta"]["text"] for event in events
-                                       if event["type"] == "content_block_delta")
-                        stop_reason = terminal["stop_reason"]
+                        text, stop_reason = structured_sse_text(raw, phase)
                     else:
                         reply = json.loads(raw)
                         (block,) = reply["content"]
