@@ -2,10 +2,18 @@
 
 from contextlib import closing
 from hashlib import sha256
+from io import BytesIO
 import json
 from pathlib import Path
 from sqlite3 import connect
 from uuid import uuid4
+
+
+MODEL_TEXT_REPLIES = {
+    "progress": ("Reading the synthetic note", (29, 6)),
+    "child_receipt": ("子轮已完成合成笔记读取。", (17, 3)),
+    "parent_receipt": ("父轮已完成合成任务汇总。", (23, 5)),
+}
 
 
 def model_reply(index, body, samples, tool_sse, text_sse, frame):
@@ -23,14 +31,31 @@ def model_reply(index, body, samples, tool_sse, text_sse, frame):
                    if row["role"] == "assistant" and isinstance(row["content"], list)
                    for block in row["content"] if block["type"] == "tool_use")
         return tool_sse(tool, with_signature=False, model=body["model"])
-    text = "Reading the synthetic note" if label == "progress" else "Synthetic receipt complete."
+    text, (input_tokens, output_tokens) = MODEL_TEXT_REPLIES[label]
     wire = text_sse({"type": "text", "text": text}, "end_turn", f"msg_{uuid4().hex}")
-    if label != "progress":
-        return wire
     events = [json.loads(line[5:]) for line in wire.splitlines() if line.startswith(b"data:")]
-    events[0]["message"]["usage"]["input_tokens"] = 29
-    events[-2]["usage"]["output_tokens"] = 6
+    events[0]["message"]["usage"]["input_tokens"] = input_tokens
+    events[-2]["usage"]["output_tokens"] = output_tokens
     return b"".join(map(frame, events))
+
+
+def _public_text_reply(raw, stream):
+    if stream:
+        from tui_message_json import MessageJSON
+        from tui_messages import BODY_LIMIT, wire_events
+
+        # 复用消息聚合器，按块重组公开流并核对完整结束。
+        assembled = MessageJSON(BODY_LIMIT)
+        for _, event in wire_events(BytesIO(raw)):
+            if event is not None:
+                assembled.add(event)
+        raw = assembled.finish()
+    reply = json.loads(raw)
+    blocks = reply["content"]
+    assert blocks and all(block["type"] == "text" for block in blocks), reply
+    text = "".join(block["text"] for block in blocks)
+    usage = reply["usage"]
+    return reply["id"], text, (usage["input_tokens"], usage["output_tokens"]), reply["stop_reason"]
 
 
 def verify_agent_progress(manage, token, foreign, received, database, samples, checked, wait_for):
@@ -48,6 +73,10 @@ def verify_agent_progress(manage, token, foreign, received, database, samples, c
     def pending_tools():
         with closing(connect(database)) as db:
             return db.execute("SELECT * FROM tui_native_turns ORDER BY id").fetchall()
+
+    def finished_receipt(request_id):
+        detail = manage("GET", "request-diagnostics/" + request_id)
+        return detail if detail["request"]["finished_at"] else None
 
     def archive_snapshot():
         snapshots = {}
@@ -81,21 +110,9 @@ def verify_agent_progress(manage, token, foreign, received, database, samples, c
         for stream in (True, False):
             before = len(received)
             _, raw, request_id = send("progress", f"progress_local_{local}_stream_{stream}", stream=stream)
-            if stream:
-                events = [json.loads(line[5:]) for line in raw.splitlines() if line.startswith(b"data:")]
-                text = "".join(e["delta"]["text"] for e in events if e["type"] == "content_block_delta")
-                message_id = events[0]["message"]["id"]
-                start, = (e["message"]["usage"] for e in events if e["type"] == "message_start")
-                stop, = (e["usage"] for e in events if e["type"] == "message_delta")
-                assert events[-1]["type"] == "message_stop"
-                usage = (start["input_tokens"], stop["output_tokens"])
-            else:
-                reply = json.loads(raw)
-                text = reply["content"][0]["text"]
-                message_id = reply["id"]
-                usage = (reply["usage"]["input_tokens"], reply["usage"]["output_tokens"])
-            assert text == ("Reading file fixture-note.txt" if local else "Reading the synthetic note")
-            assert usage == ((0, 0) if local else (29, 6))
+            message_id, text, usage, _ = _public_text_reply(raw, stream)
+            expected = ("Reading file fixture-note.txt", (0, 0)) if local else MODEL_TEXT_REPLIES["progress"]
+            assert (text, usage) == expected
             assert len(received) - before == int(not local)
             assert pending_tools() == pending
             assert all(file.read_bytes() == data for file, data in snapshots.items())
@@ -118,12 +135,25 @@ def verify_agent_progress(manage, token, foreign, received, database, samples, c
     checked(manage, token, wrong_session, headers, received, "progress_foreign_session",
             expected_status=400, trace_startup=True)
     receipts = {}
-    for label in ("child_receipt", "parent_receipt"):
+    for label, stream in (("child_receipt", True), ("parent_receipt", False)):
         before = len(received)
-        status, _, request_id = send(label, label)
-        duplicate, _, _ = send(label, "progress_duplicate_" + label, status=400)
+        status, raw, request_id = send(label, label, stream=stream)
+        message_id, text, usage, stop_reason = _public_text_reply(raw, stream)
+        assert (text, usage) == MODEL_TEXT_REPLIES[label] and stop_reason == "end_turn", (
+            label, text, usage, stop_reason,
+        )
+        duplicate, _, _ = send(label, "progress_duplicate_" + label, stream=stream, status=400)
         assert len(received) - before == 1
-        receipts[label] = {"request_id": request_id, "status": status, "duplicate_status": duplicate}
+        detail = wait_for(lambda: finished_receipt(request_id))
+        attempt, = detail["attempts"]
+        reservation = detail["request"]["context"]["tui_reservation_id"]
+        assert (attempt["request_id"], attempt["attempt_id"]) == (request_id, reservation), detail
+        tokens = attempt["tokens"]
+        assert (tokens["input_tokens"], tokens["output_tokens"]) == usage, detail
+        receipts[label] = {"request_id": request_id, "status": status, "duplicate_status": duplicate,
+                           "stream": stream, "message_id": message_id, "text": text, "usage": usage,
+                           "stop_reason": stop_reason, "attempt_id": reservation, "model_body_sha256": received[-1][0]}
+    assert len({receipt["message_id"] for receipt in receipts.values()}) == len(receipts)
     assert len(received) == 6
 
     def usage_rows():
@@ -132,7 +162,7 @@ def verify_agent_progress(manage, token, foreign, received, database, samples, c
         return result if len(result) >= 6 else None
 
     ledger = wait_for(usage_rows)
-    assert sorted(ledger) == [(10, 8, 0)] * 4 + [(29, 6, 0)] * 2
+    assert sorted(ledger) == [(10, 8, 0)] * 2 + [(17, 3, 0), (23, 5, 0)] + [(29, 6, 0)] * 2
     assert not any(file.is_file() for file in Path("/flows/api").rglob("*"))
     return {"parent_request_id": parent_id, "child_request_id": child_id, "cases": modes, "usage_records": ledger,
             "original_archive_and_bindings": len(snapshots), "receipts": receipts, "foreign_principal_status": 400,
