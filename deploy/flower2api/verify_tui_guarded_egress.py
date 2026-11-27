@@ -108,7 +108,7 @@ def check_provider_error(manage, token, identifier, received, sender_status, res
             "stop_failure": event, "diagnostics": evidence, "wire_final": "unavailable"}
 
 
-def check(manage, token, identifier, received, sender_status, restart, *, source_observer, mode):
+def check(manage, token, identifier, received, sender_status, restart, *, source_observer, mode, receipt_status=200):
     """通过正式网关提交简单非流式请求。@return 公开回执和模型实收。"""
     assert not source_observer and not restart
     headers = {"x-session-id": str(uuid4()), "User-Agent": "flower2api-direct-guarded-lab/1"}
@@ -135,7 +135,10 @@ def check(manage, token, identifier, received, sender_status, restart, *, source
         result = {"type": "tool_result", "tool_use_id": tool_reply["content"][0]["id"], "content": fixture.REPLY}
         follow = {**body, "messages": [*body["messages"], {"role": "assistant", "content": tool_reply["content"]},
                                       {"role": "user", "content": [result]}]}
-        answer, request = post("guarded_direct_tool_receipt", follow, 200)
+        answer, request = post("guarded_direct_tool_receipt", follow, receipt_status)
+        if receipt_status != 200:
+            return {**request, "initial": first, "tool_result": result, "model_posts": len(received),
+                    "public_error": answer["error"], "session_id": headers["x-session-id"], "wire_final": "unavailable"}
         _, duplicate = post("guarded_direct_tool_duplicate", follow, 400)
         assert len(received) == 2
         (role, block), = fixture.find_blocks(received[-1][1], "tool_use_id", result["tool_use_id"])

@@ -4,6 +4,7 @@ from contextlib import closing, suppress
 from hashlib import sha256
 from http.client import HTTPConnection
 from ipaddress import ip_address
+from os import getuid, getgid
 from io import BytesIO
 import json
 from pathlib import Path
@@ -11,7 +12,7 @@ from select import select
 from socket import if_nameindex
 import ssl
 import sys
-from time import monotonic, sleep, time_ns
+from time import monotonic, monotonic_ns, sleep, time_ns
 from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -29,6 +30,9 @@ if (CONFIG.get("allowed_origin") != f"https://{TARGET}" or PROXY.scheme != "http
     raise RuntimeError("直发试接只允许使用已配置的回环账号代理")
 ORIGINAL_LAUNCH = launcher.launch_workspace_cli
 ORIGINAL_CALLBACK = session._Actor.callback
+POLICY_MODE = Path("/opt/flower/tui/fixture-direct-permit")
+PERMITS = Path("/tmp/flower-direct-permits.jsonl")
+TUNNELS = Path("/tmp/flower-direct-tunnels.jsonl")
 
 
 def report(stage, **data):
@@ -47,7 +51,33 @@ def launch(*args, environment, **options):
                 "HTTPS_PROXY": f"http://127.0.0.1:{context.port}", "NODE_EXTRA_CA_CERTS": str(ca),
                 "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", "DISABLE_AUTOUPDATER": "1",
                 "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "0"}
+    if POLICY_MODE.is_file():
+        arguments = options["arguments"]
+        mod = Path(arguments[arguments.index("--plugin-dir") + 1])
+        # 一次性容器仅接入一个原生 actor。受管 Mod 使用此 actor 自己的回环回调授权。
+        managed = Path("/opt/flower-http-test/flower-http-policy/hooks/runtime/binding.js")
+        try:
+            with managed.open("x") as listener:
+                listener.write((mod / "hooks/binding.js").read_text())
+        except OSError as error:
+            report("direct_permit_launch_failed", error=type(error).__name__, errno=error.errno,
+                   uid=getuid(), gid=getgid())
+            raise
     return ORIGINAL_LAUNCH(*args, environment=settings, **options)
+
+
+def _valid_attempt(actor, step, handle):
+    return (step and step.native and handle and actor.process and not actor.dead.is_set()
+            and len(handle.tools) <= 1 and not handle.stream and actor.oauth_file
+            and handle.expires_at and handle.expires_at > time_ns() // 1_000_000
+            and all(CONFIG["binding"][key] == handle.reservation[key]
+                    for key in ("account_id", "environment_id", "generation")))
+
+
+def _record_event(file, event, **data):
+    with file.open("a") as stream:
+        stream.write(json.dumps(data) + "\n")
+    report(event, **data)
 
 
 class Callback(session._Callback):
@@ -58,12 +88,9 @@ class Callback(session._Callback):
         actor = self.server.actor
         with actor.changed:
             step, handle = actor.step, actor.claim
-            if (self.path != TARGET + ":443" or not step or not step.native or step.claimed or not handle
-                    or not actor.process or actor.dead.is_set() or len(handle.tools) > 1 or handle.stream
-                    or not actor.oauth_file
-                    or not handle.expires_at or handle.expires_at <= time_ns() // 1_000_000
-                    or not all(CONFIG["binding"][key] == handle.reservation[key]
-                               for key in ("account_id", "environment_id", "generation"))):
+            gated = POLICY_MODE.is_file()
+            if (self.path != TARGET + ":443" or not _valid_attempt(actor, step, handle)
+                    or step.claimed != gated or getattr(actor, "direct_tunnel_step", None) is step):
                 return self.send_error(403)
             peer = f"0100007F:{self.client_address[1]:04X}"
             here = f"0100007F:{self.server.server_port:04X}"
@@ -75,15 +102,18 @@ class Callback(session._Callback):
                         break
             else:
                 return self.send_error(403)
-            step.claimed = True
-            handle.body_source = "interactive_cli"
+            actor.direct_tunnel_step = step
+            if not gated:
+                step.claimed = True
+                handle.body_source = "interactive_cli"
             reservation = handle.reservation["reservation_id"]
         with closing(HTTPConnection(PROXY.hostname, PROXY.port, timeout=10)) as relay:
             relay.set_tunnel(TARGET, 443)
             relay.connect()
-            report("direct_tunnel", cli_pid=actor.process.pid, source_port=self.client_address[1], inode=inode,
-                   session_proxy_port=self.server.server_port, account_proxy_port=PROXY.port,
-                   account_proxy_peer_port=relay.sock.getsockname()[1], reservation_id=reservation)
+            _record_event(TUNNELS, "direct_tunnel", cli_pid=actor.process.pid,
+                          source_port=self.client_address[1], inode=inode, session_proxy_port=self.server.server_port,
+                          account_proxy_port=PROXY.port, account_proxy_peer_port=relay.sock.getsockname()[1],
+                          reservation_id=reservation)
             self.send_response_only(200)
             self.end_headers()
             streams = {self.connection: relay.sock, relay.sock: self.connection}
@@ -126,8 +156,38 @@ def _deliver(actor, result, message, parts):
     ORIGINAL_CALLBACK(actor, "/end", result)
 
 
+def _authorize_http(actor, data):
+    from direct_egress_identity import model_body_identity
+
+    with actor.changed:
+        step, handle = actor.step, actor.claim
+        raw = data.get("body")
+        allowed_path = data.get("url") in (
+            f"https://{TARGET}/v1/messages", f"https://{TARGET}/v1/messages?beta=true",
+        )
+        if (not _valid_attempt(actor, step, handle) or step.claimed or not allowed_path
+                or data.get("method") != "POST" or not isinstance(raw, str)):
+            raise ValueError("缺少同一会话的当前模型预留")
+        body = json.loads(raw)
+        if not actor._main_request(body, handle):
+            raise ValueError("模型输入不属于当前预留")
+        allowed = not (POLICY_MODE.read_text() == "deny-receipt" and handle.kind == "continuation")
+        _record_event(PERMITS, "direct_http_permit", allowed=allowed, cli_pid=actor.process.pid,
+                      monotonic_ns=monotonic_ns(),
+                      reservation_id=handle.reservation["reservation_id"], step=list(step.native),
+                      core_body_sha256=sha256(raw.encode()).hexdigest(),
+                      sdk_request_id=data.get("requestId"),
+                      body_identity=model_body_identity(body))
+        if allowed:
+            step.claimed = True
+            handle.body_source = "interactive_cli"
+        return {"allowed": allowed}
+
+
 def callback(actor, path, data):
     """使用受信 Mod 的完成态投影单文本或单工具的 JSON 答复。@return 原协议回执。"""
+    if path == "/direct-http-permit" and POLICY_MODE.is_file():
+        return _authorize_http(actor, data)
     if path == "/begin":
         actor.direct_result = None
     elif path == "/direct-result":
