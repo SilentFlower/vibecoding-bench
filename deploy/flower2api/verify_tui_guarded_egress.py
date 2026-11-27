@@ -1,15 +1,21 @@
 """用隔离事件源验收原版 CLI 的公开文本和单组工具直发。"""
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 from functools import partial
 from hashlib import sha256
+from http.client import HTTPConnection
 from io import BytesIO
 import json
 from pathlib import Path
 from re import fullmatch
+from select import select
 from shutil import copy2
-from socket import if_nameindex
+from socket import SHUT_RDWR, if_nameindex
 from tempfile import TemporaryDirectory
+from threading import Event
+from time import monotonic_ns
 from unittest.mock import patch
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -111,8 +117,53 @@ def check_provider_error(manage, token, identifier, received, sender_status, res
             "stop_failure": event, "diagnostics": evidence, "wire_final": "unavailable"}
 
 
+def _reconnect_receipt(manage, token, headers, follow, first, received, post, tail):
+    sent = Event()
+    try:
+        with closing(HTTPConnection("127.0.0.1", 18090, timeout=30)) as connection:
+            connection.request("POST", "/v1/messages", fixture.encoded(follow), headers={
+                **headers, "authorization": "Bearer " + token, "content-type": "application/json",
+                "anthropic-version": "2023-06-01",
+            })
+            fixture.wait_for(lambda: tail.first_frame_ns)
+            assert len(received) == 2 and not tail.writing_tail.is_set()
+            assert not select([connection.sock], [], [], 0)[0]
+            connection.sock.shutdown(SHUT_RDWR)
+            disconnected = monotonic_ns()
+        # 重交写入后才释放模型尾段，确保断开和新读者都发生在公开首响之前。
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            retried = pool.submit(post, "direct_receipt_reattach", follow, 200, sent=sent)
+            try:
+                assert sent.wait(5) and not retried.done() and len(received) == 2
+                sent_before_tail = monotonic_ns()
+            finally:
+                tail.release.set()
+            answer, reader = retried.result()
+    finally:
+        tail.release.set()
+    assert len(received) == 2 and tail.completed.is_set()
+    assert tail.first_frame_ns <= disconnected <= sent_before_tail <= tail.ended_ns
+
+    def ended():
+        rows = manage("GET", "request-diagnostics")["items"]
+        own = [row for row in rows if row["request_id"] not in (first["request_id"], reader["request_id"])]
+        return own[0] if len(own) == 1 and own[0]["finished_at"] else None
+
+    original = fixture.wait_for(ended)
+    detail = manage("GET", "request-diagnostics/" + reader["request_id"])
+    assert detail["request"]["outcome"] in ("tui_reconnect_stream", "tui_reconnect_cached")
+    assert detail["request"]["attempt_count"] == 0 and not detail["attempts"]
+    assert original["attempt_count"] == 1
+    return answer, {"request_id": original["request_id"], "status": original["status_code"],
+                    "reservation_id": original["context"]["tui_reservation_id"],
+                    "reconnect": {**reader, "original_response_headers": None, "reader_attempts": 0,
+                                  "new_model_posts": 0, "outcome": detail["request"]["outcome"],
+                                  "model_first_frame_ns": tail.first_frame_ns, "model_end_ns": tail.ended_ns,
+                                  "disconnect_ns": disconnected, "retry_written_ns": sent_before_tail}}
+
+
 def check(manage, token, identifier, received, sender_status, restart, *, source_observer, mode, receipt_status=200,
-          public_stream=False):
+          public_stream=False, receipt_tail=None):
     """通过公开网关核对真实工具。@param public_stream 是否读取公开 SSE。@return 公开回执和模型实收。"""
     assert not source_observer and not restart
     headers = {"x-session-id": str(uuid4()), "User-Agent": "flower2api-direct-guarded-lab/1"}
@@ -121,11 +172,21 @@ def check(manage, token, identifier, received, sender_status, restart, *, source
             "messages": [{"role": "user", "content": question}]}
     tool_executions = []
 
-    def post(label, request, expected):
-        status, raw, request_id = fixture.checked_messages(
-            manage, token, request, headers, received, label, expected_status=expected,
-            trace_startup=True, sender_status=sender_status,
-        )
+    def post(label, request, expected, *, sent=None):
+        if sent is None:
+            status, raw, request_id = fixture.checked_messages(
+                manage, token, request, headers, received, label, expected_status=expected,
+                trace_startup=True, sender_status=sender_status,
+            )
+        else:
+            ids = []
+            status, raw = fixture.call(
+                18090, "POST", "/v1/messages", token, request, headers,
+                observe_request_sent=sent.set,
+                observe_headers=lambda response: ids.append(response.getheader("x-cc2api-request-id")),
+            )
+            request_id, = ids
+            assert status == expected and request_id, (status, raw)
         context = manage("GET", "request-diagnostics/" + request_id)["request"].get("context") or {}
         proof = {"status": status, "request_id": request_id, "reservation_id": context.get("tui_reservation_id")}
         if public_stream and status == 200:
@@ -157,16 +218,20 @@ def check(manage, token, identifier, received, sender_status, restart, *, source
         tool_executions.append(call["id"])
         follow = {**body, "messages": [*body["messages"], {"role": "assistant", "content": tool_reply["content"]},
                                       {"role": "user", "content": [result]}]}
-        answer, request = post("guarded_direct_tool_receipt", follow, receipt_status)
+        if receipt_tail is not None:
+            answer, request = _reconnect_receipt(manage, token, headers, follow, first, received, post, receipt_tail)
+        else:
+            answer, request = post("guarded_direct_tool_receipt", follow, receipt_status)
         if receipt_status != 200:
             return {**request, "initial": first, "tool_result": result, "model_posts": len(received),
                     "public_error": answer["error"], "client_tool_executions": len(tool_executions),
                     "session_id": headers["x-session-id"], "wire_final": "unavailable"}
-        _, duplicate = post("guarded_direct_tool_duplicate", follow, 400)
+        if receipt_tail is None:
+            _, duplicate = post("guarded_direct_tool_duplicate", follow, 400)
+            request["duplicate"] = duplicate
         assert len(received) == 2
         (role, block), = fixture.find_blocks(received[-1][1], "tool_use_id", result["tool_use_id"])
         assert role == "user" and block["content"].count(fixture.REPLY) == 1
-        request["duplicate"] = duplicate
     else:
         answer, request = post("guarded_direct_public", body, 200)
         assert len(received) == 1

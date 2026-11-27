@@ -17,6 +17,7 @@ import verify_tui_cold_history as fixture
 import verify_tui_core_http_hook as core
 import verify_tui_guarded_egress as guarded
 from fixtures.native_model_send.direct_egress_identity import model_body_identity
+from verify_tui_public_sse import ModelStream
 
 
 MOD_BINDING = "import { endpoint, bearer } from './runtime/binding.js'\n"
@@ -85,18 +86,38 @@ class ObservedModel(core.ObservedModel):
         return parsed
 
 
+class ReceiptTail(ModelStream):
+    """只在第二笔模型响应中分段写出合成文本。"""
+
+    def prepare(self, wire):
+        """为文本续轮保留闸门。@param wire 模型帧。@return 实际写出的帧。"""
+        self.buffered = any(line.startswith(b"data:") and
+                            json.loads(line[5:]).get("delta", {}).get("stop_reason") == "end_turn"
+                            for line in wire.splitlines())
+        return super().prepare(wire) if self.buffered else wire
+
+    def write(self, handler, wire):
+        """写出模型帧。@param handler 模型连接。@param wire 响应。@return 无。"""
+        if self.buffered:
+            super().write(handler, wire)
+        else:
+            handler.wfile.write(wire)
+
+
 def collect(manage, token, identifier, received, sender_status, restart, *, source_observer, mode, stages,
-            public_stream=False):
+            public_stream=False, receipt_tail=None):
     """关联公开请求、核心钩子、账号隧道和接收端。
     @param manage 管理入口。@param token 合成入口凭据。@param identifier 隔离账号。
     @param received 实际模型收件。@param sender_status 失败时的发送器诊断。
     @param restart 可用的发送器重启入口。@param source_observer 是否使用额外账号观测器。
     @param mode 试接模式。@param stages 实测代理和接收端事件。@return 隔离证据。
     @param public_stream 是否通过真实公开 SSE 执行工具。
+    @param receipt_tail 断线用例的隔离模型终帧闸门。
     """
     expected = 200 if mode == "allow" else 502
     public = guarded.check(manage, token, identifier, received, sender_status, restart,
-                           source_observer=source_observer, mode="tool", receipt_status=expected, public_stream=public_stream)
+                           source_observer=source_observer, mode="tool", receipt_status=expected,
+                           public_stream=public_stream, receipt_tail=receipt_tail)
     assert public["client_tool_executions"] == 1
     (log,) = Path("/native/tui-sessions").glob("*/home/.claude/core-http.log")
     lines = log.read_text(errors="replace").splitlines()
@@ -164,12 +185,15 @@ def main():
     parser.add_argument("--sender", type=Path, default=Path("/usr/local/bin/account-sender"))
     parser.add_argument("--direct-candidate", action="store_true", help="使用允许延后首帧的直发候选")
     parser.add_argument("--stream", action="store_true", help="经公开 SSE 交付工具和完整答复")
+    parser.add_argument("--reconnect", action="store_true", help="在模型已收回执且公开首响前断开并接回")
     args = parser.parse_args()
     assert Path("/.dockerenv").is_file() and {name for _, name in if_nameindex()} == {"lo"}
     if args.direct_candidate and args.mode != "allow":
         parser.error("直发候选需要 --mode allow")
     if args.stream and not args.direct_candidate:
         parser.error("公开 SSE 需要允许工具回执的直发候选")
+    if args.reconnect and not args.stream:
+        parser.error("断线接回需要 --stream")
     version = "2.1.321"
     digest = core.PROGRAMS[version]
     with Path(f"/cli/{version}/node_modules/.bin/claude").open("rb") as stream:
@@ -180,6 +204,7 @@ def main():
     stages = {key: [] for key in ("proxy_connect_accepted", "proxy_model_tcp_connected",
                                  "model_client_hello", "model_received", "direct_model_http_identity")}
     observe = fixture.startup_event
+    receipt_tail = ReceiptTail(pressure=False) if args.reconnect else None
 
     def capture(stage, **data):
         if stage in stages:
@@ -188,11 +213,12 @@ def main():
 
     with patch.multiple(
         fixture, QuietHandler=ObservedModel, startup_event=capture,
-        verify_structured_tool_round=partial(collect, mode=args.mode, stages=stages, public_stream=args.stream),
+        verify_structured_tool_round=partial(collect, mode=args.mode, stages=stages, public_stream=args.stream,
+                                              receipt_tail=receipt_tail),
     ), TemporaryDirectory(prefix="tui-direct-reuse-") as folder:
         result = fixture.verify(
             args.gateway, args.sender, Path(folder), installed_runtime=True,
-            structured_output="live", trace_startup=True, model_connection_contract="live",
+            structured_output="live", trace_startup=True, model_connection_contract="live", model_stream_probe=receipt_tail,
         )
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
