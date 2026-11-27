@@ -109,6 +109,33 @@ def locations(body, marker):
     return hits
 
 
+def verify_archive_suffix(archive, prefix, session_id):
+    """核对退出后原档新增的问答和钩子。@param archive 原档路径。@param prefix 重开前的字节。
+    @param session_id 原生会话 ID。@return 新增后缀的长度和各类记录计数。
+    """
+    published = archive.read_bytes()
+    assert published.startswith(prefix), "恢复后原会话前缀发生变化"
+    suffix = published[len(prefix):]
+    rows = [json.loads(line) for line in suffix.splitlines()]
+    counts = {}
+    for role, marker in (("user", QUESTIONS["resumed"]), ("assistant", reply(4))):
+        messages = [row["message"] for row in rows if row["type"] == role and not row.get("isSidechain")
+                    and row.get("sessionId") == session_id and row["message"]["role"] == role]
+        counts[role] = sum(hit["verbatim_block"] for hit in locations({"messages": messages}, marker))
+    attachments = [row["attachment"] for row in rows
+                   if row["type"] == "attachment" and row.get("sessionId") == session_id]
+    counts["session_start"] = sum(
+        item["type"] == "hook_additional_context" and item.get("hookEvent") == "SessionStart"
+        and item.get("content") == [RESUME_CONTEXT] for item in attachments
+    )
+    # CLI 另存提示索引。该记录不参与主链用户消息的计数。
+    last_prompt = sum(row["type"] == "last-prompt" and row.get("lastPrompt") == QUESTIONS["resumed"] for row in rows)
+    assert counts == {"user": 1, "assistant": 1, "session_start": 1}, (
+        "恢复后原会话后缀的主链或钩子记录缺失或重复", len(suffix), counts, last_prompt,
+    )
+    return {"bytes": len(suffix), **counts, "last_prompt": last_prompt}
+
+
 def verify(binary, folder):
     """从官方 PTY 依次运行首轮、提示钩子、热续轮和档案恢复。@param binary 固定 CLI。
     @param folder 独立实验目录。@return 模型实收的相对位置和来源。
@@ -145,8 +172,8 @@ def verify(binary, folder):
             assert cli.process.pid != first_pid
             cli.submit(QUESTIONS["resumed"])
             wait_for(lambda: cli.completed() == 4, "原生恢复后本轮完成", timeout=25)
-        assert archive.read_bytes().startswith(original_archive), "恢复后原会话前缀发生变化"
         assert len(server.received) == len(QUESTIONS), len(server.received)
+        archive_suffix = verify_archive_suffix(archive, original_archive, session_id)
 
     hook_calls = [json.loads(line) for line in events.read_text().splitlines()]
     assert [(e["hook"], e["session_id"]) for e in hook_calls] == [
@@ -193,7 +220,7 @@ def verify(binary, folder):
             "provider_path": "interactive_cli_direct", "model_posts": len(turns),
             "session_id": session_id, "resumed_same_archive": True,
             "archive_prefix_sha256": sha256(original_archive).hexdigest(), "archive_prefix_preserved": True,
-            "archived_prompt_context": archived, "hook_calls": hook_calls, "turns": turns,
+            "archive_suffix": archive_suffix, "archived_prompt_context": archived, "hook_calls": hook_calls, "turns": turns,
             "transport": "http_loopback", "wire_final": "unavailable"}
 
 
