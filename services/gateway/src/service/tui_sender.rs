@@ -2901,6 +2901,54 @@ mod tests {
         }
     }
 
+    /// 原工具预留的绑定暂缺时关闭已准备的 Unix 连接，并报告确定的发送前拒绝。@return 无。
+    #[tokio::test]
+    async fn unavailable_workspace_does_not_send_authenticated_tool_receipt() {
+        let source = Source::new();
+        let root = &source.sender.submission_storage;
+        let body = b"{}";
+        let owner = source.identity();
+        let workspace = workspace::Candidate::from_request(body, true, None)
+            .unwrap()
+            .bind(root, &owner)
+            .unwrap();
+        let binding = Path::new(workspace["binding_file"].as_str().unwrap());
+        let original = std::fs::read(binding).unwrap();
+        let base = binding.parent().unwrap();
+        for target in [base, binding] {
+            let held = target.with_extension("fixture-held");
+            std::fs::rename(target, &held).unwrap();
+            let identity = Identity {
+                continuation_only: true,
+                reservation_id: Uuid::new_v4().to_string(),
+                ..owner.clone()
+            };
+            let (prepared, mut socket) = tokio::join!(source.prepare(&identity, body), async {
+                let (mut socket, mut reply) = source.receive("prepare").await;
+                let mut raw = [0; 2];
+                socket.read_exact(&mut raw).await.unwrap();
+                assert_eq!(&raw, body);
+                reply["kind"] = json!("recovered");
+                reply["workspace_protocol"] = json!(1);
+                write_json(&mut socket, &reply).await.unwrap();
+                socket
+            });
+            assert_eq!(prepared.unwrap().status(), StatusCode::NO_CONTENT);
+            let (response, ()) = tokio::join!(source.send(&identity), async {
+                assert_eq!(
+                    socket.read_u8().await.unwrap_err().kind(),
+                    io::ErrorKind::UnexpectedEof
+                );
+            });
+            let response = response.unwrap();
+            assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+            assert_eq!(response.headers()[TUI_ERROR_SOURCE], TUI_WORKSPACE_BIND);
+            assert!(!target.exists());
+            std::fs::rename(&held, target).unwrap();
+            assert_eq!(std::fs::read(binding).unwrap(), original);
+        }
+    }
+
     /// 同一预留在发送前占用名额，响应按源字节逐段返回，发送后仍可安全重放取消。@return 无。
     /// 测试单轮证明可在另一个会话驻留时独立返回。@return 无。
     #[tokio::test]

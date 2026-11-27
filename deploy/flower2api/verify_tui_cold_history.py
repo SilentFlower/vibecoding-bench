@@ -370,7 +370,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param thinking_cli_summaries 可选，核对正式 CLI 摘要设置的隔离对照。
     @param recovery_ledger_contention 是否在提交原回执时短暂占用账号账本锁。
     @param recovery_ledger_deadline 是否持续持锁直至回执触发准入截止，然后重交。
-    @param recovery_workspace_rejection 是否核对工作区绑定拒绝及原回执再次认领。
+    @param recovery_workspace_rejection 可选的工作区绑定故障，核对拒绝及原回执再次认领。
     @param recovery_readiness_rejection 是否在预留前触发账本就绪拒绝并复交原回执。
     @param recovery_slow_model 是否验证隔离模型收件后的公开超时和诊断归属。
     @param initial_idle_model_connection 是否先占用一个未握手的模型 TCP 连接。
@@ -1183,10 +1183,10 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         wrong_subject, _ = call(18090, "POST", "/v1/messages", foreign, follow, headers)
         wrong_session, _ = call(18090, "POST", "/v1/messages", token, follow,
                                 {**headers, "x-session-id": str(uuid4())})
-        changed = {**follow, "messages": [*messages, {"role": "assistant", "content": [
+        changed_arguments_body = {**follow, "messages": [*messages, {"role": "assistant", "content": [
             {**block, "input": {**ARGS, "key": "another-note"}} if block is tool else block
             for block in offered]}, result]}
-        wrong_arguments, rejection = call(18090, "POST", "/v1/messages", token, changed, headers)
+        wrong_arguments, rejection = call(18090, "POST", "/v1/messages", token, changed_arguments_body, headers)
         rejected = wrong_subject, wrong_session, wrong_arguments, len(received)
         assert rejected == (400, 400, 422, 1), (rejected, rejection)
         partial_statuses = {}
@@ -1445,9 +1445,20 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         if recovery_workspace_rejection:
             original_binding = binding_file.read_bytes()
             mismatched = {**json.loads(original_binding), "session_key": "0" * 64}
+            missing_target = {"missing-directory": binding_file.parent, "missing-binding": binding_file}.get(
+                recovery_workspace_rejection,
+            )
+            held = missing_target.with_name(missing_target.name + ".fixture-held") if missing_target else None
+            if held:
+                checkpoint_db = "file:/native/tui-reconnect/receipts.db?mode=ro"
+                with closing(connect(checkpoint_db, uri=True)) as database:
+                    (original_checkpoint,) = database.execute("SELECT actor,revision,request,state FROM receipts").fetchall()
             started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+            if held:
+                missing_target.rename(held)
             try:
-                binding_file.write_text(json.dumps(mismatched))
+                if not held:
+                    binding_file.write_text(json.dumps(mismatched))
                 rejection_status, _, rejected_request = checked_messages(
                     manage, token, follow, headers, received, "recovered_receipt_workspace", expected_status=503,
                     trace_startup=trace_startup,
@@ -1467,8 +1478,30 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                     tools = database.execute("SELECT tools FROM tui_native_turns WHERE tools IN (?, ?)",
                                              (registered_tools, "!" + registered_tools)).fetchall()
                     assert tools == [(registered_tools,)], tools
+                if held:
+                    assert not missing_target.exists()
+                    kept = held / binding_file.name if missing_target == binding_file.parent else held
+                    assert kept.read_bytes() == original_binding
+                    with closing(connect(checkpoint_db, uri=True)) as database:
+                        assert database.execute("SELECT actor,revision,request,state FROM receipts").fetchall() == [
+                            original_checkpoint,
+                        ]
             finally:
-                binding_file.write_bytes(original_binding)
+                if held:
+                    held.rename(missing_target)
+                else:
+                    binding_file.write_bytes(original_binding)
+            assert binding_file.read_bytes() == original_binding
+            if held:
+                after_restore = []
+                for caller, request_body, request_headers in (
+                    (foreign, follow, headers),
+                    (token, follow, {**headers, "x-session-id": str(uuid4())}),
+                    (token, changed_arguments_body, headers),
+                ):
+                    denied, _ = call(18090, "POST", "/v1/messages", caller, request_body, request_headers)
+                    after_restore.append(denied)
+                assert after_restore == [400, 400, 422] and len(received) == 1, after_restore
         if recovery_slow_model:
             budget_key = "v3_admission_wait_seconds"
             previous_budget = manage("GET", "settings")[budget_key]
@@ -1869,6 +1902,13 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                     "attempt_count": record["attempt_count"], "request_id": rejected_request,
                     "reservation_id": reservation, "receipt_reopened": True,
                 }
+                if held:
+                    assert captures[-1]["attempt_id"] != reservation
+                    proof["recovered_pending_tool"]["workspace_rejection"].update(
+                        fault=recovery_workspace_rejection, binding_preserved=True,
+                        binding_recreated=False, source_receipt_revision_preserved=True,
+                        denials_after_restore=after_restore, restored_reservation_id=captures[-1]["attempt_id"],
+                    )
             if recovery_readiness_rejection:
                 assert readiness_request != continuation_request_id
                 proof["recovered_pending_tool"]["readiness_rejection"] = {
@@ -4181,7 +4221,8 @@ def main():
     fault = parser.add_mutually_exclusive_group()
     fault.add_argument("--recovery-ledger-contention", action="store_true")
     fault.add_argument("--recovery-ledger-deadline", action="store_true")
-    fault.add_argument("--recovery-workspace-rejection", action="store_true")
+    fault.add_argument("--recovery-workspace-rejection", nargs="?", const="mismatched-key",
+                       choices=("mismatched-key", "missing-directory", "missing-binding"))
     fault.add_argument("--recovery-readiness-rejection", action="store_true")
     fault.add_argument("--recovery-slow-model", action="store_true")
     scenario = parser.add_mutually_exclusive_group()

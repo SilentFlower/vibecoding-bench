@@ -166,7 +166,14 @@ impl Candidate {
     /// @param root 账号私有卷。@param identity 已校验的账号、主体与会话。@return 交给源的启动资料位置及原生会话号。
     pub(super) fn bind(self, root: &Path, identity: &Identity) -> Result<Value, AppError> {
         let unavailable = |_| AppError::ServiceUnavailable("V2 工作区绑定存储不可用".into());
-        let missing = || AppError::BadRequest("V2 原会话缺少可核对的工作区绑定".into());
+        let missing = || {
+            if identity.continuation_only {
+                // 原工具组已通过准备校验。绑定暂缺发生在 Unix send 之前，交由网关归还认领。
+                AppError::ServiceUnavailable("V2 原会话工作区绑定暂不可用".into())
+            } else {
+                AppError::BadRequest("V2 原会话缺少可核对的工作区绑定".into())
+            }
+        };
         submission_log::directory(root).map_err(unavailable)?;
         // 已发布的绑定只在首次创建时原子写入。续轮读取不应等待不相关的提交或取消写入账本。
         let _lock = self
