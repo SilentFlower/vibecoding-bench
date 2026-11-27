@@ -313,15 +313,19 @@ def _public_tool_name(actor, part):
 class _LiveProjection:
     """按官方事件交付文本、签名思考和客户端工具组，沿原步骤发布最终帧。"""
 
-    def __init__(self, actor):
-        """构造同一实际步骤的公开开场。@param actor 原会话。@return 无。"""
+    def __init__(self, actor, step, handle):
+        """构造同一实际步骤的公开开场。@param actor 原会话。
+        @param step 已认领模型步骤。@param handle 本轮预留。@return 无。
+        """
         self.actor = actor
-        self.step = actor.step
+        self.step = step
         self.next_index = 0
         self.text_indices = {}
         self.text_digest = sha256()
         self.tools = {}
         self.closed = set()
+        # 开场零值维持客户端帧形状。私有标识将占位与本轮真实用量分开。
+        handle.opening_usage_placeholder = True
         self._emit({"type": "message_start", "message": {
             "id": "msg_" + uuid4().hex, "role": "assistant", "type": "message", "model": self.step.native_model,
             "content": [], "stop_reason": None, "stop_sequence": None,
@@ -442,7 +446,7 @@ def _direct_chunk(actor, data):
             raise ValueError("流式增量不属于当前模型步骤")
     chunk = data["chunk"]
     if actor.direct_stream is None:
-        actor.direct_stream = _LiveProjection(actor)
+        actor.direct_stream = _LiveProjection(actor, step, handle)
     actor.direct_stream.add(chunk)
     return {}
 
@@ -526,8 +530,9 @@ def callback(actor, path, data):
     elif path == "/direct-result":
         buffered_stream = POLICY_MODE.is_file() and POLICY_MODE.read_text() == CANDIDATE_MODE
         with actor.changed:
-            if (not actor.step or not actor.claim or not actor.step.claimed or (actor.claim.stream and not buffered_stream)
-                    or actor.step.native != (data["turn"], data["step"])):
+            step, handle = actor.step, actor.claim
+            if (not step or not handle or not step.claimed or (handle.stream and not buffered_stream)
+                    or step.native != (data["turn"], data["step"])):
                 raise ValueError("缺少同一文本模型步骤")
             if (INSTALLED_PROBE.is_file() and buffered_stream and data.get("observed_refusal") is True
                     and data.get("reason") is None and not data.get("usage")
@@ -544,7 +549,7 @@ def callback(actor, path, data):
                 return {}
             actor.direct_result = data
         if data["reason"] in EARLY_TEXT_STOPS and INSTALLED_PROBE.is_file():
-            projection = actor.direct_stream or _LiveProjection(actor)
+            projection = actor.direct_stream or _LiveProjection(actor, step, handle)
             actor.direct_result = None
             rows = data.get("archive_rows")
             model = (data.get("usage") or {}).get("model")

@@ -44,9 +44,9 @@ use crate::service::runtime_transport::{
 use crate::service::runtime_transport::{
     TUI_BODY_SOURCE, TUI_CAPTURE, TUI_CLI_INPUT_GUARD, TUI_CLI_SUBMISSION, TUI_ERROR_SOURCE,
     TUI_FINAL_CAPTURE, TUI_INSTRUCTION_LOCATION, TUI_MODEL_ACCEPT_OMITTED, TUI_MODEL_HEADER_POLICY,
-    TUI_PREPARE_BIND, TUI_PREPARE_EXCHANGE, TUI_PREPARE_LEDGER, TUI_PROMPT_SUGGESTION,
-    TUI_REPAIR_ATTEMPT, TUI_SEND_CLAIM, TUI_SENDER_CONFIG, TUI_SESSION_ORIGIN,
-    TUI_SIGNATURE_REPAIR, TUI_SUBMISSION_LEDGER, TUI_SYSTEM_PROMPT_POLICY,
+    TUI_OPENING_USAGE_PLACEHOLDER, TUI_PREPARE_BIND, TUI_PREPARE_EXCHANGE, TUI_PREPARE_LEDGER,
+    TUI_PROMPT_SUGGESTION, TUI_REPAIR_ATTEMPT, TUI_SEND_CLAIM, TUI_SENDER_CONFIG,
+    TUI_SESSION_ORIGIN, TUI_SIGNATURE_REPAIR, TUI_SUBMISSION_LEDGER, TUI_SYSTEM_PROMPT_POLICY,
     TUI_TITLE_SESSION_MAPPING, TUI_WORKSPACE_BIND, TuiReceiptProbe, TuiV2Unavailable,
 };
 use crate::service::session_policy_block;
@@ -1657,6 +1657,16 @@ impl TuiSender {
                 response
                     .headers_mut()
                     .insert(TUI_BODY_SOURCE, HeaderValue::from_static(source.as_str()));
+                if options.managed
+                    && source == TuiBodySource::InteractiveCli
+                    && status == StatusCode::OK
+                    && content_type == "text/event-stream"
+                    && head["opening_usage_placeholder"].as_bool() == Some(true)
+                {
+                    response
+                        .headers_mut()
+                        .insert(TUI_OPENING_USAGE_PLACEHOLDER, HeaderValue::from_static("1"));
+                }
             }
             if let Some(origin) = head["session_origin"]
                 .as_str()

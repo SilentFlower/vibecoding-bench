@@ -87,6 +87,7 @@ struct UsageParser {
     discard_line: bool,
     discard_event: bool,
     skip_lf: bool,
+    ignore_opening_usage: bool,
     saw_input: bool,
     saw_output: bool,
     saw_end: bool,
@@ -209,6 +210,13 @@ impl UsageCapture {
     pub(crate) fn configure_codings(&mut self, codings: &[String]) {
         if let Err(error) = self.decoder.configure(codings) {
             self.decode_failed(error);
+        }
+    }
+
+    /// 使用受信响应首部标识，排除合成开场的用量。@return 无。
+    pub(super) fn ignore_opening_usage(&mut self) {
+        if let Some(parser) = self.decoder.sink_mut() {
+            parser.ignore_opening_usage = true;
         }
     }
 
@@ -337,6 +345,7 @@ impl UsageParser {
             discard_line: false,
             discard_event: false,
             skip_lf: false,
+            ignore_opening_usage: false,
             saw_input: false,
             saw_output: false,
             saw_end: false,
@@ -575,9 +584,14 @@ impl UsageParser {
         if value["type"].as_str() == Some("message_stop") {
             self.saw_end = true;
         }
+        let opening_usage = if self.ignore_opening_usage && value["type"] == "message_start" {
+            None
+        } else {
+            value.pointer("/message/usage")
+        };
         for usage in [
             value.get("usage"),
-            value.pointer("/message/usage"),
+            opening_usage,
             value.pointer("/delta/usage"),
         ]
         .into_iter()
@@ -932,6 +946,49 @@ mod tests {
         let record = capture.into_record(true);
         assert!(record.partial);
         assert!(record.cost_usd.is_none());
+    }
+
+    /// 只有明确的投影占位被忽略，真实零及随后终态的累计计数照常记账。
+    #[tokio::test]
+    async fn marked_opening_usage_keeps_unknown_and_real_zero_distinct() {
+        let open = b"data: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":0,\"output_tokens\":0}}}\n\n";
+        let zero = b"data: {\"type\":\"message_delta\",\"usage\":{\"input_tokens\":0,\"output_tokens\":0}}\n\n";
+        let positive = b"data: {\"type\":\"message_delta\",\"usage\":{\"input_tokens\":37,\"output_tokens\":19}}\n\n";
+        let end = b"data: {\"type\":\"message_stop\"}\n\n";
+
+        for (placeholder, terminal, expected, estimate) in [
+            (false, None, [Some(0), Some(0)], Some(0.0)),
+            (true, None, [None, None], None),
+            (true, Some(zero.as_slice()), [Some(0), Some(0)], Some(0.0)),
+            (
+                true,
+                Some(positive.as_slice()),
+                [Some(37), Some(19)],
+                calculate_cost(
+                    "claude-sonnet-5",
+                    "",
+                    MessageTelemetryUsage {
+                        input_tokens: 37,
+                        output_tokens: 19,
+                        ..MessageTelemetryUsage::default()
+                    },
+                ),
+            ),
+        ] {
+            let mut capture = test_capture();
+            if placeholder {
+                capture.ignore_opening_usage();
+            }
+            capture.observe(open);
+            if let Some(terminal) = terminal {
+                capture.observe(terminal);
+                capture.observe(end);
+            }
+            let parser = capture.completed_parser(terminal.is_some());
+            assert_eq!(parser.tokens[..2], expected);
+            assert_eq!(parser.record.partial, terminal.is_none());
+            assert_eq!(parser.record.cost_usd, estimate);
+        }
     }
 
     #[tokio::test]

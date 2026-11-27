@@ -1018,6 +1018,13 @@ impl AttemptTrace {
         }
     }
 
+    /// 诊断与账本共同排除同一已标识的开场占位。@return 无。
+    pub(super) fn ignore_opening_usage(&mut self) {
+        if let Some(capture) = self.capture.as_mut() {
+            capture.ignore_opening_usage();
+        }
+    }
+
     fn observe(&mut self, bytes: &[u8]) {
         if let Some(capture) = self.capture.as_mut() {
             capture.observe(bytes);

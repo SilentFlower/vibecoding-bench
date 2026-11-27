@@ -3258,12 +3258,20 @@ impl GatewayService {
                 }
                 let status = response.status().as_u16();
                 let mut usage = response.status().is_success().then(|| {
-                    UsageCapture::new(
+                    let mut capture = UsageCapture::new(
                         self.usage_store.clone(),
                         account.id,
                         &body_map,
                         usage_started_at,
-                    )
+                    );
+                    if response
+                        .extensions()
+                        .get::<runtime_transport::TuiOpeningUsagePlaceholder>()
+                        .is_some()
+                    {
+                        capture.ignore_opening_usage();
+                    }
+                    capture
                 });
                 let retained_usage = if reconnect.is_some() && status == 200 {
                     usage
@@ -4502,6 +4510,14 @@ impl GatewayService {
             provider_error_source,
             Some("local_provider_http" | "managed_oauth_http")
         );
+        let opening_usage_placeholder = !fixture
+            && model_response_received
+            && body_source == Some(TuiBodySource::InteractiveCli)
+            && runtime_transport::tui_projection_marker(
+                response.headers(),
+                runtime_transport::TUI_OPENING_USAGE_PLACEHOLDER,
+                "1",
+            );
         if !fixture {
             if rejected_before_model {
                 diagnostics::observe_tui_model(
@@ -4534,6 +4550,13 @@ impl GatewayService {
                 .extensions_mut()
                 .remove::<runtime_transport::TuiGatewayIds>()
                 .is_some();
+        let opening_usage_placeholder =
+            opening_usage_placeholder && projected && response.status() == StatusCode::OK;
+        if opening_usage_placeholder {
+            response
+                .extensions_mut()
+                .insert(runtime_transport::TuiOpeningUsagePlaceholder);
+        }
         let submission_unknown = !fixture
             && response.status() == StatusCode::BAD_GATEWAY
             && !model_response_received
@@ -4568,6 +4591,9 @@ impl GatewayService {
                     attempt.with_feedback(request.clone());
                 }
                 attempt.tui_sources(body_source, session_origin, instruction_location);
+                if opening_usage_placeholder {
+                    attempt.ignore_opening_usage();
+                }
                 attempt.tui_capture(attempt_id, capture_state);
                 attempt.commit_native(started);
                 if !submission_unknown && refusal_projection.is_none() {

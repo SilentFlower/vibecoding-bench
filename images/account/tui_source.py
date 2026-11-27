@@ -114,6 +114,8 @@ def _model_head(handle, status, content_type):
             fields["session_origin"] = session_origin
         if instruction_location := getattr(handle, "instruction_location", None):
             fields["instruction_location"] = instruction_location
+        if content_type == "text/event-stream" and getattr(handle, "opening_usage_placeholder", False) is True:
+            fields["opening_usage_placeholder"] = True
     return fields
 
 

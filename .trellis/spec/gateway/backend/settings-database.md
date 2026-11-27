@@ -422,12 +422,14 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 
 - 修改 `UsageCapture`、响应统计解码、`AttemptTrace`／`SlotGuardBody` 接线或缓冲响应观察时适用；正式用量与独立诊断共用解析和解码实现，各自持有终结责任。
 - 只观察响应副本，不改下游原始 frame、状态、编码头、重试或调度；不扩展为响应保活、补 message_stop、TTFT、请求 codec／CCH、stateful 锚点或自动遥测改造。
+- V2 受管直发 SSE 可在同轮实际用量到达前交付文本。开场占位的来源由已认领响应提供，诊断、账本和接续流共用这一标识。
 
 ### 2. Signatures
 
 - `UsageCapture::configure_codings(&mut self, codings: &[String])`：首块响应前配置既有头解析所得编码；无编码可直接调用 `observe`。
 - `UsageCapture::observe(&mut self, bytes: &[u8])`：逐块输入原始响应；`observe_encoded(&mut self, bytes: &[u8], codings: &[String])` 供已有整包缓冲入口一次性配置并 feed。
 - `UsageCapture::observation(self, complete: bool) -> MessageObservation` 同步返回诊断摘要；`finish(self, complete: bool)` 生成正式用量并异步记录，不等待数据库。
+- `UsageCapture::ignore_opening_usage(&mut self)` 在首块前配置账本观察器。 `AttemptTrace::ignore_opening_usage(&mut self)` 配置诊断持有的观察器。
 - 内部 `ResponseBodyDecoder<W: Write>`：`configure(&mut self, &[String])`、`feed(&mut self, &[u8])`、`finish(&mut self)` 均返回 `Result<(), ResponseDecodeError>`；`take_sink(&mut self) -> Option<W>` 一次性移交末端解析状态。
 - `ResponseDecodeError::{InvalidData, SamplingLimit}` 映射为既有 `decode_error`／`sampling_limit`；事件／JSON 语法或 usage 字段非法沿用 `invalid_payload`，不新增 HTTP 错误或设置。
 
@@ -436,6 +438,8 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - 流首一个 UTF-8 BOM 可跨 chunk；明文首个非空白字符决定 JSON／SSE，前导空白受采样预算限制。JSON 与 SSE 缓冲互斥。
 - SSE 识别 LF、CRLF、CR，跨 chunk 的 CRLF 只结束一行；字段名大小写敏感，按首个冒号划分并去掉值首至多一个 ASCII 空格。注释及无 data 的块忽略，同一事件的多 data 用 LF 连接，空行才派发并做一次 JSON 解析。
 - EOF 不派发残缺 data，缺 message_stop 仍 partial，不主动补帧。完整未知事件忽略非摘要字段，保留 [DONE] 兼容、既有累计最大值、缓存分项和部分费用语义；未知 token 与真实零值分别为 None 与 Some(0)。
+- 直发投影生成开场时在本轮预留标记 `opening_usage_placeholder`。账号事件源可在私有 `200 text/event-stream` 首部 JSON 发布 `{"opening_usage_placeholder": true}`。已绑定的受管发送器核对 `body_source=interactive_cli` 后转为单值私有头 `x-v3-tui-opening-usage-placeholder: 1`。
+- 网关核对同次模型响应来源、单值标识和投影成功后，诊断和账本仅跳过 `message_start` 的 `message.usage`。完整事件中随后出现的真实用量继续参与累计，包含真实零值。公开响应维持原帧格式，私有标识只在内部传递。
 - `USAGE_BUFFER_LIMIT=1 MiB` 分别约束完整 JSON、单个原始 SSE 行和合并后 data；大行／事件丢弃整个事件至下个空行再同步。字节缓冲容量也封顶，SSE 行与事件合计最多 2 MiB；此值不包含解析树、摘要字符串和 allocator 开销。
 - gzip／x-gzip、zlib／raw-deflate、标准 br、zstd 按 Content-Encoding 逆序解码，最多 4 个有效层，identity 不计。支持完整多 gzip member 和多 zstd frame／skippable frame；deflate／br 第二条流作为尾随输入失败。
 - 持久递归 Write 下游直接消费每层输出，末端拥有解析状态，不使用整流 Vec sink／自引用回调／后台无界队列。普通 codec 输出块 8 KiB，gzip 库内暂存 32 KiB；HTTP chunk、gzip member、zstd frame 和 flush 均不等于 SSE 事件或请求终点。
@@ -455,12 +459,15 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 | 未知编码、截断、CRC／Adler／已声明 checksum 错误、非法尾随、超窗口 | decode_error／partial，保留已观察摘要，业务响应继续原样转发 |
 | deflate zlib 头碰撞／晚期失败 | 保守 partial，不新发上游请求或伪造完整 raw 结果 |
 | 缺结束帧／尾空行、body error、下游取消 | 不补事件，不派发残缺 data；已有部分用量仍可折算费用，未知不伪装完整零值 |
+| 私有占位标识缺省、值无效或重复，或响应来源为兼容发送器 | 沿既有用量观察规则；真实开场零值与非零值照常记录 |
+| 已标识开场后截断，且只有开场占位 | 诊断 token 未观测，账本一条 `partial=true`、`cost_usd=null`，两个窗口各计一次部分请求和未定价请求 |
 | EOF／末帧后 Drop／重复终结 | 每次正式调用只记一条用量，根与 attempt 终态不被迟到快照覆盖 |
 
 ### 5. Scenarios and Examples
 
 - 正常：流式 gzip 回复总长超过 1 MiB，但每个事件约 2 KiB，头部 input 与尾部 output 均保留；客户端仍收到同一 gzip 字节。
 - 边界：完整 JSON 或合并后 data 恰好 1 MiB 可观察，SSE 各行仍须在行上限内；多一字节标 partial。gzip 多 member 和 zstd 多 frame 的每个结尾都要验证。
+- 直发样本的模型开场为 37/2，公开读到文本 A 后截断时，以 `api_error` 结束并记录用量未知。相同开场完整交付时，从真实终态记录 37/19 与 `partial=false`。同样完整交付的真实 0/0 保留为已观测零值。单凭公开开场 0/0 判断是否占位会混淆这几组，观察器以已绑定私有标识为准。
 - 错误用法：每条 data 行独立解析 JSON、把整个压缩响应塞入 Vec，或看到 message_stop 就跳过 footer。正确处理：一次配置、逐块 feed、空行派发完整事件、传输收口时验证整个 codec 链。
 
 ```rust
@@ -479,6 +486,7 @@ let observed = capture.observation(complete);
 - `gateway_usage_observes_all_sse_layouts_and_response_codings`、`gateway_usage_long_compressed_responses_keep_head_and_tail`：实际 Gateway＋本地上游＋SQLite／DiagnosticsStore，API／CC、JSON／SSE、两类 >1 MiB 长流，响应逐字节和头匹配，六类 token 与一次计数一致。
 - `gateway_usage_response_failures_preserve_bytes_and_partial_semantics`、`gateway_usage_compressed_cancellation_and_body_error_finalize_once`：CRC／截断／未知／大 JSON／缺 message_stop、已收到前缀后的取消与上游读错、partial／费用／诊断终态及原错误传播。
 - `diagnostics_buffered_compression_uses_the_same_event_observer`：缓冲入口的多 data／CR-only gzip 与 complete=false，原字节不变、一次 attempt、根终态正确。
+- `marked_opening_usage_keeps_unknown_and_real_zero_distinct` 覆盖带标识截断、真实终态零值、真实终态非零和未标识的部分零值。隔离回放核对公开文本及终态、每组单次投递和记账、5h／7d 聚合、私有标识过滤，以及兼容发送器断流 10/1。
 - 完整 Rust 回归继续覆盖请求压缩、CCH、keepalive、定价与历史汇总；改动本规则不需要前端构建或新增数据库迁移。
 
 ## Common Mistakes

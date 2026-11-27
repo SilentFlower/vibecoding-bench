@@ -81,6 +81,7 @@ pub(super) const TUI_V2_STATUS_PROTOCOL: u8 = 1;
 pub(super) const TUI_GATEWAY_ID_HEADER: &str = "x-v3-tui-message-id-mode";
 pub(super) const TUI_CAPTURE: &str = "x-v3-tui-http-capture";
 pub(super) const TUI_BODY_SOURCE: &str = "x-v3-tui-body-source";
+pub(super) const TUI_OPENING_USAGE_PLACEHOLDER: &str = "x-v3-tui-opening-usage-placeholder";
 pub(super) const TUI_SESSION_ORIGIN: &str = "x-v3-tui-session-origin";
 pub(super) const TUI_INSTRUCTION_LOCATION: &str = "x-v3-tui-instruction-location";
 pub(super) const TUI_FINAL_CAPTURE: &str = "x-v3-tui-final-capture";
@@ -238,6 +239,10 @@ pub(super) fn tui_submission_unknown_error() -> AppError {
 /// 内部响应模式，供公开路由采用正文终态记账。
 #[derive(Clone)]
 pub(super) struct TuiGatewayIds;
+
+/// 已鉴权直发响应的首帧用量由投影补齐。
+#[derive(Clone, Copy)]
+pub(super) struct TuiOpeningUsagePlaceholder;
 
 const META_HEADER: &str = "x-v3-request";
 const ERROR_HEADER: &str = "x-v3-transport-error";
