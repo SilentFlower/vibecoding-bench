@@ -21,16 +21,27 @@ from verify_tui_public_sse import ModelStream, PROBE_QUESTION, SENDER
 EARLY_STREAM_HOOK = """
   on('turn.step', async function* ($, e, next) {
     const stream = next(e)
+    let sampled = false
     for (;;) {
       const item = await stream.next()
       const value = item.value
       const record = {phase: item.done ? 'public_sse_step_result' : 'public_sse_chunk',
         kind: value?.kind ?? null, fields: Object.keys(value ?? {}).sort(),
         modelMessageIdVisible: JSON.stringify(value)?.includes('msg_cold_reply') ?? false,
-        initialUsageVisible: typeof value?.usage?.input_tokens === 'number'}
+        inputCount: value?.usage?.input_tokens ?? null, text: value?.kind === 'text' ? value.text : null}
       $.ui.log('FLOWER-CORE-HTTP|' + JSON.stringify(record) + '|END', {to: 'debug'})
       if (item.done) return value
       yield value
+      if (value?.kind === 'text' && !sampled) {
+        sampled = true
+        const rows = await $.session.messages({as: 'api'})
+        const usage = await $.session.usage()
+        const snapshot = {phase: 'public_sse_session_prefix',
+          apiRoles: rows.map(row => row.role),
+          modelMessageIdVisible: JSON.stringify(rows).includes('msg_cold_reply'),
+          sessionUsageFields: Object.keys(usage).sort()}
+        $.ui.log('FLOWER-CORE-HTTP|' + JSON.stringify(snapshot) + '|END', {to: 'debug'})
+      }
     }
   })
 """
@@ -71,8 +82,10 @@ def compare(manage, token, identifier, received, sender_status, restart, *, sour
         public_headers.set()
 
     def before_tail():
-        rows = [row for row in read_events() if row["phase"] == "public_sse_chunk"]
-        return rows if any(row["kind"] == "text" for row in rows) else None
+        rows = read_events()
+        snapshot = next((row for row in rows if row["phase"] == "public_sse_session_prefix"), None)
+        if snapshot is not None:
+            return [row for row in rows if row["phase"] == "public_sse_chunk"], snapshot
 
     with ThreadPoolExecutor(max_workers=1) as pool:
         pending = pool.submit(
@@ -80,11 +93,16 @@ def compare(manage, token, identifier, received, sender_status, restart, *, sour
             expected_status=502, trace_startup=True, sender_status=sender_status, observe_response=observe_response,
         )
         try:
-            early = fixture.wait_for(before_tail)
+            early, session_prefix = fixture.wait_for(before_tail)
             assert len(received) == 1 and stream.written > 0 and not stream.writing_tail.is_set()
             assert not stream.completed.is_set() and not public_headers.is_set() and not pending.done()
-            assert all(not row["initialUsageVisible"] and not row["modelMessageIdVisible"] for row in early), early
-            assert any(row["kind"] == "engine" and row["fields"] == ["kind", "ref"] for row in early), early
+            assert [row["kind"] for row in early] == ["engine", "engine", "text"], early
+            assert all(row["inputCount"] is None and not row["modelMessageIdVisible"] for row in early), early
+            assert all(row["fields"] == ["kind", "ref"] for row in early[:2]), early
+            assert session_prefix["apiRoles"] == ["user"] and not session_prefix["modelMessageIdVisible"], session_prefix
+            start = stream.events[0]["message"]
+            assert start["id"] == "msg_cold_reply" and start["usage"]["input_tokens"] > 0, start
+            assert early[2]["text"] == stream.events[2]["delta"]["text"], early
         finally:
             stream.release.set()
         status, raw, request_id = pending.result()
@@ -97,12 +115,15 @@ def compare(manage, token, identifier, received, sender_status, restart, *, sour
     reservation_id = request["diagnostic_context"]["tui_reservation_id"]
     assert permit["allowed"] and permit["reservation_id"] == tunnel["reservation_id"] == reservation_id
     assert permit["cli_pid"] == tunnel["cli_pid"]
-    model_reply = [row for row in read_events() if row.get("origin") == "engine"
+    events = read_events()
+    model_reply = [row for row in events if row.get("origin") == "engine"
                    and row.get("model") and row["phase"] == "reply"]
     (reply,) = model_reply
     assert (reply["status"], reply["isStreaming"], reply["textLength"]) == (200, True, 0), reply
     return {"authorization": "isolated_managed_policy", "stream": body["stream"], "request_id": request_id,
             "permit": permit, "tunnel": tunnel, "model_posts": len(received), "early_hook_events": early,
+            "model_first_frame": start, "early_session_snapshot": session_prefix,
+            "step_results_after_tail": [row for row in events if row["phase"] == "public_sse_step_result"],
             "public_diagnostics": diagnostics,
             "public_headers_before_model_tail": False, "http_status": status,
             "public_error": json.loads(raw)["error"], "core_reply": reply, "wire_final": "unavailable"}
@@ -112,6 +133,7 @@ def main():
     """运行仅回环的受管钩子对照。@return 无。"""
     parser = ArgumentParser(description=__doc__)
     parser.add_argument("--gateway", type=Path, required=True)
+    parser.add_argument("--sender", type=Path, default=SENDER)
     args = parser.parse_args()
     assert Path("/.dockerenv").is_file() and {name for _, name in if_nameindex()} == {"lo"}
     version = "2.1.321"
@@ -129,7 +151,7 @@ def main():
         fixture, QuietHandler=core.ObservedModel,
         verify_structured_tool_round=partial(compare, stream=stream),
     ), TemporaryDirectory(prefix="tui-sse-observer-") as folder:
-        proof = fixture.verify(args.gateway, SENDER, Path(folder), installed_runtime=True, structured_output="live",
+        proof = fixture.verify(args.gateway, args.sender, Path(folder), installed_runtime=True, structured_output="live",
                                model_stream_probe=stream, trace_startup=True)
     print(json.dumps(proof, ensure_ascii=False, indent=2))
 
