@@ -965,6 +965,14 @@ class _Actor:
                                    else "CLI 未保留请求的固定思考预算或输出上限")
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
                             "code": "unsupported_parameter", "message": message}}))
+                    context_management = self.cold_history.context_management
+                    if context_management is not None and (
+                        native.get("context_management") != context_management
+                        or CONTEXT_BETA not in {value.strip() for value in sdk_headers.get("anthropic-beta", "").split(",")}
+                    ):
+                        raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
+                            "code": "unsupported_parameter", "message": "CLI 未保留请求的历史管理策略"}}),
+                            source="tui_cli_input_guard")
                     if self.cold_history.effort is not None:
                         output = native.get("output_config")
                         if not isinstance(output, dict) or output.get("effort") != self.cold_history.effort:

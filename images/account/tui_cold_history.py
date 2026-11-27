@@ -32,6 +32,8 @@ _IMAGE_HEADERS = {
 _MAX_PASTE_IMAGE_EDGE = 2000
 _MAX_PASTE_IMAGE_BYTES = 512_000
 _FIXED_THINKING_MODELS = ("claude-sonnet-4-6", "claude-opus-4-6")
+_ADAPTIVE_THINKING_MODELS = ("claude-sonnet-4-6", "claude-opus-5-5")
+_CLEAR_THINKING_KEEP_ALL = {"edits": [{"type": "clear_thinking_20251015", "keep": "all"}]}
 
 
 def _blocks(row):
@@ -312,6 +314,7 @@ class ColdHistory:
     tool_choice: dict | None = None
     cache_ttl: str = "off"
     recovered_models: tuple[tuple[int, str], ...] = ()
+    context_management: dict | None = None
 
     @classmethod
     def from_request(cls, body, system_policy="append", *, cache_ttl="off", read_history=None, signed_models=None):
@@ -323,7 +326,7 @@ class ColdHistory:
         @return 原生输入计划或空。
         """
         if body.keys() - {"model", "max_tokens", "thinking", "system", "messages", "tools", "stream", "output_config",
-                          "tool_choice"}:
+                          "tool_choice", "context_management"}:
             return None
         if type(body.get("max_tokens")) is not int or body["max_tokens"] <= 0:
             return None
@@ -338,10 +341,17 @@ class ColdHistory:
                 return None
         elif thinking not in (None, {"type": "disabled"}):
             # 只接受固定 CLI 能原样生成的显式显示模式。
-            if (body["model"] not in ("claude-sonnet-4-6", "claude-opus-5-5")
+            if (body["model"] not in _ADAPTIVE_THINKING_MODELS
                     or thinking not in ({"type": "adaptive", "display": "updates"},
                                         {"type": "adaptive", "display": "summarized"})):
                 return None
+        context_management = body.get("context_management")
+        # 固定 CLI 在这两款模型的 updates 模式用同一形状声明保留全部思考。
+        if "context_management" in body and (
+                context_management != _CLEAR_THINKING_KEEP_ALL
+                or thinking != {"type": "adaptive", "display": "updates"}
+                or body["model"] not in _ADAPTIVE_THINKING_MODELS):
+            return None
         output = body.get("output_config", {})
         if not isinstance(output, dict) or output and (
                 output.keys() != {"effort"} or output["effort"] not in ("low", "medium", "high", "max")):
@@ -407,7 +417,7 @@ class ColdHistory:
         return cls(history, body["model"], content[0].get("text", ""), system, tools, body["max_tokens"],
                    thinking, system_policy, output.get("effort"),
                    tuple(content) if len(content) > 1 or content[0]["type"] == "image" else (), choice, cache_ttl,
-                   tuple(sorted(signed_models.items())))
+                   tuple(sorted(signed_models.items())), context_management=context_management)
 
     def system_argument(self):
         """选择原生 CLI 提示词文件选项。@return 参数和文件正文，或缺省值。"""
@@ -476,6 +486,8 @@ class ColdHistory:
             scope = (*scope, self.tool_choice)
         if self.recovered_models:
             scope = (*scope, self.recovered_models)
+        if self.context_management is not None:
+            scope = (*scope, {"context_management": self.context_management})
         return scope if self.cache_ttl == "off" else (*scope, self.cache_ttl)
 
     def matches_tool_choice(self, native):
