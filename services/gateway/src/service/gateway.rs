@@ -2461,42 +2461,33 @@ impl GatewayService {
         let mut replay_owner = reconnect_key
             .as_ref()
             .and_then(|key| self.tui_reconnects.account(key));
-        let mut recovery = if reconnect_key.is_some()
-            && replay_owner.is_none()
-            && let Some(token) = api_token
-        {
-            recovery_row(
-                &self.account_svc.tui_database(),
-                token.id,
-                original_session,
-                &body_map,
-            )
-            .await
-            .inspect_err(|_| diagnostics::tui_admission_rejected("tui_recovery_lookup"))?
-        } else {
-            None
-        };
         let tool_owner = if let Some((owner, ..)) = &summary {
             Some(*owner)
-        } else if let Some(owner) = replay_owner.or_else(|| recovery.as_ref().map(|r| r.account_id))
-        {
+        } else if let Some(owner) = replay_owner {
             Some(owner)
         } else if method == "POST"
             && path == "/v1/messages"
             && runtime_transport::tui_runtime_configured()
             && let Some(principal) = api_token
         {
-            continuation_account(
-                self.account_svc.tui_database(),
-                (principal.id, original_session),
-                &body_map,
-            )
-            .await
-            .inspect_err(|error| {
-                if matches!(error, AppError::ServiceUnavailable(_)) {
-                    diagnostics::tui_admission_rejected("tui_tool_owner_lookup");
-                }
-            })?
+            let pool = self.account_svc.tui_database();
+            let current =
+                continuation_account(pool.clone(), (principal.id, original_session), &body_map)
+                    .await;
+            // 先读活动归属，再读恢复凭据。后台可能在两次读取间确认原进程退出。
+            if reconnect_key.is_some()
+                && let Some(row) = recovery_row(&pool, principal.id, original_session, &body_map)
+                    .await
+                    .inspect_err(|_| diagnostics::tui_admission_rejected("tui_recovery_lookup"))?
+            {
+                Some(row.account_id)
+            } else {
+                current.inspect_err(|error| {
+                    if matches!(error, AppError::ServiceUnavailable(_)) {
+                        diagnostics::tui_admission_rejected("tui_tool_owner_lookup");
+                    }
+                })?
+            }
         } else {
             None
         };
@@ -2842,20 +2833,7 @@ impl GatewayService {
                         .tui_reconnects
                         .reserve(key, account.id, &route.binding)?
                     {
-                        Reservation::First(writer) => {
-                            if replay_owner.is_some() && recovery.is_none() {
-                                // 选号期间旧缓存可能已回收。重新读取原回执，冷恢复仍须发送器出具证明。
-                                recovery = recovery_row(
-                                    &self.account_svc.tui_database(),
-                                    principal.id,
-                                    original_session,
-                                    &body_map,
-                                )
-                                .await
-                                .inspect_err(|_| diagnostics::tui_admission_rejected("tui_recovery_lookup"))?;
-                            }
-                            Some(writer)
-                        }
+                        Reservation::First(writer) => Some(writer),
                         Reservation::Existing(reply) => {
                             diagnostics::selected_account(account.id);
                             return reply.subscribe(false).await;
@@ -2875,6 +2853,19 @@ impl GatewayService {
                     (returning_tool && owner.is_some()).then_some(route.binding.as_str()),
                 )
                 .await?;
+                // 选号与就绪检查期间原进程可能已退出。持原账号路由读锁时按最新回执阶段准备。
+                let recovery = if reconnect.is_some() {
+                    recovery_row(
+                        &self.account_svc.tui_database(),
+                        principal.id,
+                        original_session,
+                        &body_map,
+                    )
+                    .await
+                    .inspect_err(|_| diagnostics::tui_admission_rejected("tui_recovery_lookup"))?
+                } else {
+                    None
+                };
                 let checking_recovery = recovery.is_some();
                 let (binding, mut turn, draining) = route
                     .begin_v2(
@@ -2884,7 +2875,7 @@ impl GatewayService {
                         &body_map,
                         &sender,
                         returning_tool,
-                        recovery.take(),
+                        recovery,
                     )
                     .await
                     .inspect_err(|error| {
