@@ -14,6 +14,7 @@ import ssl
 import sys
 from time import monotonic, monotonic_ns, sleep, time_ns
 from urllib.parse import urlsplit
+from uuid import uuid4
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import frozen_tui_source as source
@@ -33,6 +34,7 @@ ORIGINAL_CALLBACK = session._Actor.callback
 POLICY_MODE = Path("/opt/flower/tui/fixture-direct-permit")
 PERMITS = Path("/tmp/flower-direct-permits.jsonl")
 TUNNELS = Path("/tmp/flower-direct-tunnels.jsonl")
+CANDIDATE_MODE = "candidate-response"
 
 
 def report(stage, **data):
@@ -67,8 +69,8 @@ def launch(*args, environment, **options):
 
 
 def _valid_attempt(actor, step, handle):
-    probe_sse = (handle and handle.stream and not handle.tools and POLICY_MODE.is_file()
-                 and POLICY_MODE.read_text() == "observe-sse")
+    mode = POLICY_MODE.read_text() if POLICY_MODE.is_file() else None
+    probe_sse = handle and (mode == CANDIDATE_MODE or (not handle.tools and mode == "observe-sse"))
     return (step and step.native and handle and actor.process and not actor.dead.is_set()
             and len(handle.tools) <= 1 and (not handle.stream or probe_sse) and actor.oauth_file
             and handle.expires_at and handle.expires_at > time_ns() // 1_000_000
@@ -173,7 +175,8 @@ def _authorize_http(actor, data):
         body = json.loads(raw)
         if not actor._main_request(body, handle):
             raise ValueError("模型输入不属于当前预留")
-        allowed = not (POLICY_MODE.read_text() == "deny-receipt" and handle.kind == "continuation")
+        mode = POLICY_MODE.read_text()
+        allowed = not (mode == "deny-receipt" and handle.kind == "continuation")
         _record_event(PERMITS, "direct_http_permit", allowed=allowed, cli_pid=actor.process.pid,
                       monotonic_ns=monotonic_ns(),
                       reservation_id=handle.reservation["reservation_id"], step=list(step.native),
@@ -183,15 +186,40 @@ def _authorize_http(actor, data):
         if allowed:
             step.claimed = True
             handle.body_source = "interactive_cli"
+            if mode == CANDIDATE_MODE:
+                ticket = uuid4().hex
+                actor.direct_http_reply = (step, handle, ticket)
+                return {"allowed": True, "reply_ticket": ticket}
         return {"allowed": allowed}
+
+
+def _project_http_rejection(actor, data):
+    with actor.changed:
+        step, handle = actor.step, actor.claim
+        if (
+            type(data.get("status")) is not int or data["status"] != 400
+            or not isinstance(data.get("ticket"), str)
+            or not _valid_attempt(actor, step, handle)
+            or getattr(actor, "direct_http_reply", None) != (step, handle, data["ticket"])
+            or not step.claimed or step.started
+        ):
+            raise session._StaleReceipt("直发响应不属于当前模型步骤")
+        actor.direct_http_reply = None
+        # 状态来自同次受管 HTTP 回包。正文继续沿公共通用错误格式生成。
+        report("direct_http_rejection", reservation_id=handle.reservation["reservation_id"], status=400)
+        actor.abort(session.ModelResponseError(400, b"", source="managed_oauth_http"))
+    return {}
 
 
 def callback(actor, path, data):
     """使用受信 Mod 的完成态投影单文本或单工具的 JSON 答复。@return 原协议回执。"""
     if path == "/direct-http-permit" and POLICY_MODE.is_file():
         return _authorize_http(actor, data)
+    if path == "/direct-http-reply" and POLICY_MODE.is_file() and POLICY_MODE.read_text() == CANDIDATE_MODE:
+        return _project_http_rejection(actor, data)
     if path == "/begin":
         actor.direct_result = None
+        actor.direct_http_reply = None
     elif path == "/direct-result":
         with actor.changed:
             if (not actor.step or not actor.step.claimed or actor.claim.stream

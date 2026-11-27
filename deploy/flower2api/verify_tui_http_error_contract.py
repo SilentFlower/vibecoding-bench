@@ -14,13 +14,14 @@ from uuid import uuid4
 
 import verify_tui_cold_history as fixture
 import verify_tui_core_http_hook as core
-from verify_tui_direct_reuse import install_permit
+from verify_tui_direct_reuse import CANDIDATE_MODE, install_permit
 from verify_tui_public_sse_observer import read_events
 
 
 ERROR_TYPES = ("invalid_request_error", "api_error")
 ERROR_MESSAGE = "隔离模型明确拒绝合成请求"
 PROJECTED_ERROR = {"type": "api_error", "message": "V2 模型响应无效或提前终止"}
+CANDIDATE_ERROR = {"type": "api_error", "message": "本机模型返回 HTTP 400"}
 VERSION = "2.1.321"
 TURN_HOOKS = """
   const fields = value => value != null && typeof value === 'object' ? Object.keys(value).sort() : []
@@ -68,15 +69,15 @@ class FixedDateModel(core.ObservedModel):
         return "Thu, 26 Nov 2026 00:00:00 GMT"
 
 
-def install_turn_hooks(*, public_stream):
-    """在同一个官方受管 Mod 内开启阶段观测。@param public_stream 是否验收公开 SSE。@return 无。"""
+def install_turn_hooks(*, public_stream, candidate=False):
+    """开启受管钩子观测。@param public_stream 公开 SSE。@param candidate 是否交付已确认状态。@return 无。"""
     digest = core.PROGRAMS[VERSION]
     program = Path(f"/cli/{VERSION}/node_modules/.bin/claude")
     with program.open("rb") as executable:
         assert file_digest(executable, "sha256").hexdigest() == digest
-    core.install(VERSION, digest, "tool" if public_stream else "error", "managed")
-    if public_stream:
-        install_permit("observe-sse")
+    core.install(VERSION, digest, "tool" if public_stream or candidate else "error", "managed")
+    if public_stream or candidate:
+        install_permit(CANDIDATE_MODE if candidate else "observe-sse")
     module = Path(f"/opt/{core.POLICY_MARKET}/{core.POLICY_PLUGIN}/hooks/observe.js")
     source = module.read_text()
     assert source.endswith("\n}\n")
@@ -144,7 +145,7 @@ def verify_stream_hooks(reservation_id, stages, model_digest):
 
 
 def check(manage, token, identifier, received, sender_status, restart, *, source_observer, path, error, emitted,
-          public_stream, stages, upstream_status, expected_metadata=None):
+          public_stream, stages, upstream_status, expected_metadata=None, candidate=False):
     """关联公开回包与原模型拒绝。@param manage 管理入口。@param token 合成凭据。
     @param identifier 当前账号。@param received 模型收件。@param sender_status 诊断读取。
     @param restart 重启选项。@param source_observer 额外事件源观测。
@@ -152,6 +153,7 @@ def check(manage, token, identifier, received, sender_status, restart, *, source
     @param public_stream 是否提交公开 stream:true。@param stages 代理及模型接收时点。
     @param upstream_status 模型确实返回的 HTTP 状态。
     @param expected_metadata 当前路径应公开交付的标准错误元数据。
+    @param candidate 是否验收受管直发候选错误。
     @return 请求、尝试、实收与钩子记录。
     """
     assert not source_observer and not restart
@@ -170,7 +172,8 @@ def check(manage, token, identifier, received, sender_status, restart, *, source
         response_headers["latency_ms"] = (response_headers["monotonic_ns"] - start) // 1_000_000
 
     status, raw, request_id = fixture.checked_messages(
-        manage, token, body, headers, received, phase, expected_status=upstream_status if path == "account" else 502,
+        manage, token, body, headers, received, phase,
+        expected_status=upstream_status if path == "account" or candidate else 502,
         trace_startup=True, sender_status=sender_status, observe_response=observe_response,
     )
     diagnostics = fixture.report_request_diagnostics(manage, phase, request_id, session, started_at)
@@ -186,26 +189,32 @@ def check(manage, token, identifier, received, sender_status, restart, *, source
         expected = expected_metadata or {"type": "error", "error": error}
         assert public == expected, public
         assert row["diagnostic_context"]["tui_confirmed_model_responses"] == 1, row
+    elif candidate:
+        assert public == {"type": "error", "error": CANDIDATE_ERROR}, public
+        assert row["diagnostic_context"]["tui_confirmed_model_responses"] == 1, row
+        assert (row["outcome"], row["error_stage"]) == ("upstream_rejected", "upstream_headers"), row
     elif public_stream:
         assert isinstance(public.get("error"), str) and public["error"], public
     else:
         assert public == {"type": "error", "error": PROJECTED_ERROR}, public
     hooks = None
     if path == "cli":
-        hooks = (verify_stream_hooks(reservation_id, stages, model_digest) if public_stream else
+        hooks = (verify_stream_hooks(reservation_id, stages, model_digest) if public_stream or candidate else
                  {**verify_hooks(), **verify_model_connection(reservation_id, stages, model_digest)})
         assert hooks["model_received"]["monotonic_ns"] < response_headers["monotonic_ns"], hooks
+    if path == "cli" and not candidate:
         # 实收与试接钩子是独立证据，Gateway 没有得到同一响应的结构化投影。
         assert (row["outcome"], row["error_stage"]) == ("transport_error", "tui_send_http"), (row, hooks)
         assert row["native_rejection"] is None, row
         assert row["diagnostic_context"].get("tui_confirmed_model_responses") is None, row
     else:
         assert (row["outcome"], row["error_stage"]) == ("upstream_rejected", "upstream_headers"), row
-    if path == "cli" and public_stream:
+    if path == "cli" and public_stream and not candidate:
         assert row["attempt_count"] == 0 and row["attempts"] == [], row
     else:
         (attempt,) = row["attempts"]
-        assert attempt["request_id"] == request_id and attempt["status_code"] == (None if path == "cli" else status)
+        expected_attempt_status = None if path == "cli" and not candidate else status
+        assert attempt["request_id"] == request_id and attempt["status_code"] == expected_attempt_status
         assert attempt["attempt_id"] == reservation_id and row["attempt_count"] == 1, row
         assert (attempt["outcome"], attempt["error_stage"]) == (row["outcome"], row["error_stage"]), row
     return {"path": path, "stream": public_stream, "http_status": status, "public_body": public,
@@ -221,6 +230,7 @@ def main():
     parser.add_argument("--path", choices=("account", "cli"), required=True)
     parser.add_argument("--error-type", choices=ERROR_TYPES, required=True)
     parser.add_argument("--stream", action="store_true", help="公开请求使用 stream:true，核对首帧前的 JSON 错误")
+    parser.add_argument("--direct-candidate", action="store_true", help="交付同预留的受管直发 400 通用错误")
     parser.add_argument("--gateway", type=Path, required=True)
     parser.add_argument("--sender", type=Path, default=Path("/usr/local/bin/account-sender"))
     parser.add_argument("--source-account", action="store_true", help="用当前源码安装账号事件源")
@@ -229,12 +239,14 @@ def main():
                         help="账号路径可用同文真实 502 对照直发试接合成 502")
     args = parser.parse_args()
     assert Path("/.dockerenv").is_file() and {name for _, name in if_nameindex()} == {"lo"}
+    if args.direct_candidate and args.path != "cli":
+        parser.error("直发候选需要 --path cli")
     if args.path == "cli" and (args.source_account or args.error_metadata or args.upstream_status != 400):
         parser.error("可选错误元数据、候选账号源码及真实 502 需要 --path account")
     if args.upstream_status == 502 and args.error_type != PROJECTED_ERROR["type"]:
         parser.error("真实 502 对照需要 --error-type api_error")
     if args.path == "cli":
-        install_turn_hooks(public_stream=args.stream)
+        install_turn_hooks(public_stream=args.stream, candidate=args.direct_candidate)
     elif args.source_account:
         fixture.install_source()
     error = PROJECTED_ERROR if args.upstream_status == 502 else {"type": args.error_type, "message": ERROR_MESSAGE}
@@ -277,7 +289,7 @@ def main():
         fixture, QuietHandler=FixedDateModel, response_json=model_reply, startup_event=trace,
         verify_structured_tool_round=partial(
             check, path=args.path, error=error, emitted=emitted, public_stream=args.stream, stages=stages,
-            upstream_status=args.upstream_status, expected_metadata=expected_metadata,
+            upstream_status=args.upstream_status, expected_metadata=expected_metadata, candidate=args.direct_candidate,
         ),
     ), TemporaryDirectory(prefix="http-error-contract-") as folder:
         result = fixture.verify(

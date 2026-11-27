@@ -20,7 +20,9 @@ from fixtures.native_model_send.direct_egress_identity import model_body_identit
 
 
 MOD_BINDING = "import { endpoint, bearer } from './runtime/binding.js'\n"
+CANDIDATE_MODE = "candidate-response"
 PERMIT_HOOK = """
+    let replyTicket
     if (model) {
       const permit = await $.http.fetch(endpoint + '/direct-http-permit', {
         method: 'POST',
@@ -28,11 +30,22 @@ PERMIT_HOOK = """
         body: JSON.stringify({url: address, method: e.init?.method, body: e.init?.body,
           requestId: e.init?.headers?.['x-client-request-id'] ?? null}),
       })
-      if (!permit.ok || JSON.parse(permit.text).allowed !== true) {
+      const grant = permit.ok ? JSON.parse(permit.text) : null
+      if (grant?.allowed !== true) {
         record({phase: 'denied', callbackStatus: permit.status})
         return {deny: '隔离模型未取得当前预留许可'}
       }
+      replyTicket = grant.reply_ticket
     }
+"""
+REPLY_HOOK = """
+      if (replyTicket && value.status === 400) {
+        await $.http.fetch(endpoint + '/direct-http-reply', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + bearer},
+          body: JSON.stringify({ticket: replyTicket, status: value.status}),
+        })
+      }
 """
 MOD_RECOVERY = """
   }).catch(() => ({deny: '隔离模型许可回调失败'}))
@@ -53,6 +66,10 @@ def install_permit(mode):
     target = "    const reply = await next(e)"
     assert source.count(target) == 1 and source.endswith("  })\n\n}\n")
     source = source.replace(target, PERMIT_HOOK + target)
+    if mode == CANDIDATE_MODE:
+        response = "        hasErrorBody: value.text?.includes('隔离模型明确拒绝合成请求') ?? false})"
+        assert source.count(response) == 1
+        source = source.replace(response, response + "\n" + REPLY_HOOK)
     module.write_text(MOD_BINDING + source.removesuffix("  })\n\n}\n") + MOD_RECOVERY + "\n}\n")
 
 
