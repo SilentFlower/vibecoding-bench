@@ -96,6 +96,9 @@ class MessageJSON:
                 raise ValueError("模型结束增量无效")
             for key, value in delta.items():
                 self._replace(self.message, key, value)
+            # 上下文编辑报告在流式增量的顶层，非流式消息也从该位置取实际报告。
+            if "context_management" in event:
+                self._replace(self.message, "context_management", event["context_management"])
             # 用量是当前步骤的累计值，后到的字段覆盖同名旧值；缺省的缓存读数仍来自开场。
             for key, value in usage.items():
                 existing = self.message["usage"].get(key)
