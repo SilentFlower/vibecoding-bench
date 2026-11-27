@@ -918,6 +918,21 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                           stream=provider_quota == "sse")
             assert quota_reads == []
             return {**proof, "active_quota_queries": len(quota_reads)}
+        if structured_output in ("live", "restart"):
+            def restart_structured_tool(headers):
+                nonlocal source
+                marker = ("--name=" + headers["x-session-id"]).encode()
+                (pid,) = [int(path.parent.name) for path in Path("/proc").glob("[0-9]*/cmdline")
+                          if fixture_command_has(path, marker)]
+                startup_event("structured_tool_cli_sigkill", session_id=headers["x-session-id"], cli_pid=pid)
+                os.kill(pid, SIGKILL)
+                source = restart(source, "structured_tool_receipt")
+                assert not Path(f"/proc/{pid}").exists()
+
+            return verify_structured_tool_round(
+                manage, token, identifier, received, sender_state_after_failure,
+                restart_structured_tool if structured_output == "restart" else None,
+            )
         if structured_output:
             return verify_structured_output(manage, token, identifier, received)
         if external_signed_history:
@@ -3927,6 +3942,141 @@ def verify_forced_tool_choice(manage, token, identifier, received, sender_status
     return {"wire_final": "unavailable", "restarted": restart is not None, "cases": cases, "model_posts": len(received)}
 
 
+def verify_structured_tool_round(manage, token, identifier, received, sender_status, restart):
+    """核对带结构化输出的工具轮及已认领原生轮的兼容边界。
+    @param manage 管理入口。@param token 合成令牌。@param identifier 账号 ID。
+    @param received 隔离模型实收。@param sender_status 失败后的发送器状态。
+    @param restart 可选，终止原 CLI 并重启发送器。@return 按公开请求关联的证据。
+    """
+    account = manage("PUT", f"accounts/{identifier}", {"client_system_prompt_policy": "append"})
+    assert account["client_system_prompt_policy"] == "append"
+    cases, returned_tool_ids = {}, []
+    base_config = {"effort": "medium"}
+    structured_config = {**base_config, "format": STRUCTURED_FORMAT}
+
+    def post(label, body, expected, source=None):
+        before = len(received)
+        status, raw, request_id = checked_messages(
+            manage, token, body, headers, received, label, expected_status=expected,
+            trace_startup=True, sender_status=sender_status,
+        )
+        delta = len(received) - before
+        if status == 400:
+            def finished():
+                detail = manage("GET", "request-diagnostics/" + request_id)
+                return detail if detail["request"].get("finished_at") else None
+
+            detail = wait_for(finished)
+            context = detail["request"].get("context") or {}
+            assert detail["request"]["request_id"] == request_id
+            assert "tui_reservation_id" not in context and not detail["attempts"] and delta == 0
+            cases[label] = {"status": status, "request_id": request_id, "reservation_id": None,
+                            "session_id": headers["x-session-id"], "model_posts": delta,
+                            "attempt_count": len(detail["attempts"])}
+            return raw
+        reservation, record, claims = cache_marker_claims(manage, request_id)
+        proof = {"status": status, "request_id": request_id, "reservation_id": reservation,
+                 "session_id": headers["x-session-id"], "model_posts": delta, "attempt_count": record["attempt_count"]}
+        cases[label] = proof
+        if expected != 200:
+            assert delta == record["attempt_count"] == 0 and not claims
+            proof["error_code"] = json.loads(raw)["error"]["code"]
+            return raw
+        assert delta == record["attempt_count"] == 1
+        ((digest, model, _),), (claim,) = received[before:], claims
+        (attempt,) = manage("GET", "request-diagnostics/" + request_id)["attempts"]
+        assert attempt["request_id"] == request_id and attempt["attempt_id"] == reservation
+        assert attempt["context"]["tui_body_source"] == source
+        assert claim["sha256"] == digest and claim["from_interactive_cli"] is (source == "interactive_cli")
+        expected_format = body["output_config"].get("format")
+        output = model.get("output_config", {})
+        assert output == body["output_config"], (label, output)
+        assert not claim["cli_has_output_format"], (label, claim)
+        if expected_format is not None:
+            assert source == "account_sender" and claim["cli_sha256"] != digest
+        proof.update(provider_path=source, session_origin=attempt["context"]["tui_session_origin"],
+                     model_body_sha256=digest, model_output_config=output,
+                     cli_body_sha256=claim["cli_sha256"], cli_has_output_format=claim["cli_has_output_format"])
+        return raw
+
+    def tool_result(raw, content, *, failed):
+        reply = json.loads(raw)
+        tool = {"type": "tool_use", "id": NEW_ID, "name": TOOL["name"], "input": ARGS}
+        assert reply["stop_reason"] == "tool_use" and reply["content"] == [tool]
+        returned_tool_ids.append(tool["id"])
+        result = {"type": "tool_result", "tool_use_id": tool["id"], "content": content}
+        if failed:
+            result["is_error"] = True
+        return tool, result
+
+    # 旧发送器负责整轮，包含同一工具错误中的文字和原图。
+    headers = {"x-session-id": str(uuid4()), "User-Agent": "flower2api-structured-tool-fixture/1"}
+    messages = [{"role": "user", "content": "读取合成便签并返回订单状态。"}]
+    body = {"model": MODEL, "max_tokens": 128, "messages": messages, "tools": [TOOL], "system": SYSTEM[0],
+            "stream": False, "output_config": structured_config}
+    raw = post("structured_initial", body, 200, "account_sender")
+    (png,) = fixture_image_blocks(all_formats=False)
+    content = [{"type": "text", "text": "读取失败。"}, png, {"type": "text", "text": "保留诊断截图。"}]
+    tool, result = tool_result(raw, content, failed=True)
+    messages = [*messages, {"role": "assistant", "content": [tool]}, {"role": "user", "content": [result]}]
+    if restart:
+        (binding,) = Path("/native/tui-workspaces").glob("*.json")
+        binding_bytes = binding.read_bytes()
+        native_id = json.loads(binding_bytes)["native_session_id"]
+        projects = Path("/native/tui-sessions") / native_id / "home/.claude/projects"
+        archive = wait_for(lambda: next(projects.glob("*/" + native_id + ".jsonl"), None))
+        archive_bytes = archive.read_bytes()
+        restart(headers)
+    follow = {**body, "messages": messages, "stream": True}
+    raw = post("structured_error_image_receipt", follow, 200, "account_sender")
+    wire = [json.loads(line[5:]) for line in raw.splitlines() if line.startswith(b"data:")]
+    text = "".join(event["delta"]["text"] for event in wire if event["type"] == "content_block_delta")
+    (terminal,) = [event["delta"] for event in wire if event["type"] == "message_delta"]
+    assert wire[-1]["type"] == "message_stop" and terminal["stop_reason"] == "end_turn"
+    assert json.loads(text) == {"fixture_order_status": "ready"}
+    model = received[-1][1]
+    assert find_blocks(model, "id", tool["id"]) == [("assistant", tool)]
+    ((role, observed),) = find_blocks(model, "tool_use_id", tool["id"])
+    assert role == "user" and observed == result
+    cases["structured_error_image_receipt"].update(model_tool_result=observed, client_json=json.loads(text),
+                                                    stop_reason=terminal["stop_reason"])
+    if restart:
+        assert binding.read_bytes() == binding_bytes
+        resumed_archive = archive.read_bytes()
+        # 旧发送器恢复原 UUID 时，CLI 可以向同一档案追加记录。
+        assert resumed_archive.startswith(archive_bytes), (native_id, len(archive_bytes), len(resumed_archive))
+        appended_types = [json.loads(line)["type"] for line in resumed_archive[len(archive_bytes):].splitlines()]
+        cases["structured_error_image_receipt"]["archive"] = {
+            "native_session_id": native_id, "preserved_prefix_sha256": sha256(archive_bytes).hexdigest(),
+            "binding_preserved": True, "appended_record_types": appended_types,
+        }
+    post("structured_duplicate_receipt", follow, 400)
+
+    # 原生等待轮的输入合同已经确定，新增 schema 的回执须在投递前终止。
+    headers = {**headers, "x-session-id": str(uuid4())}
+    body = {**body, "output_config": base_config}
+    raw = post("native_initial", body, 200, "interactive_cli")
+    tool, result = tool_result(raw, REPLY, failed=False)
+    follow = {**body, "messages": [*body["messages"], {"role": "assistant", "content": [tool]},
+                                 {"role": "user", "content": [result]}]}
+    if restart:
+        restart(headers)
+    post("native_receipt_added_schema", {**follow, "output_config": structured_config}, 422)
+    assert cases["native_receipt_added_schema"]["error_code"] == "unsupported_parameter"
+    raw = post("native_original_receipt", follow, 200, "interactive_cli")
+    reply = json.loads(raw)
+    assert reply["stop_reason"] == "end_turn" and reply["content"] == [{"type": "text", "text": FINAL}]
+    ((role, observed),) = find_blocks(received[-1][1], "tool_use_id", tool["id"])
+    assert role == "user" and observed["content"].count(REPLY) == 1
+    origin = "disk_resume" if restart else "live_process"
+    for label in ("structured_error_image_receipt", "native_original_receipt"):
+        assert cases[label]["session_origin"] == origin, cases[label]
+    assert returned_tool_ids == [NEW_ID, NEW_ID] and len(received) == 4
+    assert not any(path.is_file() for path in Path("/flows/api").rglob("*"))
+    return {"cases": cases, "model_posts": len(received), "client_tool_results": returned_tool_ids,
+            "restarted": restart is not None, "wire_final": "unavailable"}
+
+
 def verify_structured_output(manage, token, identifier, received):
     """核对三种账号动作下的普通结构化输出。
     @param manage 管理入口。@param token 合成令牌。@param identifier 账号 ID。
@@ -4800,7 +4950,9 @@ def main():
     scenario.add_argument("--provider-quota", choices=("sse", "json"))
     scenario.add_argument("--initial-idle-model-connection", action="store_true")
     scenario.add_argument("--output-effort", action="store_true")
-    scenario.add_argument("--structured-output-contract", action="store_true")
+    scenario.add_argument("--structured-output-contract", action="store_const", const="contract")
+    scenario.add_argument("--structured-output-tool-round", dest="structured_output_contract", choices=("live", "restart"),
+                          help="核对旧发送器的结构化工具往返及原生回执新增 schema 的拒绝")
     scenario.add_argument("--external-signed-history-contract", dest="external_signed_history", action="store_const", const="contract",
                           help="核对普通客户端提交的外部签名历史")
     scenario.add_argument("--external-signed-history-source", dest="external_signed_history", action="store_const", const="source",
@@ -4886,7 +5038,7 @@ def main():
                      or args.tool_receipt_text_blocks is not None
                      or args.explicit_custom_tool_type
                      or args.recovery_readiness_rejection
-                     or args.structured_output_contract or bool(args.forced_tool_choice_contract) or args.no_tool_choice_contract
+                     or bool(args.structured_output_contract or args.forced_tool_choice_contract) or args.no_tool_choice_contract
                      or args.disable_parallel_tool_use_contract or bool(args.oauth_rotation or args.provider_quota)
                      or args.slow_tool_stream or args.interrupted_tool_stream is not None
                      or bool(auxiliary_mode or args.agent_progress)

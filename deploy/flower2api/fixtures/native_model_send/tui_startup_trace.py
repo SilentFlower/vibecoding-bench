@@ -106,6 +106,7 @@ def main():
                         "uses_native_history": actor.cold_history is not None,
                         "from_interactive_cli": submission.body == native_raw,
                         "cli_tool_choice": native.get("tool_choice"),
+                        "cli_has_output_format": "format" in (native.get("output_config") or {}),
                         "cli_tool_names": [tool.get("name") for tool in native.get("tools") or []],
                         "cli_sha256": sha256(native_raw).hexdigest() if native_raw is not None else None,
                         "sha256": sha256(submission.body).hexdigest()}
