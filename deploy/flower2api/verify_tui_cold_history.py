@@ -3913,6 +3913,19 @@ def verify_client_thinking_reply(raw, stream, model, summary):
 
     frames = [json.loads(line[5:]) for line in raw.splitlines() if line.startswith(b"data:")]
     assert frames[0]["message"]["model"] == model and frames[-1]["type"] == "message_stop", frames
+    # 按公开流的顺序核对块边界，避免把落在块外的增量单独验为成功。
+    order = [
+        (event["type"], event.get("index")) for event in frames
+        if event["type"] in ("message_start", "content_block_start", "content_block_delta",
+                             "content_block_stop", "message_delta", "message_stop")
+    ]
+    thinking_deltas = [("content_block_delta", 0)] * (2 if summary else 1)
+    assert order == [
+        ("message_start", None),
+        ("content_block_start", 0), *thinking_deltas, ("content_block_stop", 0),
+        ("content_block_start", 1), ("content_block_delta", 1), ("content_block_stop", 1),
+        ("message_delta", None), ("message_stop", None),
+    ], order
     starts = [(event["index"], event["content_block"]) for event in frames if event["type"] == "content_block_start"]
     assert starts == [(0, {"type": "thinking", "thinking": ""}), (1, {"type": "text", "text": ""})], starts
     deltas = [(event["index"], event["delta"]) for event in frames if event["type"] == "content_block_delta"]
