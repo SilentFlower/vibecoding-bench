@@ -323,6 +323,7 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - 根记录包含起止时间、下游状态、最终选中账号、结果、尝试数和可选的会话字段。根状态与尝试实际上游状态分开；中间认证或签名错误不得覆盖后续尝试结果。首字节字段 `ttft_ms` 测量响应头到达耗时，不解释为首个模型文本 token。
 - V2 根记录的 `context.tui_confirmed_model_responses` 仅累计同次私有发送确认的模型帧或可信上游 HTTP 错误。一条已标记的尝试仍可能发生在确认之前。已确认的准备拒绝或发送前拒绝可记录零。只有超时或传输中断的记录保持缺省。存在较早的已确认模型响应时，保留该计数。管理界面的「已确认模型响应数」与「已记录尝试次数」独立呈现。实际投递总数仍取决于后续证据。最终 TLS 写出采集维持未采集。
 - 本地拒绝、模拟和缓存命中有根记录，但无虚构的上游尝试。EOF、末帧、读取错误和 Drop 只终结一次；HTTP 200 内的错误事件与成功区分，缺用量或采样失败标记 `incomplete/partial`。发送错误不伪造上游 HTTP 状态或断言未提交。
+- 下游在网关形成响应前取消时，根记录保持 `cancelled`、`status_code=null`，缺省错误阶段为 `downstream_headers`，管理详情显示「生成响应头前」。响应正文读取期间取消时沿用 `downstream_body`。已经记录的错误阶段和维护中断继续优先。列表和详情将已结束记录的空 HTTP 状态显示为「未观测」。同一记录缺少已记录尝试时，执行节点显示为「节点未观测」。上游提交状态按实际尝试及确认记录独立核对。
 - 本地 503 的 `error_stage` 由实际失败边界写入：选号为 `account_selection`，凭据解析为 `credentials`，V3 环境/传输绑定准备为 `runtime_prepare`，原生能力检查及原生准备拒绝为 `native_prepare`。`RequestTraceGuard::error` 保留已记录阶段；通用 `AppError::ServiceUnavailable` 缺少边界信息时回退 `gateway`，不能仅凭错误类型归为选号失败。诊断标记不改变响应、准入超时或重试行为。
 - 尝试中的 session/thread/响应消息仅存带账号及标识类型域的 SHA256 前 128 位；线程前驱和响应消息使用同一消息域。只观察既有池解析结果，不能额外 resolve 或刷新 TTL；上游 session 摘要以实际最终 body 为准。
 - `original_session_id` 是管理员关联客户端日志的明文例外。Claude 在入站正文解码后、会话封禁与正文策略前冻结，依次尝试既有 JSON-string/legacy 提取器、`X-Claude-Code-Session-Id`，V3 路径再接受 `X-Session-Id`。反重力 Gemini 读取 `X-Session-Id`。只保存非空白、无控制字符、UTF-8 最多 256 字节的完整值，不 trim 或截断。正文提取值异常时沿原路由并保持诊断原值未知。
@@ -346,6 +347,7 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 | 已核验的反重力工具接续或重读，缺少客户端值 | 记录原工具轮派生键，保留原工具账号归属 |
 | 账号改名 / 删除 / 旧记录缺展示字段 | 查询当前名称邮箱 / LEFT JOIN 保留诊断及 ID，资料为空 / 兼容读取 |
 | 流内错误、读取异常、取消 | 保留部分 token，受控终态，响应原始字节继续透传 |
+| 生成公开响应前取消且缺少已知错误阶段 | `cancelled/downstream_headers`，HTTP 状态为空，保留实际尝试与预留 |
 | 损坏压缩、采样超限、非法 JSON | `partial=true`，受控错误类型与观察失败计数，不阻断业务 |
 | 队列满、写入或清理失败 | 记录脱敏失败信号，不改变转发/费用，不返回假完整覆盖 |
 | 非法分页、账号、时间或结果筛选 | 400 |

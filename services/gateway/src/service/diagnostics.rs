@@ -348,6 +348,9 @@ impl TraceContext {
                             .as_ref()
                             .and_then(|(_, _, stage)| stage.clone())
                             .or_else(|| Some("downstream_body".into()))
+                    } else if state.request.status_code.is_none() {
+                        // 响应尚未交给下游，取消可能发生在准备或等待上游的任意阶段。
+                        Some("downstream_headers".into())
                     } else {
                         Some("downstream_body".into())
                     }
@@ -1858,10 +1861,15 @@ mod tests {
         let id = trace.lock().request.request_id.clone();
         drop(RequestTraceGuard::new(trace));
         store.flush().await.unwrap();
+        let detail = store.detail(&id).await.unwrap();
+        assert_eq!(detail.request.outcome, "cancelled");
         assert_eq!(
-            store.detail(&id).await.unwrap().request.outcome,
-            "cancelled"
+            detail.request.error_stage.as_deref(),
+            Some("downstream_headers")
         );
+        assert_eq!(detail.request.status_code, None);
+        assert_eq!(detail.request.attempt_count, 0);
+        assert!(detail.request.native_rejection.is_none());
         let pool = AnyPoolOptions::new()
             .max_connections(1)
             .connect("sqlite::memory:")
