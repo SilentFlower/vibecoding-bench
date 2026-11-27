@@ -81,6 +81,7 @@ REGENERATED_USAGE = (19, 11)
 SLOW_READER_USAGE = (17, 11)
 SLOW_READER_PAUSE_SECONDS = 11
 SIGNED_THINKING = {"type": "thinking", "thinking": "隔离模型的合成思考段。", "signature": "c2lnbmF0dXJlLWZpeHR1cmU="}
+EXTERNAL_REDACTED_THINKING = {"type": "redacted_thinking", "data": "c3ludGhldGlj"}
 SIGNED_FORK_THINKING = {"type": "thinking", "thinking": "隔离模型在分叉产生的合成思考段。",
                         "signature": "c2lnbmF0dXJlLWZvcms="}
 ADAPTIVE_THINKING = {"type": "adaptive", "display": "updates"}
@@ -373,7 +374,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param reconnect_tool_stream 是否在真实续轮流中断开再接回。
     @param slow_tool_stream 是否在原公开连接上慢读真实续轮，核对独立用量。
     @param model_connection_contract 可选，验证模型连接复用、模型端关闭或 sender 重启后的连接归属。
-    @param external_signed_history 是否核对普通客户端提交的外部签名历史。
+    @param external_signed_history 外部签名基线，或带独立模型响应及来源字段的对照。
     @param bound_signed_history 原生主档的签名来源及新工具的热续轮或重启恢复。
     @param current_images 是否用本轮原生图文替换纯文本问题。
     @param current_image_ending 本轮九块图文以文字或图片结尾。
@@ -920,7 +921,10 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         if structured_output:
             return verify_structured_output(manage, token, identifier, received)
         if external_signed_history:
-            return verify_external_signed_history(manage, token, identifier, received, sender_state_after_failure)
+            return verify_external_signed_history(
+                manage, token, identifier, received, sender_state_after_failure,
+                origin_stack=stack if external_signed_history == "source" else None,
+            )
         if no_tool_choice:
             return verify_no_tool_choice(manage, token, identifier, received)
         if disable_parallel_tool_use:
@@ -3333,31 +3337,80 @@ def verify_provider_quota(manage, token, identifier, received, quota_windows, se
     return {"cases": cases, "stream": stream, "model_posts": len(received), "wire_final": "unavailable"}
 
 
-def verify_external_signed_history(manage, token, identifier, received, sender_status):
+def external_signed_responses(stack, old_call):
+    """从独立回环模型响应读取公开签名和模型身份。@param stack 夹具生命周期。
+    @param old_call 原外部工具。@return 两个实际读取的响应。
+    """
+    model = "claude-opus-5-5"
+    content = {"thinking": SIGNED_THINKING, "redacted_thinking": EXTERNAL_REDACTED_THINKING}
+    requests = []
+
+    class Origin(QuietHandler):
+        """为普通客户端生成独立于候选账号的合成历史响应。"""
+
+        def do_POST(self):
+            """接收公开 Messages 形状的来源请求并返回签名工具。@return 无。"""
+            payload = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            variant = payload["messages"][0]["content"]
+            assert self.path == "/v1/messages" and payload["model"] == model and variant in content
+            requests.append(variant)
+            response_json(self, {"type": "message", "role": "assistant", "id": f"msg_external_{variant}",
+                                 "model": model, "content": [content[variant], old_call], "stop_reason": "tool_use",
+                                 "usage": {"input_tokens": 12, "output_tokens": 8}})
+
+    server = serve(stack, ThreadingHTTPServer(("127.0.0.1", 0), Origin))
+    response = {}
+    for variant in content:
+        status, raw = call(server.server_port, "POST", "/v1/messages", "fixture-external-origin", {
+            "model": model, "max_tokens": 128, "messages": [{"role": "user", "content": variant}],
+            "tools": [{**TOOL, "name": old_call["name"]}],
+        })
+        body = json.loads(raw)
+        assert status == 200 and body["role"] == "assistant" and body["model"] == model
+        assert body["content"] == [content[variant], old_call]
+        response[variant] = body
+    assert requests == list(content)
+    return response
+
+
+def verify_external_signed_history(manage, token, identifier, received, sender_status, *, origin_stack=None):
     """核对外部签名历史的模型实收、调用与结果归属，以及本轮公开终态。
     @param manage 管理入口。@param token 合成调用方。@param identifier 合成账号。
-    @param received 隔离模型实收。@param sender_status 失败后读取 sender。@return 按请求关联的证据。
+    @param received 隔离模型实收。@param sender_status 失败后读取 sender。
+    @param origin_stack 可选，启用独立回环模型来源。@return 按请求关联的证据。
     """
     question = "请直接确认这条合成历史。"
     old_call = {"type": "tool_use", "id": PAST_ID, "name": "PreviousNote", "input": ARGS}
     old_result = {"type": "tool_result", "tool_use_id": PAST_ID, "is_error": True, "content": "合成历史错误。\n第二行。"}
+    origins = external_signed_responses(origin_stack, old_call) if origin_stack is not None else {}
+    variants = []
+    for label, signature in (("unsigned", None), ("thinking", SIGNED_THINKING),
+                             ("redacted_thinking", EXTERNAL_REDACTED_THINKING)):
+        if not origins:
+            variants.append((label, {"role": "assistant", "content": [signature, old_call] if signature else [old_call]}))
+        elif label in origins:
+            origin = origins[label]
+            row = {"role": origin["role"], "content": origin["content"]}
+            variants.extend(((label, row), (label + "_model", {**row, "model": origin["model"]}),
+                             (label + "_response_metadata", {**row, **{field: origin[field] for field in ("id", "model", "usage")}})))
     cases = {}
     for policy in ("append", "replace", "user_reminder"):
         account = manage("PUT", f"accounts/{identifier}", {"client_system_prompt_policy": policy})
         assert account["client_system_prompt_policy"] == policy
-        for label, signature in (("unsigned", None), ("thinking", SIGNED_THINKING),
-                                 ("redacted_thinking", {"type": "redacted_thinking", "data": "c3ludGhldGlj"})):
-            blocks_before_result = [signature, old_call] if signature else [old_call]
+        for label, assistant in variants:
+            blocks_before_result = assistant["content"]
+            signature = blocks_before_result[0] if len(blocks_before_result) == 2 else None
             body = {"model": MODEL, "max_tokens": 128, "system": SYSTEM[0], "stream": False, "messages": [
                 {"role": "user", "content": "先查询旧合成便签。"},
-                {"role": "assistant", "content": blocks_before_result},
+                assistant,
                 {"role": "user", "content": [old_result]},
                 {"role": "assistant", "content": "旧合成便签查询已经结束。"},
                 {"role": "user", "content": question},
             ]}
             headers = {"User-Agent": "flower2api-external-history-fixture/1", "x-session-id": str(uuid4())}
             phase = f"external_signature_{policy}_{label}"
-            expected = 200 if signature is None or policy == "append" else 422
+            supported_row = assistant.keys() == {"role", "content"}
+            expected = 200 if supported_row and (signature is None or policy == "append") else 422
             before = len(received)
             status, raw, request_id = checked_messages(
                 manage, token, body, headers, received, phase, expected_status=expected, trace_startup=True,
@@ -3390,6 +3443,10 @@ def verify_external_signed_history(manage, token, identifier, received, sender_s
             signed_blocks = [(row["role"], block) for row in model["messages"] for block in blocks(row)
                              if block["type"] in ("thinking", "redacted_thinking")]
             assert signed_blocks == ([("assistant", signature)] if signature else []), (phase, signed_blocks)
+            if origins:
+                assert model["model"] == MODEL != origins[label]["model"]
+                (model_row,) = [row for row in model["messages"] if any(b.get("id") == PAST_ID for b in blocks(row))]
+                assert model_row == assistant
             texts = [b.get("text", "") for row in model["messages"] if row["role"] == "user" for b in blocks(row)]
             assert sum(text.count(question) for text in texts) == 1, (phase, texts)
             system = model["system"]
@@ -3401,8 +3458,15 @@ def verify_external_signed_history(manage, token, identifier, received, sender_s
             case.update(provider_path=source, model_body_sha256=digest, cli_body_sha256=claim["cli_sha256"],
                         observed_signed_blocks=signed_blocks, old_tool_id=PAST_ID, old_tool_result=old_result,
                         client_stop_reason=reply["stop_reason"])
-    assert len(received) == 5 and not any(path.is_file() for path in Path("/flows/api").rglob("*"))
-    return {"cases": cases, "model_posts": len(received), "wire_final": "unavailable"}
+    assert len(received) == (2 if origins else 5) and not any(path.is_file() for path in Path("/flows/api").rglob("*"))
+    proof = {"cases": cases, "model_posts": len(received), "wire_final": "unavailable"}
+    if origins:
+        proof["current_request_model"] = MODEL
+        proof["external_responses"] = {label: {
+            "message_id": origin["id"], "response_model": origin["model"],
+            "content_sha256": sha256(encoded(origin["content"])).hexdigest(),
+        } for label, origin in origins.items()}
+    return proof
 
 
 def verify_bound_signed_history(manage, token, foreign, headers, follow, reply, received, callbacks, account_token,
@@ -4737,8 +4801,10 @@ def main():
     scenario.add_argument("--initial-idle-model-connection", action="store_true")
     scenario.add_argument("--output-effort", action="store_true")
     scenario.add_argument("--structured-output-contract", action="store_true")
-    scenario.add_argument("--external-signed-history-contract", action="store_true",
+    scenario.add_argument("--external-signed-history-contract", dest="external_signed_history", action="store_const", const="contract",
                           help="核对普通客户端提交的外部签名历史")
+    scenario.add_argument("--external-signed-history-source", dest="external_signed_history", action="store_const", const="source",
+                          help="用独立回环模型响应核对外部签名及来源字段")
     scenario.add_argument("--bound-signed-history", choices=("live", "restart", "fork"),
                           help="核对同一已绑定主档的签名来源及新工具回执")
     scenario.add_argument("--forced-tool-choice-contract",
@@ -4813,7 +4879,7 @@ def main():
     previous = args.mixed_release
     cache_markers = args.cache_markers or args.cache_marker_capabilities is not None
     trace_startup = (args.initial_idle_model_connection or args.trace_initial_startup or args.trace_recovery_resend or cache_markers
-                     or args.model_connection_contract is not None or args.external_signed_history_contract
+                     or args.model_connection_contract is not None or bool(args.external_signed_history)
                      or args.bound_signed_history is not None
                      or args.history_tool_images is not None or args.tool_receipt_images is not None
                      or args.history_empty_tool_result is not None or args.empty_tool_receipt is not None
@@ -4846,7 +4912,7 @@ def main():
                        recover_pending=(args.recover_pending_tool or args.oauth_rotation == "restart"
                                         or args.model_connection_contract == "restart"),
                        model_connection_contract=args.model_connection_contract,
-                       external_signed_history=args.external_signed_history_contract,
+                       external_signed_history=args.external_signed_history,
                        bound_signed_history=args.bound_signed_history,
                        oauth_rotation=bool(args.oauth_rotation), provider_quota=args.provider_quota,
                        output_effort=args.output_effort, history_png=args.history_png,
