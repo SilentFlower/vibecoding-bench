@@ -1,0 +1,23 @@
+ARG ACCOUNT_BASE=flower2api-local-dependency:account
+ARG CONTROL_BASE=flower2api-local-dependency:control
+
+FROM ${CONTROL_BASE} AS direct-control
+ARG REVISION
+ARG BINARY_REVISION
+COPY claude-code-gateway /app/claude-code-gateway
+LABEL org.opencontainers.image.revision="${REVISION}" vibebench.verification="extra-ca" \
+      vibebench.direct-candidate.binary-revision="${BINARY_REVISION}"
+
+FROM ${ACCOUNT_BASE} AS direct-account
+ARG REVISION
+ARG BINARY_REVISION
+COPY account-sender /usr/local/bin/account-sender
+COPY runtime/ /
+COPY cli/ /cli/
+RUN --network=none install -d -m 0700 -o 1001 -g 1001 /opt/flower-http-test/flower-http-policy/hooks/runtime
+LABEL org.opencontainers.image.revision="${REVISION}" vibebench.verification="extra-ca" \
+      vibebench.direct-candidate="isolated-managed-policy" vibebench.direct-candidate-cli="2.1.321" \
+      vibebench.direct-candidate.binary-revision="${BINARY_REVISION}"
+
+FROM direct-account AS direct-verification
+COPY --from=direct-control /app/claude-code-gateway /verification/claude-code-gateway

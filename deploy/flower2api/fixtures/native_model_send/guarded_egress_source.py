@@ -12,7 +12,7 @@ from select import select
 from socket import if_nameindex
 import ssl
 import sys
-from threading import Lock
+from threading import Lock, local
 from time import monotonic, monotonic_ns, sleep, time_ns
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -22,6 +22,8 @@ import frozen_tui_source as source
 import tui_sender_launch as launcher
 import tui_session as session
 from runtime_files import atomic_text
+from tui_input_policy import _IDENTITIES
+from tui_workspace_launch import publish_workspace_history
 
 if not Path("/.dockerenv").is_file() or {name for _, name in if_nameindex()} != {"lo"}:
     raise RuntimeError("直发试接只允许在仅回环的验收容器运行")
@@ -33,17 +35,63 @@ if (CONFIG.get("allowed_origin") != f"https://{TARGET}" or PROXY.scheme != "http
     raise RuntimeError("直发试接只允许使用已配置的回环账号代理")
 ORIGINAL_LAUNCH = launcher.launch_workspace_cli
 ORIGINAL_CALLBACK = session._Actor.callback
+ORIGINAL_MONITOR = session._Actor._monitor
 POLICY_MODE = Path("/opt/flower/tui/fixture-direct-permit")
+INSTALLED_PROBE = Path("/opt/flower/tui/fixture-installed-direct")
 PERMITS = Path("/tmp/flower-direct-permits.jsonl")
 TUNNELS = Path("/tmp/flower-direct-tunnels.jsonl")
 CANDIDATE_MODE = "candidate-response"
 MANAGED_BINDING_LOCK = Lock()
 managed_process = None
+launch_context = local()
 
 
 def report(stage, **data):
     """输出一次隔离试接的非敏感证据。@return 无。"""
     print(json.dumps({"event": stage, **data}), file=sys.stderr, flush=True)
+
+
+def _monitor(actor, command):
+    launch_context.actor = actor
+    try:
+        return ORIGINAL_MONITOR(actor, command)
+    finally:
+        del launch_context.actor
+
+
+def _stock_root(config, work, native_id):
+    # 原版入站只有当前用户轮时没有已确认历史。保留已占用原 UUID 的档案并按原绑定选新分支。
+    return publish_workspace_history(config, work, native_id, lambda _: False, None,
+                                     boundary=sha256(b"[]").hexdigest())
+
+
+def _stock_arguments(arguments, mod, options):
+    actor = launch_context.actor
+    handle = actor.claim
+    if handle.reservation.get("input_format") != "claude_code" or actor.cold_history is not None:
+        return arguments
+    body = json.loads(handle.raw)
+    tools = [tool["name"] for tool in handle.tools]
+    if tools not in ([], ["Read"]):
+        raise ValueError("内置隔离候选只验证外部文本和 Read")
+    system = body["system"]
+    # 账单字段与运行时身份由实际发送的 CLI 自己生成。余下的系统文本经官方文件参数交给同一 CLI。
+    if system[0]["text"].startswith("x-anthropic-billing-header:"):
+        system = system[1:]
+    (identity, *instructions) = system
+    if identity["text"] not in _IDENTITIES or any(block.keys() != {"type", "text"} for block in instructions):
+        raise ValueError("外部系统提示超出内置隔离候选范围")
+    selected = arguments.copy()
+    selected[selected.index("--tools") + 1] = ",".join(tools)
+    if instructions:
+        path = mod / "external-instructions.md"
+        atomic_text(path, "\n".join(block["text"] for block in instructions))
+        selected.extend(["--system-prompt-snapshot", "off", "--system-prompt-file", str(path)])
+    if len(body["messages"]) == 1 and body["messages"][0]["role"] == "user":
+        options.update(resume=False, prepare_history=_stock_root)
+    report("direct_stock_launch", reservation_id=handle.reservation["reservation_id"], tools=tools,
+           instruction_blocks=len(instructions))
+    return selected
 
 
 def launch(*args, environment, **options):
@@ -68,6 +116,8 @@ def launch(*args, environment, **options):
                 raise RuntimeError("隔离受管绑定仍归活跃 CLI")
             try:
                 atomic_text(managed, (mod / "hooks/binding.js").read_text())
+                if INSTALLED_PROBE.is_file():
+                    options["arguments"] = _stock_arguments(arguments, mod, options)
             except OSError as error:
                 report("direct_permit_launch_failed", error=type(error).__name__, errno=error.errno,
                        uid=getuid(), gid=getgid())
@@ -164,11 +214,102 @@ def _deliver(actor, result, message, parts):
          "usage": result["usage"]},
         {"type": "message_stop"},
     ])
-    wire = b"".join(("event: " + event["type"] + "\ndata: " + json.dumps(event) + "\n\n").encode()
-                    for event in events)
+    wire = b"".join(map(_frame, events))
     for _ in actor._model_events(actor.step, BytesIO(wire)):
         pass
     ORIGINAL_CALLBACK(actor, "/end", result)
+
+
+def _frame(event):
+    return ("event: " + event["type"] + "\ndata: " + json.dumps(event) + "\n\n").encode()
+
+
+def _public_tool_name(actor, part):
+    name = part["name"]
+    if actor.cold_history is not None:
+        return actor.cold_history.tools[name]["name"]
+    if not INSTALLED_PROBE.is_file() or name != "Read" or [tool["name"] for tool in actor.claim.tools] != ["Read"]:
+        raise ValueError("工具不属于本次已声明的隔离调用")
+    return name
+
+
+class _LiveProjection:
+    """按官方增量交付一个文本或工具块，沿原步骤发布最终帧。"""
+
+    def __init__(self, actor, chunk):
+        """从首个实收增量构造公开开场。@param actor 原会话。@param chunk 实际增量。@return 无。"""
+        self.actor = actor
+        self.step = actor.step
+        self.kind = chunk["kind"]
+        self.digest = sha256()
+        if self.kind == "tool":
+            self.source_index = chunk["index"]
+            block = {"type": "tool_use", "id": chunk["id"], "name": _public_tool_name(actor, chunk), "input": {}}
+        elif self.kind == "text":
+            block = {"type": "text", "text": ""}
+        else:
+            raise ValueError("流式内容缺少起始块")
+        self._emit({"type": "message_start", "message": {
+            "id": "msg_" + uuid4().hex, "role": "assistant", "type": "message", "model": self.step.native_model,
+            "content": [], "stop_reason": None, "stop_sequence": None,
+            # 受支持的增量未给出供应商开场用量。终态用同一步实际累计值交付。
+            "usage": {"input_tokens": 0, "output_tokens": 0},
+        }})
+        self._emit({"type": "content_block_start", "index": 0, "content_block": block})
+
+    def _emit(self, event):
+        self.actor._observe(self.step, event)
+        with self.actor.changed:
+            self.actor._publish([_frame(event)])
+
+    def add(self, chunk):
+        """发布实际文本或工具参数分片。@param chunk 官方增量。@return 无。"""
+        if self.kind == "text" and chunk["kind"] == "text":
+            text = chunk["text"]
+            delta = {"type": "text_delta", "text": text}
+        elif self.kind == "tool" and chunk["kind"] == "input" and chunk["index"] == self.source_index:
+            text = chunk["json"]
+            delta = {"type": "input_json_delta", "partial_json": text}
+        else:
+            raise ValueError("隔离直发当前步骤出现不同内容类型")
+        self.digest.update(text.encode())
+        self._emit({"type": "content_block_delta", "index": 0, "delta": delta})
+
+    def finish(self, result):
+        """确认交付内容及累计用量，再让原终态回调收口。@param result 官方步骤结果。@return 无。"""
+        if self.kind == "text" and result["reason"] == "end_turn":
+            complete = result["answer"]
+        elif self.kind == "tool" and result["reason"] == "tool_use":
+            complete = "".join(chunk["json"] for chunk in result["frames"] if chunk["kind"] == "input")
+        else:
+            raise ValueError("流式内容与同一步的结束原因不符")
+        if self.digest.digest() != sha256(complete.encode()).digest():
+            raise ValueError("公开增量与官方步骤完整结果不符")
+        self._emit({"type": "content_block_stop", "index": 0})
+        self._emit({"type": "message_delta", "delta": {"stop_reason": result["reason"], "stop_sequence": None},
+                    "usage": result["usage"]})
+        terminal = {"type": "message_stop"}
+        self.actor._observe(self.step, terminal)
+        with self.actor.changed:
+            self.step.final = [_frame(terminal)]
+        ORIGINAL_CALLBACK(self.actor, "/end", result)
+
+
+def _direct_chunk(actor, data):
+    with actor.changed:
+        step, handle = actor.step, actor.claim
+        if (not step or not handle or not step.claimed or step.stopped
+                or step.native != (data["turn"], data["step"])):
+            raise ValueError("流式增量不属于当前模型步骤")
+        if not handle.stream:
+            return {}
+    chunk = data["chunk"]
+    if actor.direct_stream is None:
+        actor.direct_stream = _LiveProjection(actor, chunk)
+        if chunk["kind"] == "tool":
+            return {}
+    actor.direct_stream.add(chunk)
+    return {}
 
 
 def _authorize_http(actor, data):
@@ -231,6 +372,9 @@ def callback(actor, path, data):
     if path == "/begin":
         actor.direct_result = None
         actor.direct_http_reply = None
+        actor.direct_stream = None
+    elif path == "/direct-chunk" and INSTALLED_PROBE.is_file():
+        return _direct_chunk(actor, data)
     elif path == "/direct-result":
         buffered_stream = POLICY_MODE.is_file() and POLICY_MODE.read_text() == CANDIDATE_MODE
         with actor.changed:
@@ -243,9 +387,13 @@ def callback(actor, path, data):
             tool, *arguments = frames
             assert tool["kind"] == "tool" and all(part["kind"] == "input" and part["index"] == tool["index"]
                                                   for part in arguments)
-            assert actor.cold_history is not None and tool["name"] in actor.cold_history.tools
+            _public_tool_name(actor, tool)
             assert isinstance(json.loads("".join(part["json"] for part in arguments)), dict)
             report("native_mod_tool_result", tool_id=tool["id"], fragments=len(arguments), usage=data["usage"])
+            if actor.direct_stream is not None:
+                actor.direct_stream.finish(data)
+                actor.direct_result = None
+                return {}
             # 网关按原合同为对外消息生成新 ID。官方 Mod 在此处已有实际工具 ID 和参数分片。
             init = {"type": "message", "role": "assistant", "model": actor.step.native_model, "usage": data["usage"]}
             parts = [
@@ -270,13 +418,18 @@ def callback(actor, path, data):
         ]
         report("native_archive_response", message_id=raw["id"], usage=result["usage"],
                answer_sha256=sha256(result["answer"].encode()).hexdigest())
-        _deliver(actor, result, raw, parts)
+        if actor.direct_stream is not None:
+            actor.direct_stream.finish(result)
+        else:
+            _deliver(actor, result, raw, parts)
     return ORIGINAL_CALLBACK(actor, path, data)
 
 
 launcher.launch_workspace_cli = launch
 session._Callback = Callback
 session._Actor.callback = callback
+if INSTALLED_PROBE.is_file():
+    session._Actor._monitor = _monitor
 
 if __name__ == "__main__":
     source.main()

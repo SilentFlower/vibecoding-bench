@@ -121,8 +121,9 @@ def check_provider_error(manage, token, identifier, received, sender_status, res
             "stop_failure": event, "diagnostics": evidence, "wire_final": "unavailable"}
 
 
-def _reconnect_receipt(manage, token, headers, follow, first, received, post, tail):
+def _reconnect_receipt(manage, token, headers, follow, first, received, post, tail, *, live_projection):
     sent = Event()
+    partial = {}
     try:
         with closing(HTTPConnection("127.0.0.1", 18090, timeout=30)) as connection:
             connection.request("POST", "/v1/messages", fixture.encoded(follow), headers={
@@ -131,8 +132,27 @@ def _reconnect_receipt(manage, token, headers, follow, first, received, post, ta
             })
             fixture.wait_for(lambda: tail.first_frame_ns)
             assert len(received) == 2 and not tail.writing_tail.is_set()
-            assert not select([connection.sock], [], [], 0)[0]
-            connection.sock.shutdown(SHUT_RDWR)
+            client_socket = connection.sock
+            if live_projection:
+                with closing(connection.getresponse()) as response:
+                    assert response.status == 200
+                    records = []
+                    for wire, item in wire_events(response):
+                        if item is None or item["type"] == "ping":
+                            continue
+                        records.append(wire)
+                        if item["type"] == "content_block_delta":
+                            assert item["delta"]["type"] == "text_delta" and item["delta"]["text"]
+                            break
+                    assert len(records) == 3 and not tail.writing_tail.is_set()
+                    partial = {"original_response_headers": response.status,
+                               "original_prefix_sha256": sha256(b"".join(records)).hexdigest(),
+                               "original_public_request_id": response.getheader("x-cc2api-request-id"),
+                               "original_prefix_read_ns": monotonic_ns()}
+                    client_socket.shutdown(SHUT_RDWR)
+            else:
+                assert not select([client_socket], [], [], 0)[0]
+                client_socket.shutdown(SHUT_RDWR)
             disconnected = monotonic_ns()
         # 重交写入后才释放模型尾段，确保断开和新读者都发生在公开首响之前。
         with ThreadPoolExecutor(max_workers=1) as pool:
@@ -158,16 +178,20 @@ def _reconnect_receipt(manage, token, headers, follow, first, received, post, ta
     assert detail["request"]["outcome"] in ("tui_reconnect_stream", "tui_reconnect_cached")
     assert detail["request"]["attempt_count"] == 0 and not detail["attempts"]
     assert original["attempt_count"] == 1
+    if live_projection:
+        assert original["request_id"] == partial["original_public_request_id"]
+        assert reader["sse_prefix_sha256"] == partial["original_prefix_sha256"]
+        assert tail.first_frame_ns <= partial["original_prefix_read_ns"] <= disconnected
     return answer, {"request_id": original["request_id"], "status": original["status_code"],
                     "reservation_id": original["context"]["tui_reservation_id"],
-                    "reconnect": {**reader, "original_response_headers": None, "reader_attempts": 0,
+                    "reconnect": {**reader, "original_response_headers": None, **partial, "reader_attempts": 0,
                                   "new_model_posts": 0, "outcome": detail["request"]["outcome"],
                                   "model_first_frame_ns": tail.first_frame_ns, "model_end_ns": tail.ended_ns,
                                   "disconnect_ns": disconnected, "retry_written_ns": sent_before_tail}}
 
 
 def check(manage, token, identifier, received, sender_status, restart, *, source_observer, mode, receipt_status=200,
-          public_stream=False, receipt_tail=None, before_receipt=None):
+          public_stream=False, receipt_tail=None, before_receipt=None, live_projection=False):
     """通过公开网关核对真实工具。@param public_stream 是否读取公开 SSE。@return 公开回执和模型实收。"""
     assert not source_observer and not restart
     headers = {"x-session-id": str(uuid4()), "User-Agent": "flower2api-direct-guarded-lab/1"}
@@ -196,14 +220,19 @@ def check(manage, token, identifier, received, sender_status, restart, *, source
         if public_stream and status == 200:
             output = MessageJSON(BODY_LIMIT)
             sequence = []
-            for _, item in wire_events(BytesIO(raw)):
+            prefix = []
+            for wire, item in wire_events(BytesIO(raw)):
                 if item is not None and item["type"] != "ping":
+                    if live_projection and len(prefix) < 3:
+                        prefix.append(wire)
                     output.add(item)
                     sequence.append(item["type"])
             assert sequence[:2] == ["message_start", "content_block_start"], sequence
             assert sequence[-3:] == ["content_block_stop", "message_delta", "message_stop"], sequence
             assert sequence[2:-3] and all(kind == "content_block_delta" for kind in sequence[2:-3]), sequence
             proof["sse_events"] = sequence
+            if live_projection:
+                proof["sse_prefix_sha256"] = sha256(b"".join(prefix)).hexdigest()
             raw = output.finish()
         return json.loads(raw), proof
 
@@ -225,7 +254,8 @@ def check(manage, token, identifier, received, sender_status, restart, *, source
         if before_receipt is not None:
             before_receipt()
         if receipt_tail is not None:
-            answer, request = _reconnect_receipt(manage, token, headers, follow, first, received, post, receipt_tail)
+            answer, request = _reconnect_receipt(manage, token, headers, follow, first, received, post, receipt_tail,
+                                                 live_projection=live_projection)
         else:
             answer, request = post("guarded_direct_tool_receipt", follow, receipt_status)
         if receipt_status != 200:

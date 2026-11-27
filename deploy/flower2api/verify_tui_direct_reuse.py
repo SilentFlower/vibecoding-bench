@@ -106,7 +106,7 @@ class ReceiptTail(ModelStream):
 
 
 def collect(manage, token, identifier, received, sender_status, restart, *, source_observer, mode, stages,
-            public_stream=False, receipt_tail=None, restart_before_receipt=False):
+            public_stream=False, receipt_tail=None, restart_before_receipt=False, live_projection=False):
     """关联公开请求、核心钩子、账号隧道和接收端。
     @param manage 管理入口。@param token 合成入口凭据。@param identifier 隔离账号。
     @param received 实际模型收件。@param sender_status 失败时的发送器诊断。
@@ -115,6 +115,7 @@ def collect(manage, token, identifier, received, sender_status, restart, *, sour
     @param public_stream 是否通过真实公开 SSE 执行工具。
     @param receipt_tail 断线用例的隔离模型终帧闸门。
     @param restart_before_receipt 是否在同一绑定结束旧 CLI 并验证从磁盘接续。
+    @param live_projection 是否在原客户端实际读到增量后断开。
     """
     expected = 200 if mode == "allow" else 502
 
@@ -127,7 +128,8 @@ def collect(manage, token, identifier, received, sender_status, restart, *, sour
     public = guarded.check(manage, token, identifier, received, sender_status, restart,
                            source_observer=source_observer, mode="tool", receipt_status=expected,
                            public_stream=public_stream, receipt_tail=receipt_tail,
-                           before_receipt=end_original_cli if restart_before_receipt else None)
+                           before_receipt=end_original_cli if restart_before_receipt else None,
+                           live_projection=live_projection)
     assert public["client_tool_executions"] == 1
     (log,) = Path("/native/tui-sessions").glob("*/home/.claude/core-http.log")
     lines = log.read_text(errors="replace").splitlines()
@@ -205,6 +207,7 @@ def main():
     parser.add_argument("--gateway", type=Path, required=True)
     parser.add_argument("--sender", type=Path, default=Path("/usr/local/bin/account-sender"))
     parser.add_argument("--direct-candidate", action="store_true", help="使用允许延后首帧的直发候选")
+    parser.add_argument("--installed-direct-candidate", action="store_true", help="从镜像内置直发候选读取实时增量")
     parser.add_argument("--stream", action="store_true", help="经公开 SSE 交付工具和完整答复")
     parser.add_argument("--reconnect", action="store_true", help="在模型已收回执且公开首响前断开并接回")
     parser.add_argument("--restart-before-receipt", action="store_true", help="隔离工具首轮后结束旧 CLI")
@@ -218,13 +221,18 @@ def main():
         parser.error("断线接回需要 --stream")
     if args.restart_before_receipt and not args.reconnect:
         parser.error("冷接续对照需要 --reconnect")
+    if args.installed_direct_candidate and not args.direct_candidate:
+        parser.error("需要 --direct-candidate")
     version = "2.1.321"
     digest = core.PROGRAMS[version]
     with Path(f"/cli/{version}/node_modules/.bin/claude").open("rb") as stream:
         assert file_digest(stream, "sha256").hexdigest() == digest
-    core.install(version, digest, "tool", "managed")
-    if args.mode != "connect-only":
-        install_permit(CANDIDATE_MODE if args.direct_candidate and args.mode == "allow" else args.mode)
+    if args.installed_direct_candidate:
+        assert Path("/opt/flower/tui/fixture-installed-direct").is_file()
+    else:
+        core.install(version, digest, "tool", "managed")
+        if args.mode != "connect-only":
+            install_permit(CANDIDATE_MODE if args.direct_candidate and args.mode == "allow" else args.mode)
     stages = {key: [] for key in ("proxy_connect_accepted", "proxy_model_tcp_connected",
                                  "model_client_hello", "model_received", "direct_model_http_identity")}
     observe = fixture.startup_event
@@ -238,7 +246,8 @@ def main():
     with patch.multiple(
         fixture, QuietHandler=ObservedModel, startup_event=capture,
         verify_structured_tool_round=partial(collect, mode=args.mode, stages=stages, public_stream=args.stream,
-                                              receipt_tail=receipt_tail, restart_before_receipt=args.restart_before_receipt),
+                                              receipt_tail=receipt_tail, restart_before_receipt=args.restart_before_receipt,
+                                              live_projection=args.installed_direct_candidate),
     ), TemporaryDirectory(prefix="tui-direct-reuse-") as folder:
         result = fixture.verify(
             args.gateway, args.sender, Path(folder), installed_runtime=True,
