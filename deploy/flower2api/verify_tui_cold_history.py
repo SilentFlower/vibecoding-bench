@@ -91,6 +91,8 @@ THINKING_UPDATES_BETA = "thinking-display-updates-2026-08-18"
 THINKING_DISPLAY_DEFAULTS = {MODEL: "summarized", "claude-opus-5-5": "omitted"}
 CONTEXT_MANAGEMENT_BETA = "context-management-2025-06-27"
 SYSTEM_CLEAR_AT_BETA = "mid-conversation-system-clear-at-2026-08-21"
+SYSTEM_EFFORT_BETA = "mid-conversation-output-config-2026-07-01"
+SYSTEM_CONTROL_CONTRACTS = ("turn-scoped-contract", "message-effort-contract")
 KEEP_ALL_THINKING = {"edits": [{"type": "clear_thinking_20251015", "keep": "all"}]}
 STRUCTURED_FORMAT = {"type": "json_schema", "schema": {
     "type": "object", "properties": {"fixture_order_status": {"type": "string", "enum": ["ready"]}},
@@ -587,13 +589,14 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             if (v1_runtime is not None or message_system_roles or adaptive_thinking_model or fixed_thinking_model
                     or mixed_context_keep_all):
                 model_betas.append(self.headers.get("anthropic-beta", ""))
-            if message_system_roles == "turn-scoped-contract" and any(
-                row["role"] == "system" and row.get("clear_at") is not None for row in body["messages"]
-            ) and SYSTEM_CLEAR_AT_BETA not in {part.strip() for part in model_betas[-1].split(",")}:
-                response_json(self, {"type": "error", "error": {
-                    "type": "invalid_request_error", "message": "隔离模型要求消息级 clear_at 的 beta",
-                }}, status=400)
-                return
+            if message_system_roles in SYSTEM_CONTROL_CONTRACTS:
+                betas = {part.strip() for part in model_betas[-1].split(",")}
+                missing = message_system_betas(body) - betas
+                if missing:
+                    response_json(self, {"type": "error", "error": {
+                        "type": "invalid_request_error", "message": "隔离模型缺少消息级声明：" + ",".join(sorted(missing)),
+                    }}, status=400)
+                    return
             if failure_boundaries and any(block.get("text") == DROP_REPLY
                                           for row in body["messages"] for block in blocks(row)):
                 self.close_connection = True
@@ -1080,8 +1083,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                                     thinking_cli_summaries)
         if message_system_roles:
             account = manage("GET", f"accounts/{identifier}")
-            if message_system_roles == "turn-scoped-contract":
-                return verify_turn_scoped_system(manage, token, account, received, model_betas)
+            if message_system_roles in SYSTEM_CONTROL_CONTRACTS:
+                return verify_system_controls(manage, token, account, received, model_betas,
+                                              per_message_effort=message_system_roles == "message-effort-contract")
             return verify_message_system_roles(manage, token, account, received, model_betas,
                                                fixed=message_system_roles == "ordinary-contract")
         if provider_quota:
@@ -3777,9 +3781,23 @@ def verify_message_system_roles(manage, token, account, received, model_betas, *
     return {"backend": backend, "cases": proof, "model_posts": len(received), "wire_final": "unavailable"}
 
 
-def verify_turn_scoped_system(manage, token, account, received, model_betas):
-    """核对普通请求的 clear_at 和原工具回执。@param manage 管理 API。@param token 合成凭据。
-    @param account 当前账号。@param received 模型实收。@param model_betas 模型协议头。@return 逐请求证据。
+def message_system_betas(body):
+    """按隔离模型的协议检查求必需 beta。@param body 模型实收。@return 所需声明集合。"""
+    required = set()
+    for row in body["messages"]:
+        if row["role"] != "system":
+            continue
+        if row.get("clear_at") is not None:
+            required.add(SYSTEM_CLEAR_AT_BETA)
+        if "effort" in (row.get("output_config") or {}):
+            required.add(SYSTEM_EFFORT_BETA)
+    return required
+
+
+def verify_system_controls(manage, token, account, received, model_betas, *, per_message_effort):
+    """核对普通请求的消息级控制和原工具回执。@param manage 管理 API。@param token 合成凭据。
+    @param account 当前账号。@param received 模型实收。@param model_betas 模型协议头。
+    @param per_message_effort 是否运行消息级推理强度用例。@return 逐请求证据。
     """
     manage("PUT", "settings", {"message_cache_control_rewrite": "off", "cache_control_ttl_rewrite": "off"})
     cases = {}
@@ -3787,6 +3805,8 @@ def verify_turn_scoped_system(manage, token, account, received, model_betas):
     scoped = {"role": "system", "content": "为本轮合成便签保留原系统指令。", "clear_at": "next_user_message"}
     model = "claude-opus-5-5"
     base = {"model": model, "max_tokens": 128, "stream": False, "system": SYSTEM[0]}
+    if per_message_effort:
+        base["output_config"] = {"effort": "high"}
     unrelated = "mid-conversation-system-2026-04-07"
 
     def headers():
@@ -3811,9 +3831,12 @@ def verify_turn_scoped_system(manage, token, account, received, model_betas):
         assert reply["stop_reason"] == expected_stop, reply
         ((digest, actual, _),) = received[before:]
         assert actual["model"] == model and actual["messages"] == body["messages"] and actual["system"] == base["system"]
+        assert actual.get("output_config") == body.get("output_config"), (label, actual.get("output_config"))
         tokens = [part.strip() for part in model_betas[-1].split(",") if part.strip()]
-        expects_beta = any(row.get("clear_at") is not None for row in body["messages"])
-        assert tokens.count(SYSTEM_CLEAR_AT_BETA) == expects_beta, (label, tokens)
+        required = message_system_betas(body)
+        assert all(tokens.count(beta) == (beta in required) for beta in (SYSTEM_CLEAR_AT_BETA, SYSTEM_EFFORT_BETA)), (
+            label, tokens,
+        )
         supplied = model_headers.get("anthropic-beta")
         if supplied:
             assert tokens[:len(supplied.split(","))] == supplied.split(","), (label, supplied, tokens)
@@ -3825,30 +3848,45 @@ def verify_turn_scoped_system(manage, token, account, received, model_betas):
         assert result["attempt_count"] == record["diagnostic_context"]["tui_confirmed_model_responses"] == 1
         result.update(reservation_id=reservation, model_body_sha256=digest, model_betas=tokens,
                       session_origin=context["tui_session_origin"],
+                      output_config=actual.get("output_config"),
                       model_system_rows=[row for row in actual["messages"] if row["role"] == "system"])
         return reply
 
-    post("implicit_current", {**base, "messages": [user, scoped]}, headers())
+    effort = {"role": "system", "content": [], "output_config": {"effort": "low"}}
+    setting = effort if per_message_effort else scoped
     history = [user, scoped, {"role": "assistant", "content": "已记下合成便签。"},
                {"role": "user", "content": "继续读回历史便签。"}]
-    post("implicit_expired_history", {**base, "messages": history}, headers())
-    post("explicit_never_with_other_beta", {**base, "messages": [user, {**scoped, "clear_at": "never"}]},
-         {**headers(), "anthropic-beta": unrelated})
-    post("explicit_beta", {**base, "messages": history},
-         {**headers(), "anthropic-beta": unrelated + "," + SYSTEM_CLEAR_AT_BETA})
-    post("without_clear_at", {**base, "messages": [user, {k: v for k, v in scoped.items() if k != "clear_at"}]}, headers())
-    post("unlisted_model", {**base, "model": MODEL, "messages": [user, scoped]}, headers(), expected_status=400)
+    plain = {"role": "system", "content": scoped["content"]}
+    if per_message_effort:
+        # 已完成的历史与新用户问之间放置原位控制。根 effort 保持 high。
+        effort_history = [history[0], history[2], effort, history[3]]
+        post("implicit_effort_history", {**base, "messages": effort_history}, headers())
+        current = {**base, "messages": [user, effort]}
+        post("effort_with_other_beta", current, {**headers(), "anthropic-beta": unrelated})
+        post("explicit_effort_beta", current, {**headers(), "anthropic-beta": unrelated + "," + SYSTEM_EFFORT_BETA})
+        post("root_effort_only", {**base, "messages": [user, plain]}, headers())
+        post("combined_clear_at_and_effort", {**base, "messages": [*history[:3], effort, history[-1]]}, headers())
+    else:
+        post("implicit_current", {**base, "messages": [user, scoped]}, headers())
+        post("implicit_expired_history", {**base, "messages": history}, headers())
+        post("explicit_never_with_other_beta", {**base, "messages": [user, {**scoped, "clear_at": "never"}]},
+             {**headers(), "anthropic-beta": unrelated})
+        post("explicit_beta", {**base, "messages": history},
+             {**headers(), "anthropic-beta": unrelated + "," + SYSTEM_CLEAR_AT_BETA})
+        post("without_clear_at", {**base, "messages": [user, plain]}, headers())
+    post("unlisted_model", {**base, "model": MODEL, "messages": [user, setting]}, headers(), expected_status=400)
     assert cases["unlisted_model"]["error_code"] == "system_role_model_not_allowed"
 
     session = headers()
-    first = {**base, "messages": [user, scoped], "tools": [TOOL]}
+    first = {**base, "messages": [user, setting], "tools": [TOOL]}
     reply = post("tool_initial", first, session, expected_stop="tool_use")
     (tool,) = reply["content"]
     assert (tool["id"], tool["name"], tool["input"]) == (NEW_ID, TOOL["name"], ARGS)
     result = {"type": "tool_result", "tool_use_id": tool["id"], "content": REPLY}
     follow = {**first, "messages": [*first["messages"], {"role": "assistant", "content": [tool]},
-                                    {"role": "user", "content": [result]},
-                                    {**scoped, "content": "读完原回执后只回答合成问题。"}]}
+                                    {"role": "user", "content": [result]}]}
+    if not per_message_effort:
+        follow["messages"].append({**scoped, "content": "读完原回执后只回答合成问题。"})
     post("tool_receipt", follow, session)
     cases["tool_receipt"]["tool_use_id"] = tool["id"]
     assert cases["tool_receipt"]["session_origin"] == "live_process"
@@ -3857,7 +3895,7 @@ def verify_turn_scoped_system(manage, token, account, received, model_betas):
     for policy in ("replace", "user_reminder"):
         updated = manage("PUT", f"accounts/{account['id']}", {"client_system_prompt_policy": policy})
         assert updated["client_system_prompt_policy"] == policy
-        post(policy, {**base, "messages": [user, scoped]}, headers(), expected_status=422)
+        post(policy, {**base, "messages": [user, setting]}, headers(), expected_status=422)
         assert cases[policy]["error_code"] == "unsupported_parameter"
     assert len(received) == len(model_betas) == 7
     return {"cases": cases, "model_posts": len(received), "wire_final": "unavailable"}
@@ -5798,6 +5836,8 @@ def main():
                               const="ordinary-contract")
     system_roles.add_argument("--turn-scoped-system-contract", dest="message_system_roles", action="store_const",
                               const="turn-scoped-contract")
+    system_roles.add_argument("--message-system-effort-contract", dest="message_system_roles", action="store_const",
+                              const="message-effort-contract")
     auto_shapes = ("omitted", "bare", "explicit-false")
     parser.add_argument("--auto-tool-choice", nargs="?", const="explicit-false", choices=auto_shapes,
                         help="使用选定的普通 auto 入口并核对等价回执")
@@ -5896,8 +5936,8 @@ def main():
         parser.error("--current-image-ending 需要同用 --current-images")
     if args.stock_client and args.v1_runtime:
         parser.error("--stock-client 使用 V2 账号")
-    if args.message_system_roles == "turn-scoped-contract" and args.v1_runtime:
-        parser.error("--turn-scoped-system-contract 使用 V2 账号")
+    if args.message_system_roles in SYSTEM_CONTROL_CONTRACTS and args.v1_runtime:
+        parser.error("消息级控制隔离夹具使用 V2 账号")
     if args.cancel_and_change_question and args.v1_runtime:
         parser.error("--cancel-and-change-question 使用 V2 账号")
     if bool(args.interleaved_title) != bool(args.title_request):

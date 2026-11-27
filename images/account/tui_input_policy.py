@@ -26,6 +26,7 @@ _UUID = re.compile(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", re.I | re.ASC
 _BILLING = "x-anthropic-billing-header:"
 CONTEXT_BETA = "context-management-2025-06-27"
 SYSTEM_CLEAR_AT_BETA = "mid-conversation-system-clear-at-2026-08-21"
+SYSTEM_EFFORT_BETA = "mid-conversation-output-config-2026-07-01"
 
 
 class InputRejection(ValueError):
