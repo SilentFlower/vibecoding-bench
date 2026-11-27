@@ -3986,20 +3986,21 @@ def verify_system_controls(manage, token, account, received, model_betas, *, per
         assert actual["model"] == model and actual["messages"] == body["messages"] and actual["system"] == base["system"]
         assert actual.get("output_config") == body.get("output_config"), (label, actual.get("output_config"))
         tokens = [part.strip() for part in model_betas[-1].split(",") if part.strip()]
-        required = message_system_betas(body)
-        assert all(tokens.count(beta) == (beta in required) for beta in (SYSTEM_CLEAR_AT_BETA, SYSTEM_EFFORT_BETA)), (
-            label, tokens,
+        supplied = [part.strip() for part in model_headers.get("anthropic-beta", "").split(",") if part.strip()]
+        # 调用方预声明的 beta 也应送达，即使本轮没有使用对应的消息级控制。
+        expected_betas = message_system_betas(body).union(supplied)
+        checked_betas = expected_betas | {SYSTEM_CLEAR_AT_BETA, SYSTEM_EFFORT_BETA}
+        assert all(tokens.count(beta) == int(beta in expected_betas) for beta in checked_betas), (
+            label, expected_betas, tokens,
         )
-        supplied = model_headers.get("anthropic-beta")
-        if supplied:
-            assert tokens[:len(supplied.split(","))] == supplied.split(","), (label, supplied, tokens)
+        assert tokens[:len(supplied)] == supplied, (label, supplied, tokens)
         (attempt,) = record["attempts"]
         reservation = record["diagnostic_context"]["tui_reservation_id"]
         assert attempt["attempt_id"] == reservation and attempt["request_id"] == request_id
         context = attempt["diagnostic_context"]
         assert context["tui_body_source"] == "account_sender"
         assert result["attempt_count"] == record["diagnostic_context"]["tui_confirmed_model_responses"] == 1
-        result.update(reservation_id=reservation, model_body_sha256=digest, model_betas=tokens,
+        result.update(reservation_id=reservation, model_body_sha256=digest, input_betas=supplied, model_betas=tokens,
                       session_origin=context["tui_session_origin"],
                       output_config=actual.get("output_config"),
                       model_system_rows=[row for row in actual["messages"] if row["role"] == "system"])
@@ -4009,7 +4010,7 @@ def verify_system_controls(manage, token, account, received, model_betas, *, per
     setting = effort if per_message_effort else scoped
     history = [user, scoped, {"role": "assistant", "content": "已记下合成便签。"},
                {"role": "user", "content": "继续读回历史便签。"}]
-    plain = {"role": "system", "content": scoped["content"]}
+    plain_request = {**base, "messages": [user, {"role": "system", "content": scoped["content"]}]}
     if per_message_effort:
         # 已完成的历史与新用户问之间放置原位控制。根 effort 保持 high。
         effort_history = [history[0], history[2], effort, history[3]]
@@ -4017,7 +4018,9 @@ def verify_system_controls(manage, token, account, received, model_betas, *, per
         current = {**base, "messages": [user, effort]}
         post("effort_with_other_beta", current, {**headers(), "anthropic-beta": unrelated})
         post("explicit_effort_beta", current, {**headers(), "anthropic-beta": unrelated + "," + SYSTEM_EFFORT_BETA})
-        post("root_effort_only", {**base, "messages": [user, plain]}, headers())
+        post("root_effort_only", plain_request, headers())
+        post("root_effort_with_predeclared_beta", plain_request,
+             {**headers(), "anthropic-beta": unrelated + "," + SYSTEM_EFFORT_BETA})
         post("combined_clear_at_and_effort", {**base, "messages": [*history[:3], effort, history[-1]]}, headers())
     else:
         post("implicit_current", {**base, "messages": [user, scoped]}, headers())
@@ -4026,7 +4029,9 @@ def verify_system_controls(manage, token, account, received, model_betas, *, per
              {**headers(), "anthropic-beta": unrelated})
         post("explicit_beta", {**base, "messages": history},
              {**headers(), "anthropic-beta": unrelated + "," + SYSTEM_CLEAR_AT_BETA})
-        post("without_clear_at", {**base, "messages": [user, plain]}, headers())
+        post("without_clear_at", plain_request, headers())
+        post("predeclared_without_clear_at", plain_request,
+             {**headers(), "anthropic-beta": unrelated + "," + SYSTEM_CLEAR_AT_BETA})
     post("unlisted_model", {**base, "model": MODEL, "messages": [user, setting]}, headers(), expected_status=400)
     assert cases["unlisted_model"]["error_code"] == "system_role_model_not_allowed"
 
@@ -4050,7 +4055,7 @@ def verify_system_controls(manage, token, account, received, model_betas, *, per
         assert updated["client_system_prompt_policy"] == policy
         post(policy, {**base, "messages": [user, setting]}, headers(), expected_status=422)
         assert cases[policy]["error_code"] == "unsupported_parameter"
-    assert len(received) == len(model_betas) == 7
+    assert len(received) == len(model_betas) == 8
     return {"cases": cases, "model_posts": len(received), "wire_final": "unavailable"}
 
 
