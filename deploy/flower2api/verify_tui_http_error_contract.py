@@ -40,6 +40,17 @@ TURN_HOOKS = """
   on('turn.complete', async ($, e, next) => {
     const record = inspect('turn_complete', e)
     $.ui.log('FLOWER-CORE-HTTP|' + JSON.stringify(record) + '|END', {to: 'debug'})
+    const transcript = await $.session.messages()
+    const api = await $.session.messages({as: 'api'})
+    for (const [phase, rows] of [['session_transcript', transcript], ['session_api', api]]) {
+      const encoded = JSON.stringify(rows)
+      const summary = {phase,
+        roles: Array.isArray(rows) ? rows.map(row => row.role) : [],
+        fields: Array.isArray(rows) ? rows.map(row => fields(row)) : [],
+        hasProviderData: /invalid_request_error|api_error|isolated-provider-detail/.test(encoded),
+        hasRenderedError: encoded.includes('隔离模型明确拒绝合成请求')}
+      $.ui.log('FLOWER-CORE-HTTP|' + JSON.stringify(summary) + '|END', {to: 'debug'})
+    }
     return next(e)
   })
 """
@@ -88,7 +99,10 @@ def verify_hooks():
     turn = [event for event in events if event["phase"] in ("step_chunk", "step_result", "turn_complete")]
     assert {event["phase"] for event in turn} == {"step_chunk", "step_result", "turn_complete"}, turn
     assert all(not event["hasProviderData"] and event["structuredErrorType"] is None for event in turn), turn
-    return {"http_reply": reply, "turn": turn, "stop_failure": stop}
+    session_rows = [event for event in events if event["phase"] in ("session_transcript", "session_api")]
+    assert {row["phase"] for row in session_rows} == {"session_transcript", "session_api"}, session_rows
+    assert all(row["roles"] and not row["hasProviderData"] for row in session_rows), session_rows
+    return {"http_reply": reply, "turn": turn, "stop_failure": stop, "session_rows": session_rows}
 
 
 def check(manage, token, identifier, received, sender_status, restart, *, source_observer, path, error, emitted):
