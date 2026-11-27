@@ -331,7 +331,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            trace_recovery_resend=False,
            history_cache_markers=False, history_cache_ttl=None, history_cache_scope=None,
            cache_capability=None, message_system_roles=False,
-           structured_output=False, forced_tool_choice=None, no_tool_choice=False, disable_parallel_tool_use=False,
+           structured_output=False, installed_runtime=False, forced_tool_choice=None, no_tool_choice=False,
+           disable_parallel_tool_use=False,
            auxiliary_mode=None,
            auxiliary_kind="title", auxiliary_sample=None, agent_progress=None, stock_client=False,
            cancel_and_change_question=False, oauth_rotation=False, provider_quota=None, slow_tool_stream=False,
@@ -399,6 +400,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param cache_capability 对照生产入口或 CLI 提示词和工具的缓存标记能力。
     @param message_system_roles 消息级系统角色对照或普通 API 固定回归模式。
     @param structured_output 是否核对普通 API 的结构化输出和实际发送路径。
+    @param installed_runtime 结构化工具轮使用镜像内置事件源和管理诊断。
     @param forced_tool_choice 核对强制工具选择及同进程或重启回执。
     @param no_tool_choice 是否核对无工具时的显式 none 和保留声明的兼容路径。
     @param disable_parallel_tool_use 是否核对禁并行的公开策略与模型实收。
@@ -427,7 +429,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     inspect_model_body = (cache_markers or message_system_roles or thinking_display_model or structured_output
                           or forced_tool_choice or no_tool_choice or disable_parallel_tool_use or provider_quota
                           or external_signed_history or interrupted_tool_stream)
-    if inspect_model_body and v1_runtime is None:
+    if inspect_model_body and v1_runtime is None and not installed_runtime:
         MODEL_BODY_TRACE.touch(mode=0o600, exist_ok=False)
         os.chown(MODEL_BODY_TRACE, 1001, 1001)
     certificates(temporary, extra_dns_names=(oauth_host,) if oauth_rotation else ())
@@ -932,6 +934,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             return verify_structured_tool_round(
                 manage, token, identifier, received, sender_state_after_failure,
                 restart_structured_tool if structured_output == "restart" else None,
+                source_observer=not installed_runtime,
             )
         if structured_output:
             return verify_structured_output(manage, token, identifier, received)
@@ -3976,11 +3979,12 @@ def verify_forced_tool_choice(manage, token, identifier, received, sender_status
     return {"wire_final": "unavailable", "restarted": restart is not None, "cases": cases, "model_posts": len(received)}
 
 
-def verify_structured_tool_round(manage, token, identifier, received, sender_status, restart):
+def verify_structured_tool_round(manage, token, identifier, received, sender_status, restart, *, source_observer):
     """核对带结构化输出的工具轮及已认领原生轮的兼容边界。
     @param manage 管理入口。@param token 合成令牌。@param identifier 账号 ID。
     @param received 隔离模型实收。@param sender_status 失败后的发送器状态。
-    @param restart 可选，终止原 CLI 并重启发送器。@return 按公开请求关联的证据。
+    @param restart 可选，终止原 CLI 并重启发送器。@param source_observer 是否安装源码正文观察器。
+    @return 按公开请求关联的证据。
     """
     account = manage("PUT", f"accounts/{identifier}", {"client_system_prompt_policy": "append"})
     assert account["client_system_prompt_policy"] == "append"
@@ -3995,42 +3999,43 @@ def verify_structured_tool_round(manage, token, identifier, received, sender_sta
             trace_startup=True, sender_status=sender_status,
         )
         delta = len(received) - before
-        if status == 400:
-            def finished():
-                detail = manage("GET", "request-diagnostics/" + request_id)
-                return detail if detail["request"].get("finished_at") else None
 
-            detail = wait_for(finished)
-            context = detail["request"].get("context") or {}
-            assert detail["request"]["request_id"] == request_id
-            assert "tui_reservation_id" not in context and not detail["attempts"] and delta == 0
-            cases[label] = {"status": status, "request_id": request_id, "reservation_id": None,
-                            "session_id": headers["x-session-id"], "model_posts": delta,
-                            "attempt_count": len(detail["attempts"])}
-            return raw
-        reservation, record, claims = cache_marker_claims(manage, request_id)
+        def finished():
+            detail = manage("GET", "request-diagnostics/" + request_id)
+            return detail if detail["request"].get("finished_at") else None
+
+        detail = wait_for(finished)
+        record, attempts = detail["request"], detail["attempts"]
+        context = record.get("context") or {}
+        assert record["request_id"] == request_id and record["status_code"] == status
+        reservation = context.get("tui_reservation_id")
+        assert (reservation is None) is (status == 400), (label, context)
         proof = {"status": status, "request_id": request_id, "reservation_id": reservation,
-                 "session_id": headers["x-session-id"], "model_posts": delta, "attempt_count": record["attempt_count"]}
+                 "session_id": headers["x-session-id"], "model_posts": delta, "attempt_count": len(attempts)}
         cases[label] = proof
+        claims = None
+        if source_observer and reservation:
+            _, _, claims = cache_marker_claims(manage, request_id)
         if expected != 200:
-            assert delta == record["attempt_count"] == 0 and not claims
-            proof["error_code"] = json.loads(raw)["error"]["code"]
+            assert delta == len(attempts) == 0 and not claims
+            if status == 422:
+                proof["error_code"] = json.loads(raw)["error"]["code"]
             return raw
-        assert delta == record["attempt_count"] == 1
-        ((digest, model, _),), (claim,) = received[before:], claims
-        (attempt,) = manage("GET", "request-diagnostics/" + request_id)["attempts"]
+        assert delta == len(attempts) == context["tui_confirmed_model_responses"] == 1
+        ((digest, model, _),), (attempt,) = received[before:], attempts
         assert attempt["request_id"] == request_id and attempt["attempt_id"] == reservation
         assert attempt["context"]["tui_body_source"] == source
-        assert claim["sha256"] == digest and claim["from_interactive_cli"] is (source == "interactive_cli")
-        expected_format = body["output_config"].get("format")
         output = model.get("output_config", {})
         assert output == body["output_config"], (label, output)
-        assert not claim["cli_has_output_format"], (label, claim)
-        if expected_format is not None:
-            assert source == "account_sender" and claim["cli_sha256"] != digest
         proof.update(provider_path=source, session_origin=attempt["context"]["tui_session_origin"],
-                     model_body_sha256=digest, model_output_config=output,
-                     cli_body_sha256=claim["cli_sha256"], cli_has_output_format=claim["cli_has_output_format"])
+                     model_body_sha256=digest, model_output_config=output)
+        if claims is not None:
+            (claim,) = claims
+            assert claim["sha256"] == digest and claim["from_interactive_cli"] is (source == "interactive_cli")
+            assert not claim["cli_has_output_format"], (label, claim)
+            if body["output_config"].get("format") is not None:
+                assert source == "account_sender" and claim["cli_sha256"] != digest
+            proof.update(cli_body_sha256=claim["cli_sha256"], cli_has_output_format=claim["cli_has_output_format"])
         return raw
 
     def tool_result(raw, content, *, failed):
@@ -4108,7 +4113,7 @@ def verify_structured_tool_round(manage, token, identifier, received, sender_sta
     assert returned_tool_ids == [NEW_ID, NEW_ID] and len(received) == 4
     assert not any(path.is_file() for path in Path("/flows/api").rglob("*"))
     return {"cases": cases, "model_posts": len(received), "client_tool_results": returned_tool_ids,
-            "restarted": restart is not None, "wire_final": "unavailable"}
+            "restarted": restart is not None, "source_observer": source_observer, "wire_final": "unavailable"}
 
 
 def verify_structured_output(manage, token, identifier, received):
@@ -4924,6 +4929,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--gateway", type=Path, required=True)
     parser.add_argument("--sender", type=Path, required=True)
+    parser.add_argument("--installed-runtime", action="store_true",
+                        help="结构化工具轮使用账号镜像的内置事件源")
     parser.add_argument("--shared-state", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--current-text-blocks", action="store_true")
     parser.add_argument("--current-images", action="store_true")
@@ -5023,6 +5030,9 @@ def main():
     scenario.add_argument("--failure-boundaries", action="store_true")
     scenario.add_argument("--v1-runtime", type=Path)
     args = parser.parse_args()
+    if args.installed_runtime and (args.structured_output_contract not in ("live", "restart")
+                                   or args.sender != Path("/usr/local/bin/account-sender")):
+        parser.error("--installed-runtime 需要结构化工具轮和镜像内置 account-sender")
     if args.current_image_ending == "image" and not args.current_images:
         parser.error("--current-image-ending 需要同用 --current-images")
     if args.stock_client and args.v1_runtime:
@@ -5085,8 +5095,9 @@ def main():
             parser.error("镜像混跑须使用私有共享夹具目录")
         previous = (None, *args.mixed_image_peers)
     elif args.v1_runtime is None:
-        install_source(previous[0] if previous else ROOT, trace_startup=trace_startup,
-                       cache_capability=args.cache_marker_capabilities, thinking_cli_summaries=thinking_cli_summaries)
+        if not args.installed_runtime:
+            install_source(previous[0] if previous else ROOT, trace_startup=trace_startup,
+                           cache_capability=args.cache_marker_capabilities, thinking_cli_summaries=thinking_cli_summaries)
     elif sha256(args.v1_runtime.read_bytes()).hexdigest() != V1_RUNTIME_SHA256:
         parser.error("V1 启动器摘要与固定版不符")
     with TemporaryDirectory(prefix="cold-history-", dir=args.shared_state) as directory:
@@ -5139,6 +5150,7 @@ def main():
                        history_cache_ttl=args.history_cache_ttl, history_cache_scope=args.history_cache_scope,
                        cache_capability=args.cache_marker_capabilities,
                        message_system_roles=args.message_system_roles, structured_output=args.structured_output_contract,
+                       installed_runtime=args.installed_runtime,
                        forced_tool_choice=args.forced_tool_choice_contract, no_tool_choice=args.no_tool_choice_contract,
                        disable_parallel_tool_use=args.disable_parallel_tool_use_contract,
                        auxiliary_mode=auxiliary_mode,
