@@ -45,6 +45,8 @@ use crate::store::diagnostics_store::{ActiveDiagnostic, DiagnosticEvent, Diagnos
 
 pub(crate) mod agy;
 
+const TUI_SEND_HTTP: &str = "tui_send_http";
+
 /// 在同一请求入口冻结日志级别与拒绝正文范围。
 #[derive(Clone, Copy, Default)]
 pub(crate) struct RequestDiagnosticsConfig {
@@ -207,7 +209,7 @@ impl TraceContext {
     fn mark_tui_submission_unknown(&self) {
         let mut state = self.lock();
         state.tui_submission_unknown = true;
-        state.request.error_stage = Some("tui_send_http".into());
+        state.request.error_stage = Some(TUI_SEND_HTTP.into());
         state.request.native_rejection = None;
         if let Some(context) = state.request.context.as_mut()
             && context.tui_confirmed_model_responses == Some(0)
@@ -593,7 +595,7 @@ pub(super) fn observe_tui_model(observation: TuiModelObservation) {
     });
 }
 
-/// 记录已发起私有提交后失去响应头的边界。@return 无。
+/// 记录已发起私有提交但尚无受信模型响应的边界。@return 无。
 pub(super) fn tui_submission_unknown() {
     let _ = CURRENT_TRACE.try_with(TraceContext::mark_tui_submission_unknown);
 }
@@ -914,6 +916,13 @@ impl AttemptTrace {
         }
     }
 
+    /// 在既有尝试记录中保留私有回包以及尚待确认的模型提交状态。@return 无。
+    pub(super) fn tui_submission_unknown(&mut self) {
+        if let Some(record) = self.record.as_mut() {
+            record.error_stage = Some(TUI_SEND_HTTP.into());
+        }
+    }
+
     /// 记录同一次实际提交的冻结定位，保留诊断的旁路语义。
     /// @param location 原已核验发送通道提供的非秘密定位。
     /// @return 无。
@@ -948,8 +957,8 @@ impl AttemptTrace {
         };
         let mut state = self.trace.lock();
         state.request.attempt_count = state.request.attempt_count.saturating_add(1);
-        if state.request.finished_at.is_none() {
-            // 晚到的尝试仍可补记。原公开响应已有终态时保留其失败阶段。
+        if state.request.finished_at.is_none() && !state.tui_submission_unknown {
+            // 晚到的尝试仍可补记。保留已确认的提交状态未知和公开终态。
             state.request.error_stage = None;
         }
         record.ordinal = state.request.attempt_count;
@@ -1074,6 +1083,8 @@ impl AttemptTrace {
         }
         record.outcome = if end != "complete" {
             end.into()
+        } else if record.error_stage.as_deref() == Some(TUI_SEND_HTTP) {
+            "transport_error".into()
         } else if record.error_stage.as_deref() == Some(TUI_CLI_INPUT_GUARD) {
             "local_rejected".into()
         } else if record.error_type.as_deref() == Some("session_policy_refusal")
@@ -1092,7 +1103,7 @@ impl AttemptTrace {
         record.error_stage = match record.outcome.as_str() {
             "success" => None,
             "cancelled" if self.trace.interrupted_by_update(end) => Some("system_update".into()),
-            "transport_error" => Some("transport".into()),
+            "transport_error" if record.error_stage.is_none() => Some("transport".into()),
             _ if record.error_stage.is_some() => record.error_stage,
             "upstream_rejected" => Some("upstream_headers".into()),
             _ => Some("upstream_body".into()),
@@ -1340,10 +1351,10 @@ fn identity_hash(account: i64, kind: &str, value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        CURRENT_LOG_MODE, CURRENT_TRACE, RequestTraceGuard, TraceContext, TuiModelObservation, begin_attempt,
-        claude_request_session, error_stage, identity_hash, local_outcome, native_rejection, now,
-        observe_tui_model, prepare_tui_attempt, profile_selection, selected_account, session_context,
-        tui_reservation, tui_submission_unknown,
+        CURRENT_LOG_MODE, CURRENT_TRACE, RequestTraceGuard, TUI_SEND_HTTP, TraceContext,
+        TuiModelObservation, begin_attempt, claude_request_session, error_stage, identity_hash,
+        local_outcome, native_rejection, now, observe_tui_model, prepare_tui_attempt,
+        profile_selection, selected_account, session_context, tui_reservation, tui_submission_unknown,
     };
     use crate::error::AppError;
     use crate::model::account::Account;
@@ -1552,6 +1563,74 @@ mod tests {
         assert_eq!(detail.request.outcome, "transport_error");
         assert_eq!(detail.request.context.unwrap().tui_confirmed_model_responses, Some(2));
         assert!(detail.attempts.is_empty());
+    }
+
+    /// 同样的私有 502 可保留一次尝试，并按来源记录根及尝试终态。@return 无。
+    #[tokio::test]
+    async fn tui_502_projection_without_model_evidence_preserves_attempt() {
+        let store = store().await;
+        for (confirmed, outcome, stage) in [
+            (None, "transport_error", TUI_SEND_HTTP),
+            (Some(1), "upstream_rejected", "upstream_headers"),
+        ] {
+            let trace = TraceContext::new(store.clone());
+            let guard = RequestTraceGuard::new(trace.clone());
+            let reservation = Uuid::new_v4().to_string();
+            let response = CURRENT_TRACE
+                .scope(trace, async {
+                    tui_reservation(&reservation);
+                    let mut attempt = prepare_tui_attempt(&account(), &json!({})).unwrap();
+                    if confirmed.is_some() {
+                        observe_tui_model(TuiModelObservation::ResponseReceived);
+                    } else {
+                        tui_submission_unknown();
+                        attempt.tui_submission_unknown();
+                    }
+                    attempt.tui_capture(reservation.clone(), None);
+                    attempt.commit();
+                    if confirmed.is_none() {
+                        assert_eq!(
+                            attempt.trace.lock().request.error_stage.as_deref(),
+                            Some(TUI_SEND_HTTP)
+                        );
+                    }
+                    let response = (StatusCode::BAD_GATEWAY, "同一正文").into_response();
+                    if confirmed.is_some() {
+                        attempt.headers(502, response.headers(), vec![]);
+                    }
+                    guard.wrap(attempt.wrap(response))
+                })
+                .await;
+            let id = response.headers()["x-cc2api-request-id"]
+                .to_str()
+                .unwrap()
+                .to_owned();
+            assert_eq!(
+                to_bytes(response.into_body(), 1024).await.unwrap(),
+                "同一正文"
+            );
+            store.flush().await.unwrap();
+            let detail = store.detail(&id).await.unwrap();
+            assert_eq!(detail.request.status_code, Some(502));
+            assert_eq!(detail.request.outcome, outcome);
+            assert_eq!(detail.request.error_stage.as_deref(), Some(stage));
+            assert_eq!(detail.request.attempt_count, 1);
+            assert!(detail.request.native_rejection.is_none());
+            let context = detail.request.context.unwrap();
+            assert_eq!(context.tui_confirmed_model_responses, confirmed);
+            assert_eq!(
+                context.tui_reservation_id.as_deref(),
+                Some(reservation.as_str())
+            );
+            let [attempt] = detail.attempts.as_slice() else {
+                panic!("必须保留一次尝试")
+            };
+            assert_eq!(attempt.attempt_id, reservation);
+            assert_eq!(attempt.request_id, id);
+            assert_eq!(attempt.status_code, confirmed.map(|_| 502));
+            assert_eq!(attempt.outcome, outcome);
+            assert_eq!(attempt.error_stage.as_deref(), Some(stage));
+        }
     }
 
     /// 同形的 422 按可信来源记录阶段，两组均保留原尝试。@return 无。

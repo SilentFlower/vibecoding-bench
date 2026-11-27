@@ -1869,7 +1869,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                                                     request_id, model_reply, replay_unknown_receipt)
                     if replay_unknown_receipt:
                         proof["original_terminal"] = verify_unknown_receipt_terminal(
-                            manage, request_id, reservation, (502, "cancelled", "upstream_body"),
+                            manage, request_id, reservation, (None, "cancelled", "tui_send_http"),
                         )
                     assert len(received) == 2 and callbacks == [NEW_ID]
                     assert original_file.read_bytes() == original_history and binding_file.read_bytes() == original_binding

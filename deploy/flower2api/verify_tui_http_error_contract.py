@@ -20,6 +20,7 @@ from verify_tui_public_sse_observer import read_events
 
 ERROR_TYPES = ("invalid_request_error", "api_error")
 ERROR_MESSAGE = "隔离模型明确拒绝合成请求"
+PROJECTED_ERROR = {"type": "api_error", "message": "V2 模型响应无效或提前终止"}
 VERSION = "2.1.321"
 TURN_HOOKS = """
   const fields = value => value != null && typeof value === 'object' ? Object.keys(value).sort() : []
@@ -110,6 +111,21 @@ def verify_hooks():
     return {"http_reply": reply, "turn": turn, "stop_failure": stop, "session_rows": session_rows}
 
 
+def verify_model_connection(reservation_id, stages, model_digest):
+    """按账号代理连接关联同一预留和模型实收。
+    @param reservation_id 原公开预留。@param stages 两段代理及模型事件。
+    @param model_digest 模型实收正文摘要。@return 专属隧道及实收事件。
+    """
+    (tunnel,) = map(json.loads, Path("/tmp/flower-direct-tunnels.jsonl").read_text().splitlines())
+    assert tunnel["reservation_id"] == reservation_id, tunnel
+    (connect,) = stages["proxy_connect_accepted"]
+    (connection,) = stages["proxy_model_tcp_connected"]
+    (post,) = stages["model_received"]
+    assert tunnel["account_proxy_peer_port"] == connect["peer_port"]
+    assert connection["peer_port"] == post["peer_port"] and post["model_body_sha256"] == model_digest
+    return {"tunnel": tunnel, "model_received": post}
+
+
 def verify_stream_hooks(reservation_id, stages, model_digest):
     """验证公开首帧前的真实 CLI 请求。@param reservation_id 原公开预留。
     @param stages 代理连接和模型收件。@param model_digest 模型实收正文摘要。
@@ -120,25 +136,21 @@ def verify_stream_hooks(reservation_id, stages, model_digest):
     assert (reply["phase"], reply["status"], reply["header"], reply["isStreaming"], reply["textLength"]) == (
         "reply", 400, "model-http-400", True, 0,
     ), reply
+    connection = verify_model_connection(reservation_id, stages, model_digest)
     (permit,) = map(json.loads, Path("/tmp/flower-direct-permits.jsonl").read_text().splitlines())
-    (tunnel,) = map(json.loads, Path("/tmp/flower-direct-tunnels.jsonl").read_text().splitlines())
-    assert permit["allowed"] and permit["reservation_id"] == tunnel["reservation_id"] == reservation_id
-    assert permit["cli_pid"] == tunnel["cli_pid"]
-    (connect,) = stages["proxy_connect_accepted"]
-    (connection,) = stages["proxy_model_tcp_connected"]
-    (post,) = stages["model_received"]
-    assert tunnel["account_proxy_peer_port"] == connect["peer_port"]
-    assert connection["peer_port"] == post["peer_port"] and post["model_body_sha256"] == model_digest
-    return {"http_reply": reply, "permit": permit, "tunnel": tunnel, "model_received": post}
+    assert permit["allowed"] and permit["reservation_id"] == reservation_id
+    assert permit["cli_pid"] == connection["tunnel"]["cli_pid"]
+    return {"http_reply": reply, "permit": permit, **connection}
 
 
 def check(manage, token, identifier, received, sender_status, restart, *, source_observer, path, error, emitted,
-          public_stream, stages, expected_metadata=None):
+          public_stream, stages, upstream_status, expected_metadata=None):
     """关联公开回包与原模型拒绝。@param manage 管理入口。@param token 合成凭据。
     @param identifier 当前账号。@param received 模型收件。@param sender_status 诊断读取。
     @param restart 重启选项。@param source_observer 额外事件源观测。
     @param path 验证路线。@param error 期望的旧公开错误。@param emitted 模型实发的错误。
     @param public_stream 是否提交公开 stream:true。@param stages 代理及模型接收时点。
+    @param upstream_status 模型确实返回的 HTTP 状态。
     @param expected_metadata 当前路径应公开交付的标准错误元数据。
     @return 请求、尝试、实收与钩子记录。
     """
@@ -158,7 +170,7 @@ def check(manage, token, identifier, received, sender_status, restart, *, source
         response_headers["latency_ms"] = (response_headers["monotonic_ns"] - start) // 1_000_000
 
     status, raw, request_id = fixture.checked_messages(
-        manage, token, body, headers, received, phase, expected_status=400 if path == "account" else 502,
+        manage, token, body, headers, received, phase, expected_status=upstream_status if path == "account" else 502,
         trace_startup=True, sender_status=sender_status, observe_response=observe_response,
     )
     diagnostics = fixture.report_request_diagnostics(manage, phase, request_id, session, started_at)
@@ -168,6 +180,7 @@ def check(manage, token, identifier, received, sender_status, restart, *, source
     assert reservation_id and response_headers["content_type"].startswith("application/json"), response_headers
     (model_digest, _, tls), = received
     (model_error,) = emitted
+    assert model_error["status"] == upstream_status, model_error
     public = json.loads(raw)
     if path == "account":
         expected = expected_metadata or {"type": "error", "error": error}
@@ -176,21 +189,25 @@ def check(manage, token, identifier, received, sender_status, restart, *, source
     elif public_stream:
         assert isinstance(public.get("error"), str) and public["error"], public
     else:
-        assert public["error"]["type"] == "api_error", public
+        assert public == {"type": "error", "error": PROJECTED_ERROR}, public
     hooks = None
     if path == "cli":
-        hooks = verify_stream_hooks(reservation_id, stages, model_digest) if public_stream else verify_hooks()
-    if path == "cli" and public_stream:
+        hooks = (verify_stream_hooks(reservation_id, stages, model_digest) if public_stream else
+                 {**verify_hooks(), **verify_model_connection(reservation_id, stages, model_digest)})
         assert hooks["model_received"]["monotonic_ns"] < response_headers["monotonic_ns"], hooks
         # 实收与试接钩子是独立证据，Gateway 没有得到同一响应的结构化投影。
         assert (row["outcome"], row["error_stage"]) == ("transport_error", "tui_send_http"), (row, hooks)
-        assert row["attempt_count"] == 0 and row["attempts"] == [], row
         assert row["native_rejection"] is None, row
         assert row["diagnostic_context"].get("tui_confirmed_model_responses") is None, row
     else:
+        assert (row["outcome"], row["error_stage"]) == ("upstream_rejected", "upstream_headers"), row
+    if path == "cli" and public_stream:
+        assert row["attempt_count"] == 0 and row["attempts"] == [], row
+    else:
         (attempt,) = row["attempts"]
-        assert attempt["request_id"] == request_id and attempt["status_code"] == status
+        assert attempt["request_id"] == request_id and attempt["status_code"] == (None if path == "cli" else status)
         assert attempt["attempt_id"] == reservation_id and row["attempt_count"] == 1, row
+        assert (attempt["outcome"], attempt["error_stage"]) == (row["outcome"], row["error_stage"]), row
     return {"path": path, "stream": public_stream, "http_status": status, "public_body": public,
             "request_id": request_id, "reservation_id": reservation_id, "public_headers": response_headers,
             "model_posts": len(received), "model_request_sha256": model_digest, "model_tls": tls,
@@ -208,15 +225,19 @@ def main():
     parser.add_argument("--sender", type=Path, default=Path("/usr/local/bin/account-sender"))
     parser.add_argument("--source-account", action="store_true", help="用当前源码安装账号事件源")
     parser.add_argument("--error-metadata", choices=("valid", "invalid"), help="核对标准错误关联与结构化错误码")
+    parser.add_argument("--upstream-status", choices=(400, 502), type=int, default=400,
+                        help="账号路径可用同文真实 502 对照直发试接合成 502")
     args = parser.parse_args()
     assert Path("/.dockerenv").is_file() and {name for _, name in if_nameindex()} == {"lo"}
-    if args.path == "cli" and (args.source_account or args.error_metadata):
-        parser.error("错误元数据用例和候选账号源码需要 --path account")
+    if args.path == "cli" and (args.source_account or args.error_metadata or args.upstream_status != 400):
+        parser.error("可选错误元数据、候选账号源码及真实 502 需要 --path account")
+    if args.upstream_status == 502 and args.error_type != PROJECTED_ERROR["type"]:
+        parser.error("真实 502 对照需要 --error-type api_error")
     if args.path == "cli":
         install_turn_hooks(public_stream=args.stream)
     elif args.source_account:
         fixture.install_source()
-    error = {"type": args.error_type, "message": ERROR_MESSAGE}
+    error = PROJECTED_ERROR if args.upstream_status == 502 else {"type": args.error_type, "message": ERROR_MESSAGE}
     # 让原状态、消息、长度与响应头保持相同。公开错误类型的差异来自正文。
     padding = "x" * (len(max(ERROR_TYPES, key=len)) - len(args.error_type))
     payload = {"type": "error", "error": {**error, "details": {"tag": "isolated-provider-detail", "padding": padding}}}
@@ -246,8 +267,9 @@ def main():
         }}:
             value = payload
             raw = json.dumps(value).encode()
-            emit(handler, value, status=status, headers=headers)
-            emitted.append({"status": status, "body": value, "body_octets": len(raw), "body_sha256": sha256(raw).hexdigest()})
+            emit(handler, value, status=args.upstream_status, headers=headers)
+            emitted.append({"status": args.upstream_status, "body": value, "body_octets": len(raw),
+                            "body_sha256": sha256(raw).hexdigest()})
             return
         emit(handler, value, status=status, headers=headers)
 
@@ -255,7 +277,7 @@ def main():
         fixture, QuietHandler=FixedDateModel, response_json=model_reply, startup_event=trace,
         verify_structured_tool_round=partial(
             check, path=args.path, error=error, emitted=emitted, public_stream=args.stream, stages=stages,
-            expected_metadata=expected_metadata,
+            upstream_status=args.upstream_status, expected_metadata=expected_metadata,
         ),
     ), TemporaryDirectory(prefix="http-error-contract-") as folder:
         result = fixture.verify(

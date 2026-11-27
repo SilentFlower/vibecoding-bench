@@ -4497,17 +4497,24 @@ impl GatewayService {
             .get(runtime_transport::TUI_INSTRUCTION_LOCATION)
             .and_then(|header| header.to_str().ok())
             .and_then(TuiInstructionLocation::from_wire);
+        let provider_error_source = runtime_transport::tui_failure_stage(
+            response.headers(),
+            &[
+                "local_provider_http",
+                "managed_oauth_http",
+                "local_provider_event",
+            ],
+        );
         let model_response_received = body_source.is_some_and(|source| {
             runtime_transport::tui_projection_marker(
                 response.headers(),
                 runtime_transport::TUI_BODY_SOURCE,
                 source.as_str(),
             )
-        }) || runtime_transport::tui_failure_stage(
-            response.headers(),
-            &["local_provider_http", "managed_oauth_http"],
-        )
-        .is_some();
+        }) || matches!(
+            provider_error_source,
+            Some("local_provider_http" | "managed_oauth_http")
+        );
         if !fixture {
             if rejected_before_model {
                 diagnostics::observe_tui_model(
@@ -4533,15 +4540,15 @@ impl GatewayService {
                 .extensions_mut()
                 .remove::<runtime_transport::TuiGatewayIds>()
                 .is_some();
-        if !fixture
+        let submission_unknown = !fixture
             && response.status() == StatusCode::BAD_GATEWAY
-            && !projected
             && !model_response_received
-            && !rejected_before_model
-        {
-            // Sender 可以在已发出 Unix send 后返回裸 502。只有私有 HTTP 头时，实际模型提交待核对。
+            && provider_error_source.is_none()
+            && !rejected_before_model;
+        if submission_unknown {
+            // JSON 委托只证明账号侧交付了私有响应。缺少模型来源时，仍需保留提交状态未知。
             diagnostics::tui_submission_unknown();
-            if let Some(mut attempt) = wire_attempt.take() {
+            if !projected && let Some(mut attempt) = wire_attempt.take() {
                 attempt.transport_error();
             }
         }
@@ -4556,15 +4563,23 @@ impl GatewayService {
                 if cli_input_rejected {
                     attempt.tui_cli_input_rejected();
                 }
+                if submission_unknown {
+                    attempt.tui_submission_unknown();
+                    // 与裸私有 502 一致，账号调度仍收到传输失败反馈。
+                    request.response_headers(account.id, response.status().as_u16());
+                } else {
+                    attempt.with_feedback(request.clone());
+                }
                 attempt.tui_sources(body_source, session_origin, instruction_location);
                 attempt.tui_capture(attempt_id, capture_state);
-                attempt.with_feedback(request.clone());
                 attempt.commit_native(started);
-                attempt.headers(
-                    response.status().as_u16(),
-                    response.headers(),
-                    response_content_codings(response.headers()),
-                );
+                if !submission_unknown {
+                    attempt.headers(
+                        response.status().as_u16(),
+                        response.headers(),
+                        response_content_codings(response.headers()),
+                    );
+                }
                 return Ok(attempt.wrap(response));
             }
             if response.status().is_success() {
