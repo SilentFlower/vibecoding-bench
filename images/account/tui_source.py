@@ -188,8 +188,6 @@ class AccountSource:
         action = hello["action"]
         ready = driver.ready()
         managed_oauth = getattr(driver, "managed_oauth", False)
-        # 调试采集与签名恢复由现有账号发送器实施。使用原生投递时须按其实际能力协商。
-        sender_features = not (managed_oauth and getattr(driver, "native_dispatch", None) is not None)
         state = {
             **proof,
             "ready": ready,
@@ -203,11 +201,9 @@ class AccountSource:
             "upstream_session_protocol": 1,
             "title_session_mapping_protocol": 1,
             "prompt_suggestion_protocol": 1,
+            "capture_http_protocol": 1,
+            "signature_repair_protocol": 1,
         }
-        if sender_features:
-            state.update(capture_http_protocol=1, signature_repair_protocol=1)
-        elif getattr(driver, "cli_handoff_capture", False):
-            state["capture_cli_submission_protocol"] = 1
         receipt = hello.get("receipt") if action == "status" else None
         inspect = getattr(driver, "receipt_idle", None)
         if ready and inspect is not None and isinstance(receipt, dict):
@@ -369,7 +365,7 @@ class AccountSource:
                 return
             if "oauth_file" in command:
                 return
-            if (cold or not sender_features) and (
+            if cold and (
                 "signature_repair" in command or command.get("capture_http") is True
             ):
                 return

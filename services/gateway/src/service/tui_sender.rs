@@ -443,7 +443,6 @@ struct VerifiedSource {
     model_headers: bool,
     model_header_policy: bool,
     capture_http: bool,
-    cli_submission: bool,
     body_policy: bool,
     input_policy: bool,
     agent_scope: bool,
@@ -473,13 +472,16 @@ async fn verify_source(
     write_json(&mut connection, &control).await?;
     let reply = read_json(&mut connection).await?;
     let idle = verify_reply(&reply, &proof)?;
+    // 旧候选在绑定时声明外部正文交付。当前源只在确认冷导入的预留中声明 CLI 采集。
+    if reply["capture_cli_submission_protocol"].as_u64() == Some(1) {
+        return Err(source_error());
+    }
     Ok(VerifiedSource {
         connection,
         proof,
         idle,
         receipt_idle: reply["receipt_idle"].as_bool(),
         capture_http: reply["capture_http_protocol"].as_u64() == Some(1),
-        cli_submission: reply["capture_cli_submission_protocol"].as_u64() == Some(1),
         model_headers: reply["model_headers_protocol"].as_u64() == Some(1),
         model_header_policy: reply["model_header_policy_protocol"].as_u64() == Some(1),
         body_policy: reply["body_policy_protocol"].as_u64() == Some(1),
@@ -748,7 +750,6 @@ impl TuiSender {
                 model_headers,
                 model_header_policy,
                 capture_http,
-                cli_submission,
                 body_policy,
                 input_policy,
                 agent_scope,
@@ -866,11 +867,8 @@ impl TuiSender {
             if cold && !managed_oauth {
                 return Err(unavailable());
             }
-            let cli_submission = match (offer_cli_capture, cold, cli_submission) {
-                (true, true, _) => Some("request_from_interactive_cli"),
-                (true, false, true) => Some("request_to_interactive_cli"),
-                _ => None,
-            };
+            let cli_submission =
+                (offer_cli_capture && cold).then_some("request_from_interactive_cli");
             let capture_http = capture_http && !cold;
             let signature_repair = signature_repair && !cold;
             let oauth_file = reply["oauth_file_protocol"].as_u64() == Some(1);
@@ -2832,6 +2830,28 @@ mod tests {
     fn assert_stage(response: Response, stage: &str) {
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
         assert_eq!(response.headers()[TUI_ERROR_SOURCE], stage);
+    }
+
+    /// 旧候选的源在绑定阶段关闭，外部正文与发送指令都留在发送器内。@return 无。
+    #[tokio::test]
+    async fn retired_cli_body_override_is_rejected_before_prepare() {
+        let source = Source::new();
+        let identity = source.identity();
+        let (response, ()) = tokio::join!(source.prepare(&identity, b"{}"), async {
+            let (socket, _) = source.listener.accept().await.unwrap();
+            let mut socket = BufReader::new(socket);
+            let mut proof = read_json(&mut socket).await.unwrap();
+            assert_eq!(proof["action"], "bind");
+            proof["ready"] = json!(true);
+            proof["idle"] = json!(true);
+            proof["managed_oauth_protocol"] = json!(1);
+            proof["capture_cli_submission_protocol"] = json!(1);
+            write_json(&mut socket, &proof).await.unwrap();
+            assert_eq!(socket.read(&mut [0_u8; 1]).await.unwrap(), 0);
+        });
+        assert_stage(response.unwrap(), TUI_PREPARE_BIND);
+        assert_eq!(source.sender.active(), 0);
+        assert!(source.send(&identity).await.is_err());
     }
 
     async fn chunk(connection: &mut BufReader<UnixStream>, bytes: &[u8]) {

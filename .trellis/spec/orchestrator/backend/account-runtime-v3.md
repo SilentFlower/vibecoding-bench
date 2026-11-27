@@ -2552,6 +2552,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 
 - 公开入口仍为 `POST /v1/messages`。受管 sender 在原绑定 Unix socket 的 `prepare` 提出整数 `native_cold_history_protocol: 1`。事件源选用该路径时在同一预留回执确认该字段。
 - 冷导入回执启用 `capture_cli_submission_protocol: 1`。本次调试证据的 `tui_provider_request.representation` 为 `request_from_interactive_cli`。
+- `capture_cli_submission_protocol: 1` 只在已确认原生路径的 `prepare` 回执声明。握手时声明该字段的旧候选源在认证绑定阶段拒绝，外部正文和发送指令均停留在发送器。旧候选历史采集的 `request_to_interactive_cli` 仍可查阅。
 
 ### 3. Contracts
 

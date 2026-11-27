@@ -1034,10 +1034,6 @@ class _Actor:
             return
         if self.driver.managed_oauth and submission.account_token is None:
             raise ModelResponseError(503, b"")
-        if self.cold_history is None and self.driver.native_dispatch is not None and self.driver.managed_oauth:
-            # 只有镜像的受信入口能安装原生投递器；两条路径使用同一份一次认领结果。
-            self.driver.native_dispatch(self, http, submission)
-            return
         step, handle = submission.step, submission.handle
         raw, headers = submission.body, submission.headers
         account_token = submission.account_token
@@ -1331,9 +1327,9 @@ class _Reserved:
 class SessionDriver:
     """绑定当前账号的真实 TUI 会话。@param config 受信预留配置。@param launcher 原版账号启动器。"""
 
-    def __init__(self, config, launcher=None, capacity=None, *, native_dispatch=None):
+    def __init__(self, config, launcher=None, capacity=None):
         """创建该账号的进程表。@param config 源配置。@param launcher 受信启动器。
-        @param capacity 账号容量。@param native_dispatch 镜像提供的原生模型投递回调。@return 无。
+        @param capacity 账号容量。@return 无。
         """
         if launcher is None:
             import tui_sender_launch as launcher
@@ -1341,7 +1337,6 @@ class SessionDriver:
         self.checkpoints = ReceiptCheckpoints(getattr(launcher, "STORAGE", None))
         self.managed_oauth = getattr(launcher, "managed_oauth_enabled", lambda: False)()
         self.oauth_file_available = getattr(launcher, "file_oauth_enabled", lambda: False)()
-        self.native_dispatch = native_dispatch
         # 编排每个 HTTP 并发配置两个预留。等待新 TUI 的队列必须留下至少一个传输名额还工具。
         limit = max(1, config["max_reservations"] // 2)
         self.summary_only_headroom = False

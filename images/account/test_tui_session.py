@@ -71,12 +71,18 @@ class SessionTests(unittest.TestCase):
             self.assertFalse(actor.step.claimed)
             driver.launcher.local_model_response.assert_not_called()
 
-    def test_native_dispatch_uses_one_authorized_frozen_submission(self):
+    def test_account_sender_uses_one_authorized_frozen_submission(self):
         """并发的同轮种子只能认领一次，错误账号授权及过期凭据保留原语义。@return 无。"""
         raw = encode(self._body())
         with closing(self._driver()) as driver, closing(driver.prepare(self._identity("native-send"), raw)) as handle:
             driver.managed_oauth = True
-            driver.native_dispatch = Mock()
+            driver.launcher = SimpleNamespace(managed_model_response=Mock())
+            response = BytesIO(b"data: {\"type\":\"error\",\"error\":{\"type\":\"api_error\"}}\n\n")
+            response.status = 200
+            response.headers = Message()
+            response.headers["Content-Type"] = "text/event-stream"
+            response.getheader = response.headers.get
+            driver.launcher.managed_model_response.return_value = response
             actor = handle.actor
             actor.oauth_file = True
             actor.step = SimpleNamespace(native=("turn", 1), native_model="chosen", claimed=False)
@@ -96,17 +102,17 @@ class SessionTests(unittest.TestCase):
                 actor.serve_model(failed, request)
             self.assertEqual(expired.exception.status, 503)
             handle.expires_at = expires_at
-            driver.native_dispatch.assert_not_called()
+            driver.launcher.managed_model_response.assert_not_called()
             peers = [Mock(headers=failed.headers) for _ in range(2)]
             with ThreadPoolExecutor(2) as pool:
                 list(pool.map(lambda peer: actor.serve_model(peer, request), peers))
-            driver.native_dispatch.assert_called_once()
+            driver.launcher.managed_model_response.assert_called_once()
             self.assertEqual(sum(peer.send_error.call_count for peer in peers), 1)
-            submission = driver.native_dispatch.call_args.args[2]
-            self.assertIs(submission.step, actor.step)
-            self.assertEqual(submission.body, raw)
+            sent = driver.launcher.managed_model_response.call_args
+            self.assertEqual(sent.args, (raw,))
+            self.assertEqual(sent.kwargs["account_token"], handle.account_token)
+            self.assertIs(sent.kwargs["reservation"], handle.reservation)
             self.assertEqual(handle.body_source, "account_sender")
-            self.assertNotIn(handle.account_token, repr(submission))
             self.assertIsNone(handle.raw)
 
     def test_non_stream_accept_uses_sdk_for_upstream_sse(self):
