@@ -4340,6 +4340,12 @@ def external_signed_responses(stack, old_call):
     return response
 
 
+def _external_history_tool_result(model, expected, phase):
+    (role, observed), = find_blocks(model, "tool_use_id", expected["tool_use_id"])
+    assert role == "user" and same_json_value(observed, expected), (phase, role, observed)
+    return observed
+
+
 def verify_external_signed_history(manage, token, identifier, received, sender_status, *, origin_stack=None):
     """核对外部签名历史的模型实收、调用与结果归属，以及本轮公开终态。
     @param manage 管理入口。@param token 合成调用方。@param identifier 合成账号。
@@ -4404,7 +4410,7 @@ def verify_external_signed_history(manage, token, identifier, received, sender_s
             assert claim["sha256"] == digest and claim["cli_sha256"], (phase, claim)
             assert (claim["cli_sha256"] == digest) is from_cli, (phase, claim)
             assert find_blocks(model, "id", PAST_ID) == [("assistant", old_call)]
-            assert find_blocks(model, "tool_use_id", PAST_ID) == [("user", old_result)]
+            observed_result = _external_history_tool_result(model, old_result, phase)
             (old_turn,) = [blocks(row) for row in model["messages"] if any(b.get("id") == PAST_ID for b in blocks(row))]
             assert [block for block in old_turn if block["type"] != "text"] == blocks_before_result, (phase, old_turn)
             signed_blocks = [(row["role"], block) for row in model["messages"] for block in blocks(row)
@@ -4423,7 +4429,7 @@ def verify_external_signed_history(manage, token, identifier, received, sender_s
             assert sum(text.count(SYSTEM[0]) for text in system_texts) == int(not reminder), (phase, system_texts)
             assert reply["stop_reason"] == "end_turn" and reply["content"] == [{"type": "text", "text": FINAL}]
             case.update(provider_path=source, model_body_sha256=digest, cli_body_sha256=claim["cli_sha256"],
-                        observed_signed_blocks=signed_blocks, old_tool_id=PAST_ID, old_tool_result=old_result,
+                        observed_signed_blocks=signed_blocks, old_tool_id=PAST_ID, old_tool_result=observed_result,
                         client_stop_reason=reply["stop_reason"])
     assert len(received) == (2 if origins else 5) and not any(path.is_file() for path in Path("/flows/api").rglob("*"))
     proof = {"cases": cases, "model_posts": len(received), "wire_final": "unavailable"}

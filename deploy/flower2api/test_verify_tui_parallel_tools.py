@@ -1,4 +1,4 @@
-"""验证公开双工具夹具按声明的 JSON 类型执行合成回调。"""
+"""验证公开工具夹具按声明的 JSON 类型核对调用和结果。"""
 
 from copy import deepcopy
 from unittest import TestCase
@@ -48,3 +48,18 @@ class ParallelToolFixtureTests(TestCase):
         model["tools"][0]["input_schema"]["properties"]["options"]["additionalProperties"] = 0
         with self.assertRaisesRegex(AssertionError, "additionalProperties.*0"):
             fixture._verify_serial_model_tools(model, tools, choice, "append_disabled")
+
+
+class HistoryToolFixtureTests(TestCase):
+    """核对已闭合旧工具结果的布尔类型及取证来源。"""
+
+    def test_external_history_result_uses_the_observed_model_block(self):
+        """布尔错误块保持原 ID，报告采用模型实收块。@return 无。"""
+        expected = {"type": "tool_result", "tool_use_id": fixture.PAST_ID, "is_error": True, "content": "旧错误"}
+        actual = dict(reversed(list(expected.items())))
+        model = {"messages": [{"role": "user", "content": [actual]}]}
+        self.assertIs(fixture._external_history_tool_result(model, expected, "signed_history"), actual)
+
+        actual["is_error"] = 1
+        with self.assertRaisesRegex(AssertionError, "is_error.*1"):
+            fixture._external_history_tool_result(model, expected, "signed_history")
