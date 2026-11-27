@@ -4905,32 +4905,46 @@ def verify_cache_capabilities(manage, token, account_id, headers, received, mode
     tools = [{"name": name, "description": f"缓存实验声明 {name}",
               "input_schema": {"type": "object", "properties": {}}} for name in ("ProbeFirst", "ProbeLast")]
     texts = ["当前缓存探针第一段。", "当前缓存探针末段。"]
-    cases = [(f"{surface}_{side}_{ttl or 'implicit'}", "append", surface, index, ttl)
+    cases = [(f"{surface}_{side}_{ttl or 'implicit'}", "append", surface, ((surface, index, ttl),))
              for surface in ("text", "tool") for index, side in enumerate(("first", "last")) for ttl in (None, "5m", "1h")]
-    cases.extend((f"unmarked_{surface}", "append", surface, None, None) for surface in ("text", "tool"))
+    cases.extend((f"unmarked_{surface}", "append", surface, ()) for surface in ("text", "tool", "combined"))
+    combined = (("tool", 1, "1h"), ("text", 0, "5m"))
+    cases.append(("combined", "append", "combined", combined))
     if mode == "baseline":
-        cases.extend((f"{policy}_{surface}", policy, surface, 0, "5m")
-                     for policy in ("replace", "user_reminder") for surface in ("text", "tool"))
-    proof = {}
+        for policy in ("replace", "user_reminder"):
+            cases.extend((f"{policy}_{surface}", policy, surface, ((surface, 0, "5m"),))
+                         for surface in ("text", "tool"))
+            cases.append((f"{policy}_combined", policy, "combined", combined))
+    proof, capabilities = {}, {}
     policy = None
-    for name, system_policy, surface, offset, ttl in cases:
+    account_path = f"accounts/{account_id}"
+    for name, system_policy, surface, markers in cases:
         if policy != system_policy:
             policy = system_policy
-            account = manage("PUT", f"accounts/{account_id}", {"client_system_prompt_policy": policy})
+            account = manage("PUT", account_path, {"client_system_prompt_policy": policy})
             assert account["request_backend"] == "tui_v2" and account["client_system_prompt_policy"] == policy
+            if mode == "baseline":
+                listed, = (row for row in manage("GET", "accounts")["data"] if row["id"] == account_id)
+                expected_account = {"request_backend": "tui_v2", "tui_v2_available": True,
+                                    "tui_system_prompt_policy_available": True, "client_system_prompt_policy": policy}
+                capabilities[policy] = {source: {key: view[key] for key in expected_account} for source, view in (
+                    ("update", account), ("detail", manage("GET", account_path)), ("list", listed),
+                )}
+                assert all(view == expected_account for view in capabilities[policy].values()), capabilities[policy]
         current = [{"type": "text", "text": text} for text in texts]
         body = {"model": MODEL, "max_tokens": 128, "stream": False, "messages": [
             {"role": role, "content": text} for role, text in HISTORY[:2]
         ] + [{"role": "user", "content": current}]}
-        if surface == "tool":
+        targets = {"text": current}
+        if surface != "text":
             body["tools"] = [tool.copy() for tool in tools]
-        expected = [None, None]
-        if offset is not None:
+            targets["tool"] = body["tools"]
+        expected = {key: [None, None] for key in targets}
+        for target, offset, ttl in markers:
             marker = {"type": "ephemeral"}
             if ttl is not None:
                 marker["ttl"] = ttl
-            targets = current if surface == "text" else body["tools"]
-            targets[offset]["cache_control"] = expected[offset] = marker
+            targets[target][offset]["cache_control"] = expected[target][offset] = marker
         before = len(received)
         status, raw, request_id = checked_messages(
             manage, token, body, {**headers, "x-session-id": str(uuid4())}, received, name,
@@ -4938,41 +4952,54 @@ def verify_cache_capabilities(manage, token, account_id, headers, received, mode
         )
         reservation, record, claims = cache_marker_claims(manage, request_id)
         evidence = {"http_status": status, "model_posts": len(received) - before, "request_id": request_id,
-                    "reservation_id": reservation, "surface": surface, "client_markers": expected, "policy": policy,
+                    "reservation_id": reservation, "surface": surface, "client_markers": expected.get(surface, expected),
+                    "policy": policy,
                     "attempt_count": record["attempt_count"]}
         if status == 422:
-            assert json.loads(raw)["error"]["code"] == "unsupported_parameter"
+            evidence["code"] = json.loads(raw)["error"]["code"]
+            assert evidence["code"] == "unsupported_parameter"
             assert before == len(received) and not claims and record["attempt_count"] == 0
         else:
             assert record["attempt_count"] == 1
             assert json.loads(raw)["content"] == [{"type": "text", "text": FINAL}]
             ((model_digest, model, _),) = received[before:]
             (claim,) = claims
-            from_cli = mode != "baseline" or offset is None
-            assert claim["sha256"] == model_digest and claim["from_interactive_cli"] is from_cli
+            from_cli = mode != "baseline" or not markers
+            assert claim["sha256"] == model_digest and claim["from_interactive_cli"] is from_cli, (name, claim)
+            assert claim["uses_native_history"] is from_cli, (name, claim)
+            if from_cli:
+                assert claim["cli_sha256"] == model_digest, (name, claim)
             ((message_index, user),) = [(i, row) for i, row in enumerate(model["messages"])
                                         if any(block.get("text") in texts for block in blocks(row))]
             assert user["role"] == "user"
             content = [(i, block) for i, block in enumerate(blocks(user)) if block.get("text") in texts]
             assert [block["text"] for _, block in content] == texts and content[1][0] == content[0][0] + 1
             projected = model.get("tools", [])
-            if surface == "tool":
+            observed = {"text": [block.get("cache_control") for _, block in content]}
+            if "tool" in targets:
                 assert [(tool["name"].removeprefix("mcp__flower__"), tool["description"], tool["input_schema"])
                         for tool in projected] == [(tool["name"], tool["description"], tool["input_schema"]) for tool in tools]
+                observed["tool"] = [tool.get("cache_control") for tool in projected]
             else:
                 assert not projected
-            observed = ([block.get("cache_control") for _, block in content] if surface == "text" else
-                        [tool.get("cache_control") for tool in projected])
-            if mode == "baseline" and offset is not None:
-                assert observed == expected, (name, observed)
-            evidence.update(from_interactive_cli=from_cli, model_body_sha256=model_digest, model_markers=observed,
+            if from_cli:
+                # 固定 CLI 默认只标记当前用户末块。关闭自动缓存后，两类显式标记均无出站表示。
+                automatic = None if mode == "native-no-auto" else {"type": "ephemeral", "ttl": "1h"}
+                native_expected = {key: [None, None] for key in targets}
+                native_expected["text"] = [None, automatic]
+                assert observed == native_expected, (mode, name, observed)
+            else:
+                assert observed == expected, (mode, name, observed)
+            evidence.update(from_interactive_cli=from_cli, uses_native_history=claim["uses_native_history"],
+                            model_body_sha256=model_digest, model_markers=observed.get(surface, observed),
                             user_message_index=message_index, user_block_indexes=[i for i, _ in content],
                             user_role=user["role"], model_tool_names=[tool["name"] for tool in projected],
                             system_markers=[block["cache_control"] for block in model.get("system", [])
                                             if "cache_control" in block])
         proof[name] = evidence
     assert not any(path.is_file() for path in Path("/flows/api").rglob("*"))
-    return {"mode": mode, "cases": proof, "model_posts": len(received), "wire_final": "unavailable"}
+    return {"mode": mode, "cases": proof, "account_capabilities": capabilities,
+            "model_posts": len(received), "wire_final": "unavailable"}
 
 
 def verify_cache_markers(manage, token, account_id, headers, received):
