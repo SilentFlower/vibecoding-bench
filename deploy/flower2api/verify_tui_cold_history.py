@@ -4642,6 +4642,11 @@ def verify_signed_fork_history(manage, token, foreign, headers, continuation, fi
             "attempts": [*prior_attempts, *attempts], "wire_final": "unavailable"}
 
 
+def _verify_serial_model_tools(model, tools, choice, phase):
+    assert same_json_value(model["tools"], tools), (phase, model["tools"])
+    assert same_json_value(model["tool_choice"], choice), (phase, model["tool_choice"])
+
+
 def verify_disable_parallel_tool_use(manage, token, identifier, received, sender_status):
     """核对禁并行、普通选择及账号策略的能力回报。
     @param manage 管理入口。@param token 调用方。@param identifier 合成账号 ID。
@@ -4686,7 +4691,7 @@ def verify_disable_parallel_tool_use(manage, token, identifier, received, sender
         if from_cli:
             verify_automatic_model_tools(model, tools)
         else:
-            assert model["tools"] == tools and model["tool_choice"] == body["tool_choice"], (phase, model)
+            _verify_serial_model_tools(model, tools, body["tool_choice"], phase)
         texts = [b.get("text", "") for row in model["messages"] if row["role"] == "user" for b in blocks(row)]
         question = body["messages"][0]["content"]
         assert sum(text.count(question) for text in texts) == 1, (phase, texts)
@@ -4723,14 +4728,17 @@ def verify_disable_parallel_tool_use(manage, token, identifier, received, sender
             headers = {"User-Agent": "flower2api-parallel-tool-fixture/1", "x-session-id": str(uuid4())}
             body = request(SERIAL_TOOL_QUESTION, SERIAL_AUTO)
             reply = post(body, headers, "append_disabled_tool", policy, 200, stop_reason="tool_use")
-            assert reply["content"] == [{"type": "tool_use", "id": NEW_ID, "name": TOOL["name"], "input": ARGS}], reply
+            expected_call = {"type": "tool_use", "id": NEW_ID, "name": TOOL["name"], "input": ARGS}
+            assert same_json_value(reply["content"], [expected_call]), reply
             results = fixture_parallel_results(reply["content"], callbacks)
             follow = {**body, "messages": [*body["messages"], {"role": "assistant", "content": reply["content"]},
                                            {"role": "user", "content": results}]}
             post(follow, headers, "append_disabled_receipt", policy, 200)
             continuation = received[-1][1]
-            assert find_blocks(continuation, "id", NEW_ID) == [("assistant", reply["content"][0])], continuation
-            assert find_blocks(continuation, "tool_use_id", NEW_ID) == [("user", results[0])], continuation
+            (call_role, call), = find_blocks(continuation, "id", NEW_ID)
+            (result_role, result), = find_blocks(continuation, "tool_use_id", NEW_ID)
+            assert call_role == "assistant" and same_json_value(call, expected_call), continuation
+            assert result_role == "user" and same_json_value(result, results[0]), continuation
             cases["append_disabled_receipt"]["model_tool_result"] = results[0]
             before = len(received)
             status, _, request_id = checked_messages(

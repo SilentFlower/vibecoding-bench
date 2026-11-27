@@ -1,5 +1,6 @@
 """验证公开双工具夹具按声明的 JSON 类型执行合成回调。"""
 
+from copy import deepcopy
 from unittest import TestCase
 
 import verify_tui_cold_history as fixture
@@ -32,3 +33,18 @@ class ParallelToolFixtureTests(TestCase):
             }], callbacks)
 
         self.assertEqual(callbacks, [])
+
+    def test_serial_model_contract_preserves_json_booleans(self):
+        """核对布尔禁并行和嵌套声明，数字替代分别触发断言。@return 无。"""
+        tools = [fixture.TOOL, fixture.PARALLEL_SECOND_TOOL]
+        choice = fixture.SERIAL_AUTO
+        model = {"tools": deepcopy(tools), "tool_choice": dict(reversed(list(choice.items())))}
+        fixture._verify_serial_model_tools(model, tools, choice, "append_disabled")
+
+        numeric_choice = {**model, "tool_choice": {**choice, "disable_parallel_tool_use": 1}}
+        with self.assertRaisesRegex(AssertionError, "disable_parallel_tool_use.*1"):
+            fixture._verify_serial_model_tools(numeric_choice, tools, choice, "append_disabled")
+
+        model["tools"][0]["input_schema"]["properties"]["options"]["additionalProperties"] = 0
+        with self.assertRaisesRegex(AssertionError, "additionalProperties.*0"):
+            fixture._verify_serial_model_tools(model, tools, choice, "append_disabled")
