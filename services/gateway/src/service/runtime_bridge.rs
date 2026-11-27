@@ -429,7 +429,8 @@ pub async fn synchronize_proxy(
         .map_err(|_| AppError::ServiceUnavailable("线路同步回执无效".into()))
 }
 
-fn config() -> Result<(String, String, reqwest::Client), AppError> {
+/// 读取受信编排器连接。@return 服务地址、服务令牌和共用客户端。
+pub(super) fn config() -> Result<(String, String, reqwest::Client), AppError> {
     let base = std::env::var("V3_RUNTIME_URL").unwrap_or_default();
     let token = std::env::var("V3_INTERNAL_TOKEN").unwrap_or_default();
     if base.is_empty() || token.len() < 32 {

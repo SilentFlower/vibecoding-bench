@@ -40,12 +40,12 @@ from datetime import datetime, timezone
 from functools import partial
 from pathlib import Path
 from stat import S_ISREG
-from typing import Literal, Optional, Sequence
+from typing import Annotated, Literal, Optional, Sequence
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import docker
 from docker.errors import DockerException, NotFound
-from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from native_capture import CaptureExpired, read_capture
 from agy_runtime.capture import read_snapshot as read_agy_snapshot, save_ingress as save_agy_ingress
 from native_capture_policy import capture_enabled as native_capture_enabled
@@ -14512,15 +14512,20 @@ def v3_agy_environment(account_id: int, prepare: bool = False) -> dict:
 
 @app.get("/internal/v3/transport/{account_id}")
 def v3_transport(account_id: int, wake: bool = True, tui_previous_release: bool = False,
-                 tui_oauth_profile: bool = False):
+                 tui_oauth_profile: bool = False,
+                 tui_rollback_generation: Annotated[int | None, Query(ge=0)] = None):
     """解析唯一绑定账号并返回受限发送实例。
     :param account_id: Gateway 账号。:param wake: 是否唤醒环境。
     :param tui_previous_release: 是否接受原版回执绑定。:param tui_oauth_profile: 是否读取 V2 OAuth 画像。
-    :return: 已核验的私有传输绑定或空值。
+    :param tui_rollback_generation: 仅回切时使用的旧登记代次，零表示历史无代次格式。
+    :return: 私有传输绑定、回切核验或空值。
     """
     if not account_runtime:
         raise HTTPException(404)
     configuration = account_runtime.gateway._request('GET', f'/admin/runtime/accounts/{account_id}/config')
+    if tui_rollback_generation is not None and (wake or not V3_ENABLED or not cluster_service
+            or configuration.get('request_backend') != 'tui_v2'):
+        raise HTTPException(409, '回切核验需要原 V2 账号与只读绑定')
     if configuration.get('platform') == 'antigravity':
         from agy_environment import transport as agy_transport
         from agy_tool_continuation import configured_binding
@@ -14552,6 +14557,8 @@ def v3_transport(account_id: int, wake: bool = True, tui_previous_release: bool 
             binding = account_runtime.existing_transport(account, placement_check=placement)
         else:
             binding = account_runtime.transport(account, effective_claude_code_version())
+        if tui_rollback_generation is not None:
+            return cluster_service.tui_rollback_status(account, account_runtime, binding, tui_rollback_generation)
         if binding and configuration.get('request_backend') == 'tui_v2':
             if tui_oauth_profile and configuration.get('auth_type') == 'oauth':
                 profile = account_runtime.tui_oauth_profile(account)
@@ -14565,7 +14572,7 @@ def v3_transport(account_id: int, wake: bool = True, tui_previous_release: bool 
     except NativePreparationBlocked as error:
         raise HTTPException(503, "原生运行时资源预算不满足，请调整后重试",
             headers={'x-v3-runtime-reason': error.reason}) from None
-    except (ValueError, RuntimeError, OSError):
+    except (ValueError, RuntimeError, OSError, DockerException):
         raise HTTPException(503, "账号环境未就绪或需要维护")
 
 

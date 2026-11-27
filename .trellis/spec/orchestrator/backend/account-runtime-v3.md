@@ -10,13 +10,16 @@
 
 - `PUT /admin/accounts/{id}` 单独提交 `request_backend` 与非负整数 `request_backend_revision`。管理视图返回生效值、待切目标、修订和 `tui_v2_available`。
 - `GET /internal/v3/transport/{account_id}?wake=false` 读取当前发送器。`NodeTransportInspection` 在节点 `inspect` 操作中携带正整数 `transport_gateway_account`。
+- `GET /internal/v3/transport/{account_id}?wake=false&tui_rollback_generation=<非负整数>` 核验离开 V2 的归属。代次 0 用于历史无代次登记。响应为 `null` 或 `{scope, predecessors, stopped}`，其中 `stopped` 为布尔值。`scope` 及 `predecessors` 的每项均只含 `account_id`、`environment_id`、`generation`、`release_id`、`endpoint`。
 - 账号镜像以 `tui-guard --check` 核验当前节点，以同一程序在发送器分配的 PTY 上启动固定 CLI。探测成功返回 0，隔离初始化失败返回 125。
 
 ### 3. Contracts
 
-- 受管 Claude 账号有原生 `native293` 与交互 `tui_v2` 的账号级选择。管理读取只查现有绑定。保存涉及 V2 的切换时，编排确认无运行绑定后可以按需准备该账号。
+- 受管 Claude 账号有原生 `native293` 与交互 `tui_v2` 的账号级选择。管理读取只查现有绑定。切入 V2 时，编排确认无运行绑定后可以按需准备该账号。
 - V1 和 legacy 按 `POST /v1/messages` 提交的完整历史转发工具结果。持久工具回执由 V2 交互会话登记和认领。请求选号、终态查询和断线恢复只在当前生效为 `tui_v2` 的账号中匹配受支持的 V2 回执。查询内存中的原回复也要核对账号当前后端。
 - 从 V1 切出时，路由读锁和账号活动门禁保护当前 HTTP 请求。历史 V1 回执行退出请求和切换判定。V2 活动轮按原 sender、绑定代次和原回执收尾。V2 新请求沿账号凭据解析获取当次 AT，通过单次私有提交交给目标账号 sender。
+- 回切 V1 时，网关在账号路由和活动门禁内确认原 V2 已排空。存在运行绑定时，核验结果须匹配当前实际空闲的发送器。环境已停时，编排复核同账号环境、执行状态及实际角色，SSH 节点使用 `NodeTransportInspection.verify_stopped=true` 在节点锁内核验。核验通过后，网关按原修订提交已有待切目标，已停环境可保持停止。接单开关继续独立控制新请求。
+- SSH 回切所需的跨发行前驱来自同一节点配置、账号、环境和分配修订的已完成维护记录。当前维护为 `rolled_back` 且原账号发行与实际范围一致时，以冻结的原代次和发行查询已完成归档。恢复记录仅提供查询起点，时序和目标发行均须接上实际换版链。
 - 隔离程序读取运行内核的 Landlock ABI。ABI 2 组合目录授权和进程过滤器保护私有文件，允许 CLI 通过本会话获准写入的文件描述符保存配置与历史。已授权的项目工作区可以共享。ABI 3 及以上使用内核的文件截短权限。
 - 原 `NodeInspection`、`BoundIdentityRead` 与 `CredentialStatusRead` 保持现有字段。节点 `inspect` 仅在收到 `transport_gateway_account` 时按 `NodeTransportInspection` 解析。其他请求使用各自原模型。
 
@@ -27,7 +30,9 @@ SSH 节点完成更新后，日志中的 `target_account_release` 来自实际�
 | 条件 | 结果 |
 | --- | --- |
 | 外部管理写入缺少修订或修订已变更 | 返回缺少修订或并发冲突 |
-| 编排确认账号没有运行绑定 | 只读返回空。保存涉及 V2 的切换可以请求准备 |
+| 编排确认账号没有运行绑定 | 普通只读查询返回空。切入 V2 可以请求准备。切回 V1 使用单独的实际停止核验 |
+| 回切查询要求唤醒或生效内核已经离开 V2 | 私有查询返回 HTTP 409 |
+| 回切时停止状态、实际空闲或历史绑定待核验 | 保留待切目标，之后按原路径对账 |
 | V1 请求正在交付 | 等当前 HTTP 请求收尾。待切期间新请求返回 HTTP 429 |
 | V2 原轮正在交付或等待工具回执 | 待切目标保留，原 sender 继续处理 |
 | V1 工具请求匹配历史 V1 回执 | 按本次完整历史转发 |
@@ -38,15 +43,16 @@ SSH 节点完成更新后，日志中的 `target_account_release` 来自实际�
 
 - 正常：在休眠账号保存 `{"request_backend":"tui_v2","request_backend_revision":0}`，编排准备同一账号后由 Gateway 登记已核验的绑定。
 - V2 工具续轮进行时保存 `native293`，待原轮收尾后对账生效。切换生效后，携带完整历史的请求进入 V1 的普通转发路径。
+- 网关登记第 168 代，节点完成第 171、172 代的换版后重建到第 174 代。节点再次升级失败并恢复原发行时，继续核对两次已完成换版。仅凭中央的停止标记便提交回切属于错误用法。应先查询当前账号的实际停止凭据。
 - 在 ABI 2 节点更新账号镜像后，通过实时就绪检查即可保存 V2。仅凭镜像标签或宿主版本号判断可用会漏掉规则加载失败。
 - 兼容：旧节点凭据回执按原模型完整字段比较。扩展字段登记在 V2 专用请求模型，保持凭据查询和身份回执可用。
 
 ### 6. Tests Required
 
-- `test_cluster_synchronization`、`test_tui_node_transition` 核对分批镜像和旧节点日志的原绑定证明，包括节点或发行错配时的拒绝。
+- `test_cluster_synchronization`、`test_tui_node_transition` 核对分批镜像、恢复原发行后的已完成归档、运行和停止两种范围，以及节点、分配、发行或代次错配时的拒绝。
 - 后台子代理首轮若比父 `Agent.prompt` 恰好多一个 LF，只有同一账号、环境代次、主体和会话的原工具启动回执匹配子代理 ID 才能接入。先来的子轮复用有界回执等待。仅比较签名时兼容这一个字符。`test_background_child_receipt_accepts_one_cli_line_feed` 覆盖回执晚到、额外空格、双换行、CRLF 和重复提交。
 
-- `verify_tui_sender_status.py` 核对管理详情只读、休眠双向切换、在途工具续轮和错误绑定。
+- `verify_tui_sender_status.py` 核对管理详情只读、休眠双向切换、在途工具续轮和错误绑定。验证关闭接单时已停账号回切后仍保持关闭，以及网关重启后待切状态自动收口，首条合成 Messages 由 V1 处理。
 - `native_v1_receipt_gateway_roundtrip` 核对显式及缺省会话下的工具结果重发、两次实际转发与持久回执行数。`old_receipts_do_not_route_to_the_retired_backend` 核对历史回执和 V2 原账号隔离。
 - `deploy/flower2api/verify_tui_guard.py` 验证私有配置、共享工作区、终端描述符及初始化失败。兼容性变更须在真实 ABI 2 与 ABI 3 或更高版本分别验证管理端切换、发送和重启后的原历史续写。
 - `test_cluster_credential_refresh`、`test_cluster_owner_runner` 核对旧节点凭据与身份回执。`test_cluster_transport` 核对排空时原 V2 路由可用和源隔离后的拒绝。

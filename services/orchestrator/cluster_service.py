@@ -22,7 +22,7 @@ from requests.exceptions import ConnectionError as RequestConnectionError, Timeo
 
 from account_isolation import ROLE_COLUMNS
 from account_runtime import RuntimeBusy, _read_json
-from account_update_identity import configured_release
+from account_update_identity import configured_release, role_release
 from cluster_nodes import NodeConfiguration, NodeCreate
 from cluster_ssh import NodeSshError, SshNode
 from cluster_store import ClusterStore
@@ -37,12 +37,15 @@ from cluster_migration_maintenance import paused_migration_record
 from cluster_transfer import NodeArchiveTransfer
 from cluster_profile_reader import profile_reader_source
 from cluster_execution import NodeInspection, NodePreparation, NodeReviewAdmission, NodeTransportInspection
+from cluster_owner_node import _stopped
 from cluster_transport import NodeTransport, NodeTransports
 from runtime_files import atomic_json
+from runtime_names import account_container_prefix
 from system_update_gate import NodeImageFetchPaused, UPDATE_GATE
 from system_update_contract import safe_read, strict_json
 
 logger = logging.getLogger(__name__)
+_NODE_MAINTENANCE_LIMIT = 8 * 1024 * 1024
 
 
 def _matches_upgrade_account_release(journal: dict, node: dict, account_release: str) -> bool:
@@ -65,6 +68,29 @@ def _matches_upgrade_account_release(journal: dict, node: dict, account_release:
             and prepared.get('revision') == node['revision'] == journal.get('revision')
             and bool(journal.get('target_release')) and prepared.get('release') == journal['target_release']
             and prepared.get('account_release') == account_release)
+
+
+def _tui_upgrade_source(journal: dict, account: dict, assignment: dict, environment: str, config_digest: str) -> dict | None:
+    if (journal.get('node_key') != assignment['node_key']
+            or journal.get('node_id') != assignment['node_id'] or journal.get('config_sha256') != config_digest):
+        return None
+    fences = journal.get('fences')
+    accounts = journal.get('accounts')
+    if not isinstance(fences, dict) or not isinstance(accounts, list):
+        return None
+    source = fences.get(str(account['id']))
+    if (not isinstance(source, dict) or source.get('environment_id') != environment
+            or source.get('assignment_revision') != assignment['revision']
+            or source.get('account_id', account['id']) != account['id']
+            or source.get('node_key', assignment['node_key']) != assignment['node_key']
+            or source.get('operation_id', journal.get('job_id')) != journal.get('job_id')):
+        return None
+    for item in accounts:
+        original = item.get('account') if isinstance(item, dict) else None
+        if (isinstance(original, dict) and original.get('id') == account['id']
+                and original.get('cc2api_account_id') == account['cc2api_account_id']):
+            return source
+    return None
 
 
 class ClusterService:
@@ -630,11 +656,20 @@ class ClusterService:
                 'endpoint': self._remote_transport_endpoint(runtime, entry.node_key, entry.environment_id,
                                                            entry.assignment_revision)}
 
-    def tui_transport_predecessors(self, account: dict, runtime, binding: dict) -> list[dict]:
-        """从可信更新或已完成迁移证明派生旧位置。@return 不含秘密的旧绑定坐标。"""
+    def tui_transport_predecessors(self, account: dict, runtime, binding: dict, *,
+                                   rollback_from: int | None = None, stopped: bool = False) -> list[dict]:
+        """从可信更新或已完成迁移证明派生旧位置。
+
+        :param account: 中央绑定账号。
+        :param runtime: 中央环境管理器。
+        :param binding: 已核验的现有发送器范围。
+        :param rollback_from: 回切需要核对的最早登记代次。
+        :param stopped: 是否已确认同一范围内的角色实际停止。
+        :return: 不含秘密的旧绑定坐标。
+        """
         current = self.store.assignment(account['id'])
         if (current['phase'] != 'ready' or not current['enabled']
-                or binding.get('release_id') != configured_release(runtime)):
+                or not stopped and binding.get('release_id') != configured_release(runtime)):
             return []
         environment = binding['environment_id']
         generation = binding['generation']
@@ -642,7 +677,8 @@ class ClusterService:
         result = []
 
         def add(node, revision, previous, release):
-            if type(previous) is not int or not 0 < previous < generation or not release:
+            if (type(previous) is not int or not 0 < previous <= generation
+                    or (previous == generation and not stopped) or not release):
                 return
             if node == 'local':
                 key = hashlib.sha256(runtime.deployment.encode()).hexdigest()[:12]
@@ -688,23 +724,145 @@ class ClusterService:
                     and origin.get('environment_id') == environment and origin.get('protocol') == 1):
                 add('local', current['revision'], entry.get('generation'), origin.get('release'))
         elif current['kind'] == 'ssh':
-            try:
-                node = self.store.get(current['node_id'])
-                journal_path = self.connection(current['node_id']).private / 'maintenance/current.json'
-                journal = strict_json(safe_read(journal_path, 8 * 1024 * 1024, private=True), 8 * 1024 * 1024)
-            except (OSError, ValueError):
-                journal = {}
-            if (journal.get('phase') == 'completed' and journal.get('node_key') == current['node_key']
-                    and journal.get('node_id') == current['node_id']
-                    and journal.get('config_sha256') == hashlib.sha256(node['config_json'].encode()).hexdigest()
-                    and _matches_upgrade_account_release(journal, node, binding['release_id'])):
-                source = journal.get('fences', {}).get(str(account['id']), {})
-                source_account = next((item['account'] for item in journal.get('accounts', [])
-                    if item.get('account', {}).get('id') == account['id']), {})
-                if (source.get('environment_id') == environment and source.get('assignment_revision') == current['revision']
-                        and source_account.get('cc2api_account_id') == gateway_id):
-                    add(current['node_key'], current['revision'], source.get('generation'), journal.get('old_account_release'))
+            for previous, release in self._tui_node_predecessors(account, runtime, current, binding, rollback_from):
+                add(current['node_key'], current['revision'], previous, release)
         return result
+
+    def _tui_stopped_scope(self, account: dict, runtime, assignment: dict) -> dict | None:
+        def stopped_row():
+            connection = self.store.database()
+            try:
+                return connection.execute("""
+                    SELECT e.* FROM account_environments e JOIN accounts a ON a.id=e.account_id
+                    WHERE a.id=? AND a.cc2api_account_id=? AND a.deleted_at IS NULL AND e.state='stopped'
+                    """, (account['id'], account['cc2api_account_id'])).fetchone()
+            finally:
+                connection.close()
+
+        row = stopped_row()
+        if row is None:
+            return None
+        row = dict(row)
+        environment = row['environment_id']
+        gateway_id = account['cc2api_account_id']
+        if assignment['kind'] == 'ssh':
+            request = NodeTransportInspection(node_key=assignment['node_key'], account_id=account['id'],
+                environment_id=environment, assignment_revision=assignment['revision'], version='2.1.293',
+                transport_gateway_account=gateway_id, verify_stopped=True)
+            node = self.connection(assignment['node_id'])
+            response = node.prepare_environment(node_container_name(runtime.deployment, assignment['node_key']),
+                request.model_dump(exclude_none=True), inspect=True)
+            proof = response.get('stopped')
+            if (response.get('protocol') != 1 or response.get('node_key') != assignment['node_key']
+                    or response.get('assignment_revision') != assignment['revision'] or not isinstance(proof, dict)
+                    or (proof.get('account_id'), proof.get('environment_id'), proof.get('generation'))
+                    != (gateway_id, environment, row['generation'])):
+                return None
+            release = proof.get('release_id')
+            endpoint = self._remote_transport_endpoint(runtime, assignment['node_key'], environment, assignment['revision'])
+        else:
+            with runtime.environment_lock(environment):
+                latest = stopped_row()
+                if (latest is None or latest['environment_id'] != environment
+                        or latest['generation'] != row['generation'] or runtime.environment_jobs(environment)):
+                    return None
+                latest = dict(latest)
+                runtime._check_node_fence(latest)
+                _stopped(runtime, latest)
+                release = role_release(runtime, latest)
+                endpoint = f'http://{account_container_prefix(runtime.deployment)}{environment}:8091'
+        if not isinstance(release, str) or not release:
+            return None
+        return {'account_id': gateway_id, 'environment_id': environment, 'generation': row['generation'],
+            'release_id': release, 'endpoint': endpoint}
+
+    def _tui_node_predecessors(self, account: dict, runtime, assignment: dict, binding: dict,
+                               first: int | None) -> list[tuple[int, str]]:
+        environment = binding['environment_id']
+        generation = binding['generation']
+        try:
+            node = self.store.get(assignment['node_id'])
+            digest = hashlib.sha256(node['config_json'].encode()).hexdigest()
+            directory = self.connection(assignment['node_id']).private / 'maintenance'
+            journal = strict_json(safe_read(directory / 'current.json', _NODE_MAINTENANCE_LIMIT, private=True),
+                _NODE_MAINTENANCE_LIMIT)
+        except (OSError, ValueError):
+            return []
+
+        def source_binding(job):
+            fence = _tui_upgrade_source(job, account, assignment, environment, digest)
+            previous = fence.get('generation') if fence else None
+            release = job.get('old_account_release')
+            if type(previous) is not int or not 0 < previous <= generation or not isinstance(release, str) or not release:
+                return None
+            return previous, release
+
+        previous = source_binding(journal)
+        if previous is None:
+            return []
+        phase = journal.get('phase')
+        if phase == 'completed' and _matches_upgrade_account_release(journal, node, configured_release(runtime)):
+            result = [previous]
+        elif first is not None and phase == 'rolled_back' and previous[1] == binding['release_id']:
+            # 恢复原发行只确定回查起点，发行之间的前驱仍来自已完成换版。
+            result = []
+        else:
+            return []
+        if first is None or previous[0] < first:
+            return result
+
+        candidates = []
+        for path in directory.glob('*.json'):
+            if not re.fullmatch(r'[a-f0-9]{32}\.json', path.name):
+                continue
+            try:
+                archive = strict_json(safe_read(path, _NODE_MAINTENANCE_LIMIT, private=True), _NODE_MAINTENANCE_LIMIT)
+                if archive.get('phase') != 'completed':
+                    continue
+                predecessor = source_binding(archive)
+                target = archive.get('target_account_release')
+                if predecessor and predecessor[0] >= first and isinstance(target, str) and target and archive.get('job_id') == path.stem:
+                    candidates.append((predecessor[0], path.stat().st_mtime_ns, target, predecessor))
+            except (OSError, ValueError):
+                # 损坏的归档不能承接换版。其余有效证据仍可供同账号核对。
+                continue
+        for source_generation, _, target, predecessor in sorted(candidates, key=lambda item: item[:2], reverse=True):
+            if source_generation <= previous[0] and target == previous[1]:
+                result.append(predecessor)
+                previous = predecessor
+        return result
+
+    def tui_rollback_status(self, account: dict, runtime, binding: dict | None, first: int) -> dict | None:
+        """核验离开 V2 所需的同账号位置和换版来源。
+
+        :param account: 中央唯一绑定的账号行。
+        :param runtime: 中央运行环境。
+        :param binding: 原路径读取的已运行发送器。
+        :param first: 网关登记的旧代次。历史无代次格式传零。
+        :return: 当前运行或已停止范围及同位置换版证据。
+        """
+        assignment = self.store.assignment(account['id'])
+        if assignment['phase'] != 'ready' or not assignment['enabled']:
+            return None
+        if binding is None:
+            scope = self._tui_stopped_scope(account, runtime, assignment)
+        else:
+            scope = {key: binding[key] for key in ('account_id', 'environment_id', 'generation', 'release_id', 'endpoint')}
+        if scope is None or scope['generation'] < first:
+            return None
+        predecessors = self.tui_transport_predecessors(
+            account, runtime, scope, rollback_from=first, stopped=binding is None)
+        if assignment['kind'] == 'ssh':
+            endpoint = self._remote_transport_endpoint(runtime, assignment['node_key'], scope['environment_id'], assignment['revision'])
+            if scope['endpoint'] != endpoint:
+                return None
+        elif binding is None:
+            # 旧单仓和当前名字指向同一部署环境，已停证明覆盖两个原有绑定名字。
+            key = hashlib.sha256(runtime.deployment.encode()).hexdigest()[:12]
+            predecessors.append({**scope, 'endpoint': f"http://v3-{key}-account-{scope['environment_id']}:8091"})
+        if self.store.assignment(account['id']) != assignment:
+            return None
+        return {'scope': scope, 'predecessors': predecessors, 'stopped': binding is None}
 
     def prepare_remote_cli(self, account: dict, runtime, gateway, quota_identity: str) -> dict:
         """按原绑定准备远程CLI环境，独立账号保留原本地刷新所有权。

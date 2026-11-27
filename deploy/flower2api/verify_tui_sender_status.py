@@ -16,12 +16,13 @@ from subprocess import Popen, run
 from tempfile import mkdtemp
 from threading import Thread
 from time import monotonic, sleep
+from urllib.parse import parse_qs, urlsplit
 from uuid import uuid4
 
 
 from verify_tui_public_gateway import check_public_gateway
 from verify_tui_prompt_cache import check_prompt_cache
-from verify_tui_sender_actions import check_actions, check_restarted, write_source_binding
+from verify_tui_sender_actions import check_actions, check_restarted, wait_for, write_source_binding
 
 
 DOCKER = ['docker', '--host', 'unix:///var/run/docker.sock']
@@ -65,6 +66,9 @@ def probe(folder: Path, gateway: Path) -> None:
     sleeping = False
     registry_queries = []
     upstream_connections = []
+    rollback_predecessors = []
+    native_requests = []
+    native_route = f'/cluster-transports/v2/{sha256(deployment.encode()).hexdigest()[:12]}/{"b" * 32}/{environment}/1'
 
     class Registry(BaseHTTPRequestHandler):
         """按既有协议返回合成编排登记；发送器由实际账号二进制运行。"""
@@ -72,26 +76,45 @@ def probe(folder: Path, gateway: Path) -> None:
         def do_GET(self):
             """按实际编排协议区分读取现有绑定与唤醒。@return 无。"""
             nonlocal sleeping
+            if self.path == native_route + '/internal/native/status':
+                if self._native_authorized():
+                    self._reply_json({'raw_input_protocol': 1, 'version': '2.1.293',
+                        'environment_id': environment, 'generation': 174})
+                return
             if self.headers.get('Authorization') != 'Bearer ' + internal:
                 self.send_error(401)
                 return
             registry_queries.append(self.path)
             route = '/internal/v3/transport/1'
-            if self.path not in (route + '?wake=false', route, route + '?wake=true'):
+            path = urlsplit(self.path)
+            params = parse_qs(path.query)
+            if path.path != route:
                 self.send_error(404)
                 return
-            if self.path != route + '?wake=false':
+            if params.get('wake') == ['false'] and 'tui_rollback_generation' in params:
+                scope = {key: value for key, value in registered.items() if key != 'secret'} if registered else None
+                payload = {'scope': scope, 'predecessors': rollback_predecessors, 'stopped': sleeping} if scope else None
+            elif params.get('wake') == ['false']:
+                payload = None if sleeping else registered
+            elif params.get('wake', ['true']) == ['true']:
                 sleeping = False
-            data = json.dumps(None if sleeping else registered).encode()
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Content-Length', str(len(data)))
-            self.end_headers()
-            self.wfile.write(data)
+                payload = registered
+            else:
+                self.send_error(404)
+                return
+            self._reply_json(payload)
 
         def do_POST(self):
             """核对配置切换的维护租约，仅在真实发送器空闲时放行。@return 无。"""
             nonlocal sleeping
+            if self.path == native_route + '/internal/native/messages':
+                if self._native_authorized():
+                    submission = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+                    native_requests.append((submission['request']['account_id'], submission['request']['generation']))
+                    self._reply_json({'id': 'msg_fixture_v1', 'type': 'message', 'role': 'assistant',
+                        'model': 'claude-sonnet-4-6', 'content': [{'type': 'text', 'text': '隔离回切后首轮 V1'}],
+                        'stop_reason': 'end_turn', 'usage': {'input_tokens': 1, 'output_tokens': 1}})
+                return
             if self.headers.get('Authorization') != 'Bearer ' + internal:
                 self.send_error(401)
                 return
@@ -108,6 +131,21 @@ def probe(folder: Path, gateway: Path) -> None:
             self.send_response(200 if idle else 409)
             self.send_header('Content-Length', '0')
             self.end_headers()
+
+        def _native_authorized(self):
+            if (self.headers.get('x-v3-relay-token') == internal
+                    and self.headers.get('Authorization') == 'Bearer ' + secret):
+                return True
+            self.send_error(401)
+            return False
+
+        def _reply_json(self, payload):
+            data = json.dumps(payload).encode()
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
 
     class Upstream(BaseRequestHandler):
         """统计任何意外访问合成代理或模型地址的 TCP 连接。"""
@@ -178,7 +216,7 @@ def probe(folder: Path, gateway: Path) -> None:
             while monotonic() < limit and process.poll() is None:
                 try:
                     if http(port, 'GET', '/admin/accounts', admin)[0] == 200:
-                        return
+                        return stop
                 except OSError:
                     sleep(0.1)
             raise RuntimeError('默认 Gateway 启动失败，见 gateway.log')
@@ -195,6 +233,53 @@ def probe(folder: Path, gateway: Path) -> None:
             write_source_binding(registered)
             write_config(registered, proxy, tui_v2={'max_reservations': 3})
 
+        def rollback_after_upgrades(account):
+            """验证已有陈旧绑定和管理回切意向随后台自动应用。@param account 当前管理视图。@return 新视图。"""
+            nonlocal registered, stop_gateway
+            set_runtime(174, False)
+            scope = {key: value for key, value in binding.items() if key != 'secret'}
+            encode = lambda value: json.dumps(value, separators=(',', ':')).encode()
+            location = (scope['account_id'], environment, 'local-old', scope['endpoint'])
+            location_digest = sha256(encode(location)).hexdigest()
+            digest = sha256(encode((*location[:2], 168, *location[2:]))).hexdigest()
+            # 隔离数据库载入旧发行已保存的绑定，实际网关与发送器使用当前发行。
+            with closing(connect(folder / 'gateway.db')) as db, db:
+                changed = db.execute("UPDATE tui_backend_intents SET binding=? WHERE account_id=1 AND revision=? AND target=''",
+                    (f'v3:{environment}:168:{location_digest}:{digest}', account['request_backend_revision']))
+                assert changed.rowcount == 1
+            rollback_predecessors.append({**scope, 'generation': 172, 'release_id': 'local-previous'})
+            try:
+                pending = admin_call('PUT', 'accounts/1', {'request_backend': 'native293',
+                    'request_backend_revision': account['request_backend_revision']})
+                assert pending['request_backend'] == 'tui_v2' and pending['request_backend_pending'] == 'native293'
+                assert pending['request_backend_wait_reason'] == 'runtime_unconfirmed'
+                repeated = admin_call('PUT', 'accounts/1', {'request_backend': 'native293',
+                    'request_backend_revision': pending['request_backend_revision']})
+                assert repeated['request_backend_revision'] == pending['request_backend_revision']
+                stop_gateway()
+                stop_gateway = launch_gateway(initial)
+                restarted = admin_call('GET', 'accounts/1', None)
+                assert restarted['request_backend_pending'] == 'native293'
+                assert restarted['request_backend_revision'] == pending['request_backend_revision']
+                rollback_predecessors.append({**scope, 'generation': 171, 'release_id': 'local-old'})
+
+                def applied():
+                    state = admin_call('GET', 'accounts/1', None)
+                    return state['request_backend'] == 'native293' and state['request_backend_pending'] is None
+
+                wait_for(applied, '后台未应用跨代回切')
+                observed = admin_call('GET', 'accounts/1', None)
+                assert observed['request_backend_revision'] == pending['request_backend_revision'] + 1
+                # 使用私有 V1 合成发送器确认普通客户端首轮走新路由，并只提交一次。
+                registered = {**registered, 'endpoint': options['V3_RUNTIME_URL'] + native_route}
+                status, message = http(18090, 'POST', '/v1/messages', token, {'model': 'claude-sonnet-4-6',
+                    'stream': False, 'max_tokens': 8, 'messages': [{'role': 'user', 'content': '验证回切'}]})
+                assert status == 200 and message['id'] == 'msg_fixture_v1', status
+                assert native_requests == [(1, 174)]
+                return observed
+            finally:
+                rollback_predecessors.clear()
+
         def compare_cache(token):
             primary, snapshot = folder/'gateway.db', folder/'cache-compare.db'
             with ExitStack() as peer:
@@ -208,7 +293,7 @@ def probe(folder: Path, gateway: Path) -> None:
                 return check_prompt_cache(token, [('raw', 18090, primary), ('gateway', 18091, snapshot)])
 
         with ExitStack() as initial:
-            launch_gateway(initial)
+            stop_gateway = launch_gateway(initial)
             admin_call('PUT', 'settings', {'allowed_user_agents': 'flower-tui-sender-status*'})
             account = admin_call('POST', 'accounts', {'email': 'sender@fixture.test',
                 'request_backend': 'legacy', 'setup_token': 'synthetic-' + uuid4().hex, 'proxy_url': proxy,
@@ -227,7 +312,8 @@ def probe(folder: Path, gateway: Path) -> None:
             assert unchanged['request_backend_revision'] == original['request_backend_revision']
             registered = binding
             positive = check_public_gateway(binding, write_config, proxy, control, admin_call, http, token,
-                                            folder / 'native/tui-v2-submissions.json', set_runtime, compare_cache)
+                                            folder / 'native/tui-v2-submissions.json', set_runtime, compare_cache,
+                                            rollback_after_upgrades)
             write_source_binding(binding)
             registered = None
             sleeping = False
@@ -256,7 +342,9 @@ def probe(folder: Path, gateway: Path) -> None:
             diagnostic = log_path.read_bytes()[previous:].decode()
             assert '发送前拒绝 V2 请求' in diagnostic and expected in diagnostic, (label, diagnostic)
             public[label] = {'status': code, 'diagnostic': expected}
-        assert registry_queries[before_invalid:] == ['/internal/v3/transport/1?wake=false'] * len(public)
+        observed = [urlsplit(path) for path in registry_queries[before_invalid:]]
+        assert len(observed) == len(public) and all(path.path == '/internal/v3/transport/1'
+            and parse_qs(path.query).get('wake') == ['false'] for path in observed)
         assert control()[1]['active'] == 0 and not upstream_connections
         result = {'status': 'passed', 'sender': sender, 'private_missing_config': 503,
                   'private_invalid_bearer': 401, 'sender_actions': actions,

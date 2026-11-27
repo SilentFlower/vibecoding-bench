@@ -62,12 +62,13 @@ def public_stream(token: str, body: dict, result: str | None = None, while_pause
 
 
 def check_public_gateway(binding, write_config, proxy, control, admin_call, http, token, ledger: Path, set_runtime,
-                         verify_cache) -> dict:
+                         verify_cache, verify_rollback) -> dict:
     """通过管理 API 启用普通账号，再从公开 Messages 入口完成双轮屏障及归属验证。
     @param binding 当前账号登记。@param write_config 配置写入器。@param proxy 隔离代理。
     @param control 发送器状态读取器。@param admin_call 管理 API。@param http 本地 HTTP 客户端。
     @param token 普通客户端令牌。@param ledger 本地验收卷内的发送器提交记录。
     @param set_runtime 设置合成运行环境的代次和休眠状态。@param verify_cache 以同一账号快照比较缓存。
+    @param verify_rollback 核对已保存的跨发行回切。
     @return 脱敏验证结果。
     """
     source = Popen([sys.executable, str(Path(__file__).with_name('verify_tui_sender_actions.py')), '--source'],
@@ -166,21 +167,26 @@ def check_public_gateway(binding, write_config, proxy, control, admin_call, http
             assert attempted.read_text().splitlines() == ['1']
             errors[str(code)] = 1
         cache = verify_cache(token)
+        closed = admin_call('PUT', 'accounts/1/work-control', {'api_accepting': False})
+        assert closed['api_accepting'] is False
         set_runtime(generation, True)
         current = admin_call('GET', 'accounts/1', None)
         assert current['request_backend'] == 'tui_v2' and current['tui_v2_available'] is False
         restored = admin_call('PUT', 'accounts/1', {'request_backend': 'native293',
                               'request_backend_revision': current['request_backend_revision']})
         assert restored['request_backend'] == 'native293' and restored['request_backend_pending'] is None, restored.keys()
+        assert admin_call('GET', 'accounts/1', None)['tui_v2_available'] is False
+        assert admin_call('GET', 'accounts/1/work-control', None)['api_accepting'] is False
+        assert admin_call('PUT', 'accounts/1/work-control', {'api_accepting': True})['api_accepting'] is True
         set_runtime(generation, True)
         reenabled = admin_call('PUT', 'accounts/1', {'request_backend': 'tui_v2',
                                'request_backend_revision': restored['request_backend_revision']})
         assert reenabled['request_backend'] == 'tui_v2' and reenabled['request_backend_pending'] is None
-        restored = admin_call('PUT', 'accounts/1', {'request_backend': 'native293',
-                              'request_backend_revision': reenabled['request_backend_revision']})
+        restored = verify_rollback(reenabled)
         assert restored['request_backend'] == 'native293' and restored['request_backend_pending'] is None
         return {'admin_selected': selected['request_backend'], 'admin_switched_to': restored['request_backend'], 'prompt_cache': cache,
                 'enabled_v2_from_sleep': True, 'returned_to_v1_from_sleep': True, 'repeated_v1_v2_switch': True,
+                'stopped_rollback_preserved_closed_admission': True, 'archived_rollback_applied_in_background': True,
                 'active_continuation_retained_backend': True,
                 'first_http': 200, 'continuation_http': 200, 'before_source_release_bytes': [first_size, second_size],
                 'foreign_tool_result_http': denied, 'altered_tool_input_http': mismatch,

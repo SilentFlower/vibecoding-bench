@@ -13,9 +13,10 @@ use crate::model::account::Account;
 use crate::service::account::{AccountQueue, AccountService};
 use crate::service::runtime_bridge::{account_config_permit, account_route_config_permit};
 use crate::service::runtime_transport::{
-    TuiBindingStatus, TuiReadySender, tui_fixture, tui_input_rejection, tui_same_binding,
-    tui_scope, tui_switch_status, tui_transition_status,
+    TuiBindingStatus, TuiReadySender, TuiRollbackReadiness, tui_fixture, tui_input_rejection,
+    tui_rollback_readiness, tui_same_binding, tui_scope, tui_switch_status, tui_transition_status,
 };
+use crate::service::system_update::background_admission;
 use crate::service::tui_native_drain::{self, NativeTurn};
 use crate::store::account_store::TuiBackendSnapshot;
 
@@ -172,6 +173,15 @@ async fn reconcile_locked(
     let fixture = tui_fixture(account);
     let active_v2 = state.active == TUI_V2;
     let unbound_v2 = active_v2 && state.target != TUI_V2 && state.binding.is_empty();
+    let returning_to_v1 = active_v2 && state.target == "native293";
+    let _update_activity = if returning_to_v1 {
+        let Some(activity) = background_admission()? else {
+            return Ok(state);
+        };
+        Some(activity)
+    } else {
+        None
+    };
     if fixture
         && ((active_v2
             && tui_native_drain::occupied_v2(service.tui_database(), account.id).await?)
@@ -196,13 +206,18 @@ async fn reconcile_locked(
     {
         return Ok(state);
     }
-    let confirmed = if fixture || unbound_v2 {
-        state.binding.clone()
+    let (confirmed, stopped) = if fixture || unbound_v2 {
+        (state.binding.clone(), false)
+    } else if returning_to_v1 {
+        let Ok(Some(readiness)) = tui_rollback_readiness(account, &state.binding).await else {
+            return Ok(state);
+        };
+        (String::new(), readiness == TuiRollbackReadiness::Stopped)
     } else {
         let Some(binding) = idle_binding(account, &state.binding).await else {
             return Ok(state);
         };
-        binding
+        (binding, false)
     };
     let next_binding = if state.target == TUI_V2 {
         &confirmed
@@ -213,7 +228,7 @@ async fn reconcile_locked(
         .update_tui_backend(account.id, &state, &state.target, "", next_binding)
         .await?;
     drop(permit);
-    if saved.active == "native293" {
+    if saved.active == "native293" && !stopped {
         service.request_native_wake(account.id);
     }
     Ok(saved)
@@ -255,7 +270,8 @@ pub(crate) async fn change_locked(
     }
     let crosses_v2 = !pending.is_empty()
         && (target == TUI_V2 || before.active == TUI_V2 && !before.binding.is_empty());
-    let ready = if crosses_v2 {
+    let returning_to_v1 = before.active == TUI_V2 && target == "native293" && !tui_fixture(account);
+    let ready = if crosses_v2 && !returning_to_v1 {
         tui_switch_status(account).await
     } else {
         tui_transition_status(account).await

@@ -64,6 +64,7 @@ use crate::service::native_runtime::{NativePool, NativeSenderConfig, NativeSubmi
 use crate::service::request_session::valid_id;
 use crate::service::rewriter::{CacheControlTtlRewrite, MessageCacheControlRewrite};
 use crate::service::runtime_background::{BACKGROUND_HEADER, BackgroundPurpose};
+use crate::service::runtime_bridge::config as runtime_management_config;
 use crate::service::tui_backend::TUI_V2;
 #[cfg(target_os = "linux")]
 use crate::service::tui_sender::TuiSender;
@@ -249,6 +250,36 @@ struct TuiBindingProof {
     generation: u64,
     endpoint: String,
     release_id: String,
+}
+
+impl TuiBindingProof {
+    fn key(self) -> String {
+        tui_sender_key(
+            &TransportBinding {
+                account_id: self.account_id,
+                environment_id: self.environment_id,
+                generation: self.generation,
+                endpoint: self.endpoint,
+                release_id: self.release_id,
+                secret: String::new(),
+            },
+            false,
+        )
+    }
+}
+
+/// 回切许可依赖实际运行状态，已停止环境应用后继续按需启动。
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum TuiRollbackReadiness {
+    Running,
+    Stopped,
+}
+
+#[derive(Deserialize)]
+struct TuiRollbackProof {
+    scope: TuiBindingProof,
+    predecessors: Vec<TuiBindingProof>,
+    stopped: bool,
 }
 
 /// 请求元信息与原始 body 分开传输，避免重新序列化改变协议字节。
@@ -1177,6 +1208,76 @@ pub(super) async fn tui_transition_status(account: &Account) -> Result<TuiBindin
         .map_err(TuiV2Unavailable::into_error)
 }
 
+/// 核对离开 V2 所需的空闲和原绑定。@param account 当前账号。@param registered 原登记。
+/// @return 可切回的实际状态，或等待更多证据。
+pub(super) async fn tui_rollback_readiness(
+    account: &Account,
+    registered: &str,
+) -> Result<Option<TuiRollbackReadiness>, AppError> {
+    let current = match probe_tui_account(account, Duration::from_secs(2), None, None).await {
+        Ok(status) if !status.idle => return Ok(None),
+        Ok(status) if status.can_advance(registered) => {
+            return Ok(Some(TuiRollbackReadiness::Running));
+        }
+        Ok(status) => Some(status.key),
+        Err(TuiV2Unavailable::NotRunning) => None,
+        Err(error) => return Err(error.into_error()),
+    };
+    let generation = tui_sender_key_parts(registered).map_or(0, |(_, generation, _, _)| generation);
+    let (base, secret, client) = runtime_management_config()?;
+    let unavailable = || AppError::ServiceUnavailable("V2 回切环境待核对".into());
+    let proof = client
+        .get(format!("{base}/internal/v3/transport/{}", account.id))
+        .query(&[
+            ("wake", "false".to_owned()),
+            ("tui_rollback_generation", generation.to_string()),
+        ])
+        .bearer_auth(secret)
+        .timeout(Duration::from_secs(2))
+        .send()
+        .await
+        .and_then(reqwest::Response::error_for_status)
+        .map_err(|_| unavailable())?
+        .json::<Option<TuiRollbackProof>>()
+        .await
+        .map_err(|_| unavailable())?;
+    Ok(proof.and_then(|proof| proof.confirm(account.id, registered, current.as_deref())))
+}
+
+impl TuiRollbackProof {
+    fn confirm(
+        self,
+        account: i64,
+        registered: &str,
+        current: Option<&str>,
+    ) -> Option<TuiRollbackReadiness> {
+        if self.scope.account_id != account || self.scope.generation == 0 {
+            return None;
+        }
+        let environment = self.scope.environment_id.clone();
+        let generation = self.scope.generation;
+        let scope = self.scope.key();
+        let readiness = match current {
+            Some(current) if !self.stopped && current == scope => TuiRollbackReadiness::Running,
+            None if self.stopped => TuiRollbackReadiness::Stopped,
+            _ => return None,
+        };
+        // 空闲观测与归属凭据须指向同一个当前发送器。旧版凭据只用于收口原登记。
+        let matches =
+            |key: &str| tui_same_binding(registered, key) || tui_later_generation(registered, key);
+        (matches(&scope)
+            || self.predecessors.into_iter().any(|proof| {
+                proof.account_id == account
+                    && proof.environment_id == environment
+                    && proof.generation > 0
+                    && (proof.generation < generation
+                        || self.stopped && proof.generation == generation)
+                    && matches(&proof.key())
+            }))
+        .then_some(readiness)
+    }
+}
+
 /// 只核对本轮登记过的实际 sender，包括滚动期间受限保留的旧远端。
 /// @param account 原账号。@param registered 回执绑定。@param probe 原轮身份。@return 已认证的 sender 状态。
 pub(super) async fn tui_receipt_status(
@@ -1298,17 +1399,7 @@ fn tui_predecessor_keys(current: &TransportBinding, proofs: Vec<TuiBindingProof>
             {
                 return None;
             }
-            Some(tui_sender_key(
-                &TransportBinding {
-                    account_id: proof.account_id,
-                    environment_id: proof.environment_id,
-                    generation: proof.generation,
-                    endpoint: proof.endpoint,
-                    release_id: proof.release_id,
-                    secret: String::new(),
-                },
-                false,
-            ))
+            Some(proof.key())
         })
         .collect()
 }
@@ -4444,6 +4535,56 @@ mod tests {
         let fixture = tui_sender_key(&original, true);
         assert!(tui_same_binding(&fixture, &fixture));
         assert!(!tui_later_generation(&fixture, &current));
+    }
+
+    /// 历史凭据覆盖原位置的早期代次。新状态仍要和实际空闲观测吻合。
+    #[test]
+    fn tui_rollback_requires_original_scope_and_current_observation() {
+        let environment = "a".repeat(32);
+        let endpoint = format!("http://flower2api-0123456789ab-{environment}:8091");
+        let binding = |generation, release: &str| TuiBindingProof {
+            account_id: 7,
+            environment_id: environment.clone(),
+            generation,
+            endpoint: endpoint.clone(),
+            release_id: release.into(),
+        };
+        let old = binding(168, "older-release").key();
+        let current = binding(174, "current-release").key();
+        let proof = |stopped, predecessors| TuiRollbackProof {
+            scope: binding(174, "current-release"),
+            stopped,
+            predecessors,
+        };
+        assert_eq!(
+            proof(false, vec![binding(172, "previous-release")]).confirm(7, &old, Some(&current)),
+            None
+        );
+        assert_eq!(
+            proof(false, vec![binding(171, "older-release")]).confirm(7, &old, Some(&current)),
+            Some(TuiRollbackReadiness::Running)
+        );
+        assert_eq!(
+            proof(true, vec![binding(171, "older-release")]).confirm(7, &old, None),
+            Some(TuiRollbackReadiness::Stopped)
+        );
+        assert_eq!(
+            proof(true, vec![]).confirm(7, &current, Some(&current)),
+            None
+        );
+        assert_eq!(proof(false, vec![]).confirm(7, &current, None), None);
+        assert_eq!(proof(true, vec![]).confirm(8, &current, None), None);
+        let later = binding(175, "current-release").key();
+        assert_eq!(
+            proof(false, vec![binding(171, "older-release")]).confirm(7, &old, Some(&later)),
+            None
+        );
+        let mut different_assignment = binding(171, "older-release");
+        different_assignment.endpoint.push_str("/different");
+        assert_eq!(
+            proof(true, vec![different_assignment]).confirm(7, &old, None),
+            None
+        );
     }
 
     /// 公开 V2 错误保持 sender 原状态和字节，提交超时之后也不调用取消。

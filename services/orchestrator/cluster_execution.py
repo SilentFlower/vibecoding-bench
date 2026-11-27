@@ -113,9 +113,11 @@ class NodeTransportInspection(NodeInspection):
     """复核已运行的 V2 发送器绑定。
 
     :param transport_gateway_account: 该环境绑定的网关账号。
+    :param verify_stopped: 回切时核验原环境和角色实际停止。
     """
 
     transport_gateway_account: StrictInt = Field(ge=1)
+    verify_stopped: StrictBool | None = None
 
 
 class ImportPreparation(BaseModel):
@@ -376,6 +378,15 @@ class NodeExecution:
         scope = {'protocol': 1, 'node_key': self.node_key, 'assignment_revision': request.assignment_revision}
         try:
             runtime._check_node_fence(row)
+            if request.verify_stopped and row['state'] == 'stopped':
+                from cluster_owner_node import _idle, _stopped
+
+                # 中央的停止标记可能滞后，回切需要在原节点锁内确认实际角色和执行记录。
+                _idle(self, runtime, row)
+                _stopped(runtime, row)
+                return {**scope, 'binding': None, 'stopped': {
+                    'account_id': gateway_id, 'environment_id': row['environment_id'],
+                    'generation': row['generation'], 'release_id': role_release(runtime, row)}}
             if row['state'] not in ('ready', 'cli_reconcile'):
                 return {**scope, 'binding': None}
             for role in ('network', 'sender'):

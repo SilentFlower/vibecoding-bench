@@ -1,5 +1,5 @@
 """核对节点独立提供方和休眠账号的可信更新回执。"""
-from contextlib import closing
+from contextlib import closing, nullcontext
 from hashlib import sha256
 from io import BytesIO
 import json
@@ -13,6 +13,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from account_isolation import tui_node_provider
+from cluster_execution import NodeExecution, NodeTransportInspection
 from cluster_service import ClusterService
 from cluster_store import ClusterStore
 from cluster_transport import NodeTransports
@@ -165,6 +166,208 @@ class TuiNodeTransitionTests(unittest.TestCase):
                     atomic_json(path, {**legacy, **change})
                     with self.subTest(journal=change):
                         self.assertEqual([], service.tui_transport_predecessors(account, runtime, binding))
+
+    def test_rollback_follows_completed_archives_for_the_same_account_and_node(self) -> None:
+        """复现 168、171、172、174 的历史，拒绝不同归属或未完成的换版。@return 无。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            node_key, environment = 'b' * 32, 'a' * 32
+            assignment = {'phase': 'ready', 'enabled': True, 'kind': 'ssh',
+                'node_id': 2, 'node_key': node_key, 'revision': 2}
+            account = {'id': 1, 'cc2api_account_id': 17}
+            node = {'config_json': '{}'}
+            service = object.__new__(ClusterService)
+            service.connection = lambda _: SimpleNamespace(private=root)
+            service.store = SimpleNamespace(assignment=lambda _: assignment, get=lambda _: node,
+                database=lambda: sqlite3.connect(root / 'bench.db'))
+            with closing(service.store.database()) as connection, connection:
+                connection.execute('CREATE TABLE node_migrations (account_id,phase,updated_at,operation_id)')
+            runtime = SimpleNamespace(deployment='synthetic', release_id='ci-104-1')
+            endpoint = service._remote_transport_endpoint(runtime, node_key, environment, 2)
+            scope = {'account_id': 17, 'environment_id': environment, 'generation': 174,
+                'release_id': runtime.release_id, 'endpoint': endpoint}
+
+            def journal(job_id, generation, old, target, **overrides):
+                return {'job_id': job_id, 'phase': 'completed', 'node_id': 2, 'node_key': node_key,
+                    'config_sha256': sha256(node['config_json'].encode()).hexdigest(),
+                    'old_account_release': old, 'target_account_release': target, 'accounts': [{'account': account}],
+                    'fences': {'1': {'environment_id': environment, 'assignment_revision': 2,
+                        'generation': generation}}, **overrides}
+
+            maintenance = root / 'maintenance'
+            current = maintenance / 'current.json'
+            completed = journal('1' * 32, 172, 'ci-103-1', 'ci-104-1')
+            atomic_json(current, completed)
+            historical = maintenance / ('2' * 32 + '.json')
+            good = journal('2' * 32, 171, 'ci-102-1', 'ci-103-1')
+            atomic_json(historical, good)
+            atomic_json(maintenance / ('3' * 32 + '.json'), journal('3' * 32, 170, 'ci-101-1', 'ci-102-1', phase='rolled_back'))
+            atomic_json(maintenance / ('4' * 32 + '.json'), journal('4' * 32, 167, 'ci-100-1', 'ci-102-1'))
+            compact = lambda values: [(entry['generation'], entry['release_id']) for entry in values]
+            self.assertEqual([(172, 'ci-103-1')], compact(service.tui_transport_predecessors(account, runtime, scope)))
+            reply = service.tui_rollback_status(account, runtime, {**scope, 'secret': 'synthetic'}, 168)
+            self.assertEqual(scope, reply['scope'])
+            self.assertFalse(reply['stopped'])
+            self.assertEqual([(172, 'ci-103-1'), (171, 'ci-102-1')], compact(reply['predecessors']))
+            for changes in (
+                {'phase': 'rolled_back'}, {'config_sha256': 'changed'}, {'target_account_release': 'ci-999-1'},
+                {'accounts': [{'account': {**account, 'cc2api_account_id': 18}}]},
+                {'fences': {'1': {'environment_id': environment, 'assignment_revision': 4, 'generation': 171}}},
+            ):
+                atomic_json(historical, {**good, **changes})
+                with self.subTest(changes=changes):
+                    reply = service.tui_rollback_status(account, runtime, scope, 168)
+                    self.assertEqual([(172, 'ci-103-1')], compact(reply['predecessors']))
+
+            atomic_json(historical, good)
+            atomic_json(maintenance / (completed['job_id'] + '.json'), completed)
+            restored = journal('5' * 32, 174, 'ci-104-1', 'ci-105-1', phase='rolled_back')
+            restored_scope = {**scope, 'generation': 176}
+            atomic_json(current, restored)
+            self.assertEqual([], service.tui_transport_predecessors(account, runtime, restored_scope))
+            with patch.object(service, '_tui_stopped_scope', return_value=restored_scope):
+                for binding in (restored_scope, None):
+                    with self.subTest(stopped=binding is None):
+                        reply = service.tui_rollback_status(account, runtime, binding, 168)
+                        self.assertEqual(binding is None, reply['stopped'])
+                        self.assertEqual([(172, 'ci-103-1'), (171, 'ci-102-1')], compact(reply['predecessors']))
+            for changes in (
+                {'phase': 'rolling_back_control'}, {'old_account_release': 'ci-105-1'},
+                {'fences': {'1': {'environment_id': environment, 'assignment_revision': 3, 'generation': 174}}},
+                {'fences': {'1': {'environment_id': environment, 'assignment_revision': 2, 'generation': 177}}},
+            ):
+                atomic_json(current, {**restored, **changes})
+                with self.subTest(restore=changes):
+                    reply = service.tui_rollback_status(account, runtime, restored_scope, 168)
+                    self.assertEqual([], reply['predecessors'])
+
+    def test_stopped_rollback_requires_a_current_node_receipt(self) -> None:
+        """停止标记须与实际所属 Node 的只读回执一致。@return 无。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            node_key, environment = 'b' * 32, 'a' * 32
+            account = {'id': 1, 'cc2api_account_id': 17}
+            assignment = {'phase': 'ready', 'enabled': True, 'kind': 'ssh',
+                'node_id': 2, 'node_key': node_key, 'revision': 2}
+
+            def database():
+                connection = sqlite3.connect(root / 'bench.db')
+                connection.row_factory = sqlite3.Row
+                return connection
+
+            with closing(database()) as connection, connection:
+                connection.execute('CREATE TABLE accounts (id,cc2api_account_id,deleted_at)')
+                connection.execute('INSERT INTO accounts VALUES (1,17,NULL)')
+                connection.execute('CREATE TABLE account_environments (account_id,environment_id,generation,state)')
+                connection.execute("INSERT INTO account_environments VALUES (1,?,174,'stopped')", (environment,))
+                connection.execute('CREATE TABLE node_migrations (account_id,phase,updated_at,operation_id)')
+            service = object.__new__(ClusterService)
+            service.store = SimpleNamespace(assignment=lambda _: assignment, get=lambda _: {'config_json': '{}'}, database=database)
+            node = SimpleNamespace(private=root, prepare_environment=Mock())
+            service.connection = lambda _: node
+            runtime = SimpleNamespace(deployment='synthetic', release_id='ci-104-1')
+            reply = {'protocol': 1, 'node_key': node_key, 'assignment_revision': 2, 'binding': None}
+            node.prepare_environment.return_value = reply
+            self.assertIsNone(service.tui_rollback_status(account, runtime, None, 174))
+            stopped = {'account_id': 17, 'environment_id': environment, 'generation': 174, 'release_id': runtime.release_id}
+            node.prepare_environment.return_value = {**reply, 'stopped': stopped}
+            verified = service.tui_rollback_status(account, runtime, None, 174)
+            self.assertTrue(verified['stopped'])
+            self.assertEqual({**stopped, 'endpoint': service._remote_transport_endpoint(runtime, node_key, environment, 2)},
+                verified['scope'])
+            _, request = node.prepare_environment.call_args.args
+            self.assertTrue(request['verify_stopped'])
+            self.assertEqual(17, request['transport_gateway_account'])
+            self.assertEqual({'inspect': True}, node.prepare_environment.call_args.kwargs)
+            for change in ({'generation': 173}, {'account_id': 18}, {'environment_id': 'c' * 32}):
+                node.prepare_environment.return_value = {**reply, 'stopped': {**stopped, **change}}
+                with self.subTest(change=change):
+                    self.assertIsNone(service.tui_rollback_status(account, runtime, None, 174))
+
+    def test_stopped_node_and_local_proofs_check_actual_roles(self) -> None:
+        """数据库已停时，实际运行的角色仍阻止回切。@return 无。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            node_key, environment = 'b' * 32, 'a' * 32
+            account = {'id': 1, 'cc2api_account_id': 17}
+            row = {'account_id': 1, 'environment_id': environment, 'generation': 174, 'state': 'stopped'}
+
+            def database():
+                connection = sqlite3.connect(root / 'bench.db')
+                connection.row_factory = sqlite3.Row
+                return connection
+
+            with closing(database()) as connection, connection:
+                connection.execute('CREATE TABLE accounts (id,cc2api_account_id,deleted_at)')
+                connection.execute('INSERT INTO accounts VALUES (1,17,NULL)')
+                connection.execute('CREATE TABLE account_environments (account_id,environment_id,generation,state)')
+                connection.execute("INSERT INTO account_environments VALUES (1,?,174,'stopped')", (environment,))
+                connection.execute('CREATE TABLE node_migrations (account_id,phase,updated_at,operation_id)')
+            runtime = Mock()
+            runtime.deployment = 'synthetic'
+            runtime.data = root
+            runtime._root.return_value = root / 'environments' / environment
+            runtime.environment_lock.return_value = nullcontext()
+            runtime.environment_jobs.return_value = []
+            runtime.reviews.serial_state.return_value = None
+            runtime._running_sender_active.return_value = 0
+            role = Mock()
+            runtime.client.containers.list.return_value = [role]
+            runtime._labels.side_effect = lambda _: {'vibebench.environment': environment, 'vibebench.role': 'account'}
+            executor = object.__new__(NodeExecution)
+            executor.node_key = node_key
+            executor.data = root
+            executor.database = database
+            executor._locked = Mock(return_value=nullcontext())
+            executor._inspection_row = Mock(return_value=row)
+            executor._runtime = Mock(return_value=runtime)
+            executor._check_execution_records = Mock()
+            executor._release_runtime = Mock()
+            request = NodeTransportInspection(node_key=node_key, account_id=1, environment_id=environment,
+                assignment_revision=2, version='2.1.293', transport_gateway_account=17, verify_stopped=True)
+            service = object.__new__(ClusterService)
+            assignment = {'phase': 'ready', 'enabled': True, 'kind': 'local'}
+            service.store = SimpleNamespace(assignment=lambda _: assignment, database=database)
+            runtime.node_key = node_key
+            role.labels = {'vibebench.environment': environment, 'vibebench.cluster-node': node_key}
+            role.attrs = {'State': {'Running': True, 'Pid': 123}}
+            with patch('cluster_execution.role_release', return_value='ci-104-1'):
+                with self.assertRaisesRegex(ValueError, '角色实际停止'):
+                    executor.inspect(request)
+                role.attrs = {'State': {'Running': False, 'Pid': 0}}
+                self.assertEqual(174, executor.inspect(request)['stopped']['generation'])
+                executor._check_execution_records.assert_called_with(runtime, row)
+            runtime.node_key = None
+            role.labels.pop('vibebench.cluster-node')
+            with patch('cluster_service.role_release', return_value='ci-104-1'):
+                self.assertTrue(service.tui_rollback_status(account, runtime, None, 174)['stopped'])
+                role.attrs = {'State': {'Running': False, 'Pid': 123}}
+                with self.assertRaisesRegex(ValueError, '角色实际停止'):
+                    service.tui_rollback_status(account, runtime, None, 174)
+
+    def test_private_transport_rollback_is_readonly_and_dispatches_claude_config(self) -> None:
+        """现有 Claude 运行配置可以省略平台字段，回切查询固定只读。@return 无。"""
+        from fastapi import HTTPException
+        from main import v3_transport
+
+        runtime = Mock()
+        runtime.gateway._request.return_value = {'account_id': 17, 'request_backend': 'tui_v2'}
+        service = Mock()
+        assignment = {'kind': 'ssh'}
+        service.store.assignment.return_value = assignment
+        service.existing_remote_transport.return_value = None
+        service.tui_rollback_status.return_value = {'stopped': True}
+        database = Mock()
+        account = {'id': 1, 'cc2api_account_id': 17}
+        database.execute.return_value.fetchall.return_value = [account]
+        with patch('main.account_runtime', runtime), patch('main.cluster_service', service), \
+                patch('main.V3_ENABLED', True), patch('main.get_db', return_value=database):
+            with self.assertRaises(HTTPException) as invalid:
+                v3_transport(17, tui_rollback_generation=168)
+            self.assertEqual(409, invalid.exception.status_code)
+            self.assertEqual({'stopped': True}, v3_transport(17, wake=False, tui_rollback_generation=168))
+        service.prepare_remote.assert_not_called()
+        service.tui_rollback_status.assert_called_once_with(account, runtime, None, 168)
 
     def test_readonly_original_remote_binding_survives_control_upgrade(self) -> None:
         """旧远端只对原轮查询开放，常规查询与后续代次保持原校验。@return 无。"""
