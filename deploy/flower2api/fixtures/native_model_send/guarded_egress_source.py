@@ -41,6 +41,7 @@ INSTALLED_PROBE = Path("/opt/flower/tui/fixture-installed-direct")
 PERMITS = Path("/tmp/flower-direct-permits.jsonl")
 TUNNELS = Path("/tmp/flower-direct-tunnels.jsonl")
 CANDIDATE_MODE = "candidate-response"
+STOCK_TOOLS = {"Read", "Glob"}
 MANAGED_BINDING_LOCK = Lock()
 managed_process = None
 launch_context = local()
@@ -72,8 +73,8 @@ def _stock_arguments(arguments, mod, options):
         return arguments
     body = json.loads(handle.raw)
     tools = [tool["name"] for tool in handle.tools]
-    if tools not in ([], ["Read"]):
-        raise ValueError("内置隔离候选只验证外部文本和 Read")
+    if not set(tools) <= STOCK_TOOLS:
+        raise ValueError("内置隔离候选只验证外部文本、Read 和 Glob")
     system = body["system"]
     # 账单字段与运行时身份由实际发送的 CLI 自己生成。余下的系统文本经官方文件参数交给同一 CLI。
     if system[0]["text"].startswith("x-anthropic-billing-header:"):
@@ -131,7 +132,7 @@ def _valid_attempt(actor, step, handle):
     mode = POLICY_MODE.read_text() if POLICY_MODE.is_file() else None
     probe_sse = handle and (mode == CANDIDATE_MODE or (not handle.tools and mode == "observe-sse"))
     return (step and step.native and handle and actor.process and not actor.dead.is_set()
-            and len(handle.tools) <= 1 and (not handle.stream or probe_sse) and actor.oauth_file
+            and (INSTALLED_PROBE.is_file() or len(handle.tools) <= 1) and (not handle.stream or probe_sse) and actor.oauth_file
             and handle.expires_at and handle.expires_at > time_ns() // 1_000_000
             and all(CONFIG["binding"][key] == handle.reservation[key]
                     for key in ("account_id", "environment_id", "generation")))
@@ -228,64 +229,93 @@ def _public_tool_name(actor, part):
     name = part["name"]
     if actor.cold_history is not None:
         return actor.cold_history.tools[name]["name"]
-    if not INSTALLED_PROBE.is_file() or name != "Read" or [tool["name"] for tool in actor.claim.tools] != ["Read"]:
+    if (not INSTALLED_PROBE.is_file() or name not in STOCK_TOOLS
+            or name not in {tool["name"] for tool in actor.claim.tools}):
         raise ValueError("工具不属于本次已声明的隔离调用")
     return name
 
 
 class _LiveProjection:
-    """按官方增量交付一个文本或工具块，沿原步骤发布最终帧。"""
+    """按官方增量交付文本和客户端工具组，沿原步骤发布最终帧。"""
 
-    def __init__(self, actor, chunk):
-        """从首个实收增量构造公开开场。@param actor 原会话。@param chunk 实际增量。@return 无。"""
+    def __init__(self, actor):
+        """构造同一实际步骤的公开开场。@param actor 原会话。@return 无。"""
         self.actor = actor
         self.step = actor.step
-        self.kind = chunk["kind"]
-        self.digest = sha256()
-        if self.kind == "tool":
-            self.source_index = chunk["index"]
-            block = {"type": "tool_use", "id": chunk["id"], "name": _public_tool_name(actor, chunk), "input": {}}
-        elif self.kind == "text":
-            block = {"type": "text", "text": ""}
-        else:
-            raise ValueError("流式内容缺少起始块")
+        self.next_index = 0
+        self.text_index = None
+        self.text_digest = sha256()
+        self.tools = {}
+        self.open_indices = set()
         self._emit({"type": "message_start", "message": {
             "id": "msg_" + uuid4().hex, "role": "assistant", "type": "message", "model": self.step.native_model,
             "content": [], "stop_reason": None, "stop_sequence": None,
             # 受支持的增量未给出供应商开场用量。终态用同一步实际累计值交付。
             "usage": {"input_tokens": 0, "output_tokens": 0},
         }})
-        self._emit({"type": "content_block_start", "index": 0, "content_block": block})
 
     def _emit(self, event):
         self.actor._observe(self.step, event)
         with self.actor.changed:
             self.actor._publish([_frame(event)])
 
+    def _start(self, block):
+        index = self.next_index
+        self.next_index += 1
+        self.open_indices.add(index)
+        self._emit({"type": "content_block_start", "index": index, "content_block": block})
+        return index
+
+    def _stop(self, index):
+        self._emit({"type": "content_block_stop", "index": index})
+        self.open_indices.remove(index)
+
     def add(self, chunk):
         """发布实际文本或工具参数分片。@param chunk 官方增量。@return 无。"""
-        if self.kind == "text" and chunk["kind"] == "text":
+        kind = chunk["kind"]
+        if kind == "tool":
+            if self.text_index is not None:
+                self._stop(self.text_index)
+                self.text_index = None
+            native_index = chunk["index"]
+            if native_index in self.tools:
+                raise ValueError("同一原生工具索引重复开始")
+            name = _public_tool_name(self.actor, chunk)
+            index = self._start({"type": "tool_use", "id": chunk["id"], "name": name, "input": {}})
+            self.tools[native_index] = (index, chunk["id"], sha256())
+            return
+        if kind == "text":
+            if self.text_index is None:
+                self.text_index = self._start({"type": "text", "text": ""})
+            index, digest = self.text_index, self.text_digest
             text = chunk["text"]
             delta = {"type": "text_delta", "text": text}
-        elif self.kind == "tool" and chunk["kind"] == "input" and chunk["index"] == self.source_index:
+        else:
+            # 官方工具分片带原生索引。多个工具同时打开时仍只更新各自的公开块。
+            index, _, digest = self.tools[chunk["index"]]
             text = chunk["json"]
             delta = {"type": "input_json_delta", "partial_json": text}
-        else:
-            raise ValueError("隔离直发当前步骤出现不同内容类型")
-        self.digest.update(text.encode())
-        self._emit({"type": "content_block_delta", "index": 0, "delta": delta})
+        digest.update(text.encode())
+        self._emit({"type": "content_block_delta", "index": index, "delta": delta})
 
     def finish(self, result):
         """确认交付内容及累计用量，再让原终态回调收口。@param result 官方步骤结果。@return 无。"""
-        if self.kind == "text" and result["reason"] == "end_turn":
-            complete = result["answer"]
-        elif self.kind == "tool" and result["reason"] == "tool_use":
-            complete = "".join(chunk["json"] for chunk in result["frames"] if chunk["kind"] == "input")
-        else:
+        if result["reason"] != ("tool_use" if self.tools else "end_turn"):
             raise ValueError("流式内容与同一步的结束原因不符")
-        if self.digest.digest() != sha256(complete.encode()).digest():
+        if self.text_digest.digest() != sha256(result["answer"].encode()).digest():
             raise ValueError("公开增量与官方步骤完整结果不符")
-        self._emit({"type": "content_block_stop", "index": 0})
+        completed_tools = {}
+        for part in result["frames"]:
+            if part["kind"] == "tool":
+                completed_tools[part["index"]] = (part["id"], sha256())
+            else:
+                completed_tools[part["index"]][1].update(part["json"].encode())
+        if {index: (identifier, digest.digest()) for index, (_, identifier, digest) in self.tools.items()} != {
+            index: (identifier, digest.digest()) for index, (identifier, digest) in completed_tools.items()
+        }:
+            raise ValueError("公开工具组与官方步骤完整结果不符")
+        for index in sorted(self.open_indices):
+            self._stop(index)
         self._emit({"type": "message_delta", "delta": {"stop_reason": result["reason"], "stop_sequence": None},
                     "usage": result["usage"]})
         terminal = {"type": "message_stop"}
@@ -301,13 +331,9 @@ def _direct_chunk(actor, data):
         if (not step or not handle or not step.claimed or step.stopped
                 or step.native != (data["turn"], data["step"])):
             raise ValueError("流式增量不属于当前模型步骤")
-        if not handle.stream:
-            return {}
     chunk = data["chunk"]
     if actor.direct_stream is None:
-        actor.direct_stream = _LiveProjection(actor, chunk)
-        if chunk["kind"] == "tool":
-            return {}
+        actor.direct_stream = _LiveProjection(actor)
     actor.direct_stream.add(chunk)
     return {}
 
@@ -364,7 +390,7 @@ def _project_http_rejection(actor, data):
 
 
 def callback(actor, path, data):
-    """使用受信 Mod 的完成态投影单文本或单工具的 JSON 答复。@return 原协议回执。"""
+    """将同一受信 Mod 步骤交给公开响应及原工具登记。@return 原协议回执。"""
     if path == "/direct-http-permit" and POLICY_MODE.is_file():
         return _authorize_http(actor, data)
     if path == "/direct-http-reply" and POLICY_MODE.is_file() and POLICY_MODE.read_text() == CANDIDATE_MODE:
@@ -383,6 +409,10 @@ def callback(actor, path, data):
                 raise ValueError("缺少同一文本模型步骤")
             actor.direct_result = data
         if data["reason"] == "tool_use":
+            if actor.direct_stream is not None:
+                actor.direct_stream.finish(data)
+                actor.direct_result = None
+                return {}
             frames = data["frames"]
             tool, *arguments = frames
             assert tool["kind"] == "tool" and all(part["kind"] == "input" and part["index"] == tool["index"]
@@ -390,10 +420,6 @@ def callback(actor, path, data):
             _public_tool_name(actor, tool)
             assert isinstance(json.loads("".join(part["json"] for part in arguments)), dict)
             report("native_mod_tool_result", tool_id=tool["id"], fragments=len(arguments), usage=data["usage"])
-            if actor.direct_stream is not None:
-                actor.direct_stream.finish(data)
-                actor.direct_result = None
-                return {}
             # 网关按原合同为对外消息生成新 ID。官方 Mod 在此处已有实际工具 ID 和参数分片。
             init = {"type": "message", "role": "assistant", "model": actor.step.native_model, "usage": data["usage"]}
             parts = [
