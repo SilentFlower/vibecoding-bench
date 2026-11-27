@@ -489,11 +489,12 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     suggestion = auxiliary_kind == "suggestion"
     auxiliary_reply = SUGGESTION_REPLY if suggestion else TITLE_REPLY
     auxiliary_text = SUGGESTION_REPLY if suggestion else TITLE_TEXT
-    slow_tool_arrivals = []
+    slow_model_arrivals = []
     slow_tool_prefix = Event()
     slow_tool_terminal = Event()
     retained_receipt = replay_unknown_receipt in ("live", "complete", "json-live", "json-complete")
     lost_receipt = recovery_slow_model or replay_unknown_receipt in ("lost-live", "lost")
+    trace_receipt_timing = retained_receipt or lost_receipt
     model_reply = {}
     closed_model_tunnels = {}
     gateway_reply_trace = temporary / "receipt-gateway.log"
@@ -550,6 +551,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             if trace_startup:
                 startup_event("model_http_headers", peer_port=self.client_address[1])
             raw = self.rfile.read(int(self.headers["Content-Length"]))
+            received_ns = monotonic_ns() if trace_receipt_timing else None
             body = json.loads(raw)
             model_digest = sha256(raw).hexdigest()
             if model_connection_contract:
@@ -568,6 +570,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 else:
                     is_auxiliary = body.get("output_config", {}).get("format") == sample["output_config"]["format"]
             (auxiliary_received if is_auxiliary else received).append((model_digest, body, self.connection.version()))
+            if received_ns is not None and not is_auxiliary:
+                slow_model_arrivals.append({"monotonic_ns": received_ns, "model_body_sha256": model_digest,
+                                            "has_tool_receipt": bool(find_blocks(body, "tool_use_id", NEW_ID))})
             if oauth_rotation:
                 generation = "initial" if bearer == "Bearer " + account_token else "rotated"
                 credential_observations.append({"credential": generation, "model_body_sha256": model_digest})
@@ -617,7 +622,6 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             paused_receipt = retained_receipt and results and len(received) == 2
             withheld_headers = lost_receipt and results and len(received) == 2
             if paused_receipt or withheld_headers:
-                slow_tool_arrivals.append(monotonic())
                 model_reply["peer_port"] = self.client_address[1]
             restart = any(b.get("text") == AFTER_RESTART for row in body["messages"] for b in blocks(row))
             paused_question = cancel_and_change_question and any(
@@ -1850,19 +1854,31 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             manage("PUT", "settings", {budget_key: "3"})
             started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
             phase = "recovered_receipt_slow_model" if recover_pending else "live_receipt_slow_model"
+            posts_before = len(slow_model_arrivals)
             try:
                 status, raw, request_id = checked_messages(
                     manage, token, follow, headers, received, phase, expected_status=502,
                     trace_startup=trace_startup, sender_status=sender_state_after_failure,
                 )
-                returned = monotonic()
-                arrival, = slow_tool_arrivals
-                assert request_id and arrival < returned and len(received) == 2
+                returned = monotonic_ns()
+                returned_at = datetime.now(timezone.utc)
+                # 在查询管理端前固定公开回包时的观测，迟到收件不能改写原时序。
+                observed = [item for item in slow_model_arrivals.copy() if item["monotonic_ns"] < returned]
+                tool_arrivals = [item for item in observed[posts_before:] if item["has_tool_receipt"]]
+                timing = {"public_return_monotonic_ns": returned, "model_posts_before": posts_before,
+                          "model_posts_at_return": len(observed), "model_arrivals": observed,
+                          "tool_receipts_before_return": len(tool_arrivals)}
+                startup_event("unknown_receipt_public_return", phase=phase, request_id=request_id,
+                              http_status=status, **timing)
+                evidence = report_request_diagnostics(
+                    manage, phase, request_id, headers["x-session-id"], started_at, failed_at=returned_at,
+                )
+                assert request_id and posts_before == 1 and len(observed) == 2 and len(tool_arrivals) == 1, (
+                    phase, request_id, status, timing,
+                )
+                (arrival,) = tool_arrivals
                 ((role, receipt),) = find_blocks(received[-1][1], "tool_use_id", NEW_ID)
                 assert role == "user" and REPLY in json.dumps(receipt, ensure_ascii=False)
-                evidence = report_request_diagnostics(
-                    manage, phase, request_id, headers["x-session-id"], started_at,
-                )
                 record, = evidence["requests"]
                 assert (record["status_code"], record["error_stage"], record["outcome"]) == (
                     status, "tui_send_http", "transport_error",
@@ -1883,7 +1899,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                     assert fixture_command_has(Path(f"/proc/{original}/cmdline"), marker)
                     assert original_file.read_bytes().startswith(original_history)
                 verify_model(received, policy="append", old_content=old_result, current_text_blocks=current_text_blocks)
-                proof = {"http_status": status, "model_received_before_public_return_ms": round((returned - arrival) * 1000),
+                proof = {"http_status": status, **timing,
+                         "model_received_before_public_return_ms": round((returned - arrival["monotonic_ns"]) / 1e6),
                          "model_posts": len(received), "client_tool_calls": len(callbacks), "old_tool_calls": 0,
                          "public_stream": follow["stream"],
                          "request_id": request_id, "reservation_id": reservation, "outcome": record["outcome"],
