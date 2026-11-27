@@ -95,7 +95,7 @@ def install(version, digest, mode, authority):
     @param mode 实验场景。@param authority 实验授权方式。@return 无。
     """
     # 仅替换此容器的实验版本与摘要。启动器仍校验原版文件及工作区归属。
-    guarded.install()
+    guarded.install(debug_file="core-http.log")
     root = Path("/opt/flower/tui")
     launcher = root / "tui_sender_launch.py"
     code, count = subn(r'^VERSION = "[0-9.]+"$', f'VERSION = "{version}"', launcher.read_text(), flags=MULTILINE)
@@ -103,13 +103,6 @@ def install(version, digest, mode, authority):
     code, count = subn(r'^PROGRAM_SHA256 = "[0-9a-f]+"$', f'PROGRAM_SHA256 = "{digest}"', code, flags=MULTILINE)
     assert count == 1
     launcher.write_text(code)
-    source = root / "tui_source.py"
-    launch = "    return ORIGINAL_LAUNCH(*args, environment=settings, **options)"
-    body = source.read_text()
-    assert body.count(launch) == 1
-    source.write_text(body.replace(launch, """
-    options["arguments"] = [*options["arguments"], "--debug-file", str(config_dir / "core-http.log")]
-""" + launch))
     hook = JS.replace("__DENY__", json.dumps(mode == "deny"))
     if authority == "managed" and mode == "error":
         hook += FAILURE_HOOK

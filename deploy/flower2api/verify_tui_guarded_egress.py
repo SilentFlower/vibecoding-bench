@@ -25,8 +25,11 @@ from tui_message_json import MessageJSON
 from tui_messages import BODY_LIMIT, wire_events
 
 
-def install(*, observe_failure=False):
-    """在一次性容器安装直发试接。@param observe_failure 是否读取官方失败事件。@return 无。"""
+def install(*, observe_failure=False, debug_file=None):
+    """在一次性容器安装直发试接。
+    @param observe_failure 是否读取官方失败事件。
+    @param debug_file 测试工作区的官方调试日志名。@return 无。
+    """
     if not Path("/.dockerenv").is_file() or {name for _, name in if_nameindex()} != {"lo"}:
         raise RuntimeError("直发试接只允许在仅回环的验收容器运行")
     root = Path("/opt/flower/tui")
@@ -56,12 +59,13 @@ def install(*, observe_failure=False):
     return next(e)
   })
 """)
+        debug_file = "stop-failure.log"
+    if debug_file is not None:
         runtime = source.read_text()
-        launch = "    return ORIGINAL_LAUNCH(*args, environment=settings, **options)"
+        launch = '\n    settings = {**environment,'
         assert runtime.count(launch) == 1
-        source.write_text(runtime.replace(launch, """
-    options["arguments"] = [*options["arguments"], "--debug-file", str(config_dir / "stop-failure.log")]
-""" + launch))
+        debug = f'\n    options["arguments"] = [*options["arguments"], "--debug-file", str(config_dir / {debug_file!r})]'
+        source.write_text(runtime.replace(launch, debug + launch))
     mod.write_text(adjusted)
 
 
@@ -163,7 +167,7 @@ def _reconnect_receipt(manage, token, headers, follow, first, received, post, ta
 
 
 def check(manage, token, identifier, received, sender_status, restart, *, source_observer, mode, receipt_status=200,
-          public_stream=False, receipt_tail=None):
+          public_stream=False, receipt_tail=None, before_receipt=None):
     """通过公开网关核对真实工具。@param public_stream 是否读取公开 SSE。@return 公开回执和模型实收。"""
     assert not source_observer and not restart
     headers = {"x-session-id": str(uuid4()), "User-Agent": "flower2api-direct-guarded-lab/1"}
@@ -218,6 +222,8 @@ def check(manage, token, identifier, received, sender_status, restart, *, source
         tool_executions.append(call["id"])
         follow = {**body, "messages": [*body["messages"], {"role": "assistant", "content": tool_reply["content"]},
                                       {"role": "user", "content": [result]}]}
+        if before_receipt is not None:
+            before_receipt()
         if receipt_tail is not None:
             answer, request = _reconnect_receipt(manage, token, headers, follow, first, received, post, receipt_tail)
         else:

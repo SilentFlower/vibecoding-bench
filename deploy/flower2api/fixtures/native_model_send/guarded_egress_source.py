@@ -12,6 +12,7 @@ from select import select
 from socket import if_nameindex
 import ssl
 import sys
+from threading import Lock
 from time import monotonic, monotonic_ns, sleep, time_ns
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -20,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import frozen_tui_source as source
 import tui_sender_launch as launcher
 import tui_session as session
+from runtime_files import atomic_text
 
 if not Path("/.dockerenv").is_file() or {name for _, name in if_nameindex()} != {"lo"}:
     raise RuntimeError("直发试接只允许在仅回环的验收容器运行")
@@ -35,6 +37,8 @@ POLICY_MODE = Path("/opt/flower/tui/fixture-direct-permit")
 PERMITS = Path("/tmp/flower-direct-permits.jsonl")
 TUNNELS = Path("/tmp/flower-direct-tunnels.jsonl")
 CANDIDATE_MODE = "candidate-response"
+MANAGED_BINDING_LOCK = Lock()
+managed_process = None
 
 
 def report(stage, **data):
@@ -53,18 +57,23 @@ def launch(*args, environment, **options):
                 "HTTPS_PROXY": f"http://127.0.0.1:{context.port}", "NODE_EXTRA_CA_CERTS": str(ca),
                 "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", "DISABLE_AUTOUPDATER": "1",
                 "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "0"}
+    global managed_process
     if POLICY_MODE.is_file():
         arguments = options["arguments"]
         mod = Path(arguments[arguments.index("--plugin-dir") + 1])
-        # 一次性容器仅接入一个原生 actor。受管 Mod 使用此 actor 自己的回环回调授权。
         managed = Path("/opt/flower-http-test/flower-http-policy/hooks/runtime/binding.js")
-        try:
-            with managed.open("x") as listener:
-                listener.write((mod / "hooks/binding.js").read_text())
-        except OSError as error:
-            report("direct_permit_launch_failed", error=type(error).__name__, errno=error.errno,
-                   uid=getuid(), gid=getgid())
-            raise
+        with MANAGED_BINDING_LOCK:
+            # 隔离受管 Mod 同时只为一个 CLI 授权。进程退出后恢复轮才可发布自己的回环绑定。
+            if managed_process is not None and managed_process.poll() is None:
+                raise RuntimeError("隔离受管绑定仍归活跃 CLI")
+            try:
+                atomic_text(managed, (mod / "hooks/binding.js").read_text())
+            except OSError as error:
+                report("direct_permit_launch_failed", error=type(error).__name__, errno=error.errno,
+                       uid=getuid(), gid=getgid())
+                raise
+            managed_process = ORIGINAL_LAUNCH(*args, environment=settings, **options)
+            return managed_process
     return ORIGINAL_LAUNCH(*args, environment=settings, **options)
 
 
