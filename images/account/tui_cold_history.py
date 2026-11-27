@@ -193,13 +193,13 @@ def _automatic_tools(choice):
             and choice.get("disable_parallel_tool_use", False) is False)
 
 
-def alternate_auto_tool_choice(choice):
-    """切换允许并行的显式 auto 形状。@param choice 原始 tool_choice。@return 等价形状或空。"""
-    if _automatic_tools(choice):
-        if "disable_parallel_tool_use" in choice:
-            return {"type": "auto"}
-        return {"type": "auto", "disable_parallel_tool_use": False}
-    return None
+def equivalent_auto_tool_choices(choice):
+    """列出普通工具自动选择的等价形状。@param choice 工具选项，空表示省略。
+    @return 先列显式 auto，再列其它等价形状。
+    """
+    if choice is None or _automatic_tools(choice):
+        return ({"type": "auto"}, {"type": "auto", "disable_parallel_tool_use": False}, None)
+    return ()
 
 
 def _signed_thinking(block):
@@ -480,7 +480,7 @@ class ColdHistory:
 
     def matches_tool_choice(self, native):
         """核对显式工具选择及并行许可。@param native CLI 已生成的请求。@return 是否维持原选择。"""
-        if self.tool_choice is None:
+        if self.tool_choice is None and not self.tools:
             return True
         if self.tool_choice == {"type": "none"}:
             # Messages 无工具时缺省选择为 none，须一并核对 CLI 没有添加任何工具。
@@ -493,8 +493,10 @@ class ColdHistory:
         """核对同一工具轮的根输入。@param plan 客户端回传的根轮计划。@return 是否匹配原轮。"""
         if self == plan:
             return True
-        alternate = alternate_auto_tool_choice(self.tool_choice)
-        return alternate is not None and replace(self, tool_choice=alternate) == plan
+        return bool(self.tools) and any(
+            replace(self, tool_choice=choice) == plan
+            for choice in equivalent_auto_tool_choices(self.tool_choice)
+        )
 
     def receipt_boundary(self):
         """冻结必须随原工具回执复用的根轮输入。@return 不含客户原文的边界。"""
@@ -524,11 +526,13 @@ class ColdHistory:
             if plan.receipt_boundary() == boundary:
                 return plan
             # 旧修订以原字段形状写入摘要。匹配后继续沿用原修订的计划和归档范围。
-            alternate = alternate_auto_tool_choice(plan.tool_choice)
-            if alternate is not None:
-                original = replace(plan, tool_choice=alternate)
-                if original.receipt_boundary() == boundary:
-                    return original
+            if plan.tools:
+                for choice in equivalent_auto_tool_choices(plan.tool_choice):
+                    if choice == plan.tool_choice:
+                        continue
+                    original = replace(plan, tool_choice=choice)
+                    if original.receipt_boundary() == boundary:
+                        return original
         return None
 
     def resume_receipts(self, messages, *, signed_tool_models=None):

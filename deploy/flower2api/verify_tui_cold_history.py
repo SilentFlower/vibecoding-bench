@@ -323,7 +323,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            v1_runtime=None,
            parallel_tools=False, reconnect_tool_stream=False, interrupted_tool_stream=None,
            current_images=False, current_image_ending="text",
-           auto_tool_choice=None, auto_tool_direct_text=False, prior_auto_source=None,
+           auto_tool_choice=None, receipt_auto_tool_choice=None, auto_tool_direct_text=False, prior_auto_source=None,
            adaptive_thinking_model=None, adaptive_thinking_display="updates", thinking_display_model=None,
            fixed_thinking_model=None, fixed_thinking_display="updates",
            thinking_cli_summaries=None,
@@ -382,6 +382,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param current_images 是否用本轮原生图文替换纯文本问题。
     @param current_image_ending 本轮九块图文以文字或图片结尾。
     @param auto_tool_choice 原请求中自动选择的字段形状。
+    @param receipt_auto_tool_choice 合法回执的等价字段形状。
     @param prior_auto_source 写入原工具回执摘要的旧账号事件源检出。
     @param auto_tool_direct_text 是否让模型在有工具声明时直接返回文本。
     @param adaptive_thinking_model 可选，核对显式 adaptive 的固定模型。
@@ -1143,9 +1144,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         body = {"model": MODEL, "max_tokens": 128, "stream": True, "messages": messages,
                 "tools": declared, "system": [{"type": "text", "text": part} for part in SYSTEM]}
         if auto_tool_choice or auto_tool_direct_text:
-            body["tool_choice"] = {"type": "auto"}
-            if auto_tool_choice == "explicit-false":
-                body["tool_choice"]["disable_parallel_tool_use"] = False
+            body = with_auto_tool_choice(body, auto_tool_choice or "bare")
         if adaptive_thinking_model:
             body["model"] = adaptive_thinking_model
             if adaptive_thinking_display != "default":
@@ -1183,7 +1182,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             (attempt,) = verify_captures(manage, received, account_token)
             assert attempt["request_id"] == initial_request_id and attempt["diagnostic_body_source"] == "interactive_cli"
             assert attempt["ingress_body_sha256"] == sha256(encoded(body)).hexdigest()
-            return {"http_status": initial_status, "input_tool_choice": body["tool_choice"],
+            return {"http_status": initial_status, "input_tool_choice": body.get("tool_choice"),
                     "model_tools": names, "model_tool_choice_present": "tool_choice" in model_request,
                     "model_posts": len(received),
                     "public_content_types": starts, "stop_reason": stop_reason, "client_tool_calls": callbacks,
@@ -1287,6 +1286,10 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 assert signed_tool_models == expected_models, signed_tool_models
         follow = {**body, "stream": reconnect_tool_stream or slow_tool_stream or interrupted_tool_stream is not None,
                   "messages": [*messages, {"role": "assistant", "content": offered}, result]}
+        if auto_tool_choice:
+            other_auto = receipt_auto_tool_choice or ("explicit-false" if auto_tool_choice == "bare" else "bare")
+            if prior_auto_source is None:
+                follow = with_auto_tool_choice(follow, other_auto)
         if auxiliary_mode:
             auxiliary_proof = verify_pending_auxiliary(
                 manage, token, headers, received, auxiliary_received, temporary / "gateway.db",
@@ -1412,27 +1415,21 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             assert manage("GET", "request-diagnostics/" + empty_history_request_id)["attempts"] == []
         if auto_tool_choice:
             # 合法回执切换等价形状。实际选择、工具声明和回执内容仍随原轮核验。
-            other_auto = {"type": "auto"}
-            if auto_tool_choice == "bare":
-                other_auto["disable_parallel_tool_use"] = False
             changed_choices = {}
             for label, choice in (
                 ("none", {"type": "none"}),
                 ("parallel_disabled", {"type": "auto", "disable_parallel_tool_use": True}),
                 ("named", {"type": "tool", "name": TOOL["name"]}),
-                ("omitted_choice", None),
+                ("any", {"type": "any"}),
             ):
                 changed = {**follow, "tool_choice": choice}
-                if choice is None:
-                    changed.pop("tool_choice")
-                rejected, raw, _ = checked_messages(
+                rejected, raw, rejected_id = checked_messages(
                     manage, token, changed, headers, received, "changed_tool_choice_" + label,
                     expected_status=422, trace_startup=trace_startup,
                 )
                 assert len(received) == 1, (label, raw, len(received))
+                assert not manage("GET", "request-diagnostics/" + rejected_id)["attempts"]
                 changed_choices[label] = rejected
-            if prior_auto_source is None:
-                follow["tool_choice"] = other_auto
         if explicit_custom_tool_type:
             changed_tools = deepcopy(declared)
             changed_tools[0].pop("type")
@@ -1503,7 +1500,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             assert changed_signature == 422 and len(received) == 1, (changed_signature, response, len(received))
             changed_signature_body = response
         if interrupted_tool_stream:
-            retry = {**follow, "tool_choice": other_auto} if prior_auto_source is not None else follow
+            retry = with_auto_tool_choice(follow, other_auto) if prior_auto_source is not None else follow
             try:
                 proof = verify_interrupted_tool_stream(
                     manage, temporary, token, headers, follow, received, callbacks,
@@ -1516,8 +1513,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             if prior_auto_source is not None:
                 assert prior_auto_checkpoint is not None
                 model_tools = [verify_automatic_model_tools(native, declared) for _, native, _ in received]
-                proof.update(prior_auto_checkpoint=prior_auto_checkpoint, first_receipt_tool_choice=follow["tool_choice"],
-                             retry_tool_choice=retry["tool_choice"], tool_choice_rejections=changed_choices,
+                proof.update(prior_auto_checkpoint=prior_auto_checkpoint, first_receipt_tool_choice=follow.get("tool_choice"),
+                             retry_tool_choice=retry.get("tool_choice"), tool_choice_rejections=changed_choices,
                              retry_receipt_body_sha256=sha256(encoded(retry)).hexdigest(), model_tools=model_tools)
             return proof
         if reconnect_tool_stream or slow_tool_stream:
@@ -1528,14 +1525,14 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                         continue_tool_stream, finish_stream, slow_stream_finished, initial_request_id, sender_state_after_failure,
                     )
                 else:
-                    replay = {**follow, "tool_choice": body["tool_choice"]} if auto_tool_choice else follow
+                    replay = with_auto_tool_choice(follow, auto_tool_choice) if auto_tool_choice else follow
                     proof = verify_tool_stream_reconnect(manage, temporary, token, account_token, headers, follow,
                                                          received, continue_tool_stream, finish_stream, callbacks,
                                                          replay=replay)
                     if auto_tool_choice:
                         model_tools = [verify_automatic_model_tools(native, declared) for _, native, _ in received]
-                        proof.update(input_tool_choice=body["tool_choice"], receipt_tool_choice=follow["tool_choice"],
-                                     replay_tool_choice=replay["tool_choice"], tool_choice_rejections=changed_choices,
+                        proof.update(input_tool_choice=body.get("tool_choice"), receipt_tool_choice=follow.get("tool_choice"),
+                                     replay_tool_choice=replay.get("tool_choice"), tool_choice_rejections=changed_choices,
                                      model_tools=model_tools)
             finally:
                 continue_tool_stream.set()
@@ -1740,7 +1737,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             verify_client_thinking_reply(raw, False, body["model"], SIGNED_THINKING["thinking"])
         else:
             assert final["content"] == [{"type": "text", "text": FINAL}]
-        duplicate_body = {**follow, "tool_choice": body["tool_choice"]} if auto_tool_choice else follow
+        duplicate_body = with_auto_tool_choice(follow, auto_tool_choice) if auto_tool_choice else follow
         duplicate, _ = call(18090, "POST", "/v1/messages", token, duplicate_body, headers)
         assert duplicate == 400 and len(received) == 2, (duplicate, len(received))
         assert callbacks == expected_ids
@@ -2038,7 +2035,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             model_tools = [verify_automatic_model_tools(native, declared) for _, native, _ in received]
             assert all(attempt["diagnostic_body_source"] == "interactive_cli" for attempt in captures), captures
             proof.update(auto_tool_choice=[native.get("tool_choice") for _, native, _ in received],
-                         input_tool_choice=body["tool_choice"], receipt_tool_choice=follow["tool_choice"],
+                         input_tool_choice=body.get("tool_choice"), receipt_tool_choice=follow.get("tool_choice"),
                          model_tools=model_tools,
                          model_tool_choice_present=["tool_choice" in native for _, native, _ in received],
                          changed_tool_choice_status=changed_choices["none"], tool_choice_rejections=changed_choices)
@@ -4922,6 +4919,18 @@ def find_blocks(body, key, identifier):
     return [(row["role"], b) for row in body["messages"] for b in blocks(row) if b.get(key) == identifier]
 
 
+def with_auto_tool_choice(body, shape):
+    """按指定形状传入默认工具选择。@param body 原始请求。@param shape 字段形状。@return 调整后的请求。"""
+    result = dict(body)
+    if shape == "omitted":
+        result.pop("tool_choice", None)
+    else:
+        result["tool_choice"] = {"type": "auto"}
+        if shape == "explicit-false":
+            result["tool_choice"]["disable_parallel_tool_use"] = False
+    return result
+
+
 def verify_automatic_model_tools(model_request, declared):
     """核对固定 CLI 的默认工具选择及完整工具声明。
     @param model_request 隔离模型实收正文。@param declared 公开工具声明。@return 实收工具名。
@@ -5057,10 +5066,13 @@ def main():
     system_roles.add_argument("--message-system-roles", dest="message_system_roles", action="store_const", const="observe")
     system_roles.add_argument("--ordinary-message-system-contract", dest="message_system_roles", action="store_const",
                               const="ordinary-contract")
-    parser.add_argument("--auto-tool-choice", nargs="?", const="explicit-false", choices=("bare", "explicit-false"),
-                        help="核对两种等价 auto 回执及原工具组边界")
+    auto_shapes = ("omitted", "bare", "explicit-false")
+    parser.add_argument("--auto-tool-choice", nargs="?", const="explicit-false", choices=auto_shapes,
+                        help="使用选定的普通 auto 入口并核对等价回执")
+    parser.add_argument("--receipt-auto-tool-choice", choices=auto_shapes,
+                        help="选择合法回执的等价 auto 字段形状")
     parser.add_argument("--prior-auto-source", type=Path,
-                        help="从旧账号源码实际认领的显式 false 回执恢复，并改用等价的 bare auto")
+                        help="从旧账号事件源实际认领的回执摘要恢复")
     parser.add_argument("--adaptive-thinking-model", choices=(MODEL, "claude-opus-5-5"))
     parser.add_argument("--fixed-thinking-model", choices=(MODEL, "claude-opus-4-6"))
     parser.add_argument("--fixed-thinking-display", choices=("updates", "summarized"), default="updates")
@@ -5132,10 +5144,13 @@ def main():
     scenario.add_argument("--failure-boundaries", action="store_true")
     scenario.add_argument("--v1-runtime", type=Path)
     args = parser.parse_args()
+    if args.receipt_auto_tool_choice is not None and (
+            args.auto_tool_choice is None or args.auto_tool_choice == args.receipt_auto_tool_choice):
+        parser.error("--receipt-auto-tool-choice 需要不同形状的 --auto-tool-choice")
     if args.prior_auto_source is not None and (
-            args.interrupted_tool_stream != "before-tool" or args.auto_tool_choice != "explicit-false"
+            args.interrupted_tool_stream != "before-tool" or args.auto_tool_choice is None
             or args.recover_pending_tool or args.installed_runtime):
-        parser.error("--prior-auto-source 需要 --interrupted-tool-stream before-tool 与 --auto-tool-choice explicit-false")
+        parser.error("--prior-auto-source 需要 --interrupted-tool-stream before-tool 与 --auto-tool-choice")
     if args.installed_runtime and (args.structured_output_contract not in ("live", "restart")
                                    or args.sender != Path("/usr/local/bin/account-sender")):
         parser.error("--installed-runtime 需要结构化工具轮和镜像内置 account-sender")
@@ -5245,7 +5260,7 @@ def main():
                        current_images=args.current_images,
                        cancel_and_change_question=args.cancel_and_change_question,
                        current_image_ending=args.current_image_ending,
-                       auto_tool_choice=args.auto_tool_choice,
+                       auto_tool_choice=args.auto_tool_choice, receipt_auto_tool_choice=args.receipt_auto_tool_choice,
                        prior_auto_source=args.prior_auto_source,
                        auto_tool_direct_text=args.auto_tool_direct_text,
                        adaptive_thinking_model=args.adaptive_thinking_model,

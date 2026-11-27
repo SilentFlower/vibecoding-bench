@@ -84,16 +84,15 @@ pub(super) fn key(
             .get("tools")
             .and_then(Value::as_array)
             .is_some_and(|v| !v.is_empty())
-        && fields.get("tool_choice")
-            == Some(&json!({"type": "auto", "disable_parallel_tool_use": false}))
+        && fields.get("tool_choice").is_some_and(|choice| {
+            *choice == json!({"type": "auto"})
+                || *choice == json!({"type": "auto", "disable_parallel_tool_use": false})
+        })
     {
-        // 这两个形状的普通回执共用同一份公开回复。保留正文与其它参数的完整比较。
-        let bare = json!({"type": "auto"});
+        // 有工具的普通请求省略选择时默认 auto。只从响应索引中略过该选项，出站仍使用原正文。
         hash_json_object(
             &mut hash,
-            fields
-                .iter()
-                .map(|(key, value)| (key, if key == "tool_choice" { &bare } else { value })),
+            fields.iter().filter(|(key, _)| *key != "tool_choice"),
             false,
         );
     } else {
@@ -644,7 +643,7 @@ mod tests {
 
     use super::{GRACE, Reconnects, Reservation, key};
 
-    /// 只合并声明工具的普通回执两种显式 auto 形状。
+    /// 只合并声明工具的普通回执的三种默认 auto 形状。
     #[test]
     fn ordinary_auto_receipt_reconnect_identity() {
         let headers = HeaderMap::new();
@@ -663,30 +662,47 @@ mod tests {
         let bare = json!({"tools": [{"name": "LookupNote"}], "tool_choice": {"type": "auto"}, "stream": true});
         let mut explicit = bare.clone();
         explicit["tool_choice"]["disable_parallel_tool_use"] = json!(false);
-        let original = reconnect(1, "same-session", &bare, false);
+        let mut omitted = bare.clone();
+        omitted.as_object_mut().unwrap().remove("tool_choice");
+        let original = reconnect(1, "same-session", &omitted, false);
+        assert_eq!(original, reconnect(1, "same-session", &bare, false));
         assert_eq!(original, reconnect(1, "same-session", &explicit, false));
         assert_ne!(original, reconnect(2, "same-session", &explicit, false));
         assert_ne!(original, reconnect(1, "other-session", &explicit, false));
+        let index = Reconnects::default();
+        let _writer = index.reserve(original, 1, "binding").unwrap();
+        let equivalent = reconnect(1, "same-session", &explicit, false);
+        assert!(index.reserve(equivalent, 2, "binding").is_err());
+        assert!(index.reserve(equivalent, 1, "different-binding").is_err());
         assert_ne!(
-            reconnect(1, "same-session", &bare, true),
+            reconnect(1, "same-session", &omitted, true),
             reconnect(1, "same-session", &explicit, true)
         );
-        let mut billed_bare = bare.clone();
+        let mut billed_omitted = omitted.clone();
         let mut billed_explicit = explicit.clone();
         let billing = json!([{"type": "text", "text": "x-anthropic-billing-header: cc_version=2.1.293.abc; cc_entrypoint=cli;"}]);
-        billed_bare["system"] = billing.clone();
+        billed_omitted["system"] = billing.clone();
         billed_explicit["system"] = billing;
         assert_ne!(
-            reconnect(1, "same-session", &billed_bare, false),
+            reconnect(1, "same-session", &billed_omitted, false),
             reconnect(1, "same-session", &billed_explicit, false)
         );
         for changed in [json!(true), json!(0), json!(null)] {
             explicit["tool_choice"]["disable_parallel_tool_use"] = changed;
             assert_ne!(original, reconnect(1, "same-session", &explicit, false));
         }
+        explicit["tool_choice"] = json!(null);
+        assert_ne!(original, reconnect(1, "same-session", &explicit, false));
         explicit["tool_choice"] = json!({"type": "auto", "disable_parallel_tool_use": false});
         explicit["stream"] = json!(false);
         assert_ne!(original, reconnect(1, "same-session", &explicit, false));
+        let no_tools = json!({"tools": [], "stream": true});
+        let mut no_tools_auto = no_tools.clone();
+        no_tools_auto["tool_choice"] = json!({"type": "auto"});
+        assert_ne!(
+            reconnect(1, "same-session", &no_tools, false),
+            reconnect(1, "same-session", &no_tools_auto, false)
+        );
     }
 
     /// 拒绝超预算的重连后，原空闲截止时间和观察通知均保持一致。

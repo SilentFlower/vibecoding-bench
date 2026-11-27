@@ -924,23 +924,18 @@ class ColdHistoryTests(TestCase):
     def test_explicit_auto_tool_choice_preserves_parallel_permission(self):
         """自动选择进入原生合同并随原工具组冻结。@return 无。"""
         choice = {"type": "auto", "disable_parallel_tool_use": False}
-        plan = ColdHistory.from_request({**self.body, "tool_choice": choice})
-        native = {"tools": list(plan.tools.values())}
-        self.assertTrue(plan.matches_tool_choice(native))
-        self.assertTrue(plan.matches_tool_choice({**native, "tool_choice": choice}))
-        self.assertFalse(plan.matches_tool_choice({"tools": []}))
-        self.assertNotEqual(plan.receipt_boundary(), ColdHistory.from_request(self.body).receipt_boundary())
-        bare_body = {**self.body, "tool_choice": {"type": "auto"}}
-        bare = ColdHistory.from_request(bare_body)
-        self.assertNotEqual(bare.receipt_boundary(), plan.receipt_boundary())
-        self.assertTrue(plan.matches_receipt_plan(bare))
-        self.assertTrue(bare.matches_receipt_plan(plan))
-        self.assertFalse(plan.matches_receipt_plan(ColdHistory.from_request(self.body)))
-        self.assertEqual(ColdHistory.from_receipt_boundary(bare_body, plan.receipt_boundary()), plan)
-        self.assertEqual(
-            ColdHistory.from_receipt_boundary({**self.body, "tool_choice": choice}, bare.receipt_boundary()), bare,
-        )
-        self.assertIsNone(ColdHistory.from_receipt_boundary(self.body, plan.receipt_boundary()))
+        bodies = (self.body, {**self.body, "tool_choice": {"type": "auto"}}, {**self.body, "tool_choice": choice})
+        plans = [ColdHistory.from_request(body) for body in bodies]
+        self.assertEqual(len({plan.receipt_boundary()["digest"] for plan in plans}), 3)
+        for original in plans:
+            native = {"tools": list(original.tools.values())}
+            self.assertTrue(original.matches_tool_choice(native))
+            self.assertTrue(original.matches_tool_choice({**native, "tool_choice": choice}))
+            self.assertFalse(original.matches_tool_choice({"tools": []}))
+            for body, current in zip(bodies, plans, strict=True):
+                self.assertTrue(original.matches_receipt_plan(current))
+                self.assertEqual(ColdHistory.from_receipt_boundary(body, original.receipt_boundary()), original)
+        plan = plans[0]
         for other in ({"type": "none"}, {"type": "tool", "name": "LookupNote"},
                       {**choice, "disable_parallel_tool_use": True}, {**choice, "disable_parallel_tool_use": 0}):
             with self.subTest(other=other):

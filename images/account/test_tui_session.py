@@ -49,30 +49,31 @@ class SessionTests(unittest.TestCase):
         self.assertNotEqual(_receipt_request(body, changed, cache_ttl="off"), _receipt_request(body, default))
 
     def test_equivalent_auto_receipt_uses_original_claimed_digest(self):
-        """两种显式 auto 与旧认领摘要可接续，保留其余请求的比较。@return 无。"""
-        body = {**self._body(), "tools": [{"name": "LookupNote"}], "tool_choice": {"type": "auto"}}
-        explicit = {**body, "tool_choice": {"type": "auto", "disable_parallel_tool_use": False}}
+        """三种 auto 表示接续旧认领摘要，保留其它字段比较。@return 无。"""
+        omitted = {**self._body(), "tools": [{"name": "LookupNote"}]}
+        bare = {**omitted, "tool_choice": {"type": "auto"}}
+        explicit = {**omitted, "tool_choice": {"type": "auto", "disable_parallel_tool_use": False}}
         identity = self._identity("auto-choice")
-        stored = digest([explicit, {}, None, None])
-        current = _receipt_request(body, identity)
-        self.assertEqual(_receipt_request(explicit, identity), current)
-        self.assertEqual(_receipt_request(body, identity, previous=stored), stored)
-        self.assertEqual(_receipt_request(explicit, identity, previous=current), current)
-        for changed in ({**body, "stream": False}, {**body, "tools": []},
-                        {**body, "tool_choice": {"type": "auto", "disable_parallel_tool_use": 0}},
-                        {**body, "tool_choice": {"type": "auto", "disable_parallel_tool_use": True}}):
+        shapes = (omitted, bare, explicit)
+        stored = [digest([body, {}, None, None]) for body in shapes]
+        for body in shapes:
+            self.assertEqual(_receipt_request(body, identity), stored[1])
+            for previous in stored:
+                self.assertEqual(_receipt_request(body, identity, previous=previous), previous)
+        for changed in ({**omitted, "stream": False}, {**omitted, "tools": []}, {**omitted, "tool_choice": None},
+                        {**omitted, "tool_choice": {"type": "auto", "disable_parallel_tool_use": 0}},
+                        {**omitted, "tool_choice": {"type": "auto", "disable_parallel_tool_use": True}}):
             with self.subTest(changed=changed):
-                new = _receipt_request(changed, identity, previous=stored)
-                self.assertNotIn(new, (current, stored))
+                self.assertNotIn(_receipt_request(changed, identity, previous=stored[0]), stored)
         with TemporaryDirectory() as directory:
             key = ("auto-choice", "session-1")
             with closing(ReceiptCheckpoints(directory)) as checkpoints:
                 revision = checkpoints.offer(key, "session-1", "history", [], 60)
-                self.assertTrue(checkpoints.submit(key, revision, stored, recovered=False))
+                self.assertTrue(checkpoints.submit(key, revision, stored[0], recovered=False))
             with closing(ReceiptCheckpoints(directory)) as checkpoints:
                 previous = checkpoints.find(key)[3]
                 self.assertTrue(checkpoints.submit(
-                    key, revision, _receipt_request(body, identity, previous=previous), recovered=True,
+                    key, revision, _receipt_request(explicit, identity, previous=previous), recovered=True,
                 ))
 
     def test_protocol_headers_use_current_sdk_and_reject_unsupported_beta(self):

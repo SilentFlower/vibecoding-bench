@@ -29,7 +29,7 @@ from uuid import UUID, uuid4
 from runtime_files import atomic_text
 from tui_capacity import TuiCapacity, TuiCapacityError
 from tui_cold_history import (
-    ColdHistory, MCP_SERVER, SIGNED_THINKING_TYPES, alternate_auto_tool_choice, tool_result_has_cache_marker,
+    ColdHistory, MCP_SERVER, SIGNED_THINKING_TYPES, equivalent_auto_tool_choices, tool_result_has_cache_marker,
     tool_result_has_images, tool_result_has_text_blocks, tool_result_is_empty,
 )
 from tui_reconnect import ReceiptCheckpoints, digest
@@ -1213,16 +1213,24 @@ def _receipt_request(body, reservation, *, cache_ttl=None, previous=None):
             policy = None
     input_format = reservation.get("input_format")
     scope = (dict(reservation.get("model_headers") or {}), policy, input_format)
-    choice = body.get("tool_choice")
-    alternate = alternate_auto_tool_choice(choice)
+    choice = body.get("tool_choice", {"type": "auto"})
     tools = body.get("tools")
-    if alternate is None or not isinstance(tools, list) or not tools or native_input(body, input_format):
+    equivalents = equivalent_auto_tool_choices(choice) if choice is not None else ()
+    if not equivalents or not isinstance(tools, list) or not tools or native_input(body, input_format):
         return digest([body, *scope])
-    bare, explicit = (alternate, choice) if "disable_parallel_tool_use" in choice else (choice, alternate)
-    # 旧库可能已认领显式 false 的摘要。相同回执复用该摘要，保留数据库的条件写入。
-    if previous is not None and digest([{**body, "tool_choice": explicit}, *scope]) == previous:
-        return previous
-    return digest([{**body, "tool_choice": bare}, *scope])
+    canonical, *legacy = equivalents
+    normalized = {**body, "tool_choice": canonical}
+    request = digest([normalized, *scope])
+    if previous is not None and previous != request:
+        # 已认领的旧回执保留原摘要。比对其余字段后才允许继续使用数据库的条件写入。
+        for shape in legacy:
+            if shape is None:
+                normalized.pop("tool_choice")
+            else:
+                normalized["tool_choice"] = shape
+            if digest([normalized, *scope]) == previous:
+                return previous
+    return request
 
 
 class _Reserved:
