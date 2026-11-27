@@ -83,6 +83,7 @@ REGENERATED_USAGE = (19, 11)
 SLOW_READER_USAGE = (17, 11)
 SLOW_READER_PAUSE_SECONDS = 11
 SIGNED_THINKING = {"type": "thinking", "thinking": "隔离模型的合成思考段。", "signature": "c2lnbmF0dXJlLWZpeHR1cmU="}
+REDACTED_TOOL_THINKING = {"type": "redacted_thinking", "data": "c3ludGhldGljLXJlZGFjdGVkLWJsb2Nr"}
 EXTERNAL_REDACTED_THINKING = {"type": "redacted_thinking", "data": "c3ludGhldGlj"}
 SIGNED_FORK_THINKING = {"type": "thinking", "thinking": "隔离模型在分叉产生的合成思考段。",
                         "signature": "c2lnbmF0dXJlLWZvcms="}
@@ -214,10 +215,11 @@ def pending_mixed_tool_scope(database, session_id):
 
 
 def fixture_tool_sse(tool, *, with_signature, second=None, model=MODEL, thinking_text=SIGNED_THINKING["thinking"],
-                     signature=SIGNED_THINKING["signature"], message_id="msg_cold_tool"):
+                     signature=SIGNED_THINKING["signature"], message_id="msg_cold_tool", redacted=None):
     """交付隔离模型工具流。@param tool 原生工具调用。@param with_signature 是否先交付合成签名块。
     @param second 可选的同轮第二次工具调用。@param model 模型实际回复的身份，可省略。
     @param thinking_text 合成思考摘要，可为空。@param signature 隔离签名。@param message_id 原响应 ID。
+    @param redacted 可选的不透明思考块，完整内容随开始事件交付。
     @return SSE。"""
     wire = message_sse(tool, "tool_use", message_id)
     if not with_signature and second is None and model == MODEL:
@@ -237,14 +239,15 @@ def fixture_tool_sse(tool, *, with_signature, second=None, model=MODEL, thinking
     for event in events:
         if "index" in event:
             event["index"] += 1
-    signed = [{"type": "content_block_start", "index": 0, "content_block": {"type": "thinking", "thinking": ""}}]
-    if thinking_text:
+    signed = [{"type": "content_block_start", "index": 0,
+               "content_block": redacted or {"type": "thinking", "thinking": ""}}]
+    if redacted is None:
+        if thinking_text:
+            signed.append({"type": "content_block_delta", "index": 0,
+                           "delta": {"type": "thinking_delta", "thinking": thinking_text}})
         signed.append({"type": "content_block_delta", "index": 0,
-                       "delta": {"type": "thinking_delta", "thinking": thinking_text}})
-    signed.extend([
-        {"type": "content_block_delta", "index": 0, "delta": {"type": "signature_delta", "signature": signature}},
-        {"type": "content_block_stop", "index": 0},
-    ])
+                       "delta": {"type": "signature_delta", "signature": signature}})
+    signed.append({"type": "content_block_stop", "index": 0})
     events[1:1] = signed
     return b"".join(map(frame, events))
 
@@ -398,7 +401,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param provider_quota 可选的公开 SSE 或 JSON 供应商限流和被动额度对照。
     @param current_text_blocks 是否验证本轮文本块顺序及边界归属。
     @param signed_tool_history 是否核对隔离模型原工具轮的签名块。
-    @param signed_tool_response 可选，模拟空思考正文或缺少助手模型的隔离响应。
+    @param signed_tool_response 可选，模拟空思考、不透明思考或缺少助手模型的隔离响应。
     @param split_history_tools 是否将已闭合的旧工具组分为相邻消息。
     @param v1_runtime 固定 V1 制品，提供时仅验证 V1 内核的公开能力。
     @param parallel_tools 是否验证同一步多个新工具的回执。
@@ -499,6 +502,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
         or (fixed_thinking_model is not None and fixed_thinking_display == "summarized")
     )
     signed_thinking_text = "" if signed_tool_response == "signature-only" else SIGNED_THINKING["thinking"]
+    redacted_thinking = REDACTED_TOOL_THINKING if signed_tool_response == "redacted" else None
     lookups = []
     deny_proxy = False
     denied_tunnels = []
@@ -694,7 +698,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                     second = {"type": "tool_use", "id": SECOND_ID, "name": other["name"], "input": PARALLEL_SECOND_ARGS}
                 response_model = None if signed_tool_response == "missing-model" else body["model"]
                 wire = fixture_tool_sse(content, with_signature=signed_tool_history, second=second,
-                                        model=response_model, thinking_text=signed_thinking_text)
+                                        model=response_model, thinking_text=signed_thinking_text, redacted=redacted_thinking)
             elif cut_tool_reply:
                 if interrupted_tool_stream == "after-tool-start":
                     prefix, remaining, terminal = fixture_reconnect_sse(tool["name"], usage=INTERRUPTED_USAGE)
@@ -1428,13 +1432,21 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             changed = manage("PUT", f"accounts/{identifier}", {"client_system_prompt_policy": "replace"})
             assert changed["client_system_prompt_policy"] == "replace"
         if signed_tool_history:
+            signed_type = "redacted_thinking" if redacted_thinking else "thinking"
             (start,) = [event["content_block"] for event in events if event["type"] == "content_block_start"
-                        and event["index"] == 0 and event["content_block"]["type"] == "thinking"]
-            deltas = [event["delta"] for event in events if event["type"] == "content_block_delta" and event["index"] == 0]
-            signed_block = {**start,
-                            "thinking": start["thinking"] + "".join(d["thinking"] for d in deltas if d["type"] == "thinking_delta"),
-                            "signature": "".join(d["signature"] for d in deltas if d["type"] == "signature_delta")}
-            assert signed_block == {**SIGNED_THINKING, "thinking": signed_thinking_text}
+                        and event["index"] == 0 and event["content_block"]["type"] == signed_type]
+            if redacted_thinking:
+                first_block_events = [event["type"] for event in events if event.get("index") == 0]
+                assert first_block_events == ["content_block_start", "content_block_stop"], first_block_events
+                assert start == redacted_thinking, start
+                signed_block = start
+            else:
+                deltas = [event["delta"] for event in events
+                          if event["type"] == "content_block_delta" and event["index"] == 0]
+                signed_block = {**start,
+                                "thinking": start["thinking"] + "".join(d["thinking"] for d in deltas if d["type"] == "thinking_delta"),
+                                "signature": "".join(d["signature"] for d in deltas if d["type"] == "signature_delta")}
+                assert signed_block == {**SIGNED_THINKING, "thinking": signed_thinking_text}
             offered.insert(0, signed_block)
             if previous is None:
                 with closing(connect("file:/native/tui-reconnect/receipts.db?mode=ro", uri=True)) as database:
@@ -1654,10 +1666,12 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 )
             assert len(received) == 1
         if signed_tool_history:
-            tampered = {**signed_block, "signature": "Y2hhbmdlZA=="}
+            changed_field = "data" if redacted_thinking else "signature"
+            changed_signed_phase = "changed_redacted_data" if redacted_thinking else "changed_signature"
+            tampered = {**signed_block, changed_field: "Y2hhbmdlZA=="}
             changed = {**follow, "messages": [*messages, {"role": "assistant", "content": [tampered, *offered[1:]]}, result]}
             changed_signature, response, changed_signature_request_id = checked_messages(
-                manage, token, changed, headers, received, "changed_signature", expected_status=422,
+                manage, token, changed, headers, received, changed_signed_phase, expected_status=422,
                 trace_startup=trace_startup, sender_status=sender_state_after_failure,
             )
             assert changed_signature == 422 and len(received) == 1, (changed_signature, response, len(received))
@@ -1934,9 +1948,9 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             sender_status=sender_state_after_failure, trace_recovery_resend=trace_recovery_resend,
         )
         if signed_tool_history:
-            # 在原样回执收到响应后读回诊断，避免为预期中的改签名拒绝增加一次等待。
+            # 在原样回执收到响应后读回诊断，避免为预期中的篡改拒绝增加一次等待。
             signature_rejection = signed_receipt_rejection(
-                manage, "changed_signature", changed_signature_request_id, headers["x-session-id"],
+                manage, changed_signed_phase, changed_signature_request_id, headers["x-session-id"],
                 changed_signature, changed_signature_body,
             )
         if rejected_signed_recovery:
@@ -2332,13 +2346,18 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             if summarized_thinking:
                 proof["client_content"] = final["content"]
         if signed_tool_history:
-            hydrated = find_blocks(received[1][1], "type", "thinking")
+            hydrated = find_blocks(received[1][1], "type", signed_type)
             assert hydrated == [("assistant", signed_block)], (
                 hydrated, [(row["role"], [block["type"] for block in blocks(row)]) for row in received[1][1]["messages"]],
             )
-            proof.update(observed_signature_preserved=True, changed_signature_status=changed_signature,
-                         changed_signature_rejection=signature_rejection,
-                         signed_reply=hydrated[0][1], recorded_signed_tool_models=signed_tool_models)
+            proof.update(signed_reply=hydrated[0][1], recorded_signed_tool_models=signed_tool_models)
+            if redacted_thinking:
+                assert not find_blocks(received[1][1], "type", "thinking")
+                proof.update(observed_redacted_preserved=True, changed_redacted_data_status=changed_signature,
+                             changed_redacted_data_rejection=signature_rejection)
+            else:
+                proof.update(observed_signature_preserved=True, changed_signature_status=changed_signature,
+                             changed_signature_rejection=signature_rejection)
         if toggle_pending_policy:
             proof["pending_policy"] = "append"
         if tool_policy:
@@ -2357,6 +2376,10 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 (signed,) = archived
                 assert set(signed) == {"role", "content", "model"}
                 assert signed["model"] == events[0]["message"]["model"]
+                if redacted_thinking:
+                    archived_thinking = [block for block in signed["content"]
+                                         if block["type"] in ("thinking", "redacted_thinking")]
+                    assert archived_thinking == [signed_block], archived_thinking
                 proof["recovered_signed_tool_model"] = signed["model"]
             continue_prompt_count = model_continue_prompt_count(native_recovery)
             assert continue_prompt_count == 1
@@ -5881,7 +5904,7 @@ def main():
     parser.add_argument("--adaptive-thinking-display", choices=("default", "updates", "summarized"), default="updates")
     parser.add_argument("--thinking-cli-summaries", choices=("on", "off"))
     parser.add_argument("--signed-tool-history", action="store_true")
-    parser.add_argument("--signed-tool-response", choices=("signature-only", "missing-model"))
+    parser.add_argument("--signed-tool-response", choices=("signature-only", "redacted", "missing-model"))
     parser.add_argument("--trace-initial-startup", action="store_true", help="记录源码 V2 夹具的启动阶段")
     parser.add_argument("--trace-recovery-resend", action="store_true",
                         help="隔离工具回执收到 503 后原样补发一次，分别取证并保留原失败")
