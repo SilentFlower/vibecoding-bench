@@ -206,7 +206,10 @@ def _signed_group(blocks):
         if block["type"] in SIGNED_THINKING_TYPES:
             group.append(block)
         elif block["type"] == "tool_use":
-            tool = {**block, "name": block["name"].removeprefix(MCP_PREFIX)}
+            name = block["name"]
+            if not isinstance(name, str):
+                raise ValueError("原生助手工具名称必须为字符串")
+            tool = {**block, "name": name.removeprefix(MCP_PREFIX)}
             if tool.get("caller") == {"type": "direct"}:
                 tool.pop("caller")
             group.append(tool)

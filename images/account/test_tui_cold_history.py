@@ -3,6 +3,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
 from copy import deepcopy
+from functools import partial
 import json
 from os import close, openpty
 from pathlib import Path
@@ -16,6 +17,7 @@ from tui_cold_history import IMPORT_BOUNDARY, ColdHistory
 from tui_reconnect import digest
 from tui_workspace_launch import (
     HistoryReplay, WorkspaceLaunchObservation, _key, _project_history_dir, _resume_path, launch_workspace_cli,
+    publish_workspace_history, read_bound_history,
 )
 
 PNG_DATA = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII="
@@ -843,6 +845,52 @@ class ColdHistoryTests(TestCase):
         changed["messages"][1]["content"][1]["input"] = {"different": True}
         self.assertIsNone(ColdHistory.from_request(changed, read_history=sources(archive)))
         self.assertIsNone(ColdHistory.from_receipt_boundary(changed, boundary))
+
+    def test_bound_signature_discards_corrupt_archive_alongside_healthy_archive(self):
+        """归档中无关工具名类型错误时仅丢弃该档的全部签名来源。@return 无。"""
+        body = deepcopy(self.body)
+        signature = {"type": "thinking", "thinking": "合成思考", "signature": "合成签名"}
+        tool, = body["messages"][1]["content"]
+        body["messages"][1]["content"].insert(0, signature)
+        scope = (1, "合成环境", 2)
+        session = "合成会话"
+        reservation = dict(zip(("account_id", "environment_id", "principal_id"), scope, strict=True), session_id=session)
+        native = str(uuid4())
+        key = _key((scope, session))
+        with TemporaryDirectory() as directory:
+            storage = Path(directory)
+            base = storage / "tui-workspaces"
+            work = base / _key((scope, "session", session))
+            base.mkdir(mode=0o700)
+            work.mkdir(mode=0o700)
+            binding = base / (key + ".json")
+            binding.write_text(json.dumps({"session_key": key, "native_session_id": native, "client_path": None}))
+            binding.chmod(0o600)
+            config = storage / "tui-sessions" / native / "home/.claude"
+            boundary = "a" * 64
+
+            def publish(model, *, corrupt=False):
+                def render(selected):
+                    def row(response, content):
+                        return {"type": "assistant", "sessionId": selected, "cwd": str(work),
+                                "message": {"role": "assistant", "id": response, "model": model, "content": content}}
+
+                    first = {"type": "user", "sessionId": selected, "cwd": str(work), IMPORT_BOUNDARY: boundary}
+                    rows = [first, row("msg_signed", [signature]), row("msg_signed", [tool])]
+                    if corrupt:
+                        rows.append(row("msg_unrelated", [{**tool, "id": "toolu_unrelated", "name": None}]))
+                    return "".join(json.dumps(item) + "\n" for item in rows)
+
+                return publish_workspace_history(config, work, native, lambda _: False, render, boundary=boundary)
+
+            self.assertEqual(publish("claude-opus-5-5"), native)
+            self.assertNotEqual(publish(body["model"], corrupt=True), native)
+            read_history = partial(read_bound_history, reservation, storage)
+            plan = ColdHistory.from_request(body, read_history=read_history)
+            self.assertIsNotNone(plan)
+            self.assertEqual(plan.recovered_models, ((1, "claude-opus-5-5"),))
+            (_project_history_dir(config, work) / (native + ".jsonl")).unlink()
+            self.assertIsNone(ColdHistory.from_request(body, read_history=read_history))
 
     def test_explicit_auto_tool_choice_preserves_parallel_permission(self):
         """自动选择进入原生合同并随原工具组冻结。@return 无。"""
