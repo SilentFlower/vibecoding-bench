@@ -8,11 +8,14 @@ import json
 from pathlib import Path
 from socket import if_nameindex
 from tempfile import TemporaryDirectory
+from time import monotonic_ns
 from unittest.mock import patch
 from uuid import uuid4
 
 import verify_tui_cold_history as fixture
 import verify_tui_core_http_hook as core
+from verify_tui_direct_reuse import install_permit
+from verify_tui_public_sse_observer import read_events
 
 
 ERROR_TYPES = ("invalid_request_error", "api_error")
@@ -64,20 +67,22 @@ class FixedDateModel(core.ObservedModel):
         return "Thu, 26 Nov 2026 00:00:00 GMT"
 
 
-def install_turn_hooks():
-    """在同一个官方受管 Mod 内开启只读阶段观测。@return 无。"""
+def install_turn_hooks(*, public_stream):
+    """在同一个官方受管 Mod 内开启阶段观测。@param public_stream 是否验收公开 SSE。@return 无。"""
     digest = core.PROGRAMS[VERSION]
     program = Path(f"/cli/{VERSION}/node_modules/.bin/claude")
     with program.open("rb") as executable:
         assert file_digest(executable, "sha256").hexdigest() == digest
-    core.install(VERSION, digest, "error", "managed")
+    core.install(VERSION, digest, "tool" if public_stream else "error", "managed")
+    if public_stream:
+        install_permit("observe-sse")
     module = Path(f"/opt/{core.POLICY_MARKET}/{core.POLICY_PLUGIN}/hooks/observe.js")
     source = module.read_text()
     assert source.endswith("\n}\n")
     marker = "record({phase: 'reply', keys: Object.keys(value), status: value.status, header,"
     assert source.count(marker) == 1
     source = source.replace(marker, marker + "\n        responseHeaders: headers,")
-    module.write_text(source[:-3] + TURN_HOOKS + "\n}\n")
+    module.write_text(source if public_stream else source[:-3] + TURN_HOOKS + "\n}\n")
 
 
 def verify_hooks():
@@ -105,41 +110,72 @@ def verify_hooks():
     return {"http_reply": reply, "turn": turn, "stop_failure": stop, "session_rows": session_rows}
 
 
-def check(manage, token, identifier, received, sender_status, restart, *, source_observer, path, error, emitted):
+def verify_stream_hooks(reservation_id):
+    """验证公开首帧前的真实 CLI 请求。@param reservation_id 原公开预留。@return 模型状态与物理归属。"""
+    offer, reply = [event for event in read_events() if event.get("model")]
+    assert (offer["phase"], offer["origin"], offer["method"]) == ("offer", "engine", "POST"), offer
+    assert (reply["phase"], reply["status"], reply["header"], reply["isStreaming"], reply["textLength"]) == (
+        "reply", 400, "model-http-400", True, 0,
+    ), reply
+    (permit,) = map(json.loads, Path("/tmp/flower-direct-permits.jsonl").read_text().splitlines())
+    (tunnel,) = map(json.loads, Path("/tmp/flower-direct-tunnels.jsonl").read_text().splitlines())
+    assert permit["allowed"] and permit["reservation_id"] == tunnel["reservation_id"] == reservation_id
+    assert permit["cli_pid"] == tunnel["cli_pid"]
+    return {"http_reply": reply, "permit": permit, "tunnel": tunnel}
+
+
+def check(manage, token, identifier, received, sender_status, restart, *, source_observer, path, error, emitted,
+          public_stream):
     """关联公开回包与原模型拒绝。@param manage 管理入口。@param token 合成凭据。
     @param identifier 当前账号。@param received 模型收件。@param sender_status 诊断读取。
     @param restart 重启选项。@param source_observer 额外事件源观测。
     @param path 验证路线。@param error 期望的旧公开错误。@param emitted 模型实发的错误。
-    @return 请求、尝试、实收与钩子记录。
+    @param public_stream 是否提交公开 stream:true。@return 请求、尝试、实收与钩子记录。
     """
     assert not source_observer and not restart
     session = str(uuid4())
-    body = {"model": fixture.MODEL, "max_tokens": 128, "stream": False, "thinking": {"type": "disabled"},
+    body = {"model": fixture.MODEL, "max_tokens": 128, "stream": public_stream, "thinking": {"type": "disabled"},
             "messages": [{"role": "user", "content": fixture.REJECT_MODEL_REQUEST}]}
     headers = {"x-session-id": session, "User-Agent": "flower2api-http-error-proof/1"}
     phase = f"http_error_{path}_{error['type']}"
     started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+    start = monotonic_ns()
+    response_headers = {}
+
+    def observe_response(response):
+        response_headers["content_type"] = response.getheader("content-type")
+        response_headers["latency_ms"] = (monotonic_ns() - start) // 1_000_000
+
     status, raw, request_id = fixture.checked_messages(
         manage, token, body, headers, received, phase, expected_status=400 if path == "account" else 502,
-        trace_startup=True, sender_status=sender_status,
+        trace_startup=True, sender_status=sender_status, observe_response=observe_response,
     )
     diagnostics = fixture.report_request_diagnostics(manage, phase, request_id, session, started_at)
     (row,) = diagnostics["requests"]
-    (attempt,) = row["attempts"]
-    assert row["request_id"] == attempt["request_id"] == request_id and row["attempt_count"] == 1, row
-    assert row["status_code"] == attempt["status_code"] == status, row
-    assert attempt["attempt_id"] == row["diagnostic_context"]["tui_reservation_id"], row
+    assert row["request_id"] == request_id and row["status_code"] == status, row
+    reservation_id = row["diagnostic_context"]["tui_reservation_id"]
+    assert reservation_id and response_headers["content_type"].startswith("application/json"), response_headers
+    if path == "account" or not public_stream:
+        (attempt,) = row["attempts"]
+        assert attempt["request_id"] == request_id and attempt["status_code"] == status
+        assert attempt["attempt_id"] == reservation_id and row["attempt_count"] == 1, row
     (model_digest, _, tls), = received
     (model_error,) = emitted
     public = json.loads(raw)
     if path == "account":
         assert public == {"type": "error", "error": error}, public
+    elif public_stream:
+        assert isinstance(public.get("error"), str) and public["error"], public
     else:
         assert public["error"]["type"] == "api_error", public
-    return {"path": path, "http_status": status, "public_body": public, "request_id": request_id,
+    hooks = None
+    if path == "cli":
+        hooks = verify_stream_hooks(reservation_id) if public_stream else verify_hooks()
+    return {"path": path, "stream": public_stream, "http_status": status, "public_body": public,
+            "request_id": request_id, "reservation_id": reservation_id, "public_headers": response_headers,
             "model_posts": len(received), "model_request_sha256": model_digest, "model_tls": tls,
             "model_response": model_error, "diagnostics": diagnostics,
-            "hooks": verify_hooks() if path == "cli" else None, "wire_final": "unavailable"}
+            "hooks": hooks, "wire_final": "unavailable"}
 
 
 def main():
@@ -147,11 +183,12 @@ def main():
     parser = ArgumentParser(description=__doc__)
     parser.add_argument("--path", choices=("account", "cli"), required=True)
     parser.add_argument("--error-type", choices=ERROR_TYPES, required=True)
+    parser.add_argument("--stream", action="store_true", help="公开请求使用 stream:true，核对首帧前的 JSON 错误")
     parser.add_argument("--gateway", type=Path, required=True)
     args = parser.parse_args()
     assert Path("/.dockerenv").is_file() and {name for _, name in if_nameindex()} == {"lo"}
     if args.path == "cli":
-        install_turn_hooks()
+        install_turn_hooks(public_stream=args.stream)
     error = {"type": args.error_type, "message": ERROR_MESSAGE}
     # 让原状态、消息、长度与响应头保持相同。公开错误类型的差异来自正文。
     padding = "x" * (len(max(ERROR_TYPES, key=len)) - len(args.error_type))
@@ -172,7 +209,7 @@ def main():
 
     with patch.multiple(
         fixture, QuietHandler=FixedDateModel, response_json=model_reply,
-        verify_structured_tool_round=partial(check, path=args.path, error=error, emitted=emitted),
+        verify_structured_tool_round=partial(check, path=args.path, error=error, emitted=emitted, public_stream=args.stream),
     ), TemporaryDirectory(prefix="http-error-contract-") as folder:
         result = fixture.verify(
             args.gateway, Path("/usr/local/bin/account-sender"), Path(folder), installed_runtime=True,

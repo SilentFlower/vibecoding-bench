@@ -6,10 +6,11 @@ from contextlib import closing
 from datetime import datetime, timezone
 from functools import partial
 from hashlib import file_digest, sha256
-from http.client import HTTPConnection, HTTPException
+from http.client import HTTPConnection, HTTPException, IncompleteRead
 import json
 from pathlib import Path
 from socket import SOL_SOCKET, SO_RCVBUF, if_nameindex
+from sqlite3 import connect
 from tempfile import TemporaryDirectory
 from threading import Event
 from time import monotonic_ns, sleep
@@ -29,9 +30,13 @@ CHUNK_SIZE = 32 * 1024
 class ModelStream:
     """分段写出模型 SSE，直到测试端明确放行剩余帧。"""
 
-    def __init__(self, *, pressure):
-        """建立首帧屏障。@param pressure 是否使用能施加套接字背压的响应。@return 无。"""
+    def __init__(self, *, pressure, interrupt=False):
+        """建立首帧屏障。@param pressure 是否使用能施加套接字背压的响应。
+        @param interrupt 是否在客户端读到前缀后截断真实模型流。@return 无。
+        """
         self.pressure = pressure
+        self.interrupt = interrupt
+        self.interrupted_at_ns = None
         self.release = Event()
         self.writing_tail = Event()
         self.completed = Event()
@@ -68,6 +73,11 @@ class ModelStream:
         if not self.release.wait(20):
             handler.close_connection = True
             return
+        if self.interrupt:
+            self.interrupted_at_ns = monotonic_ns()
+            fixture.startup_event("public_sse_model_interrupted", advertised_bytes=self.total, written_bytes=self.written)
+            handler.close_connection = True
+            return
         self.writing_tail.set()
         for offset in range(0, len(tail), CHUNK_SIZE):
             chunk = tail[offset:offset + CHUNK_SIZE]
@@ -88,12 +98,14 @@ def pending_public_bytes(client_port):
     return 0
 
 
-def first_frames(manage, token, identifier, received, sender_status, restart, *, source_observer, stream, observe):
+def first_frames(manage, token, identifier, received, sender_status, restart, *, source_observer, stream, observe,
+                 database, case):
     """核对公开首帧早于模型终帧，并按需施加慢读。
     @param manage 管理接口。@param token 合成凭据。@param identifier 隔离账号。
     @param received 模型实收。@param sender_status 发送器诊断。@param restart 重启处理器。
     @param source_observer 是否安装额外账号事件源。@param stream 模型流屏障。
-    @param observe 本地阶段记录器。@return 模型和客户端的可复跑证据。
+    @param observe 本地阶段记录器。@param database 隔离网关用量库。@param case 当前用例。
+    @return 模型和客户端的可复跑证据。
     """
     assert not restart and not source_observer
     session = str(uuid4())
@@ -102,7 +114,7 @@ def first_frames(manage, token, identifier, received, sender_status, restart, *,
     headers = {"x-session-id": session, "User-Agent": "flower2api-public-sse/1",
                "anthropic-version": "2023-06-01", "Authorization": "Bearer " + token,
                "Content-Type": "application/json"}
-    phase = "public_sse_backpressure" if stream.pressure else "public_sse_first_frame"
+    phase = "public_sse_" + case.replace("-", "_")
     observe("public_request_start", session_id=session, phase=phase)
     started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
     request_id = status = None
@@ -127,9 +139,12 @@ def first_frames(manage, token, identifier, received, sender_status, restart, *,
                     status, request_id, response.read() if status != 200 else None,
                 )
                 prefix = fixture.read_tool_stream_data_lines(response, 3)
-                prefix_ms = (monotonic_ns() - started) // 1_000_000
+                prefix_seen_ns = monotonic_ns()
+                prefix_ms = (prefix_seen_ns - started) // 1_000_000
                 assert not stream.writing_tail.is_set() and not stream.completed.is_set() and len(received) == 1
+                observe("public_sse_prefix", request_id=request_id, model_posts=len(received), data_frames=len(prefix))
                 pressure = None
+                transport_error = None
                 stream.release.set()
                 if stream.pressure:
                     assert stream.writing_tail.wait(5)
@@ -142,7 +157,13 @@ def first_frames(manage, token, identifier, received, sender_status, restart, *,
                                 "model_completed_at_resume": stream.completed.is_set()}
                     if connection.sock is not None:
                         connection.sock.setsockopt(SOL_SOCKET, SO_RCVBUF, original_receive_buffer)
-                tail = response.read()
+                try:
+                    tail = response.read()
+                except IncompleteRead as error:
+                    if not stream.interrupt:
+                        raise
+                    tail = error.partial
+                    transport_error = type(error).__name__
     except (AssertionError, HTTPException, OSError) as error:
         failed_at = datetime.now(timezone.utc)
         observe("public_sse_failure", session_id=session, phase=phase, request_id=request_id, http_status=status,
@@ -151,21 +172,49 @@ def first_frames(manage, token, identifier, received, sender_status, restart, *,
         raise
     finally:
         stream.release.set()
-    assert stream.completed.wait(5)
     lines = prefix + [line for line in tail.splitlines(keepends=True) if line.startswith(b"data:")]
     events = [json.loads(line[5:]) for line in lines]
     public_id = events[0]["message"]["id"]
-    assert public_id.startswith("msg_")
+    assert public_id.startswith("msg_") and len(received) == 1
     expected = stream.events
     expected[0]["message"]["id"] = public_id
-    assert events == expected and len(received) == 1
-    detail = manage("GET", "request-diagnostics/" + request_id)
+
+    def finished():
+        detail = manage("GET", "request-diagnostics/" + request_id)
+        return detail if detail["request"].get("finished_at") else None
+
+    detail = fixture.wait_for(finished)
     (attempt,) = detail["attempts"]
-    assert attempt["request_id"] == request_id and attempt["attempt_id"] == detail["request"]["context"]["tui_reservation_id"]
-    return {"stream": body["stream"], "request_id": request_id, "reservation_id": attempt["attempt_id"],
-            "public_message_id": public_id, "prefix_frames_before_model_tail": len(prefix), "prefix_ms": prefix_ms,
-            "data_frames": len(lines), "data_sha256": sha256(b"".join(lines)).hexdigest(),
-            "model_bytes": stream.total, "client_backpressure": pressure, "model_posts": len(received)}
+    record = detail["request"]
+    assert attempt["request_id"] == request_id and attempt["attempt_id"] == record["context"]["tui_reservation_id"]
+    result = {"stream": body["stream"], "http_status": status, "request_id": request_id,
+              "reservation_id": attempt["attempt_id"], "public_message_id": public_id,
+              "prefix_frames_before_model_tail": len(prefix), "prefix_ms": prefix_ms,
+              "data_frames": len(lines), "data_sha256": sha256(b"".join(lines)).hexdigest(),
+              "model_bytes": stream.total, "client_backpressure": pressure, "model_posts": len(received)}
+    if not stream.interrupt:
+        assert stream.completed.wait(5) and events == expected
+        return result
+    assert prefix_seen_ns < stream.interrupted_at_ns and stream.written < stream.total and not stream.completed.is_set()
+    assert events[:3] == expected[:3] and len(events) == 4 and transport_error is None, (events, transport_error)
+    assert events[-1]["type"] == "error" and events[-1]["error"]["type"] == "api_error", events[-1]
+    assert (record["status_code"], record["outcome"], record["error_stage"], record["attempt_count"]) == (
+        200, "upstream_error", "upstream_body", 1,
+    ), record
+
+    def partial_usage():
+        with closing(connect(database)) as db:
+            rows = db.execute("SELECT input_tokens, output_tokens, partial FROM usage_records").fetchall()
+        return rows if rows else None
+
+    (usage,) = fixture.wait_for(partial_usage)
+    first_usage = expected[0]["message"]["usage"]
+    assert usage == (first_usage["input_tokens"], first_usage["output_tokens"], 1), usage
+    return {**result, "model_interrupted_after_prefix": True, "model_bytes_written": stream.written,
+            "transport_error": transport_error, "http_body_complete": transport_error is None,
+            "stream_error": events[-1]["error"],
+            "outcome": record["outcome"], "error_stage": record["error_stage"], "attempt_count": record["attempt_count"],
+            "usage": {"input_tokens": usage[0], "output_tokens": usage[1], "partial": True}}
 
 
 def installed(gateway, case):
@@ -179,7 +228,9 @@ def installed(gateway, case):
     with Path("/opt/flower/tui/tui-guard").open("rb") as guard:
         authorization = {"source": "installed", "guard_sha256": file_digest(guard, "sha256").hexdigest(),
                          "managed_file_present": policy.is_file(), "managed_dropins_present": dropins.is_dir()}
-    stream = ModelStream(pressure=case == "backpressure") if case != "reconnect" else None
+    stream = None
+    if case != "reconnect":
+        stream = ModelStream(pressure=case == "backpressure", interrupt=case == "after-first-frame")
     current_session, sockets, posts = [], [], []
     original = fixture.startup_event
 
@@ -204,7 +255,7 @@ def installed(gateway, case):
         else:
             options.update(structured_output="live", model_stream_probe=stream)
             replacements["verify_structured_tool_round"] = partial(
-                first_frames, stream=stream, observe=observe,
+                first_frames, stream=stream, observe=observe, database=Path(folder) / "gateway.db", case=case,
             )
         with patch.multiple(fixture, **replacements):
             result = fixture.verify(gateway, SENDER, Path(folder), installed_runtime=True, trace_startup=True, **options)
@@ -223,7 +274,7 @@ def main():
     """隔离运行一个独立的公开 SSE 验收。@return 严格模式按物理出站归属退出。"""
     parser = ArgumentParser(description=__doc__)
     parser.add_argument("--gateway", type=Path, required=True)
-    parser.add_argument("--case", choices=("first-frame", "backpressure", "reconnect"), required=True)
+    parser.add_argument("--case", choices=("first-frame", "backpressure", "reconnect", "after-first-frame"), required=True)
     parser.add_argument("--require-cli-owner", action="store_true",
                         help="要求账号代理入口的客户端套接字由官方 CLI 持有")
     args = parser.parse_args()
