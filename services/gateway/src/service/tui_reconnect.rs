@@ -563,12 +563,17 @@ impl Drop for Writer {
     fn drop(&mut self) {
         self.release_entry();
         let mut out = self.reply.output.lock().unwrap();
-        if !out.complete {
+        let pending = !out.complete;
+        if pending {
             out.failed = true;
             out.complete = true;
         }
         out.readers.clear();
         self.reply.changed.send_replace(());
+        drop(out);
+        if pending {
+            diagnostics::tui_reply_event("gateway_tui_reply_cache", "no_reply");
+        }
     }
 }
 
@@ -667,17 +672,26 @@ impl Writer {
             if cancelled && let Err(error) = delivery.cancel().await {
                 tracing::warn!(%error,"维护取消的工具回执待核对");
             }
-            {
+            let cached = {
                 let mut out = self.reply.output.lock().unwrap();
                 out.complete = true;
                 out.failed = !complete;
                 out.readers.clear();
                 self.reply.changed.send_replace(());
-            }
+                complete && out.disconnected && !out.overflow
+            };
             if !complete {
                 // 已知残缺的前缀不能交给重试。用量收口可能等待数据库，新的恢复继续走原绑定核验。
                 self.release_entry();
             }
+            let cache_result = if cached {
+                "ready"
+            } else if complete {
+                "not_replayable"
+            } else {
+                "incomplete"
+            };
+            diagnostics::tui_reply_event("gateway_tui_reply_cache", cache_result);
             if let Some(usage) = usage {
                 usage.finish(complete).await;
             }

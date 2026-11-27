@@ -149,21 +149,28 @@ def worker(model_port):
 
 def message_sse(content, stop_reason, message_id):
     """将一个结果放入普通 Messages SSE。@param content 内容块。@param stop_reason 终态。@param message_id 消息 ID。@return 字节。"""
+    return b''.join(message_sse_frames(content, stop_reason, message_id))
+
+
+def message_sse_frames(content, stop_reason, message_id):
+    """按模型生成顺序产生 Messages SSE。@param content 内容块。@param stop_reason 终态。
+    @param message_id 消息 ID。@return 按需生成的 SSE 帧。
+    """
     tool = content['type'] == 'tool_use'
     start = {**content, 'input':{}} if tool else {'type':'text','text':''}
     delta = ({'type':'input_json_delta','partial_json':json_bytes(content['input']).decode()} if tool
              else {'type':'text_delta','text':content['text']})
-    events = [
+    prefix = [
         {'type':'message_start','message':{'id':message_id,'role':'assistant','type':'message',
             'model':MODEL,'content':[],'stop_reason':None,'stop_sequence':None,
             'usage':{'input_tokens':10,'output_tokens':1}}},
         {'type':'content_block_start','index':0,'content_block':start},
         {'type':'content_block_delta','index':0,'delta':delta},
-        {'type':'content_block_stop','index':0},
-        {'type':'message_delta','delta':{'stop_reason':stop_reason,'stop_sequence':None},'usage':{'output_tokens':8}},
-        {'type':'message_stop'},
     ]
-    return b''.join(map(frame, events))
+    yield from map(frame, prefix)
+    yield frame({'type':'content_block_stop','index':0})
+    yield frame({'type':'message_delta','delta':{'stop_reason':stop_reason,'stop_sequence':None},'usage':{'output_tokens':8}})
+    yield frame({'type':'message_stop'})
 
 
 class HandoffFixture:

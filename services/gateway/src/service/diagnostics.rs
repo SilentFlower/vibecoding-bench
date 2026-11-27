@@ -518,6 +518,28 @@ pub(super) fn tui_startup_event(
     let _ = (stage, id, request, result);
 }
 
+/// 关联隔离探针的私有交付与接回缓存。@param stage 固定阶段。@param result 实际终态。@return 无。
+pub(super) fn tui_reply_event(stage: &'static str, result: &'static str) {
+    #[cfg(all(target_os = "linux", feature = "v3-verification"))]
+    if var("FLOWER_V2_STARTUP_TRACE").as_deref() == Ok("1") {
+        let ids = CURRENT_TRACE.try_with(|trace| {
+            let state = trace.lock();
+            state
+                .request
+                .context
+                .as_ref()?
+                .tui_reservation_id
+                .clone()
+                .map(|id| (id, state.request.request_id.clone()))
+        });
+        if let Ok(Some((id, request))) = ids {
+            tui_startup_event(stage, Some(&id), Some(&request), Some(result));
+        }
+    }
+    #[cfg(not(all(target_os = "linux", feature = "v3-verification")))]
+    let _ = (stage, result);
+}
+
 /// 记录预留前的准入拒绝。@param branch 网关实际返回错误的固定分支。@return 无返回值。
 pub(super) fn tui_admission_rejected(branch: &'static str) {
     #[cfg(all(target_os = "linux", feature = "v3-verification"))]

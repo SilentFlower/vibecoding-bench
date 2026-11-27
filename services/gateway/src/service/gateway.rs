@@ -3105,6 +3105,7 @@ impl GatewayService {
                     )
                     .await
                     .inspect_err(|error| {
+                        diagnostics::tui_reply_event("gateway_tui_private_body", "no_response");
                         if matches!(error, AppError::BadGateway(_)) {
                             diagnostics::tui_submission_unknown();
                         } else {

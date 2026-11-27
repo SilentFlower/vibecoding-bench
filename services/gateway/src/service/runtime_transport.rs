@@ -1851,7 +1851,7 @@ pub(super) async fn tui_public_response(
         let mut public = tui_sender_response::project_observed(
             response.status(),
             content_type,
-            Body::from_stream(response.bytes_stream()),
+            tui_private_body(response),
             policy_account,
         )
         .await?;
@@ -1880,8 +1880,44 @@ pub(super) async fn tui_public_response(
         }
     }
     public
-        .body(Body::from_stream(response.bytes_stream()))
+        .body(tui_private_body(response))
         .map_err(|_| AppError::BadGateway("V2 sender 响应头无效".into()))
+}
+
+/// 在投影前观察私有 HTTP 正文的实际读取结果。@param response 原私有响应。@return 原字节流。
+fn tui_private_body(response: reqwest::Response) -> Body {
+    #[cfg(all(target_os = "linux", feature = "v3-verification"))]
+    if std::env::var("FLOWER_V2_STARTUP_TRACE").as_deref() == Ok("1") {
+        use super::diagnostics::tui_reply_event;
+
+        let result = if response.status().is_success() {
+            "received"
+        } else {
+            "received_error"
+        };
+        let body = unfold(
+            (Box::pin(response.bytes_stream()), false),
+            move |(mut source, failed)| async move {
+                match source.next().await {
+                    Some(frame) => {
+                        if frame.is_err() && !failed {
+                            tui_reply_event("gateway_tui_private_body", "read_failed");
+                        }
+                        let failed = failed || frame.is_err();
+                        Some((frame, (source, failed)))
+                    }
+                    None => {
+                        if !failed {
+                            tui_reply_event("gateway_tui_private_body", result);
+                        }
+                        None
+                    }
+                }
+            },
+        );
+        return Body::from_stream(body);
+    }
+    Body::from_stream(response.bytes_stream())
 }
 
 /// 同一公开请求的原文和解析线索；身份、路由与认证始终由预留绑定独立校验。

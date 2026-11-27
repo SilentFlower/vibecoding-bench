@@ -61,6 +61,8 @@ V2 私有提交响应头丢失，或已提交的私有入口只交回没有模�
 
 已提交的 V2 工具回执在网关等待首响应头到期时公开返回 502。原私有请求沿工具响应接回窗口继续读取。同一回执可接回仍在交付的原流，或读取已完成的缓存回复。晚到的模型响应及尝试按原预留补记，原公开 502 继续保留。接回请求自身的上游尝试计数为零。
 
+隔离构建启用 `v3-verification` 和 `FLOWER_V2_STARTUP_TRACE=1` 时，验收可以按原公开请求和预留核对两个网关终态。`gateway_tui_private_body/received` 表示网关从私有 HTTP 成功响应读到正文结束。`received_error` 表示完整读到私有 HTTP 错误响应。`read_failed` 表示正文读取失败，`no_response` 表示私有提交在取得响应前结束。`gateway_tui_reply_cache/ready` 表示已核验的完整回复确实保存在接回缓存。`no_reply` 表示写者在发布完整回复前释放，`incomplete` 表示已发布的回复收尾失败。隔离模型生成终帧和本地写出结果由模型夹具另行记录。用量收口用于核对计费。
+
 重试原因包括 `oauth_recovery`、`credentials_rejected`、`signature_repair`、`transient_rate_limit` 和 `account_rate_limit`。错误阶段区分准入、请求、凭据、认证恢复、账号选择、Hello 探针、传输、上游响应头/响应体和下游响应体；不保存任意错误文本。采样错误类型为 `sampling_limit`、`decode_error` 或 `invalid_payload`；上游错误类型只保留白名单，未知类型归为 `unknown_upstream_error`。
 
 ## 留存、隐私与故障信号
