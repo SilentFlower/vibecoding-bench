@@ -258,11 +258,11 @@ def fixture_parallel_results(calls, callbacks):
     @param calls 从公开 SSE 重组的调用。@param callbacks 实际执行记录。@return 逆序的结果块。
     """
     def lookup_note(arguments):
-        assert arguments == ARGS, arguments
+        assert same_json_value(arguments, ARGS), arguments
         return REPLY
 
     def set_tag(arguments):
-        assert arguments == PARALLEL_SECOND_ARGS, arguments
+        assert same_json_value(arguments, PARALLEL_SECOND_ARGS), arguments
         raise ValueError(SECOND_REPLY)
 
     handlers = {TOOL["name"]: lookup_note, PARALLEL_SECOND_TOOL["name"]: set_tag}
@@ -1358,9 +1358,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             offered.append(block)
         assert [block["id"] for block in offered] == expected_ids, offered
         assert [block["name"] for block in offered] == [item["name"] for item in declared], offered
-        assert [block["input"] for block in offered] == (
-            [ARGS, PARALLEL_SECOND_ARGS] if parallel_tools else [ARGS]
-        ), offered
+        public_inputs = [block["input"] for block in offered]
+        assert same_json_value(public_inputs, [ARGS, PARALLEL_SECOND_ARGS] if parallel_tools else [ARGS]), offered
         tool = offered[0]
         if parallel_tools:
             result = {"role": "user", "content": fixture_parallel_results(offered, callbacks)}
@@ -2292,27 +2291,38 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                              changed_nested_history_cache_status=changed_nested_cache)
         if parallel_tools and not (tool_receipt_images or exact_tool_receipts):
             first, second = (document for _, document, _ in received)
+            assert final["stop_reason"] == "end_turn", final
             assert TOOL["input_schema"] != PARALLEL_SECOND_TOOL["input_schema"]
             for native in (first, second):
                 second_tool, = [t for t in native["tools"] if t["name"] == NATIVE_SECOND_TOOL_NAME]
-                assert second_tool["input_schema"] == PARALLEL_SECOND_TOOL["input_schema"]
+                assert same_json_value(second_tool["input_schema"], PARALLEL_SECOND_TOOL["input_schema"]), second_tool
             assert not find_blocks(first, "id", SECOND_ID) and not find_blocks(first, "tool_use_id", SECOND_ID)
-            assert find_blocks(second, "id", SECOND_ID) == [("assistant", {
+            ((call_role, second_call),) = find_blocks(second, "id", SECOND_ID)
+            assert call_role == "assistant" and same_json_value(second_call, {
                 "type": "tool_use", "name": NATIVE_SECOND_TOOL_NAME, "id": SECOND_ID, "input": PARALLEL_SECOND_ARGS,
-            })]
+            }), second_call
             (success_role, success), = find_blocks(second, "tool_use_id", NEW_ID)
             assert success_role == "user" and not success.get("is_error", False) and success["content"] == REPLY
             (role, failed), = find_blocks(second, "tool_use_id", SECOND_ID)
             assert role == "user" and failed["is_error"] is True
-            # CLI 会在最后一个结果补足原生 Token 提醒，原始失败正文必须保持在开头。
-            assert failed["content"].startswith(SECOND_REPLY + "\n\n<system-reminder>\n<total_tokens>")
+            # 记录固定 CLI 两种续轮的实收差异，模型结果始终按原调用 ID 归属。
+            token_reminder = failed["content"].startswith(SECOND_REPLY + "\n\n<system-reminder>\n<total_tokens>")
+            if recover_pending:
+                assert failed["content"] == SECOND_REPLY, failed
+            else:
+                assert token_reminder, failed
             client_order = [block["tool_use_id"] for block in result["content"]]
             model_order = [block["tool_use_id"] for row in second["messages"] for block in blocks(row)
                            if block.get("tool_use_id") in expected_ids]
-            assert client_order == expected_ids[::-1] and model_order == expected_ids, (client_order, model_order)
+            assert client_order == expected_ids[::-1]
+            assert model_order == (client_order if recover_pending else expected_ids), (client_order, model_order)
             proof.update(parallel_tool_receipt_rejections=partial_statuses, preserved_tool_error=True,
                          client_result_order=client_order, model_result_order=model_order,
-                         distinct_tool_schemas=True, exact_success_text=True, failure_token_reminder=True)
+                         distinct_tool_schemas=True, exact_success_text=True, failure_token_reminder=token_reminder,
+                         public_second_tool_input=public_inputs[1], model_second_tool_input=second_call["input"])
+            if recover_pending:
+                assert binding_file.read_bytes() == original_binding, binding_file
+                proof["original_binding_preserved"] = True
         if split_history_tools:
             for _, native, _ in received:
                 assert find_blocks(native, "id", PAST_SECOND_ID) == [("assistant", {
@@ -5861,7 +5871,7 @@ def verify_model(received, *, policy, old_content, current_text_blocks=False, ex
         assert tool["name"] == NATIVE_TOOL_NAME and tool["input_schema"] == TOOL["input_schema"]
     assert not find_blocks(first, "id", NEW_ID) and not find_blocks(first, "tool_use_id", NEW_ID)
     (new,) = find_blocks(second, "id", NEW_ID)
-    assert new[0] == "assistant" and new[1]["name"] == NATIVE_TOOL_NAME and new[1]["input"] == ARGS
+    assert new[0] == "assistant" and new[1]["name"] == NATIVE_TOOL_NAME and same_json_value(new[1]["input"], ARGS), new
     if exact_receipts:
         for result in exact_receipts:
             tool_id = result["tool_use_id"]
@@ -6018,7 +6028,8 @@ def main():
     scenario.add_argument("--history-images", action="store_true")
     scenario.add_argument("--history-tool-blocks", action="store_true")
     scenario.add_argument("--split-history-tools", action="store_true")
-    scenario.add_argument("--parallel-new-tools", action="store_true")
+    scenario.add_argument("--parallel-new-tools", nargs="?", const="live", choices=("live", "restart"),
+                          help="核对双工具逆序回执；restart 结束原 CLI 并重启发送器")
     scenario.add_argument("--reconnect-tool-stream", action="store_true")
     scenario.add_argument("--interrupted-tool-stream", nargs="?", const="before-tool",
                           choices=("before-tool", "after-tool-start"),
@@ -6035,12 +6046,13 @@ def main():
     scenario.add_argument("--failure-boundaries", action="store_true")
     scenario.add_argument("--v1-runtime", type=Path)
     args = parser.parse_args()
+    recover_pending_tool = args.recover_pending_tool or args.parallel_new_tools == "restart"
     if args.receipt_auto_tool_choice is not None and (
             args.auto_tool_choice is None or args.auto_tool_choice == args.receipt_auto_tool_choice):
         parser.error("--receipt-auto-tool-choice 需要不同形状的 --auto-tool-choice")
     if args.prior_auto_source is not None and (
             args.interrupted_tool_stream != "before-tool" or args.auto_tool_choice is None
-            or args.recover_pending_tool or args.installed_runtime):
+            or recover_pending_tool or args.installed_runtime):
         parser.error("--prior-auto-source 需要 --interrupted-tool-stream before-tool 与 --auto-tool-choice")
     if args.installed_runtime and (args.structured_output_contract not in ("live", "restart")
                                    or args.sender != Path("/usr/local/bin/account-sender")):
@@ -6080,8 +6092,8 @@ def main():
         parser.error("--tool-receipt-nested-cache 需要同用 --tool-receipt-text-blocks")
     if args.tool_receipt_outer_cache and not args.tool_receipt_text_blocks:
         parser.error("--tool-receipt-outer-cache 需要同用 --tool-receipt-text-blocks")
-    if args.trace_recovery_resend and not (args.recover_pending_tool or args.model_connection_contract == "restart"):
-        parser.error("--trace-recovery-resend 需要 --recover-pending-tool 或 --model-connection-contract restart")
+    if args.trace_recovery_resend and not (recover_pending_tool or args.model_connection_contract == "restart"):
+        parser.error("--trace-recovery-resend 需要工具回执恢复场景")
     if (args.recovery_ledger_contention or args.recovery_ledger_deadline or args.recovery_workspace_rejection
         or args.recovery_readiness_rejection or args.recovery_slow_model) and (
         not args.recover_pending_tool or args.signed_tool_history
@@ -6138,7 +6150,7 @@ def main():
                        system_policy=args.system_policy, toggle_pending_policy=args.toggle_pending_policy,
                        stock_client=args.stock_client,
                        tool_policy="replace" if args.bound_signed_history else args.tool_policy,
-                       recover_pending=(args.recover_pending_tool or args.oauth_rotation == "restart"
+                       recover_pending=(recover_pending_tool or args.oauth_rotation == "restart"
                                         or args.model_connection_contract == "restart"),
                        model_connection_contract=args.model_connection_contract,
                        external_signed_history=args.external_signed_history,
@@ -6160,7 +6172,7 @@ def main():
                        signed_tool_history=args.signed_tool_history or bool(args.bound_signed_history),
                        signed_tool_response=args.signed_tool_response,
                        split_history_tools=args.split_history_tools,
-                       v1_runtime=args.v1_runtime, parallel_tools=args.parallel_new_tools,
+                       v1_runtime=args.v1_runtime, parallel_tools=args.parallel_new_tools is not None,
                        reconnect_tool_stream=args.reconnect_tool_stream, slow_tool_stream=args.slow_tool_stream,
                        interrupted_tool_stream=args.interrupted_tool_stream,
                        current_images=args.current_images,
