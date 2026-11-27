@@ -1969,7 +1969,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                         assert retained_history == original_history
                     else:
                         assert retained_history.startswith(original_history)
-                        assert proof["replay"]["session_origin"] == "live_process", proof["replay"]
+                    expected_origin = "disk_resume" if recover_pending else "live_process"
+                    assert proof["replay"]["session_origin"] == expected_origin, proof["replay"]
                     proof["original_cli_alive_at_502"] = not recover_pending
                     proof["original_history_bytes_equal"] = retained_history == original_history
                     proof["original_binding_preserved"] = True
