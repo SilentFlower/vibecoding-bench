@@ -85,16 +85,19 @@ class ObservedModel(core.ObservedModel):
         return parsed
 
 
-def collect(manage, token, identifier, received, sender_status, restart, *, source_observer, mode, stages):
+def collect(manage, token, identifier, received, sender_status, restart, *, source_observer, mode, stages,
+            public_stream=False):
     """关联公开请求、核心钩子、账号隧道和接收端。
     @param manage 管理入口。@param token 合成入口凭据。@param identifier 隔离账号。
     @param received 实际模型收件。@param sender_status 失败时的发送器诊断。
     @param restart 可用的发送器重启入口。@param source_observer 是否使用额外账号观测器。
     @param mode 试接模式。@param stages 实测代理和接收端事件。@return 隔离证据。
+    @param public_stream 是否通过真实公开 SSE 执行工具。
     """
     expected = 200 if mode == "allow" else 502
     public = guarded.check(manage, token, identifier, received, sender_status, restart,
-                           source_observer=source_observer, mode="tool", receipt_status=expected)
+                           source_observer=source_observer, mode="tool", receipt_status=expected, public_stream=public_stream)
+    assert public["client_tool_executions"] == 1
     (log,) = Path("/native/tui-sessions").glob("*/home/.claude/core-http.log")
     lines = log.read_text(errors="replace").splitlines()
     assert any(f"{core.POLICY_PLUGIN}@{core.POLICY_MARKET}" in line and "tier prepend" in line for line in lines)
@@ -158,15 +161,22 @@ def main():
     parser = ArgumentParser(description=__doc__)
     parser.add_argument("--mode", choices=("connect-only", "allow", "deny-receipt"), required=True)
     parser.add_argument("--gateway", type=Path, required=True)
+    parser.add_argument("--sender", type=Path, default=Path("/usr/local/bin/account-sender"))
+    parser.add_argument("--direct-candidate", action="store_true", help="使用允许延后首帧的直发候选")
+    parser.add_argument("--stream", action="store_true", help="经公开 SSE 交付工具和完整答复")
     args = parser.parse_args()
     assert Path("/.dockerenv").is_file() and {name for _, name in if_nameindex()} == {"lo"}
+    if args.direct_candidate and args.mode != "allow":
+        parser.error("直发候选需要 --mode allow")
+    if args.stream and not args.direct_candidate:
+        parser.error("公开 SSE 需要允许工具回执的直发候选")
     version = "2.1.321"
     digest = core.PROGRAMS[version]
     with Path(f"/cli/{version}/node_modules/.bin/claude").open("rb") as stream:
         assert file_digest(stream, "sha256").hexdigest() == digest
     core.install(version, digest, "tool", "managed")
     if args.mode != "connect-only":
-        install_permit(args.mode)
+        install_permit(CANDIDATE_MODE if args.direct_candidate and args.mode == "allow" else args.mode)
     stages = {key: [] for key in ("proxy_connect_accepted", "proxy_model_tcp_connected",
                                  "model_client_hello", "model_received", "direct_model_http_identity")}
     observe = fixture.startup_event
@@ -178,10 +188,10 @@ def main():
 
     with patch.multiple(
         fixture, QuietHandler=ObservedModel, startup_event=capture,
-        verify_structured_tool_round=partial(collect, mode=args.mode, stages=stages),
+        verify_structured_tool_round=partial(collect, mode=args.mode, stages=stages, public_stream=args.stream),
     ), TemporaryDirectory(prefix="tui-direct-reuse-") as folder:
         result = fixture.verify(
-            args.gateway, Path("/usr/local/bin/account-sender"), Path(folder), installed_runtime=True,
+            args.gateway, args.sender, Path(folder), installed_runtime=True,
             structured_output="live", trace_startup=True, model_connection_contract="live",
         )
     print(json.dumps(result, ensure_ascii=False, indent=2))

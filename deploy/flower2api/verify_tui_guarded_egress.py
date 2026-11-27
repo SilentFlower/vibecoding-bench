@@ -3,6 +3,7 @@
 import argparse
 from functools import partial
 from hashlib import sha256
+from io import BytesIO
 import json
 from pathlib import Path
 from re import fullmatch
@@ -14,6 +15,8 @@ from urllib.parse import urlsplit
 from uuid import uuid4
 
 import verify_tui_cold_history as fixture
+from tui_message_json import MessageJSON
+from tui_messages import BODY_LIMIT, wire_events
 
 
 def install(*, observe_failure=False):
@@ -108,21 +111,36 @@ def check_provider_error(manage, token, identifier, received, sender_status, res
             "stop_failure": event, "diagnostics": evidence, "wire_final": "unavailable"}
 
 
-def check(manage, token, identifier, received, sender_status, restart, *, source_observer, mode, receipt_status=200):
-    """通过正式网关提交简单非流式请求。@return 公开回执和模型实收。"""
+def check(manage, token, identifier, received, sender_status, restart, *, source_observer, mode, receipt_status=200,
+          public_stream=False):
+    """通过公开网关核对真实工具。@param public_stream 是否读取公开 SSE。@return 公开回执和模型实收。"""
     assert not source_observer and not restart
     headers = {"x-session-id": str(uuid4()), "User-Agent": "flower2api-direct-guarded-lab/1"}
     question = "从真实原版进程直接提交的合成问题。"
-    body = {"model": fixture.MODEL, "max_tokens": 128, "stream": False, "thinking": {"type": "disabled"},
+    body = {"model": fixture.MODEL, "max_tokens": 128, "stream": public_stream, "thinking": {"type": "disabled"},
             "messages": [{"role": "user", "content": question}]}
+    tool_executions = []
+
     def post(label, request, expected):
         status, raw, request_id = fixture.checked_messages(
             manage, token, request, headers, received, label, expected_status=expected,
             trace_startup=True, sender_status=sender_status,
         )
         context = manage("GET", "request-diagnostics/" + request_id)["request"].get("context") or {}
-        return json.loads(raw), {"status": status, "request_id": request_id,
-                                 "reservation_id": context.get("tui_reservation_id")}
+        proof = {"status": status, "request_id": request_id, "reservation_id": context.get("tui_reservation_id")}
+        if public_stream and status == 200:
+            output = MessageJSON(BODY_LIMIT)
+            sequence = []
+            for _, item in wire_events(BytesIO(raw)):
+                if item is not None and item["type"] != "ping":
+                    output.add(item)
+                    sequence.append(item["type"])
+            assert sequence[:2] == ["message_start", "content_block_start"], sequence
+            assert sequence[-3:] == ["content_block_stop", "message_delta", "message_stop"], sequence
+            assert sequence[2:-3] and all(kind == "content_block_delta" for kind in sequence[2:-3]), sequence
+            proof["sse_events"] = sequence
+            raw = output.finish()
+        return json.loads(raw), proof
 
     first = None
     result = None
@@ -132,13 +150,18 @@ def check(manage, token, identifier, received, sender_status, restart, *, source
         assert len(received) == 1 and tool_reply["stop_reason"] == "tool_use"
         assert tool_reply["content"] == [{"type": "tool_use", "id": fixture.NEW_ID,
                                           "name": fixture.TOOL["name"], "input": fixture.ARGS}]
-        result = {"type": "tool_result", "tool_use_id": tool_reply["content"][0]["id"], "content": fixture.REPLY}
+        call, = tool_reply["content"]
+        # 执行端只接收公开回复中的工具 ID 和参数，读取夹具提供的一条合成便签。
+        notes = {fixture.encoded(fixture.ARGS): fixture.REPLY}
+        result = {"type": "tool_result", "tool_use_id": call["id"], "content": notes[fixture.encoded(call["input"])]}
+        tool_executions.append(call["id"])
         follow = {**body, "messages": [*body["messages"], {"role": "assistant", "content": tool_reply["content"]},
                                       {"role": "user", "content": [result]}]}
         answer, request = post("guarded_direct_tool_receipt", follow, receipt_status)
         if receipt_status != 200:
             return {**request, "initial": first, "tool_result": result, "model_posts": len(received),
-                    "public_error": answer["error"], "session_id": headers["x-session-id"], "wire_final": "unavailable"}
+                    "public_error": answer["error"], "client_tool_executions": len(tool_executions),
+                    "session_id": headers["x-session-id"], "wire_final": "unavailable"}
         _, duplicate = post("guarded_direct_tool_duplicate", follow, 400)
         assert len(received) == 2
         (role, block), = fixture.find_blocks(received[-1][1], "tool_use_id", result["tool_use_id"])
@@ -155,6 +178,7 @@ def check(manage, token, identifier, received, sender_status, restart, *, source
     assert sum(block.get("text") == question for row in model["messages"] if row["role"] == "user"
                for block in fixture.blocks(row)) == 1
     return {**request, "initial": first, "tool_result": result,
+            "client_tool_executions": len(tool_executions),
             "session_id": headers["x-session-id"], "model_posts": len(received), "model_body_sha256": model_hash,
             "model_tls": tls, "answer_id": answer["id"], "answer_sha256": sha256(fixture.FINAL.encode()).hexdigest(),
             "model_usage": answer["usage"], "wire_final": "unavailable"}

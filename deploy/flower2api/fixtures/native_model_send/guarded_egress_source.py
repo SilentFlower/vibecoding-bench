@@ -221,8 +221,9 @@ def callback(actor, path, data):
         actor.direct_result = None
         actor.direct_http_reply = None
     elif path == "/direct-result":
+        buffered_stream = POLICY_MODE.is_file() and POLICY_MODE.read_text() == CANDIDATE_MODE
         with actor.changed:
-            if (not actor.step or not actor.step.claimed or actor.claim.stream
+            if (not actor.step or not actor.step.claimed or (actor.claim.stream and not buffered_stream)
                     or actor.step.native != (data["turn"], data["step"])):
                 raise ValueError("缺少同一文本模型步骤")
             actor.direct_result = data
@@ -250,8 +251,10 @@ def callback(actor, path, data):
         result = actor.direct_result
         raw = _observe_after_archive(actor, result)
         assert raw["id"] and result["reason"] == "end_turn"
+        text, = raw["content"]
         parts = [
-            {"type": "content_block_start", "index": 0, "content_block": raw["content"][0]},
+            {"type": "content_block_start", "index": 0, "content_block": {**text, "text": ""}},
+            {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": text["text"]}},
             {"type": "content_block_stop", "index": 0},
         ]
         report("native_archive_response", message_id=raw["id"], usage=result["usage"],

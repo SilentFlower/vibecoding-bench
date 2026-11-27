@@ -43,6 +43,8 @@ class ModelStream:
         self.written = 0
         self.total = 0
         self.events = []
+        self.first_frame_ns = None
+        self.ended_ns = None
 
     def prepare(self, wire):
         """组装隔离模型实际发送的有序响应。@param wire 默认模型 SSE。@return 本轮完整 SSE。"""
@@ -66,10 +68,14 @@ class ModelStream:
         @param wire 待发送 SSE。@return 无。
         """
         first, second, third, tail = wire.split(b"\n\n", 3)
-        prefix = b"\n\n".join((first, second, third, b""))
-        handler.wfile.write(prefix)
+        first += b"\n\n"
+        handler.wfile.write(first)
         handler.wfile.flush()
-        self.written = len(prefix)
+        self.first_frame_ns = monotonic_ns()
+        prefix_tail = b"\n\n".join((second, third, b""))
+        handler.wfile.write(prefix_tail)
+        handler.wfile.flush()
+        self.written = len(first) + len(prefix_tail)
         if not self.release.wait(20):
             handler.close_connection = True
             return
@@ -84,6 +90,7 @@ class ModelStream:
             handler.wfile.write(chunk)
             self.written += len(chunk)
         handler.wfile.flush()
+        self.ended_ns = monotonic_ns()
         self.completed.set()
 
 

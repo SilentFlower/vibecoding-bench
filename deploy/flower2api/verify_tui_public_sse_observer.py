@@ -2,19 +2,22 @@
 
 from argparse import ArgumentParser
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 from functools import partial
 from hashlib import file_digest
+from http.client import HTTPConnection
 import json
 from pathlib import Path
 from socket import if_nameindex
 from tempfile import TemporaryDirectory
 from threading import Event
+from time import monotonic_ns
 from unittest.mock import patch
 from uuid import uuid4
 
 import verify_tui_cold_history as fixture
 import verify_tui_core_http_hook as core
-from verify_tui_direct_reuse import install_permit
+from verify_tui_direct_reuse import CANDIDATE_MODE, install_permit
 from verify_tui_public_sse import ModelStream, PROBE_QUESTION, SENDER
 
 
@@ -65,11 +68,11 @@ def read_events():
     return records
 
 
-def compare(manage, token, identifier, received, sender_status, restart, *, source_observer, stream):
+def compare(manage, token, identifier, received, sender_status, restart, *, source_observer, stream, candidate=False):
     """模型保留终帧时核对官方流事件和公开边界。@param manage 管理接口。@param token 合成凭据。
     @param identifier 隔离账号。@param received 模型实收。@param sender_status 发送器诊断。
     @param restart 重启处理器。@param source_observer 是否使用额外账号观测。
-    @param stream 模型流屏障。@return 实测隔离对照。
+    @param stream 模型流屏障。@param candidate 是否启用完成态交付。@return 实测隔离对照。
     """
     assert not restart and not source_observer
     session = str(uuid4())
@@ -77,9 +80,34 @@ def compare(manage, token, identifier, received, sender_status, restart, *, sour
             "messages": [{"role": "user", "content": PROBE_QUESTION}]}
     headers = {"x-session-id": session, "User-Agent": "flower2api-public-sse-observer/1"}
     public_headers = Event()
+    public_times = {}
 
     def observe_response(_response):
+        public_times["response_headers_ns"] = monotonic_ns()
         public_headers.set()
+
+    def public_candidate():
+        with closing(HTTPConnection("127.0.0.1", 18090, timeout=30)) as connection:
+            connection.request("POST", "/v1/messages", fixture.encoded(body), headers={
+                **headers, "authorization": "Bearer " + token, "content-type": "application/json",
+                "anthropic-version": "2023-06-01",
+            })
+            with closing(connection.getresponse()) as response:
+                observe_response(response)
+                request_id = response.getheader("x-cc2api-request-id")
+                if response.status != 200:
+                    return response.status, response.read(), request_id
+                assert response.getheader("content-type").startswith("text/event-stream")
+                prefix = bytearray()
+                data_seen = False
+                for line in iter(response.readline, b""):
+                    prefix.extend(line)
+                    if line.startswith(b"data:"):
+                        data_seen = True
+                    elif data_seen and line in (b"\n", b"\r\n"):
+                        public_times["first_data_frame_ns"] = monotonic_ns()
+                        break
+                return response.status, bytes(prefix) + response.read(), request_id
 
     def before_tail():
         rows = read_events()
@@ -88,7 +116,7 @@ def compare(manage, token, identifier, received, sender_status, restart, *, sour
             return [row for row in rows if row["phase"] == "public_sse_chunk"], snapshot
 
     with ThreadPoolExecutor(max_workers=1) as pool:
-        pending = pool.submit(
+        pending = pool.submit(public_candidate) if candidate else pool.submit(
             fixture.checked_messages, manage, token, body, headers, received, "isolated_public_sse",
             expected_status=502, trace_startup=True, sender_status=sender_status, observe_response=observe_response,
         )
@@ -120,13 +148,27 @@ def compare(manage, token, identifier, received, sender_status, restart, *, sour
                    and row.get("model") and row["phase"] == "reply"]
     (reply,) = model_reply
     assert (reply["status"], reply["isStreaming"], reply["textLength"]) == (200, True, 0), reply
-    return {"authorization": "isolated_managed_policy", "stream": body["stream"], "request_id": request_id,
+    result = {"authorization": "isolated_managed_policy", "stream": body["stream"], "request_id": request_id,
             "permit": permit, "tunnel": tunnel, "model_posts": len(received), "early_hook_events": early,
             "model_first_frame": start, "early_session_snapshot": session_prefix,
             "step_results_after_tail": [row for row in events if row["phase"] == "public_sse_step_result"],
             "public_diagnostics": diagnostics,
             "public_headers_before_model_tail": False, "http_status": status,
-            "public_error": json.loads(raw)["error"], "core_reply": reply, "wire_final": "unavailable"}
+            "core_reply": reply, "wire_final": "unavailable"}
+    if not candidate:
+        return {**result, "public_error": json.loads(raw)["error"]}
+    assert status == 200, (status, raw, request_id)
+    events = [json.loads(line[5:]) for line in raw.splitlines() if line.startswith(b"data:")]
+    assert [event["type"] for event in events] == [event["type"] for event in stream.events]
+    assert events[2]["delta"] == stream.events[2]["delta"]
+    assert events[0]["message"]["usage"]["input_tokens"] == start["usage"]["input_tokens"]
+    assert events[-2]["usage"]["output_tokens"] == stream.events[-2]["usage"]["output_tokens"]
+    assert events[-2]["delta"]["stop_reason"] == "end_turn"
+    assert stream.first_frame_ns < stream.ended_ns <= public_times["response_headers_ns"] <= public_times["first_data_frame_ns"]
+    (attempt,) = request["attempts"]
+    assert attempt["attempt_id"] == reservation_id and attempt["request_id"] == request_id
+    return {**result, "data_frames": len(events), "answer": events[2]["delta"]["text"],
+            "timing_ns": {"model_first_frame_ns": stream.first_frame_ns, "model_end_ns": stream.ended_ns, **public_times}}
 
 
 def main():
@@ -134,6 +176,7 @@ def main():
     parser = ArgumentParser(description=__doc__)
     parser.add_argument("--gateway", type=Path, required=True)
     parser.add_argument("--sender", type=Path, default=SENDER)
+    parser.add_argument("--direct-candidate", action="store_true", help="验收模型结束后的候选公开事件流")
     args = parser.parse_args()
     assert Path("/.dockerenv").is_file() and {name for _, name in if_nameindex()} == {"lo"}
     version = "2.1.321"
@@ -141,7 +184,7 @@ def main():
     with Path(f"/cli/{version}/node_modules/.bin/claude").open("rb") as executable:
         assert file_digest(executable, "sha256").hexdigest() == digest
     core.install(version, digest, "tool", "managed")
-    install_permit("observe-sse")
+    install_permit(CANDIDATE_MODE if args.direct_candidate else "observe-sse")
     module = Path(f"/opt/{core.POLICY_MARKET}/{core.POLICY_PLUGIN}/hooks/observe.js")
     source = module.read_text()
     assert source.endswith("\n}\n")
@@ -149,7 +192,7 @@ def main():
     stream = ModelStream(pressure=False)
     with patch.multiple(
         fixture, QuietHandler=core.ObservedModel,
-        verify_structured_tool_round=partial(compare, stream=stream),
+        verify_structured_tool_round=partial(compare, stream=stream, candidate=args.direct_candidate),
     ), TemporaryDirectory(prefix="tui-sse-observer-") as folder:
         proof = fixture.verify(args.gateway, args.sender, Path(folder), installed_runtime=True, structured_output="live",
                                model_stream_probe=stream, trace_startup=True)
