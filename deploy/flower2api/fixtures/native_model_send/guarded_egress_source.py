@@ -121,7 +121,9 @@ class Callback(session._Callback):
             self.send_response_only(200)
             self.end_headers()
             streams = {self.connection: relay.sock, relay.sock: self.connection}
-            while ready := select(list(streams), [], [], 5)[0]:
+            # 模型等待期间同一 TLS 隧道可暂时没有数据。以会话生命周期收回连接。
+            while not actor.dead.is_set():
+                ready, _, _ = select(list(streams), [], [], 1)
                 for stream in ready:
                     data = stream.recv(65536)
                     if not data:

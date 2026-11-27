@@ -11,7 +11,7 @@ from pathlib import Path
 from socket import if_nameindex
 from tempfile import TemporaryDirectory
 from threading import Event
-from time import monotonic_ns
+from time import monotonic_ns, sleep
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -68,11 +68,13 @@ def read_events():
     return records
 
 
-def compare(manage, token, identifier, received, sender_status, restart, *, source_observer, stream, candidate=False):
+def compare(manage, token, identifier, received, sender_status, restart, *, source_observer, stream, candidate=False,
+            hold_model_tail=False):
     """模型保留终帧时核对官方流事件和公开边界。@param manage 管理接口。@param token 合成凭据。
     @param identifier 隔离账号。@param received 模型实收。@param sender_status 发送器诊断。
     @param restart 重启处理器。@param source_observer 是否使用额外账号观测。
     @param stream 模型流屏障。@param candidate 是否启用完成态交付。@return 实测隔离对照。
+    @param hold_model_tail 是否核对暂时无模型数据时原连接仍可交付。
     """
     assert not restart and not source_observer
     session = str(uuid4())
@@ -82,8 +84,10 @@ def compare(manage, token, identifier, received, sender_status, restart, *, sour
     public_headers = Event()
     public_times = {}
 
-    def observe_response(_response):
+    def observe_response(response):
         public_times["response_headers_ns"] = monotonic_ns()
+        fixture.startup_event("direct_sse_public_headers", status=response.status,
+                              request_id=response.getheader("x-cc2api-request-id"))
         public_headers.set()
 
     def public_candidate():
@@ -131,6 +135,9 @@ def compare(manage, token, identifier, received, sender_status, restart, *, sour
             start = stream.events[0]["message"]
             assert start["id"] == "msg_cold_reply" and start["usage"]["input_tokens"] > 0, start
             assert early[2]["text"] == stream.events[2]["delta"]["text"], early
+            if hold_model_tail:
+                sleep(6)
+                assert not stream.writing_tail.is_set() and not public_headers.is_set()
         finally:
             stream.release.set()
         status, raw, request_id = pending.result()
@@ -177,6 +184,7 @@ def main():
     parser.add_argument("--gateway", type=Path, required=True)
     parser.add_argument("--sender", type=Path, default=SENDER)
     parser.add_argument("--direct-candidate", action="store_true", help="验收模型结束后的候选公开事件流")
+    parser.add_argument("--hold-model-tail", action="store_true", help="隔离模型发送前缀后空闲六秒")
     args = parser.parse_args()
     assert Path("/.dockerenv").is_file() and {name for _, name in if_nameindex()} == {"lo"}
     version = "2.1.321"
@@ -192,7 +200,8 @@ def main():
     stream = ModelStream(pressure=False)
     with patch.multiple(
         fixture, QuietHandler=core.ObservedModel,
-        verify_structured_tool_round=partial(compare, stream=stream, candidate=args.direct_candidate),
+        verify_structured_tool_round=partial(compare, stream=stream, candidate=args.direct_candidate,
+                                              hold_model_tail=args.hold_model_tail),
     ), TemporaryDirectory(prefix="tui-sse-observer-") as folder:
         proof = fixture.verify(args.gateway, args.sender, Path(folder), installed_runtime=True, structured_output="live",
                                model_stream_probe=stream, trace_startup=True)
