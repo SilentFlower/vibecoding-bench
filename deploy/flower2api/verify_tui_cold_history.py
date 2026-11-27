@@ -323,7 +323,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            v1_runtime=None,
            parallel_tools=False, reconnect_tool_stream=False, interrupted_tool_stream=None,
            current_images=False, current_image_ending="text",
-           auto_tool_choice=None, auto_tool_direct_text=False,
+           auto_tool_choice=None, auto_tool_direct_text=False, prior_auto_source=None,
            adaptive_thinking_model=None, adaptive_thinking_display="updates", thinking_display_model=None,
            fixed_thinking_model=None, fixed_thinking_display="updates",
            thinking_cli_summaries=None,
@@ -382,6 +382,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param current_images 是否用本轮原生图文替换纯文本问题。
     @param current_image_ending 本轮九块图文以文字或图片结尾。
     @param auto_tool_choice 原请求中自动选择的字段形状。
+    @param prior_auto_source 写入原工具回执摘要的旧账号事件源检出。
     @param auto_tool_direct_text 是否让模型在有工具声明时直接返回文本。
     @param adaptive_thinking_model 可选，核对显式 adaptive 的固定模型。
     @param adaptive_thinking_display 在工具首轮与续轮冻结的显式显示值。
@@ -827,13 +828,31 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 startup_event("sender_ready", phase=phase, sender_pid=process.pid,
                               ready=state["ready"], idle=state.get("idle"))
 
+        prior_auto_checkpoint = None
+
         def restart(process, phase):
+            nonlocal prior_auto_checkpoint
             wait_for(lambda: sender_state().get("idle"))
             if trace_startup:
                 startup_event("sender_stop_requested", phase=phase, sender_pid=process.pid)
             stop(process)
             if trace_startup:
                 startup_event("sender_exited", phase=phase, sender_pid=process.pid, returncode=process.returncode)
+            if prior_auto_source is not None:
+                # 旧源已实际认领原回执。读取其持久修订和摘要，再让新源恢复同一账号卷。
+                module = Path("images/account/tui_session.py")
+                prior_sha = sha256((prior_auto_source / module).read_bytes()).hexdigest()
+                current_sha = sha256((ROOT / module).read_bytes()).hexdigest()
+                assert prior_sha != current_sha, "旧账号事件源与待验事件源相同"
+                ledger = Path("/native/tui-reconnect/receipts.db")
+                with closing(connect(ledger.as_uri() + "?mode=ro", uri=True)) as database:
+                    ((revision, receipt_digest, state),) = database.execute(
+                        "SELECT revision, request, state FROM receipts"
+                    ).fetchall()
+                assert state == "open" and receipt_digest and len(receipt_digest) == 64, (revision, receipt_digest, state)
+                prior_auto_checkpoint = {"revision": revision, "digest": receipt_digest, "state": state,
+                                         "prior_source_sha256": prior_sha, "recovery_source_sha256": current_sha}
+                install_source(ROOT, trace_startup=True)
             restarted = start_sender()
             if trace_startup:
                 startup_event("sender_started", phase=phase, sender_pid=restarted.pid)
@@ -1412,7 +1431,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 )
                 assert len(received) == 1, (label, raw, len(received))
                 changed_choices[label] = rejected
-            follow["tool_choice"] = other_auto
+            if prior_auto_source is None:
+                follow["tool_choice"] = other_auto
         if explicit_custom_tool_type:
             changed_tools = deepcopy(declared)
             changed_tools[0].pop("type")
@@ -1483,15 +1503,22 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             assert changed_signature == 422 and len(received) == 1, (changed_signature, response, len(received))
             changed_signature_body = response
         if interrupted_tool_stream:
+            retry = {**follow, "tool_choice": other_auto} if prior_auto_source is not None else follow
             try:
                 proof = verify_interrupted_tool_stream(
                     manage, temporary, token, headers, follow, received, callbacks,
                     finish_stream, continue_tool_stream, initial_request_id, lambda: restart(source, "interrupted_tool_retry"),
-                    sender_state_after_failure, after_tool_start=interrupted_tool_stream == "after-tool-start",
+                    sender_state_after_failure, after_tool_start=interrupted_tool_stream == "after-tool-start", retry=retry,
                 )
             finally:
                 finish_stream.set()
             verify_model(received[:2], policy="append", old_content=old_result)
+            if prior_auto_source is not None:
+                assert prior_auto_checkpoint is not None
+                model_tools = [verify_automatic_model_tools(native, declared) for _, native, _ in received]
+                proof.update(prior_auto_checkpoint=prior_auto_checkpoint, first_receipt_tool_choice=follow["tool_choice"],
+                             retry_tool_choice=retry["tool_choice"], tool_choice_rejections=changed_choices,
+                             retry_receipt_body_sha256=sha256(encoded(retry)).hexdigest(), model_tools=model_tools)
             return proof
         if reconnect_tool_stream or slow_tool_stream:
             try:
@@ -2545,7 +2572,7 @@ def interrupted_stream_tool_result(tool, callbacks):
 
 def verify_interrupted_tool_stream(manage, temporary, token, headers, follow, received, callbacks,
                                    finish_stream, continue_tool_stream, initial_request_id, restart_sender, sender_status,
-                                   *, after_tool_start):
+                                   *, after_tool_start, retry):
     """验证已开始交付的流丢失后，仅用原工具回执恢复一次。
     @param manage 管理入口。@param temporary 本次数据库目录。@param token 调用方。
     @param headers 原公开会话。@param follow 原回执。
@@ -2554,6 +2581,7 @@ def verify_interrupted_tool_stream(manage, temporary, token, headers, follow, re
     @param initial_request_id 首轮公开请求。
     @param restart_sender 等原轮释放后重启 sender。@param sender_status 失败后读取 sender。
     @param after_tool_start 是否已交付下一工具编号及半段参数。
+    @param retry 恢复时提交的原回执或其等价表示。
     @return 中断、恢复、后续工具及用量证据。
     """
     marker = ("--name=" + headers["x-session-id"]).encode()
@@ -2672,7 +2700,7 @@ def verify_interrupted_tool_stream(manage, temporary, token, headers, follow, re
                 prefix_read.set()
 
         _, tail, request_id = checked_messages(
-            manage, token, follow, headers, received, phase, trace_startup=True,
+            manage, token, retry, headers, received, phase, trace_startup=True,
             sender_status=sender_status, observe_response=hold,
         )
         return prefix + [line for line in tail.splitlines(keepends=True) if line.startswith(b"data:")], request_id
@@ -2698,7 +2726,7 @@ def verify_interrupted_tool_stream(manage, temporary, token, headers, follow, re
     tool = {**start, "input": json.loads("".join(event["delta"]["partial_json"] for event in events[5:7]))}
     assert tool["input"] == SECOND_ARGS and events[-2]["delta"]["stop_reason"] == "tool_use"
     assert callbacks == [NEW_ID]
-    current_request = next_tool_stream_receipt(follow, tool, result=interrupted_stream_tool_result(tool, callbacks))
+    current_request = next_tool_stream_receipt(retry, tool, result=interrupted_stream_tool_result(tool, callbacks))
     _, final, next_id = checked_messages(
         manage, token, current_request, headers, received, "interrupted_tool_next_receipt",
         trace_startup=True, sender_status=sender_status,
@@ -5031,6 +5059,8 @@ def main():
                               const="ordinary-contract")
     parser.add_argument("--auto-tool-choice", nargs="?", const="explicit-false", choices=("bare", "explicit-false"),
                         help="核对两种等价 auto 回执及原工具组边界")
+    parser.add_argument("--prior-auto-source", type=Path,
+                        help="从旧账号源码实际认领的显式 false 回执恢复，并改用等价的 bare auto")
     parser.add_argument("--adaptive-thinking-model", choices=(MODEL, "claude-opus-5-5"))
     parser.add_argument("--fixed-thinking-model", choices=(MODEL, "claude-opus-4-6"))
     parser.add_argument("--fixed-thinking-display", choices=("updates", "summarized"), default="updates")
@@ -5102,6 +5132,10 @@ def main():
     scenario.add_argument("--failure-boundaries", action="store_true")
     scenario.add_argument("--v1-runtime", type=Path)
     args = parser.parse_args()
+    if args.prior_auto_source is not None and (
+            args.interrupted_tool_stream != "before-tool" or args.auto_tool_choice != "explicit-false"
+            or args.recover_pending_tool or args.installed_runtime):
+        parser.error("--prior-auto-source 需要 --interrupted-tool-stream before-tool 与 --auto-tool-choice explicit-false")
     if args.installed_runtime and (args.structured_output_contract not in ("live", "restart")
                                    or args.sender != Path("/usr/local/bin/account-sender")):
         parser.error("--installed-runtime 需要结构化工具轮和镜像内置 account-sender")
@@ -5173,7 +5207,8 @@ def main():
         previous = (None, *args.mixed_image_peers)
     elif args.v1_runtime is None:
         if not args.installed_runtime:
-            install_source(previous[0] if previous else ROOT, trace_startup=trace_startup,
+            source_root = previous[0] if previous else args.prior_auto_source or ROOT
+            install_source(source_root, trace_startup=trace_startup,
                            cache_capability=args.cache_marker_capabilities, thinking_cli_summaries=thinking_cli_summaries)
     elif sha256(args.v1_runtime.read_bytes()).hexdigest() != V1_RUNTIME_SHA256:
         parser.error("V1 启动器摘要与固定版不符")
@@ -5211,6 +5246,7 @@ def main():
                        cancel_and_change_question=args.cancel_and_change_question,
                        current_image_ending=args.current_image_ending,
                        auto_tool_choice=args.auto_tool_choice,
+                       prior_auto_source=args.prior_auto_source,
                        auto_tool_direct_text=args.auto_tool_direct_text,
                        adaptive_thinking_model=args.adaptive_thinking_model,
                        fixed_thinking_model=args.fixed_thinking_model,
