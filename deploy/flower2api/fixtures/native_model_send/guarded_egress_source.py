@@ -236,7 +236,7 @@ def _public_tool_name(actor, part):
 
 
 class _LiveProjection:
-    """按官方增量交付文本和客户端工具组，沿原步骤发布最终帧。"""
+    """按官方事件交付文本、签名思考和客户端工具组，沿原步骤发布最终帧。"""
 
     def __init__(self, actor):
         """构造同一实际步骤的公开开场。@param actor 原会话。@return 无。"""
@@ -246,6 +246,7 @@ class _LiveProjection:
         self.text_indices = {}
         self.text_digest = sha256()
         self.tools = {}
+        self.closed = set()
         self._emit({"type": "message_start", "message": {
             "id": "msg_" + uuid4().hex, "role": "assistant", "type": "message", "model": self.step.native_model,
             "content": [], "stop_reason": None, "stop_sequence": None,
@@ -265,7 +266,21 @@ class _LiveProjection:
         return index
 
     def add(self, chunk):
-        """发布实际文本或工具参数分片。@param chunk 官方增量。@return 无。"""
+        """发布实际文本、工具参数分片或已追加的签名块。@param chunk 官方事件。@return 无。"""
+        if chunk["kind"] == "signed":
+            for block in chunk["blocks"]:
+                if block["type"] == "thinking":
+                    index = self._start({"type": "thinking", "thinking": "", "signature": ""})
+                    if block["thinking"]:
+                        self._emit({"type": "content_block_delta", "index": index,
+                                    "delta": {"type": "thinking_delta", "thinking": block["thinking"]}})
+                    self._emit({"type": "content_block_delta", "index": index,
+                                "delta": {"type": "signature_delta", "signature": block["signature"]}})
+                else:
+                    index = self._start({"type": "redacted_thinking", "data": block["data"]})
+                self._emit({"type": "content_block_stop", "index": index})
+                self.closed.add(index)
+            return
         kind, native_index = chunk["kind"], chunk["index"]
         if kind == "tool":
             if native_index in self.tools:
@@ -305,8 +320,12 @@ class _LiveProjection:
             index: (identifier, digest.digest()) for index, (identifier, digest) in completed_tools.items()
         }:
             raise ValueError("公开工具组与官方步骤完整结果不符")
+        if self.closed:
+            # 签名来源使用官方步骤汇报的实际响应模型。开场用于展示的请求模型可能与它不同。
+            self.step.response_model = result["usage"].get("model")
         for index in range(self.next_index):
-            self._emit({"type": "content_block_stop", "index": index})
+            if index not in self.closed:
+                self._emit({"type": "content_block_stop", "index": index})
         self._emit({"type": "message_delta", "delta": {"stop_reason": result["reason"], "stop_sequence": None},
                     "usage": result["usage"]})
         terminal = {"type": "message_stop"}

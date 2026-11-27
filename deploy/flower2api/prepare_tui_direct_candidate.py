@@ -37,9 +37,23 @@ def main():
     (account / "fixture-installed-direct").touch()
     mod = account / "tui-mod/hooks/session.js"
     mod_code = mod.read_text()
+    register = "export function register(on) {\n"
+    step = "    const stream = next(e)\n"
     position = "      const chunk = item.value\n"
-    assert mod_code.count(position) == 1
-    mod.write_text(mod_code.replace(position, position + """      if (['text', 'tool', 'input'].includes(chunk.kind)) {
+    terminal = "        const response = item.value\n"
+    assert all(mod_code.count(marker) == 1 for marker in (register, step, position, terminal))
+    mod.write_text(mod_code.replace(register, register + """  let responseStep = null
+  on('session.append', { door: 'response' }, async ($, e, next) => {
+    // 官方增量可读思考文字，完整签名和不透明内容来自同一步的助手追加事件。
+    if (responseStep && !e.agentId && e.message.role === 'assistant') {
+      const blocks = e.message.content.filter(b => ['thinking', 'redacted_thinking'].includes(b.type))
+      if (blocks.length) await post($, 'direct-chunk', { ...responseStep, chunk: { kind: 'signed', blocks } })
+    }
+    return next(e)
+  })
+""").replace(step, """    responseStep = { turn: e.turnId, step: e.index }
+""" + step).replace(terminal, terminal + """        responseStep = null
+""").replace(position, position + """      if (['text', 'tool', 'input'].includes(chunk.kind)) {
         await post($, 'direct-chunk', { turn: e.turnId, step: e.index, chunk })
       }
 """))
