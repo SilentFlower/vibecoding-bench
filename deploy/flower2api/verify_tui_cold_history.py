@@ -3129,8 +3129,11 @@ def verify_cancel_before_headers(
     )
     assert json.loads(raw)["content"] == [{"type": "text", "text": FINAL}]
     ((digest, model, _),) = received
-    user_texts = [block.get("text") for row in model["messages"] if row["role"] == "user" for block in blocks(row)]
-    assert user_texts.count(CHANGED_QUESTION) == 1 and CANCELLED_QUESTION not in user_texts
+    user_texts = [block["text"] for row in model["messages"] if row["role"] == "user"
+                  for block in blocks(row) if block["type"] == "text"]
+    cancelled_count = sum(text.count(CANCELLED_QUESTION) for text in user_texts)
+    changed_count = sum(text.count(CHANGED_QUESTION) for text in user_texts)
+    assert (cancelled_count, changed_count) == (0, 1), (fresh_id, cancelled_count, changed_count)
     wait_for(sender_idle)
 
     request_id = candidate["request_id"]
