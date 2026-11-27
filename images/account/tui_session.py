@@ -978,7 +978,8 @@ class _Actor:
                         output = native.get("output_config")
                         if not isinstance(output, dict) or output.get("effort") != self.cold_history.effort:
                             raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
-                                "code": "unsupported_parameter", "message": "CLI 当前模型未生成请求的推理强度"}}))
+                                "code": "unsupported_parameter", "message": "CLI 当前模型未生成请求的推理强度"}}),
+                                source="tui_cli_input_guard")
                     if not self.cold_history.matches_tool_choice(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
                             "code": "unsupported_parameter", "message": "CLI 未保留请求的工具选择"}}))

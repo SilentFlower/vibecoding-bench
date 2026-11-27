@@ -144,26 +144,27 @@ class SessionTests(unittest.TestCase):
             self.assertEqual(handle.body_source, "account_sender")
             self.assertIsNone(handle.raw)
 
-    def test_cli_thinking_plan_mismatch_is_local_before_model_submission(self):
-        """显示、固定预算或输出上限不符时保留本地校验来源。@return 无。"""
+    def test_cli_generation_plan_mismatch_is_local_before_model_submission(self):
+        """思考显示、固定预算、输出上限或强度不符时保留本地校验来源。@return 无。"""
         adaptive = {"type": "adaptive", "display": "updates"}
         fixed = {"type": "enabled", "budget_tokens": 1024, "display": "updates"}
-        for expected, actual, max_tokens in (
-            (adaptive, {**adaptive, "display": "summarized"}, 4096),
-            (fixed, {**fixed, "budget_tokens": 1025}, 4096),
-            (fixed, fixed, 4095),
+        for name, requested, actual in (
+            ("display", {"thinking": adaptive}, {"thinking": {**adaptive, "display": "summarized"}}),
+            ("thinking_budget", {"thinking": fixed}, {"thinking": {**fixed, "budget_tokens": 1025}}),
+            ("max_tokens", {"thinking": fixed}, {"max_tokens": 4095}),
+            ("effort", {"output_config": {"effort": "high"}}, {"output_config": {"effort": "low"}}),
         ):
-            with self.subTest(thinking=actual, max_tokens=max_tokens), closing(self._driver()) as driver:
+            with self.subTest(name=name), closing(self._driver()) as driver:
                 driver.managed_oauth = True
-                identity = {**self._identity("thinking-guard"), "native_cold_history": True}
-                body = {**self._body(), "model": "claude-sonnet-4-6", "thinking": expected, "max_tokens": 4096}
+                identity = {**self._identity("generation-guard"), "native_cold_history": True}
+                body = {**self._body(), "model": "claude-sonnet-4-6", "max_tokens": 4096, **requested}
                 with closing(driver.prepare(identity, encode(body))) as handle:
                     actor = handle.actor
                     self.assertIsNotNone(actor.cold_history)
                     actor.step = SimpleNamespace(native=("turn", 1), native_model=body["model"], claimed=False)
                     driver.launcher = SimpleNamespace(managed_model_response=Mock())
                     marker = "<system-reminder>\nprompt.submit hook additional context: " + actor.guard_text
-                    native = {**body, "thinking": actual, "max_tokens": max_tokens, "messages": [
+                    native = {**body, **actual, "messages": [
                         {"role": "user", "content": [{"type": "text", "text": marker + "\n</system-reminder>"}]},
                     ]}
                     with self.assertRaises(ModelResponseError) as caught:
