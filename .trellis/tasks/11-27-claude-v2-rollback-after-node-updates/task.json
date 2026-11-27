@@ -1,0 +1,47 @@
+{
+  "id": "claude-v2-rollback-after-node-updates",
+  "name": "claude-v2-rollback-after-node-updates",
+  "title": "修复 Claude 账号跨代切回 V1",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-27",
+  "completedAt": "2026-11-27",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-27T01:41:47Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-11-27T01:20:15Z",
+      "implementationStarted": false
+    }
+  },
+  "progress": {
+    "completedSteps": [
+      "修复 V2 停机和跨代回切",
+      "验证节点恢复原发行后的归档核验和 V1 首条请求"
+    ],
+    "partialStep": null,
+    "nextStep": "签名发行和受管部署后，核对 11-14 的 V1 生效值和待切目标",
+    "notes": "隔离验收通过。11-14 的线上状态待部署后验证。",
+    "updatedAt": "2026-11-27T01:41:47Z"
+  }
+}
