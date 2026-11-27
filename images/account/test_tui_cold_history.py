@@ -930,6 +930,17 @@ class ColdHistoryTests(TestCase):
         self.assertTrue(plan.matches_tool_choice({**native, "tool_choice": choice}))
         self.assertFalse(plan.matches_tool_choice({"tools": []}))
         self.assertNotEqual(plan.receipt_boundary(), ColdHistory.from_request(self.body).receipt_boundary())
+        bare_body = {**self.body, "tool_choice": {"type": "auto"}}
+        bare = ColdHistory.from_request(bare_body)
+        self.assertNotEqual(bare.receipt_boundary(), plan.receipt_boundary())
+        self.assertTrue(plan.matches_receipt_plan(bare))
+        self.assertTrue(bare.matches_receipt_plan(plan))
+        self.assertFalse(plan.matches_receipt_plan(ColdHistory.from_request(self.body)))
+        self.assertEqual(ColdHistory.from_receipt_boundary(bare_body, plan.receipt_boundary()), plan)
+        self.assertEqual(
+            ColdHistory.from_receipt_boundary({**self.body, "tool_choice": choice}, bare.receipt_boundary()), bare,
+        )
+        self.assertIsNone(ColdHistory.from_receipt_boundary(self.body, plan.receipt_boundary()))
         for other in ({"type": "none"}, {"type": "tool", "name": "LookupNote"},
                       {**choice, "disable_parallel_tool_use": True}, {**choice, "disable_parallel_tool_use": 0}):
             with self.subTest(other=other):

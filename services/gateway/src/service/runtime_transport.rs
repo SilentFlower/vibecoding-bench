@@ -1963,6 +1963,18 @@ pub(super) fn tui_input_rejection(reason: &str) -> Option<AppError> {
         })
 }
 
+/// 判断正文是否自报原生 billing 格式。@param body 入站正文。@return 是否含原生格式标记。
+pub(super) fn has_tui_billing_marker(body: &Value) -> bool {
+    let system = &body["system"];
+    let marked = |s: &str| s.trim_start().starts_with("x-anthropic-billing-header:");
+    system.as_str().is_some_and(marked)
+        || system.as_array().is_some_and(|blocks| {
+            blocks
+                .iter()
+                .any(|block| block["text"].as_str().is_some_and(marked))
+        })
+}
+
 /// 旧源仅放行已知不会在新合同中删除字段或改变准入的基本 Messages 形状。
 fn legacy_tui_input_compatible(body: &Value) -> bool {
     body.as_object().is_some_and(|obj| {
@@ -1986,20 +1998,16 @@ fn legacy_tui_input_compatible(body: &Value) -> bool {
             row.as_object()
                 .is_some_and(|obj| obj.keys().all(|k| matches!(k.as_str(), "role" | "content")))
         })
-    }) && !body.get("system").is_some_and(|system| {
-        let marked = |s: &str| s.trim_start().starts_with("x-anthropic-billing-header:");
-        system.as_str().is_some_and(marked)
-            || system.as_array().is_some_and(|blocks| {
-                blocks.iter().any(|block| {
-                    block["text"].as_str().is_some_and(marked)
-                        || !block.as_object().is_some_and(|fields| {
-                            fields
-                                .keys()
-                                .all(|key| matches!(key.as_str(), "type" | "text"))
-                        })
+    }) && !has_tui_billing_marker(body)
+        && !body["system"].as_array().is_some_and(|blocks| {
+            blocks.iter().any(|block| {
+                !block.as_object().is_some_and(|fields| {
+                    fields
+                        .keys()
+                        .all(|key| matches!(key.as_str(), "type" | "text"))
                 })
             })
-    })
+        })
 }
 
 /// 无 billing 的原生格式还须匹配固定 CLI 版本和入口，宽泛客户端分类仅用于工具归属。

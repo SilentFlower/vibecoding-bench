@@ -17,7 +17,7 @@ from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/orchestrator"))
 from tui_capacity import TuiCapacity
-from tui_reconnect import ReceiptCheckpoints
+from tui_reconnect import ReceiptCheckpoints, digest
 from tui_session import SessionDriver, _install_mod, _receipt_request
 from tui_messages import (
     ModelResponseError,
@@ -47,6 +47,33 @@ class SessionTests(unittest.TestCase):
         self.assertNotEqual(_receipt_request(body, forced), _receipt_request(body, default))
         changed = {**forced, "body_policy": {**forced["body_policy"], "adaptive": True}}
         self.assertNotEqual(_receipt_request(body, changed, cache_ttl="off"), _receipt_request(body, default))
+
+    def test_equivalent_auto_receipt_uses_original_claimed_digest(self):
+        """两种显式 auto 与旧认领摘要可接续，保留其余请求的比较。@return 无。"""
+        body = {**self._body(), "tools": [{"name": "LookupNote"}], "tool_choice": {"type": "auto"}}
+        explicit = {**body, "tool_choice": {"type": "auto", "disable_parallel_tool_use": False}}
+        identity = self._identity("auto-choice")
+        stored = digest([explicit, {}, None, None])
+        current = _receipt_request(body, identity)
+        self.assertEqual(_receipt_request(explicit, identity), current)
+        self.assertEqual(_receipt_request(body, identity, previous=stored), stored)
+        self.assertEqual(_receipt_request(explicit, identity, previous=current), current)
+        for changed in ({**body, "stream": False}, {**body, "tools": []},
+                        {**body, "tool_choice": {"type": "auto", "disable_parallel_tool_use": 0}},
+                        {**body, "tool_choice": {"type": "auto", "disable_parallel_tool_use": True}}):
+            with self.subTest(changed=changed):
+                new = _receipt_request(changed, identity, previous=stored)
+                self.assertNotIn(new, (current, stored))
+        with TemporaryDirectory() as directory:
+            key = ("auto-choice", "session-1")
+            with closing(ReceiptCheckpoints(directory)) as checkpoints:
+                revision = checkpoints.offer(key, "session-1", "history", [], 60)
+                self.assertTrue(checkpoints.submit(key, revision, stored, recovered=False))
+            with closing(ReceiptCheckpoints(directory)) as checkpoints:
+                previous = checkpoints.find(key)[3]
+                self.assertTrue(checkpoints.submit(
+                    key, revision, _receipt_request(body, identity, previous=previous), recovered=True,
+                ))
 
     def test_protocol_headers_use_current_sdk_and_reject_unsupported_beta(self):
         """普通 API 校验同轮原生能力，协议值按准入结果覆盖默认值。@return 无。"""

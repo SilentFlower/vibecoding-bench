@@ -29,8 +29,8 @@ from uuid import UUID, uuid4
 from runtime_files import atomic_text
 from tui_capacity import TuiCapacity, TuiCapacityError
 from tui_cold_history import (
-    ColdHistory, MCP_SERVER, SIGNED_THINKING_TYPES, tool_result_has_cache_marker, tool_result_has_images,
-    tool_result_has_text_blocks, tool_result_is_empty,
+    ColdHistory, MCP_SERVER, SIGNED_THINKING_TYPES, alternate_auto_tool_choice, tool_result_has_cache_marker,
+    tool_result_has_images, tool_result_has_text_blocks, tool_result_is_empty,
 )
 from tui_reconnect import ReceiptCheckpoints, digest
 from tui_input_policy import CONTEXT_BETA, InputRejection, native_input
@@ -1203,7 +1203,7 @@ class _Actor:
                 return
 
 
-def _receipt_request(body, reservation, *, cache_ttl=None):
+def _receipt_request(body, reservation, *, cache_ttl=None, previous=None):
     # 只绑定实际支持的生成参数和返回表示，连接 ID 与预留期限可随重试变化。
     policy = reservation.get("body_policy")
     if cache_ttl is not None and cache_ttl != (policy["ttl"] if policy else "off"):
@@ -1211,7 +1211,18 @@ def _receipt_request(body, reservation, *, cache_ttl=None):
         policy = {**(policy or {"sub2api": False, "adaptive": False}), "ttl": cache_ttl}
         if cache_ttl == "off" and not policy["sub2api"] and not policy["adaptive"]:
             policy = None
-    return digest([body, dict(reservation.get("model_headers") or {}), policy, reservation.get("input_format")])
+    input_format = reservation.get("input_format")
+    scope = (dict(reservation.get("model_headers") or {}), policy, input_format)
+    choice = body.get("tool_choice")
+    alternate = alternate_auto_tool_choice(choice)
+    tools = body.get("tools")
+    if alternate is None or not isinstance(tools, list) or not tools or native_input(body, input_format):
+        return digest([body, *scope])
+    bare, explicit = (alternate, choice) if "disable_parallel_tool_use" in choice else (choice, alternate)
+    # 旧库可能已认领显式 false 的摘要。相同回执复用该摘要，保留数据库的条件写入。
+    if previous is not None and digest([{**body, "tool_choice": explicit}, *scope]) == previous:
+        return previous
+    return digest([{**body, "tool_choice": bare}, *scope])
 
 
 class _Reserved:
@@ -1703,7 +1714,7 @@ class SessionDriver:
                             cache_ttl=actor.cold_history.cache_ttl,
                             signed_models=dict(actor.cold_history.recovered_models),
                         )
-                        if not native_body_policy or plan != actor.cold_history or not tool_results_only:
+                        if not native_body_policy or not actor.cold_history.matches_receipt_plan(plan) or not tool_results_only:
                             raise InputRejection("unsupported_parameter")
                         requires_recovery = any(tool_result_has_images(answer) or tool_result_is_empty(answer)
                                                 for answer in answers.values())
@@ -1726,8 +1737,10 @@ class SessionDriver:
                 branch, previous, expected, prior_request, revision, native_checkpoint = checkpoint
                 answers = tool_receipts(messages, previous, expected,
                                         input_format=reservation.get("input_format"), checkpoint=True)
-                if native_checkpoint is None and prior_request is not None and prior_request != request:
-                    raise ValueError("已提交的工具结果或模型参数与重试不符")
+                if native_checkpoint is None and prior_request is not None:
+                    request = _receipt_request(body, reservation, previous=prior_request)
+                    if prior_request != request:
+                        raise ValueError("已提交的工具结果或模型参数与重试不符")
 
         cold = recovery_history = None
         signed_tool_models = {}
@@ -1743,7 +1756,7 @@ class SessionDriver:
             cold = ColdHistory.from_receipt_boundary(body, boundary)
             if cold is None:
                 raise InputRejection("unsupported_parameter")
-            request = _receipt_request(body, reservation, cache_ttl=cold.cache_ttl)
+            request = _receipt_request(body, reservation, cache_ttl=cold.cache_ttl, previous=prior_request)
             if prior_request is not None and prior_request != request:
                 raise ValueError("已提交的工具结果或模型参数与重试不符")
             recovery_history = cold.resume_receipts(messages, signed_tool_models=signed_tool_models)

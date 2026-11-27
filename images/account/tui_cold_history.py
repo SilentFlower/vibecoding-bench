@@ -193,6 +193,15 @@ def _automatic_tools(choice):
             and choice.get("disable_parallel_tool_use", False) is False)
 
 
+def alternate_auto_tool_choice(choice):
+    """切换允许并行的显式 auto 形状。@param choice 原始 tool_choice。@return 等价形状或空。"""
+    if _automatic_tools(choice):
+        if "disable_parallel_tool_use" in choice:
+            return {"type": "auto"}
+        return {"type": "auto", "disable_parallel_tool_use": False}
+    return None
+
+
 def _signed_thinking(block):
     if block["type"] == "redacted_thinking":
         return block.keys() == {"type", "data"} and isinstance(block.get("data"), str) and bool(block["data"])
@@ -480,6 +489,13 @@ class ColdHistory:
         tools = native.get("tools")
         return isinstance(tools, list) and bool(tools) and _automatic_tools(native.get("tool_choice", {"type": "auto"}))
 
+    def matches_receipt_plan(self, plan):
+        """核对同一工具轮的根输入。@param plan 客户端回传的根轮计划。@return 是否匹配原轮。"""
+        if self == plan:
+            return True
+        alternate = alternate_auto_tool_choice(self.tool_choice)
+        return alternate is not None and replace(self, tool_choice=alternate) == plan
+
     def receipt_boundary(self):
         """冻结必须随原工具回执复用的根轮输入。@return 不含客户原文的边界。"""
         current = self.current_blocks or self.prompt
@@ -503,8 +519,16 @@ class ColdHistory:
         # TTL 已参与旧摘要。按私有协议的三个取值核对原始输入，持久格式继续兼容已有回执。
         for ttl in ("off", "5m", "1h"):
             plan = cls.from_request(root, boundary["system_policy"], cache_ttl=ttl, signed_models=signed_models)
-            if plan is not None and plan.receipt_boundary() == boundary:
+            if plan is None:
+                continue
+            if plan.receipt_boundary() == boundary:
                 return plan
+            # 旧修订以原字段形状写入摘要。匹配后继续沿用原修订的计划和归档范围。
+            alternate = alternate_auto_tool_choice(plan.tool_choice)
+            if alternate is not None:
+                original = replace(plan, tool_choice=alternate)
+                if original.receipt_boundary() == boundary:
+                    return original
         return None
 
     def resume_receipts(self, messages, *, signed_tool_models=None):

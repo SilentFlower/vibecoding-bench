@@ -1392,7 +1392,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             assert len(received) == 1
             assert manage("GET", "request-diagnostics/" + empty_history_request_id)["attempts"] == []
         if auto_tool_choice:
-            # 两种 auto 字段形状在模型端等效，工具回执仍须匹配根轮实际提交的形状。
+            # 合法回执切换等价形状。实际选择、工具声明和回执内容仍随原轮核验。
             other_auto = {"type": "auto"}
             if auto_tool_choice == "bare":
                 other_auto["disable_parallel_tool_use"] = False
@@ -1401,14 +1401,18 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 ("none", {"type": "none"}),
                 ("parallel_disabled", {"type": "auto", "disable_parallel_tool_use": True}),
                 ("named", {"type": "tool", "name": TOOL["name"]}),
-                ("equivalent_form", other_auto),
+                ("omitted_choice", None),
             ):
+                changed = {**follow, "tool_choice": choice}
+                if choice is None:
+                    changed.pop("tool_choice")
                 rejected, raw, _ = checked_messages(
-                    manage, token, {**follow, "tool_choice": choice}, headers, received, "changed_tool_choice_" + label,
+                    manage, token, changed, headers, received, "changed_tool_choice_" + label,
                     expected_status=422, trace_startup=trace_startup,
                 )
                 assert len(received) == 1, (label, raw, len(received))
                 changed_choices[label] = rejected
+            follow["tool_choice"] = other_auto
         if explicit_custom_tool_type:
             changed_tools = deepcopy(declared)
             changed_tools[0].pop("type")
@@ -1497,8 +1501,15 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                         continue_tool_stream, finish_stream, slow_stream_finished, initial_request_id, sender_state_after_failure,
                     )
                 else:
+                    replay = {**follow, "tool_choice": body["tool_choice"]} if auto_tool_choice else follow
                     proof = verify_tool_stream_reconnect(manage, temporary, token, account_token, headers, follow,
-                                                         received, continue_tool_stream, finish_stream, callbacks)
+                                                         received, continue_tool_stream, finish_stream, callbacks,
+                                                         replay=replay)
+                    if auto_tool_choice:
+                        model_tools = [verify_automatic_model_tools(native, declared) for _, native, _ in received]
+                        proof.update(input_tool_choice=body["tool_choice"], receipt_tool_choice=follow["tool_choice"],
+                                     replay_tool_choice=replay["tool_choice"], tool_choice_rejections=changed_choices,
+                                     model_tools=model_tools)
             finally:
                 continue_tool_stream.set()
                 finish_stream.set()
@@ -1702,7 +1713,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             verify_client_thinking_reply(raw, False, body["model"], SIGNED_THINKING["thinking"])
         else:
             assert final["content"] == [{"type": "text", "text": FINAL}]
-        duplicate, _ = call(18090, "POST", "/v1/messages", token, follow, headers)
+        duplicate_body = {**follow, "tool_choice": body["tool_choice"]} if auto_tool_choice else follow
+        duplicate, _ = call(18090, "POST", "/v1/messages", token, duplicate_body, headers)
         assert duplicate == 400 and len(received) == 2, (duplicate, len(received))
         assert callbacks == expected_ids
         if previous:
@@ -1999,7 +2011,8 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             model_tools = [verify_automatic_model_tools(native, declared) for _, native, _ in received]
             assert all(attempt["diagnostic_body_source"] == "interactive_cli" for attempt in captures), captures
             proof.update(auto_tool_choice=[native.get("tool_choice") for _, native, _ in received],
-                         input_tool_choice=body["tool_choice"], model_tools=model_tools,
+                         input_tool_choice=body["tool_choice"], receipt_tool_choice=follow["tool_choice"],
+                         model_tools=model_tools,
                          model_tool_choice_present=["tool_choice" in native for _, native, _ in received],
                          changed_tool_choice_status=changed_choices["none"], tool_choice_rejections=changed_choices)
         if adaptive_thinking_model:
@@ -2814,16 +2827,16 @@ def verify_connected_slow_tool_stream(manage, temporary, token, account_token, h
 
 
 def verify_tool_stream_reconnect(manage, temporary, token, account_token, headers, follow,
-                                 received, continue_tool_stream, finish_stream, callbacks):
+                                 received, continue_tool_stream, finish_stream, callbacks, *, replay):
     """断开真实续轮读者，再读取同一次交付。@param manage 管理入口。@param temporary 本次私有数据库目录。
     @param token 合成调用方。@param account_token 合成模型凭据。@param headers 原请求会话。
     @param follow 同一公开工具回执。@param received 模型实收。
     @param continue_tool_stream 放行余下参数。@param finish_stream 放行终帧。
-    @param callbacks 客户端已执行的合成工具。@return 实测证据。
+    @param callbacks 客户端已执行的合成工具。@param replay 重连时提交的等价回执。@return 实测证据。
     """
     def disconnect_after_prefix(previous=None):
         with closing(HTTPConnection("127.0.0.1", 18090, timeout=30)) as connection:
-            connection.request("POST", "/v1/messages", encoded(follow), {
+            connection.request("POST", "/v1/messages", encoded(follow if previous is None else replay), {
                 "Authorization": "Bearer " + token, "Content-Type": "application/json",
                 "anthropic-version": "2023-06-01", **headers,
             })
@@ -2873,7 +2886,7 @@ def verify_tool_stream_reconnect(manage, temporary, token, account_token, header
     with closing(connect(temporary / "gateway.db")) as database:
         wait_for(lambda: database.execute("SELECT count(*) FROM tui_native_turns WHERE tools=?",
                                          (encoded([RECONNECT_ID]).decode(),)).fetchone()[0] == 1)
-    _, wire, cached_request_id = checked_messages(manage, token, follow, headers, received, "reconnect_cached")
+    _, wire, cached_request_id = checked_messages(manage, token, replay, headers, received, "reconnect_cached")
     cached_model_posts = len(received)
     assert cached_model_posts == 2, cached_model_posts
     reader_ids = [original_request_id, live_request_id, cached_request_id]
@@ -2892,7 +2905,7 @@ def verify_tool_stream_reconnect(manage, temporary, token, account_token, header
     assert json.loads(raw)["content"] == [{"type": "text", "text": FINAL}]
     (role, result), = find_blocks(received[-1][1], "tool_use_id", RECONNECT_ID)
     assert role == "user" and result["content"].count(SECOND_REPLY) == 1
-    duplicate, response = call(18090, "POST", "/v1/messages", token, follow, headers)
+    duplicate, response = call(18090, "POST", "/v1/messages", token, replay, headers)
     assert duplicate == 400 and len(received) == 3, (duplicate, response, len(received))
 
     def replay_diagnostics():
@@ -5017,7 +5030,7 @@ def main():
     system_roles.add_argument("--ordinary-message-system-contract", dest="message_system_roles", action="store_const",
                               const="ordinary-contract")
     parser.add_argument("--auto-tool-choice", nargs="?", const="explicit-false", choices=("bare", "explicit-false"),
-                        help="核对根轮的 auto 字段形状及工具回执冻结")
+                        help="核对两种等价 auto 回执及原工具组边界")
     parser.add_argument("--adaptive-thinking-model", choices=(MODEL, "claude-opus-5-5"))
     parser.add_argument("--fixed-thinking-model", choices=(MODEL, "claude-opus-4-6"))
     parser.add_argument("--fixed-thinking-display", choices=("updates", "summarized"), default="updates")

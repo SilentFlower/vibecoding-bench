@@ -19,9 +19,9 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc, watch};
 use tokio::time::{Instant, sleep_until};
 
 use super::diagnostics;
-use super::request_session::hash_json;
+use super::request_session::{hash_json, hash_json_object};
 use super::runtime_transport::{
-    TuiBodyPolicy, tui_agent_header, tui_cli_format, tui_model_headers,
+    TuiBodyPolicy, has_tui_billing_marker, tui_agent_header, tui_cli_format, tui_model_headers,
 };
 use super::system_update::{InferenceCutover, UpdateActivity};
 use super::tui_native_drain::Delivery;
@@ -77,7 +77,28 @@ pub(super) fn key(
         ]),
         false,
     );
-    hash_json(&mut hash, body, false);
+    if !native
+        && !has_tui_billing_marker(body)
+        && let Some(fields) = body.as_object()
+        && fields
+            .get("tools")
+            .and_then(Value::as_array)
+            .is_some_and(|v| !v.is_empty())
+        && fields.get("tool_choice")
+            == Some(&json!({"type": "auto", "disable_parallel_tool_use": false}))
+    {
+        // 这两个形状的普通回执共用同一份公开回复。保留正文与其它参数的完整比较。
+        let bare = json!({"type": "auto"});
+        hash_json_object(
+            &mut hash,
+            fields
+                .iter()
+                .map(|(key, value)| (key, if key == "tool_choice" { &bare } else { value })),
+            false,
+        );
+    } else {
+        hash_json(&mut hash, body, false);
+    }
     Ok(hash.finalize().into())
 }
 
@@ -617,8 +638,56 @@ impl Writer {
 
 #[cfg(test)]
 mod tests {
-    use super::{GRACE, Reconnects, Reservation};
+    use axum::http::HeaderMap;
+    use serde_json::json;
     use tokio::time::Instant;
+
+    use super::{GRACE, Reconnects, Reservation, key};
+
+    /// 只合并声明工具的普通回执两种显式 auto 形状。
+    #[test]
+    fn ordinary_auto_receipt_reconnect_identity() {
+        let headers = HeaderMap::new();
+        let reconnect = |principal, session, body: &_, native| {
+            key(
+                principal,
+                Some(session),
+                body,
+                &headers,
+                native,
+                Default::default(),
+                "",
+            )
+            .unwrap()
+        };
+        let bare = json!({"tools": [{"name": "LookupNote"}], "tool_choice": {"type": "auto"}, "stream": true});
+        let mut explicit = bare.clone();
+        explicit["tool_choice"]["disable_parallel_tool_use"] = json!(false);
+        let original = reconnect(1, "same-session", &bare, false);
+        assert_eq!(original, reconnect(1, "same-session", &explicit, false));
+        assert_ne!(original, reconnect(2, "same-session", &explicit, false));
+        assert_ne!(original, reconnect(1, "other-session", &explicit, false));
+        assert_ne!(
+            reconnect(1, "same-session", &bare, true),
+            reconnect(1, "same-session", &explicit, true)
+        );
+        let mut billed_bare = bare.clone();
+        let mut billed_explicit = explicit.clone();
+        let billing = json!([{"type": "text", "text": "x-anthropic-billing-header: cc_version=2.1.293.abc; cc_entrypoint=cli;"}]);
+        billed_bare["system"] = billing.clone();
+        billed_explicit["system"] = billing;
+        assert_ne!(
+            reconnect(1, "same-session", &billed_bare, false),
+            reconnect(1, "same-session", &billed_explicit, false)
+        );
+        for changed in [json!(true), json!(0), json!(null)] {
+            explicit["tool_choice"]["disable_parallel_tool_use"] = changed;
+            assert_ne!(original, reconnect(1, "same-session", &explicit, false));
+        }
+        explicit["tool_choice"] = json!({"type": "auto", "disable_parallel_tool_use": false});
+        explicit["stream"] = json!(false);
+        assert_ne!(original, reconnect(1, "same-session", &explicit, false));
+    }
 
     /// 拒绝超预算的重连后，原空闲截止时间和观察通知均保持一致。
     #[tokio::test]
