@@ -804,6 +804,38 @@ class ColdHistoryTests(TestCase):
         archived[-2]["content"][0]["signature"] = "改写签名"
         self.assertFalse(recovered.matches_recovered_signatures({"messages": archived}))
 
+    def test_bound_signature_reads_only_matching_response_model(self):
+        """分行归档与回执摘要复用同一来源，冲突和缺失继续拒绝。@return 无。"""
+        body = deepcopy(self.body)
+        signature = {"type": "thinking", "thinking": "合成思考", "signature": "合成签名"}
+        tool, = body["messages"][1]["content"]
+        body["messages"][1]["content"].insert(0, signature)
+        model = "claude-opus-5-5"
+        native_tool = {**tool, "name": "mcp__flower__" + tool["name"]}
+        archive = [{"type": "assistant",
+                    "message": {"role": "assistant", "id": "msg_archive", "model": model, "content": [block]}}
+                   for block in (signature, native_tool)]
+        self.assertIsNone(ColdHistory.from_request(body))
+        plan = ColdHistory.from_request(body, read_history=lambda read: read(iter(archive)))
+        self.assertIsNotNone(plan)
+        self.assertEqual(plan.recovered_models, ((1, model),))
+        boundary = json.loads(json.dumps(plan.receipt_boundary()))
+        self.assertEqual(ColdHistory.from_receipt_boundary(body, boundary), plan)
+
+        rejections = [
+            [archive[0]],
+            [{**row, "message": {**row["message"], "id": None}} for row in archive],
+            [archive[0], {**archive[1], "message": {**archive[1]["message"], "id": "different"}}],
+            [*archive, *({**row, "message": {**row["message"], "id": "msg_other", "model": self.body["model"]}}
+                         for row in archive)],
+        ]
+        for observed in rejections:
+            self.assertIsNone(ColdHistory.from_request(body, read_history=lambda read: read(iter(observed))))
+        changed = deepcopy(body)
+        changed["messages"][1]["content"][1]["input"] = {"different": True}
+        self.assertIsNone(ColdHistory.from_request(changed, read_history=lambda read: read(iter(archive))))
+        self.assertIsNone(ColdHistory.from_receipt_boundary(changed, boundary))
+
     def test_explicit_auto_tool_choice_preserves_parallel_permission(self):
         """自动选择进入原生合同并随原工具组冻结。@return 无。"""
         choice = {"type": "auto", "disable_parallel_tool_use": False}

@@ -54,7 +54,7 @@ from tui_messages import (
     valid_model_header_value,
     wire_events,
 )
-from tui_workspace_launch import WorkspaceLaunchObservation
+from tui_workspace_launch import WorkspaceLaunchObservation, read_bound_history
 
 # 与网关的 BINDING_TTL_MS 一致，客户端确认工具时原进程和资源名额仍随会话保留。
 _RECEIPT_SECONDS = 60 * 60
@@ -977,7 +977,7 @@ class _Actor:
                     if not output_history.matches_history_tool_text_blocks(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
                             "code": "unsupported_parameter", "message": "CLI 未保留工具结果中的原始文本块"}}))
-                    if handle.kind == "recovered" and not self.recovery_history.matches_recovered_signatures(native):
+                    if handle.kind != "continuation" and not output_history.matches_recovered_signatures(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
                             "code": "unsupported_parameter", "message": "CLI 未保留已核对的签名工具历史"}}))
                 if handle.kind == "recovered" and not self.driver.checkpoints.submit(
@@ -1697,6 +1697,7 @@ class SessionDriver:
                         plan = ColdHistory.from_request(
                             {**body, "messages": messages[:prompt_index]}, actor.cold_history.system_policy,
                             cache_ttl=actor.cold_history.cache_ttl,
+                            signed_models=dict(actor.cold_history.recovered_models),
                         )
                         if not native_body_policy or plan != actor.cold_history or not tool_results_only:
                             raise InputRejection("unsupported_parameter")
@@ -1745,7 +1746,9 @@ class SessionDriver:
             if recovery_history is None:
                 raise InputRejection("unsupported_parameter")
         elif native_history_allowed and checkpoint is None:
-            cold = ColdHistory.from_request(body, system_policy, cache_ttl=native_cache_ttl)
+            storage = getattr(self.launcher, "STORAGE", None)
+            reader = partial(read_bound_history, reservation, storage) if storage is not None else None
+            cold = ColdHistory.from_request(body, system_policy, cache_ttl=native_cache_ttl, read_history=reader)
         if cold is None and system_policy != "append" and not is_native and checkpoint is None:
             raise InputRejection("unsupported_parameter")
         if retire_for_recovery is not None:

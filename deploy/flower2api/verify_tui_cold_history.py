@@ -54,6 +54,7 @@ HISTORY = [
 HISTORY_CACHE = ({"type": "ephemeral", "ttl": "1h"}, {"type": "ephemeral"})
 QUESTION = "NOW：查询新便签并回答。"
 QUESTION_TAIL = "NOW：保留本轮问题第二段。"
+SIGNED_ARCHIVE_QUESTION = "另查一条便签，保留已确认的签名工具历史。"
 CANCELLED_QUESTION = "CANCEL：暂停这道尚未完成的问题。"
 CHANGED_QUESTION = "CHANGE：改问已确认的旧订单号。"
 CHANGED_REPLY = "新问题的答案只来自已确认历史。"
@@ -326,7 +327,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
            auxiliary_mode=None,
            auxiliary_kind="title", auxiliary_sample=None, agent_progress=None, stock_client=False,
            cancel_and_change_question=False, oauth_rotation=False, provider_quota=None, slow_tool_stream=False,
-           model_connection_contract=None, external_signed_history=False, history_tool_images=None,
+           model_connection_contract=None, external_signed_history=False, bound_signed_history=None, history_tool_images=None,
            tool_receipt_images=None, explicit_custom_tool_type=False, history_empty_tool_result=None,
            empty_tool_receipt=None, tool_receipt_text_blocks=None, tool_receipt_nested_cache=None,
            tool_receipt_outer_cache=None):
@@ -366,6 +367,7 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
     @param slow_tool_stream 是否在原公开连接上慢读真实续轮，核对独立用量。
     @param model_connection_contract 可选，验证模型连接复用、模型端关闭或 sender 重启后的连接归属。
     @param external_signed_history 是否核对普通客户端提交的外部签名历史。
+    @param bound_signed_history 原生主档的签名来源及新工具的热续轮或重启恢复。
     @param current_images 是否用本轮原生图文替换纯文本问题。
     @param current_image_ending 本轮九块图文以文字或图片结尾。
     @param auto_tool_choice 原请求中自动选择的字段形状。
@@ -580,6 +582,15 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 prefix, wire = fixture_cancelled_tool_sse(tool["name"])
             elif cancel_and_change_question:
                 wire = message_sse({"type": "text", "text": CHANGED_REPLY}, "end_turn", "msg_changed_question")
+            elif bound_signed_history and any(b.get("text") == SIGNED_ARCHIVE_QUESTION
+                                               for row in body["messages"] for b in blocks(row)):
+                if find_blocks(body, "tool_use_id", SECOND_ID):
+                    wire = message_sse({"type": "text", "text": FINAL}, "end_turn", "msg_bound_signed_reply")
+                else:
+                    wire = fixture_tool_sse(
+                        {"type": "tool_use", "id": SECOND_ID, "name": tool["name"], "input": SECOND_ARGS},
+                        with_signature=True, model=body["model"],
+                    )
             elif not results and tool and not restart and v1_runtime is None:
                 content = {"type": "tool_use", "id": NEW_ID, "name": tool["name"], "input": ARGS}
                 second = None
@@ -1645,6 +1656,12 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                                  if "cache_control" in item else item for item in expected_receipts]
         verify_model(received, policy=tool_policy or "append", old_content=old_result, current_text_blocks=current_text_blocks,
                      exact_receipts=expected_receipts)
+        if bound_signed_history:
+            return verify_bound_signed_history(
+                manage, token, foreign, headers, follow, final, received, callbacks, account_token,
+                initial_request_id, continuation_request_id, bound_signed_history,
+                lambda: restart(source, "bound_signed_receipt"), sender_state_after_failure,
+            )
         captures = verify_captures(manage, received, account_token, additional_secrets=(
             (refresh_token, rotated_token, rotated_refresh) if oauth_rotation else ()
         ))
@@ -3362,6 +3379,100 @@ def verify_external_signed_history(manage, token, identifier, received, sender_s
     return {"cases": cases, "model_posts": len(received), "wire_final": "unavailable"}
 
 
+def verify_bound_signed_history(manage, token, foreign, headers, follow, reply, received, callbacks, account_token,
+                                initial_id, old_receipt_id, mode, restart_sender, sender_status):
+    """用已核对的原生签名工具组开启下一轮，再按原身份交回新回执。
+    @param manage 管理入口。@param token 原主体。@param foreign 另一主体。@param headers 原会话。
+    @param follow 原工具回执。@param reply 已完成的原轮响应。
+    @param received 隔离模型收件。@param callbacks 已执行的工具。@param account_token 合成账号凭据。
+    @param initial_id 原会话首轮。@param old_receipt_id 完成原工具的请求。@param mode 热续轮或恢复。
+    @param restart_sender 在原 CLI 退出后重启。@param sender_status 失败后读取 sender。@return 逐轮证据。
+    """
+    wait_for(lambda: sender_status().get("idle"))
+    (binding,) = Path("/native/tui-workspaces").glob("*.json")
+    original_binding = binding.read_bytes()
+    native_id = json.loads(original_binding)["native_session_id"]
+    project = Path("/native/tui-sessions") / native_id / "home/.claude/projects"
+    (archive,) = project.glob("*/" + native_id + ".jsonl")
+    original_archive = archive.read_bytes()
+    sources = [(record["message"].get("id"), record["message"].get("model"), block)
+               for line in original_archive.splitlines() if (record := json.loads(line)).get("type") == "assistant"
+               for block in blocks(record["message"])
+               if block.get("signature") == SIGNED_THINKING["signature"] or block.get("id") == NEW_ID]
+    assert len(sources) == 2 and {row[:2] for row in sources} == {("msg_cold_tool", follow["model"])}
+    assert sources[0][2] == SIGNED_THINKING and sources[1][2]["id"] == NEW_ID
+    new_body = {**follow, "messages": [
+        *follow["messages"], {"role": "assistant", "content": reply["content"]},
+        {"role": "user", "content": SIGNED_ARCHIVE_QUESTION},
+    ]}
+    tampered = deepcopy(new_body)
+    ((_, altered_signature),) = find_blocks(tampered, "signature", SIGNED_THINKING["signature"])
+    altered_signature["signature"] = "Y2hhbmdlZA=="
+    changed_tool = deepcopy(new_body)
+    ((_, original_tool),) = find_blocks(changed_tool, "id", NEW_ID)
+    original_tool["input"]["key"] = "different-synthetic-note"
+    rejections = {}
+    for phase, caller, body, request_headers in (
+        ("fresh_session", token, new_body, {**headers, "x-session-id": str(uuid4())}),
+        ("foreign_subject", foreign, new_body, headers),
+        ("changed_signature", token, tampered, headers),
+        ("changed_tool", token, changed_tool, headers),
+    ):
+        status, raw, request_id = checked_messages(
+            manage, caller, body, request_headers, received, "bound_signature_" + phase, expected_status=422,
+            trace_startup=True, sender_status=sender_status,
+        )
+        assert json.loads(raw)["error"]["code"] == "unsupported_parameter" and len(received) == 2
+        assert not manage("GET", "request-diagnostics/" + request_id)["attempts"]
+        rejections[phase] = {"request_id": request_id, "http_status": status}
+    _, raw, new_id = checked_messages(
+        manage, token, new_body, headers, received, "bound_signature_new_question", trace_startup=True,
+        sender_status=sender_status,
+    )
+    response = json.loads(raw)
+    expected_tool = {"type": "tool_use", "id": SECOND_ID, "name": TOOL["name"], "input": SECOND_ARGS}
+    assert response["stop_reason"] == "tool_use" and response["content"] == [SIGNED_THINKING, expected_tool]
+    assert len(received) == 3 and callbacks == [NEW_ID]
+    callbacks.append(expected_tool["id"])
+    continuation = {**new_body, "messages": [
+        *new_body["messages"], {"role": "assistant", "content": response["content"]},
+        {"role": "user", "content": [{"type": "tool_result", "tool_use_id": SECOND_ID, "content": SECOND_REPLY}]},
+    ]}
+    if mode == "restart":
+        marker = ("--name=" + headers["x-session-id"]).encode()
+        (cli,) = [path for path in Path("/proc").glob("[0-9]*/cmdline") if fixture_command_has(path, marker)]
+        os.kill(int(cli.parent.name), SIGKILL)
+        restart_sender()
+        assert not cli.parent.exists()
+    _, raw, final_id = checked_messages(
+        manage, token, continuation, headers, received, "bound_signature_receipt", trace_startup=True,
+        sender_status=sender_status,
+    )
+    assert json.loads(raw)["stop_reason"] == "end_turn" and len(received) == 4
+    for signed_count, (_, model, _) in enumerate(received[2:], start=1):
+        assert find_blocks(model, "id", NEW_ID) == [("assistant", {
+            "type": "tool_use", "id": NEW_ID, "name": NATIVE_TOOL_NAME, "input": ARGS,
+        })]
+        assert find_blocks(model, "tool_use_id", NEW_ID) == [("user", {
+            "type": "tool_result", "tool_use_id": NEW_ID, "content": REPLY,
+        })]
+        present = find_blocks(model, "signature", SIGNED_THINKING["signature"])
+        assert present == [("assistant", SIGNED_THINKING)] * signed_count
+    (role, new_result), = find_blocks(received[-1][1], "tool_use_id", SECOND_ID)
+    assert role == "user" and new_result["content"].count(SECOND_REPLY) == 1
+    duplicate, _ = call(18090, "POST", "/v1/messages", token, continuation, headers)
+    assert duplicate == 400 and len(received) == 4
+    assert archive.read_bytes() == original_archive and binding.read_bytes() == original_binding
+    attempts = verify_captures(manage, received, account_token)
+    assert [a["request_id"] for a in attempts] == [initial_id, old_receipt_id, new_id, final_id]
+    assert all(a["diagnostic_body_source"] == "interactive_cli" for a in attempts)
+    assert attempts[-1]["diagnostic_session_origin"] == ("disk_resume" if mode == "restart" else "live_process")
+    return {"mode": mode, "source_model": sources[0][1], "source_message_id": sources[0][0],
+            "source_tool_id": NEW_ID, "model_posts": len(received), "client_tool_calls": callbacks,
+            "rejections": rejections, "original_history_preserved": True, "duplicate_status": duplicate,
+            "attempts": attempts, "wire_final": "unavailable"}
+
+
 def verify_disable_parallel_tool_use(manage, token, identifier, received, sender_status):
     """核对禁并行、普通选择及账号策略的能力回报。
     @param manage 管理入口。@param token 调用方。@param identifier 合成账号 ID。
@@ -4490,6 +4601,8 @@ def main():
     scenario.add_argument("--structured-output-contract", action="store_true")
     scenario.add_argument("--external-signed-history-contract", action="store_true",
                           help="核对普通客户端提交的外部签名历史")
+    scenario.add_argument("--bound-signed-history", choices=("live", "restart"),
+                          help="核对同一已绑定主档的签名来源及新工具回执")
     scenario.add_argument("--forced-tool-choice-contract",
                           choices=("live", "restart", "restart-metadata-only", "restart-closed-metadata-only"))
     scenario.add_argument("--no-tool-choice-contract", action="store_true")
@@ -4563,6 +4676,7 @@ def main():
     cache_markers = args.cache_markers or args.cache_marker_capabilities is not None
     trace_startup = (args.initial_idle_model_connection or args.trace_initial_startup or args.trace_recovery_resend or cache_markers
                      or args.model_connection_contract is not None or args.external_signed_history_contract
+                     or args.bound_signed_history is not None
                      or args.history_tool_images is not None or args.tool_receipt_images is not None
                      or args.history_empty_tool_result is not None or args.empty_tool_receipt is not None
                      or args.tool_receipt_text_blocks is not None
@@ -4590,11 +4704,12 @@ def main():
                        restart_history=args.restart_history, text_input=args.text_input,
                        system_policy=args.system_policy, toggle_pending_policy=args.toggle_pending_policy,
                        stock_client=args.stock_client,
-                       tool_policy=args.tool_policy,
+                       tool_policy="replace" if args.bound_signed_history else args.tool_policy,
                        recover_pending=(args.recover_pending_tool or args.oauth_rotation == "restart"
                                         or args.model_connection_contract == "restart"),
                        model_connection_contract=args.model_connection_contract,
                        external_signed_history=args.external_signed_history_contract,
+                       bound_signed_history=args.bound_signed_history,
                        oauth_rotation=bool(args.oauth_rotation), provider_quota=args.provider_quota,
                        output_effort=args.output_effort, history_png=args.history_png,
                        history_images=args.history_images, history_tool_blocks=args.history_tool_blocks,
@@ -4608,7 +4723,8 @@ def main():
                        explicit_custom_tool_type=args.explicit_custom_tool_type,
                        previous=previous,
                        failure_boundaries=args.failure_boundaries, current_text_blocks=args.current_text_blocks,
-                       signed_tool_history=args.signed_tool_history, signed_tool_response=args.signed_tool_response,
+                       signed_tool_history=args.signed_tool_history or bool(args.bound_signed_history),
+                       signed_tool_response=args.signed_tool_response,
                        split_history_tools=args.split_history_tools,
                        v1_runtime=args.v1_runtime, parallel_tools=args.parallel_new_tools,
                        reconnect_tool_stream=args.reconnect_tool_stream, slow_tool_stream=args.slow_tool_stream,

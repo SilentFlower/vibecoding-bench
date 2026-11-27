@@ -80,6 +80,8 @@ def _main_history(stream, work: Path, native_id: str) -> Iterator[dict]:
     main = False
     for line in stream:
         row = json.loads(line)
+        if not isinstance(row, dict):
+            raise ValueError("V2 恢复历史记录必须为对象")
         if row.get("type") in ("user", "assistant") and not row.get("isSidechain"):
             if row.get("sessionId") != native_id or row.get("cwd") != str(work):
                 raise ValueError("V2 恢复历史与当前会话工作区不匹配")
@@ -87,6 +89,42 @@ def _main_history(stream, work: Path, native_id: str) -> Iterator[dict]:
             yield row
     if not main:
         raise _MissingMainHistory("V2 恢复历史缺少原生主轮")
+
+
+def _binding_path(reservation: dict, storage: Path):
+    scope = (reservation["account_id"], reservation["environment_id"], reservation["principal_id"])
+    session = reservation["session_id"]
+    key = _key((scope, session))
+    return scope, session, key, storage / "tui-workspaces" / (key + ".json")
+
+
+def _read_binding(stack: ExitStack, scope, session: str, key: str, path: Path) -> tuple[str, Path]:
+    parent = _owned_dir(stack, path.parent)
+    with _owned_file(parent, path.name) as stream:
+        record = json.load(stream)
+    native_id = record["native_session_id"]
+    if record["session_key"] != key or str(UUID(native_id)) != native_id or UUID(native_id).version != 4:
+        raise ValueError("V2 原生会话身份不匹配")
+    client = record["client_path"]
+    project = _key((scope, "project", client) if client is not None else (scope, "session", session))
+    return native_id, path.parent / project
+
+
+def read_bound_history(reservation: dict, storage: Path, read: Callable[[Iterator[dict]], dict]) -> dict:
+    """在准备阶段只读查验已发布的原生主档。
+    @param reservation 同一受信 socket 的准备身份。@param storage 账号卷。
+    @param read 从完整核对后的主链读取所需事实。@return 读回的事实，或无法取得来源时的空字典。
+    """
+    try:
+        with ExitStack() as stack:
+            native_id, work = _read_binding(stack, *_binding_path(reservation, storage))
+            config = storage / "tui-sessions" / native_id / "home" / ".claude"
+            project = _owned_dir(stack, _project_history_dir(config, work))
+            with _owned_file(project, native_id + ".jsonl") as stream:
+                return read(_main_history(stream, work, native_id))
+    except (KeyError, OSError, TypeError, ValueError):
+        # 来源校验只用于证明已发生的响应。未取得证据的输入沿既有能力边界收口。
+        return {}
 
 
 def _resume_path(stack: ExitStack, config: Path, work: Path, native_id: str, required: bool,
@@ -212,36 +250,13 @@ def launch_workspace_cli(
     ):
         raise ValueError("V2 提交与已准备预留不匹配")
     launch = command["workspace"]
-    scope = (
-        reservation["account_id"],
-        reservation["environment_id"],
-        reservation["principal_id"],
-    )
-    session = reservation["session_id"]
-    key = _key((scope, session))
-    base = storage / "tui-workspaces"
-    path = base / (key + ".json")
+    scope, session, key, path = _binding_path(reservation, storage)
     if launch["version"] != 1 or str(path) != launch["binding_file"]:
         raise ValueError("V2 提交绑定属于其他会话")
     with ExitStack() as stack:
-        parent = _owned_dir(stack, base)
-        with _owned_file(parent, path.name) as stream:
-            record = json.load(stream)
-        native_id = record["native_session_id"]
-        if (
-            record["session_key"] != key
-            or native_id != launch["native_session_id"]
-            or str(UUID(native_id)) != native_id
-            or UUID(native_id).version != 4
-        ):
+        native_id, work = _read_binding(stack, scope, session, key, path)
+        if native_id != launch["native_session_id"]:
             raise ValueError("V2 原生会话身份不匹配")
-        client = record["client_path"]
-        project = _key(
-            (scope, "project", client)
-            if client is not None
-            else (scope, "session", session)
-        )
-        work = base / project
         if str(work) != launch["work_dir"]:
             raise ValueError("V2 提交工作目录不属于当前绑定")
         cwd = _owned_dir(stack, work)

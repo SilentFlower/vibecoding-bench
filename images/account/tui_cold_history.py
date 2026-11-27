@@ -4,7 +4,7 @@ from base64 import b64decode
 from contextlib import ExitStack
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
-from itertools import chain, islice, zip_longest
+from itertools import chain, groupby, islice, zip_longest
 from pathlib import Path
 import re
 from struct import unpack_from
@@ -201,6 +201,45 @@ def _signed_thinking(block):
             and bool(block["signature"]))
 
 
+def _signed_group(blocks):
+    group = []
+    for block in blocks:
+        if block["type"] in SIGNED_THINKING_TYPES:
+            group.append(block)
+        elif block["type"] == "tool_use":
+            tool = {**block, "name": block["name"].removeprefix(MCP_PREFIX)}
+            if tool.get("caller") == {"type": "direct"}:
+                tool.pop("caller")
+            group.append(tool)
+    return group
+
+
+def _archive_models(rows, requested):
+    def response_key(row):
+        message = row.get("message", {})
+        if row["type"] != "assistant" or not isinstance(message, dict) or message.get("role") != "assistant":
+            return None
+        model, response = message.get("model"), message.get("id")
+        if isinstance(model, str) and model and isinstance(response, str) and response:
+            return response, model
+        return None
+
+    expected = {index: digest(group) for index, group in requested.items()}
+    fingerprints = set(expected.values())
+    observed = {}
+    for identity, response_rows in groupby(rows, response_key):
+        if identity is None:
+            continue
+        # 一个响应的原生归档可把签名和工具分成相邻行。冷导入行没有响应 ID。
+        group = _signed_group(block for row in response_rows for block in _blocks(row["message"]))
+        if any(block["type"] in SIGNED_THINKING_TYPES for block in group):
+            fingerprint = digest(group)
+            if fingerprint in fingerprints:
+                observed.setdefault(fingerprint, set()).add(identity[1])
+    return {index: next(iter(models)) for index, fingerprint in expected.items()
+            if len(models := observed.get(fingerprint, ())) == 1}
+
+
 def _closed_history(rows, *, result_types=(str,), signed_rows=()):
     pending, seen, results = set(), set(), set()
     for index, row in enumerate(rows):
@@ -255,10 +294,12 @@ class ColdHistory:
     recovered_models: tuple[tuple[int, str], ...] = ()
 
     @classmethod
-    def from_request(cls, body, system_policy="append", *, cache_ttl="off"):
+    def from_request(cls, body, system_policy="append", *, cache_ttl="off", read_history=None, signed_models=None):
         """识别普通文本、内嵌图像及受支持的闭合历史。
         @param body 已校验的请求。@param system_policy 本轮冻结的账号系统指令动作。
         @param cache_ttl 经账号预留核对的平台 TTL。强制模式仅承接已有历史断点。
+        @param read_history 可选，同一已绑定原生主档的只读回调。
+        @param signed_models 可选，原工具回执已冻结的签名来源。
         @return 原生输入计划或空。
         """
         if body.keys() - {"model", "max_tokens", "thinking", "system", "messages", "tools", "stream", "output_config",
@@ -279,8 +320,23 @@ class ColdHistory:
             return None
         *history, current = body["messages"]
         if (current["role"] != "user" or (history and history[0]["role"] != "user")
-                or any(row["role"] not in ("user", "assistant") or not _blocks(row) for row in history)
-                or not _closed_history(history)):
+                or any(row["role"] not in ("user", "assistant") or not _blocks(row) for row in history)):
+            return None
+        requested, signed_rows = {}, set()
+        for index, (role, rows) in enumerate(groupby(enumerate(history), lambda item: item[1]["role"])):
+            if role != "assistant":
+                continue
+            content = []
+            for position, row in rows:
+                blocks = _blocks(row)
+                if any(block["type"] in SIGNED_THINKING_TYPES for block in blocks):
+                    signed_rows.add(position)
+                content.extend(blocks)
+            if any(block["type"] in SIGNED_THINKING_TYPES for block in content):
+                if not any(block["type"] == "tool_use" for block in content):
+                    return None
+                requested[index] = content
+        if not _closed_history(history, signed_rows=signed_rows):
             return None
         content = _blocks(current)
         if not content or not all(_plain_text(block) or _inline_image(block, for_paste=True) for block in content):
@@ -315,9 +371,17 @@ class ColdHistory:
         if system_policy != "replace":
             system = system or ""
         tools = {MCP_PREFIX + tool["name"]: tool for tool in declared}
+        if requested and signed_models is None and read_history is not None:
+            signed_models = read_history(lambda rows: _archive_models(
+                rows, {index: _signed_group(content) for index, content in requested.items()},
+            ))
+        signed_models = signed_models or {}
+        if requested.keys() != signed_models.keys():
+            return None
         return cls(history, body["model"], content[0].get("text", ""), system, tools, body["max_tokens"],
                    thinking, system_policy, output.get("effort"),
-                   tuple(content) if len(content) > 1 or content[0]["type"] == "image" else (), choice, cache_ttl)
+                   tuple(content) if len(content) > 1 or content[0]["type"] == "image" else (), choice, cache_ttl,
+                   tuple(sorted(signed_models.items())))
 
     def system_argument(self):
         """选择原生 CLI 提示词文件选项。@return 参数和文件正文，或缺省值。"""
@@ -405,19 +469,23 @@ class ColdHistory:
         if self.current_blocks and all(block["type"] == "text" for block in self.current_blocks):
             # 已签发的纯文本多块回执仍沿用原摘要。
             current = tuple(block["text"] for block in self.current_blocks)
-        return {
+        boundary = {
             "prompt_index": len(self.history) + 1,
             "system_policy": self.system_policy,
             "digest": digest([self._scope(), self.history, current]),
         }
+        if self.recovered_models:
+            boundary["bound_signature_models"] = [list(item) for item in self.recovered_models]
+        return boundary
 
     @classmethod
     def from_receipt_boundary(cls, body, boundary):
         """从持久摘要恢复已冻结的根轮。@param body 回执原始输入。@param boundary 原生根轮边界。@return 已匹配计划或空。"""
         root = {**body, "messages": body["messages"][:boundary["prompt_index"]]}
+        signed_models = dict(boundary.get("bound_signature_models", ()))
         # TTL 已参与旧摘要。按私有协议的三个取值核对原始输入，持久格式继续兼容已有回执。
         for ttl in ("off", "5m", "1h"):
-            plan = cls.from_request(root, boundary["system_policy"], cache_ttl=ttl)
+            plan = cls.from_request(root, boundary["system_policy"], cache_ttl=ttl, signed_models=signed_models)
             if plan is not None and plan.receipt_boundary() == boundary:
                 return plan
         return None
@@ -453,11 +521,12 @@ class ColdHistory:
                 history[-1]["content"] += content
             else:
                 history.append({"role": role, "content": list(content)})
-        models = {}
+        models = dict(self.recovered_models)
         if signed_tool_models:
             for index, row in enumerate(history):
                 content = row["content"]
-                if row["role"] != "assistant" or not any(block["type"] in SIGNED_THINKING_TYPES for block in content):
+                if (index in models or row["role"] != "assistant"
+                        or not any(block["type"] in SIGNED_THINKING_TYPES for block in content)):
                     continue
                 reported = {signed_tool_models.get(block["id"]) for block in content if block["type"] == "tool_use"}
                 if len(reported) != 1:
@@ -487,9 +556,8 @@ class ColdHistory:
                     current = []
             if current:
                 groups.append(current)
-            return [[block["id"] if block["type"] == "tool_use" else block for block in content
-                     if block["type"] in (*SIGNED_THINKING_TYPES, "tool_use")]
-                    for content in groups if any(block["type"] in SIGNED_THINKING_TYPES for block in content)]
+            return [digest(_signed_group(content)) for content in groups
+                    if any(block["type"] in SIGNED_THINKING_TYPES for block in content)]
 
         return signed_groups(native["messages"]) == signed_groups(self.history)
 
@@ -516,6 +584,13 @@ class ColdHistory:
                 history[-1][1].extend(blocks)
             else:
                 history.append((row["role"], list(blocks)))
+        for index, _ in self.recovered_models:
+            role, content = history[index]
+            history[index] = role, [
+                {**block, "name": MCP_PREFIX + block["name"]}
+                if block["type"] == "tool_use" and not block["name"].startswith(MCP_PREFIX) else block
+                for block in content
+            ]
         return history
 
     def has_history_cache_markers(self):
@@ -589,8 +664,11 @@ class ColdHistory:
             # 固定版 CLI 会向 --resume 的目标追加。本轮只携带客户端确认的前缀，原档案保持原字节。
             directory = replay_resources.enter_context(TemporaryDirectory(prefix="history-replay-", dir=config))
             path = Path(directory) / (session_id + ".jsonl")
-            for row, (role, content) in zip(kept, history, strict=True):
+            models = dict(self.recovered_models)
+            for index, (row, (role, content)) in enumerate(zip(kept, history, strict=True)):
                 row["message"] = {"role": role, "content": content}
+                if index in models:
+                    row["message"]["model"] = models[index]
             atomic_text(path, "".join(encode(row).decode() + "\n" for row in kept), replace=False)
             return path
 
