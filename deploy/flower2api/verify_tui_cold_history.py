@@ -2004,9 +2004,14 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 return proof
             finally:
                 manage("PUT", "settings", {budget_key: previous_budget})
-        rejected_signed_recovery = signed_tool_history and recover_pending and signed_tool_response == "missing-model"
+        missing_signed_model = signed_tool_history and signed_tool_response == "missing-model"
+        rejected_signed_recovery = missing_signed_model and (recover_pending or empty_tool_receipt is not None)
+        receipt_phase = "recovered_receipt" if recover_pending else "receipt"
+        if rejected_signed_recovery and not recover_pending:
+            original_command = Path(f"/proc/{original}/cmdline")
+            assert fixture_command_has(original_command, marker)
         status, raw, continuation_request_id = checked_messages(
-            manage, token, follow, headers, received, "recovered_receipt" if recover_pending else "receipt",
+            manage, token, follow, headers, received, receipt_phase,
             expected_status=422 if rejected_signed_recovery else 200, trace_startup=trace_startup,
             sender_status=sender_state_after_failure, trace_recovery_resend=trace_recovery_resend,
         )
@@ -2021,15 +2026,23 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
             assert status == 422 and len(received) == 1, (status, raw, len(received))
             assert json.loads(raw)["error"]["code"] == "unsupported_parameter", raw
             receipt_rejection = signed_receipt_rejection(
-                manage, "recovered_receipt", continuation_request_id, headers["x-session-id"], status, raw,
+                manage, receipt_phase, continuation_request_id, headers["x-session-id"], status, raw,
             )
+            if not recover_pending:
+                assert fixture_command_has(original_command, marker)
             assert original_file.read_bytes() == original_history
+            assert binding_file.read_bytes() == original_binding
             (first_attempt,) = verify_captures(manage, received, account_token)
-            proof = {"cold_recovery_status": status, "changed_signature_status": changed_signature,
+            proof = {"receipt_status": status, "original_process_active": not recover_pending,
+                     "changed_signature_status": changed_signature,
                      "changed_signature_rejection": signature_rejection, "receipt_rejection": receipt_rejection,
                      "receipt_request_id": continuation_request_id, "receipt_attempts": receipt_rejection["attempt_count"],
                      "recorded_signed_tool_models": signed_tool_models,
                      "model_posts": len(received), "original_history_preserved": True, "attempt": first_attempt}
+            if recover_pending:
+                proof["cold_recovery_status"] = status
+            if empty_tool_receipt:
+                proof["submitted_tool_results"] = result["content"]
             if adaptive_thinking_model:
                 assert received[0][1]["thinking"] == body.get("thinking", ADAPTIVE_THINKING)
                 proof.update(thinking=received[0][1]["thinking"], changed_thinking_status=changed_thinking)
@@ -2449,16 +2462,23 @@ def verify(gateway, sender, temporary, *, restart_history=False, text_input=Fals
                 proof["client_content"] = final["content"]
         if signed_tool_history:
             hydrated = find_blocks(received[1][1], "type", signed_type)
-            assert hydrated == [("assistant", signed_block)], (
-                hydrated, [(row["role"], [block["type"] for block in blocks(row)]) for row in received[1][1]["messages"]],
-            )
-            proof.update(signed_reply=hydrated[0][1], recorded_signed_tool_models=signed_tool_models)
+            signed_reply_preserved = hydrated == [("assistant", signed_block)]
+            proof["recorded_signed_tool_models"] = signed_tool_models
+            if missing_signed_model:
+                # 非空热续仅记录模型实际收到的签名块，供空回执拒绝对照。
+                assert captures[1]["diagnostic_session_origin"] == "live_process", captures
+                proof["observed_signed_blocks"] = len(hydrated)
+            else:
+                assert signed_reply_preserved, (
+                    hydrated, [(row["role"], [block["type"] for block in blocks(row)]) for row in received[1][1]["messages"]],
+                )
+                proof["signed_reply"] = hydrated[0][1]
             if redacted_thinking:
                 assert not find_blocks(received[1][1], "type", "thinking")
                 proof.update(observed_redacted_preserved=True, changed_redacted_data_status=changed_signature,
                              changed_redacted_data_rejection=signature_rejection)
             else:
-                proof.update(observed_signature_preserved=True, changed_signature_status=changed_signature,
+                proof.update(observed_signature_preserved=signed_reply_preserved, changed_signature_status=changed_signature,
                              changed_signature_rejection=signature_rejection)
         if toggle_pending_policy:
             proof["pending_policy"] = "append"
