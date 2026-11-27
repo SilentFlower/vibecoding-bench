@@ -43,6 +43,32 @@ class ColdHistoryTests(TestCase):
             ],
         }
 
+    def test_fixed_thinking_requires_exact_supported_shape_and_freezes_budget(self):
+        """核对固定预算形状及原回执冻结模型、思考和输出上限。@return 无。"""
+        thinking = {"type": "enabled", "budget_tokens": 1536, "display": "updates"}
+        baseline = {**self.body, "thinking": thinking, "max_tokens": 4096}
+        for model in ("claude-sonnet-4-6", "claude-opus-4-6"):
+            body = {**baseline, "model": model}
+            with self.subTest(model=model):
+                plan = ColdHistory.from_request(body)
+                self.assertIsNotNone(plan)
+                boundary = plan.receipt_boundary()
+                self.assertEqual(ColdHistory.from_receipt_boundary(body, boundary), plan)
+                changed = {**thinking, "budget_tokens": 1792}
+                self.assertIsNone(ColdHistory.from_receipt_boundary({**body, "thinking": changed}, boundary))
+                self.assertIsNone(ColdHistory.from_receipt_boundary({**body, "max_tokens": 4097}, boundary))
+        for variant in (
+            {"model": "claude-opus-5-5"},
+            {"thinking": {"type": "enabled", "budget_tokens": 1536}},
+            {"thinking": {**thinking, "display": "omitted"}},
+            {"thinking": {**thinking, "budget_tokens": 1023}},
+            {"thinking": {**thinking, "budget_tokens": 1536.0}},
+            {"max_tokens": 1536},
+            {"max_tokens": 128001},
+        ):
+            with self.subTest(variant=variant):
+                self.assertIsNone(ColdHistory.from_request({**baseline, **variant}))
+
     def test_bound_history_is_idempotent_and_readable_after_restart(self):
         """核对同一绑定只写入已完成的历史，重启后由启动器读回。@return 无。"""
         plan = ColdHistory.from_request(self.body)

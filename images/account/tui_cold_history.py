@@ -31,6 +31,7 @@ _IMAGE_HEADERS = {
 # 固定 CLI 的文件粘贴超出像素或字节边界会重采样或重编码。已有历史不经过粘贴。
 _MAX_PASTE_IMAGE_EDGE = 2000
 _MAX_PASTE_IMAGE_BYTES = 512_000
+_FIXED_THINKING_MODELS = ("claude-sonnet-4-6", "claude-opus-4-6")
 
 
 def _blocks(row):
@@ -318,7 +319,14 @@ class ColdHistory:
         if type(body.get("max_tokens")) is not int or body["max_tokens"] <= 0:
             return None
         thinking = body.get("thinking")
-        if thinking not in (None, {"type": "disabled"}):
+        if isinstance(thinking, dict) and thinking.get("type") == "enabled":
+            budget = thinking.get("budget_tokens")
+            # 这两个模型允许关闭自适应。CLI 会将更大的配置钳制为输出上限或思考预算上限。
+            if (body["model"] not in _FIXED_THINKING_MODELS or type(budget) is not int
+                    or not 1024 <= budget < body["max_tokens"] <= 128_000
+                    or thinking != {"type": "enabled", "budget_tokens": budget, "display": "updates"}):
+                return None
+        elif thinking not in (None, {"type": "disabled"}):
             # 只接受固定 CLI 能原样生成的显式显示模式。
             if (body["model"] not in ("claude-sonnet-4-6", "claude-opus-5-5")
                     or thinking not in ({"type": "adaptive", "display": "updates"},

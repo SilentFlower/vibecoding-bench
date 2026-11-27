@@ -499,8 +499,12 @@ class _Actor:
                         if type(budget) is int and budget > 0
                         else {}
                     )
-                    if self.settings.get("thinking", {}).get("type") == "disabled":
+                    thinking = self.settings.get("thinking", {})
+                    if thinking.get("type") == "disabled":
                         env["MAX_THINKING_TOKENS"] = "0"
+                    elif plan is not None and thinking.get("type") == "enabled":
+                        env["CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING"] = "1"
+                        env["MAX_THINKING_TOKENS"] = str(thinking["budget_tokens"])
                     if launch_plan is not None and launch_plan.has_history_cache_markers():
                         # CLI 的自动断点会与客户前缀同时出现，还可能改变 TTL 顺序。
                         env["DISABLE_PROMPT_CACHING"] = "1"
@@ -953,9 +957,14 @@ class _Actor:
                     self.agent_messages.clear()
                 if self.cold_history is not None:
                     thinking = self.cold_history.thinking
-                    if thinking is not None and thinking["type"] == "adaptive" and native.get("thinking") != thinking:
+                    if thinking is not None and thinking["type"] != "disabled" and (
+                        native.get("thinking") != thinking
+                        or (thinking["type"] == "enabled" and native.get("max_tokens") != self.cold_history.max_tokens)
+                    ):
+                        message = ("CLI 未保留请求的自适应思考显示模式" if thinking["type"] == "adaptive"
+                                   else "CLI 未保留请求的固定思考预算或输出上限")
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
-                            "code": "unsupported_parameter", "message": "CLI 未保留请求的自适应思考显示模式"}}))
+                            "code": "unsupported_parameter", "message": message}}))
                     if self.cold_history.effort is not None:
                         output = native.get("output_config")
                         if not isinstance(output, dict) or output.get("effort") != self.cold_history.effort:
