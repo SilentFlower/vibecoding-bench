@@ -5055,20 +5055,25 @@ def verify_cache_markers(manage, token, account_id, headers, received):
             ((digest, model, _),) = received[before:]
             (claim,) = own_claims
             assert claim["sha256"] == digest, (name, evidence, claim)
-            from_cli = name in ("unmarked", "history", "history_replace", "history_user_reminder", "nested_result",
-                                "forced_ttl_5m", "forced_ttl_1h")
+            nested_result = name in ("nested_result", "forced_nested_result")
+            from_cli = nested_result or name in ("unmarked", "history", "history_replace", "history_user_reminder",
+                                                "forced_ttl_5m", "forced_ttl_1h")
             assert claim["from_interactive_cli"] is from_cli, (name, claim)
             assert model.get("tools", []) == body.get("tools", []), name
             if from_cli:
                 user_texts = [b.get("text") for message in model["messages"] if message["role"] == "user"
                               for b in blocks(message)]
                 assert user_texts.count(question["text"]) == user_texts.count(tail["text"]) == 1
-                if name == "nested_result":
-                    assert observed_cache_breakpoints(model) == []
+                if nested_result:
+                    assert claim["uses_native_history"] is True, (name, claim)
+                    markers = observed_cache_breakpoints(model)
+                    assert markers == [], (name, markers)
                     assert find_blocks(model, "id", PAST_ID) == [("assistant", historical_tool)]
                     observed = find_blocks(model, "tool_use_id", PAST_ID)
-                    assert observed == [("user", historical_result)], observed
-                    evidence["nested_result"] = observed
+                    # 平台 TTL 只覆盖直接断点，结果内部的断点保留原值。
+                    assert observed == [("user", historical_result)], (name, observed)
+                    evidence.update(nested_result=observed, cache_markers=markers,
+                                    uses_native_history=claim["uses_native_history"])
                 elif expected is not None:
                     markers = observed_cache_breakpoints(model)
                     assert markers == [(i, 0, row["role"], row["content"][0])
