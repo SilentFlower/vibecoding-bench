@@ -7,6 +7,7 @@ import json
 import os
 import re
 import secrets
+from sqlite3 import Error as DatabaseError
 from contextlib import ExitStack, contextmanager
 from threading import Event, Thread
 from pathlib import Path
@@ -26,6 +27,7 @@ from runtime_files import atomic_json
 from system_update_contract import MANIFEST_LIMIT, safe_read, strict_json, validate_operation
 from system_update_gate import UPDATE_GATE
 from system_update_rollout import read_rollout
+from system_update_stopped import HOST_READ_PATH, stopped_environment
 from cluster_migration_maintenance import paused_migration_lease
 from cluster_store import ClusterStore
 
@@ -305,8 +307,30 @@ def runtime_snapshot(runtime, central_only: bool = False, control_only: bool = F
                         continue
                 except (ValueError, RuntimeError, AttributeError):
                     pass
+            historical_blocker = None
+            if (not control_only and gate.get('phase') == 'blocked' and gate.get('operation_id')
+                    and gate['active'] == 0 and row['state'] == 'stopped'
+                    and row['account_id'] is not None and row['account_id'] not in accounts
+                    and any(row[column] for column in ROLE_COLUMNS.values())):
+                try:
+                    stopped = stopped_environment(runtime, row, gate, UPDATE_GATE.state,
+                        lambda scope: updater_request('POST', HOST_READ_PATH, scope))
+                except HTTPException as error:
+                    historical_blocker = ('宿主尚未提供历史停止证据读取' if error.status_code == 404
+                        else '宿主历史停止证据暂不可用')
+                except (DatabaseError, DockerException, KeyError, OSError, ValueError):
+                    historical_blocker = '历史停止环境的原归属、角色或在途证据待核对'
+                else:
+                    if not central_only or stopped['node_kind'] == 'local':
+                        environments.append({**item, **stopped, 'gateway_account_id': None})
+                    continue
+            if central_only:
                 if not control_only:
-                    blockers.append(row['name'] + ': 环境归属待核对')
+                    blockers.append(row['name'] + ': ' + (historical_blocker or '环境归属待核对'))
+                continue
+            if historical_blocker:
+                environments.append({**item, 'roles': {}, 'origin': None, 'blockers': [historical_blocker]})
+                blockers.append(row['name'] + ': ' + historical_blocker)
                 continue
             try:
                 if service is None or service.synchronization is None or accounts.get(row['account_id']) is None:
@@ -880,8 +904,10 @@ def system_updates_router(runtime_provider) -> APIRouter:
             raise HTTPException(409, '环境身份或代次已经变化')
         row = dict(stored)
         locality = getattr(runtime, 'locality', None)
-        if body.central_only and locality is not None and not locality(row):
-            raise HTTPException(409, '中央快速换版仅操作本机环境')
+        if locality is not None and (body.central_only or (account is None and row['account_id'] is not None)) and not locality(row):
+            if body.central_only:
+                raise HTTPException(409, '中央快速换版仅操作本机环境')
+            raise HTTPException(409, '历史停止环境仅提供维护读取')
         with runtime.environment_lock(row['environment_id']):
             if body.action in ('restore', 'retire'):
                 if evidence['active'] or (body.action == 'restore' and any(item['blockers']
