@@ -215,7 +215,7 @@ def coordinate_gate(service, runtime, peer: GatePeer, action: str, gate: dict):
             # 原 freeze 的 HTTP 也可能晚于取消抵达。此时无需访问 SSH，记录本地取消决定防止迟到的新写入。
             atomic_json(marker, {**identity, 'revision': None, 'released': True})
             return True
-        if action == 'release' and record['released']:
+        if action == 'release' and record['released'] and record['revision'] is None:
             return True
         command = NodeGateCommand(action='read', deployment=runtime.deployment, node_key=peer.node_key,
             operation_id=gate['operation_id'], epoch=gate['epoch'], target_release=gate['target_release'], created_at=gate['created_at'])
@@ -228,8 +228,9 @@ def coordinate_gate(service, runtime, peer: GatePeer, action: str, gate: dict):
             record = {**identity, 'revision': status['revision'], 'released': False}
             # 在第一个远端写入前持久化旧修订。超时或进程重启后沿同一安装身份释放。
             atomic_json(marker, record)
-        if record['released']:
+        if action == 'freeze' and record['released']:
             raise ValueError('该操作已释放节点，迟到的冻结请求已失效')
+        # 已下发意图的节点可能从备份恢复到同一 blocked 门禁，宿主重试释放时仍核对实际状态。
         command = NodeGateCommand.model_validate({**command.model_dump(), 'action': action, 'expected_revision': record['revision']})
         result = _call(service, runtime, peer, command)
         if action == 'freeze':
@@ -242,7 +243,8 @@ def coordinate_gate(service, runtime, peer: GatePeer, action: str, gate: dict):
             return False
         if (result['phase'], result['operation_id'], result['epoch']) != ('idle', None, gate['epoch']):
             raise ValueError('原节点未确认释放')
-        atomic_json(marker, {**record, 'released': True})
+        if not record['released']:
+            atomic_json(marker, {**record, 'released': True})
         return True
     finally:
         os.close(lock)
