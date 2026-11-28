@@ -8,11 +8,13 @@ import socket
 import stat
 import struct
 import threading
+
 import time
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr, model_validator
 
+from cluster_update_gate import NodeJobThread
 from cluster_execution_grants import ExecutionScope
 from runtime_files import atomic_json, private_directory
 from runtime_terminal_input import KEYS, send_terminal_input
@@ -102,7 +104,7 @@ class NodeInputBroker:
                 listener.listen(2)
                 listener.settimeout(0.25)
                 self.listener = listener
-                self.thread = threading.Thread(target=self._serve, name='node-input-' + self.scope.operation_id[:8], daemon=True)
+                self.thread = NodeJobThread(target=self._serve, name='node-input-' + self.scope.operation_id[:8], daemon=True)
                 self.thread.start()
             except BaseException:
                 listener.close()

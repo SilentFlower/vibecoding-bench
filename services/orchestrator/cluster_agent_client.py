@@ -37,12 +37,13 @@ class _NodeConnection(HTTPConnection):
         self.sock = stream
 
 
-def node_agent_request(data: Path, token: str, operation: str, raw: bytes) -> dict:
+def node_agent_request(data: Path, token: str, operation: str, raw: bytes, *, maintenance: tuple[str, str] | None = None) -> dict:
     """向本容器的私有UDS提交一次固定动作，未知提交由原调用方核对。
 
     :param data: 精确安装数据根。
     :param token: 本节点独立服务认证。
     :param operation: 固定节点操作。
+    :param maintenance: 仅原平台节点安装任务传入的操作和代次。
     :param raw: 有界JSON输入。
     :return: 有界私有协议回执。
     """
@@ -51,6 +52,7 @@ def node_agent_request(data: Path, token: str, operation: str, raw: bytes) -> di
         'grant-create', 'grant-renew', 'grant-get', 'grant-close', 'credential-refresh-start', 'credential-refresh-get', 'credential-status', 'credential-material', 'credential-identity', 'credential-usage-get', 'account-login-get', 'account-login-observe', 'account-login-code-receipt', 'account-login-snapshot', 'account-login-input', 'account-bound-identity', 'account-bound-login-start', 'account-bound-login-get', 'account-bound-login-stop', 'account-bound-login-observe', 'account-bound-login-code', 'account-bound-login-code-receipt', 'account-bound-login-commit', 'account-bound-login-snapshot', 'account-bound-login-accept', 'account-bound-login-discard', 'account-bound-login-input', 'account-bound-login-publish', 'account-bound-login-abort', 'credential-refresh-stop', 'account-login-start', 'account-login-stop', 'account-login-code', 'account-login-commit', 'account-login-accept', 'account-login-discard', 'credential-usage-start', 'credential-usage-stop', 'terminal-assets', 'terminal-start',
         'terminal-get', 'terminal-observe', 'terminal-send', 'terminal-input', 'terminal-control',
         'terminal-conversation', 'terminal-usage', 'terminal-passive', 'terminal-passive-ack', 'terminal-quota-state', 'terminal-quota-read', 'api-quota-read', 'project-history-capture', 'terminal-capture', 'terminal-maintenance', 'terminal-recover', 'terminal-reconcile', 'terminal-snapshot', 'terminal-snapshot-get', 'terminal-verification-start', 'terminal-verification-get', 'terminal-verification-cancel', 'run-verification-start', 'run-verification-get', 'run-verification-cancel', 'run-review-input-stage', 'run-review-input-commit', 'run-review-input-facts', 'run-scenario-input-stage', 'run-scenario-input-commit', 'run-scenario-input-facts', 'run-scenario-input-archive', 'run-project-prepare', 'run-project-configure', 'run-project-decision', 'run-project-facts', 'run-project-native', 'run-project-permit', 'run-snapshot', 'run-snapshot-get', 'run-start', 'run-get', 'run-poll', 'run-control', 'run-recover', 'run-quota-state', 'run-quota-read', 'run-artifact', 'run-files', 'run-file', 'run-stats', 'run-capture', 'run-session', 'run-refresh', 'run-refresh-get', 'run-owner-refresh-defer', 'continue-start', 'continue-get', 'continue-input', 'continue-control', 'continue-recover', 'continue-quota-state', 'continue-quota-read', 'continue-quota-control', 'continue-credentials'}
+    allowed.add('platform-gate')
     allowed.update(DRAFT_LOGIN_OPERATIONS)
     allowed.update(OWNER_OPERATIONS)
     allowed.update(ENVIRONMENT_OPERATIONS)
@@ -69,10 +71,14 @@ def node_agent_request(data: Path, token: str, operation: str, raw: bytes) -> di
         timeout = None
     elif operation in AGY_NODE_SHORT:
         timeout = 15
+    if operation == 'platform-gate':
+        timeout = 5
     connection = _NodeConnection(data / 'node-agent/control.sock', timeout)
     try:
-        connection.request('POST', '/operations/' + operation, body=raw,
-            headers={'content-type': 'application/json', 'x-v3-node-token': token, 'connection': 'close'})
+        headers = {'content-type': 'application/json', 'x-v3-node-token': token, 'connection': 'close'}
+        if maintenance:
+            headers.update({'x-v3-node-update-operation': maintenance[0], 'x-v3-node-update-epoch': maintenance[1]})
+        connection.request('POST', '/operations/' + operation, body=raw, headers=headers)
         response = connection.getresponse()
         try:
             maximum=response_limit(operation)
@@ -93,12 +99,12 @@ def main() -> None:
     :return: None；标准输出沿原ok/result与固定脱敏错误合同。
     """
     try:
-        if os.environ.get('V3_ROLE')!='node-control' or len(sys.argv)!=2:
+        if os.environ.get('V3_ROLE')!='node-control' or len(sys.argv) not in (2, 4):
             raise ValueError('节点私有客户端入口角色或操作无效')
         raw=sys.stdin.buffer.read(2*1024*1024+1)
         if len(raw)>2*1024*1024:
             raise ValueError('节点准备请求过大')
-        result=node_agent_request(Path(os.environ['BENCH_DATA']),os.environ['V3_INTERNAL_TOKEN'],sys.argv[1],raw)
+        result=node_agent_request(Path(os.environ['BENCH_DATA']),os.environ['V3_INTERNAL_TOKEN'],sys.argv[1],raw, maintenance=tuple(sys.argv[2:]) or None)
     except Exception as error:
         # 沿原SSH入口只公开故障类型，实际请求、认证与远端原文留在私有边界。
         result={'ok':False,'reason':'node_preparation_failed','error_type':type(error).__name__}

@@ -6,6 +6,7 @@ import json
 import os
 import shlex
 import threading
+
 import time
 from contextlib import contextmanager
 from pathlib import Path
@@ -14,6 +15,7 @@ from docker.errors import NotFound
 
 from account_runtime import AccountRuntime, read_cli_identity_at
 from cli_telemetry_policy import cli_telemetry_environment
+from cluster_update_gate import NodeJobThread
 from cluster_credential_account import read_node_credential_account
 from cluster_credentials_contract import CredentialIdentityImport, CredentialMaterial, CredentialRefreshStart, CredentialStatusRead, CredentialUsageStart, credential_start
 from cluster_execution import NodeInspection, _GatewaySnapshot
@@ -254,7 +256,7 @@ class NodeCredentials:
                     atomic_json(path,record)
                     self.slots.release()
                 else:
-                    worker=threading.Thread(target=self._run,args=(request,),name='node-credential-refresh',daemon=True)
+                    worker=NodeJobThread(target=self._run,args=(request,),name='node-credential-refresh',daemon=True)
                     self.workers[scope.operation_id]=worker
                     worker.start()
             except BaseException:

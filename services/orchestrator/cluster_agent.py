@@ -27,6 +27,7 @@ from cluster_execution import NodeExecution, NodeLocation, execute_operation
 from agy_node import AgyNode
 from agy_node_contract import AGY_NODE_OPERATIONS, AGY_NODE_SHORT
 from cluster_quiesce import NodeQuiesce, quiesce_node
+from cluster_update_gate import NodeGateCommand, node_admission, node_gate
 from cluster_execution_grants import ExecutionGrant, ExecutionGrants, ExecutionScope
 from cluster_draft_login import NodeDraftLogins
 from cluster_draft_login_contract import DraftLoginAccept, DraftLoginActivation, DraftLoginCode, DraftLoginCodeRead, DraftLoginGrant, DraftLoginGrantClose, DraftLoginInputQuery, DraftLoginPreparation, DraftLoginPreparationDelete, DraftLoginScope, DraftLoginStart
@@ -134,6 +135,8 @@ def create_node_app(executor: NodeExecution, host: NodeRuntimeHost, token: str, 
             elif operation == STOPPED_OBSERVE:
                 request = StoppedNodeRead.model_validate(strict_json(raw,16384))
                 value = node_observation(executor,host,grants,draft_grants,request)
+            elif operation == 'platform-gate':
+                value = node_gate(executor, NodeGateCommand.model_validate(strict_json(raw, 4096)))
             elif operation in AGY_NODE_OPERATIONS:
                 value = agy.call(operation, strict_json(raw, 2 * 1024 * 1024))
             elif operation in ('stage-preparation-files', 'prepare-files'):
@@ -327,6 +330,7 @@ def create_node_app(executor: NodeExecution, host: NodeRuntimeHost, token: str, 
             'credential-material','credential-identity','credential-usage-get','credential-owner-get',
             'account-login-get','account-login-observe','account-login-code-receipt','account-login-snapshot','account-login-input','account-bound-identity',
             'account-bound-login-get','account-bound-login-observe','account-bound-login-code-receipt','account-bound-login-snapshot','account-bound-login-input')
+        control = control or operation == 'platform-gate'
         selected = control_slots if control else slots
         if not selected.acquire(blocking=False):
             return JSONResponse({'ok': False, 'reason': 'node_busy'}, status_code=503)
@@ -337,7 +341,16 @@ def create_node_app(executor: NodeExecution, host: NodeRuntimeHost, token: str, 
                 limit = 96 * 1024 if operation in ('terminal-quota-state', 'run-quota-state', 'continue-quota-state') else 16384 if control else 2 * 1024 * 1024
                 if len(raw) > limit:
                     return JSONResponse({'ok': False, 'reason': 'node_request_too_large'}, status_code=413)
-            result = await run_in_threadpool(dispatch, operation, bytes(raw))
+            operation_id = request.headers.get('x-v3-node-update-operation')
+            epoch = request.headers.get('x-v3-node-update-epoch')
+            continuation = (operation_id, epoch) if operation_id or epoch else None
+            def admitted():
+                with node_admission(operation, continuation):
+                    return dispatch(operation, bytes(raw))
+            try:
+                result = await run_in_threadpool(admitted)
+            except (RuntimeError, ValueError):
+                return JSONResponse({'ok': False, 'reason': 'node_maintenance'}, status_code=503)
             return JSONResponse(result)
         finally:
             selected.release()
@@ -360,13 +373,14 @@ def create_node_app(executor: NodeExecution, host: NodeRuntimeHost, token: str, 
             await websocket.close(code=1013)
             return
         try:
-            await websocket.accept()
-            first = await asyncio.wait_for(websocket.receive_text(), timeout=10)
-            model=DraftLoginScope if websocket.url.path=='/draft-login-pty' else ExecutionScope
-            scope = model.model_validate(strict_json(first.encode(), 16384))
-            actor={'/account-login-pty':logins,'/account-bound-login-pty':bound_logins,'/continue-pty':continues,
-                '/draft-login-pty':draft_logins}[websocket.url.path]
-            await actor.serve(websocket, scope)
+            with node_admission('node-pty', None):
+                await websocket.accept()
+                first = await asyncio.wait_for(websocket.receive_text(), timeout=10)
+                model=DraftLoginScope if websocket.url.path=='/draft-login-pty' else ExecutionScope
+                scope = model.model_validate(strict_json(first.encode(), 16384))
+                actor={'/account-login-pty':logins,'/account-bound-login-pty':bound_logins,'/continue-pty':continues,
+                    '/draft-login-pty':draft_logins}[websocket.url.path]
+                await actor.serve(websocket, scope)
         except Exception as error:
             logging.getLogger(__name__).error('节点续聊PTY关闭 error_type=%s', type(error).__name__)
         finally:

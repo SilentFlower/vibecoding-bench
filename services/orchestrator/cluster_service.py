@@ -42,6 +42,7 @@ from cluster_transport import NodeTransport, NodeTransports
 from runtime_files import atomic_json
 from runtime_names import account_container_prefix
 from system_update_gate import NodeImageFetchPaused, UPDATE_GATE
+from cluster_update_gate import maintenance_scope
 from system_update_contract import safe_read, strict_json
 
 logger = logging.getLogger(__name__)
@@ -270,7 +271,7 @@ class ClusterService:
 
     def _restore_platform_node(self, row: dict, body: dict, lock, activity) -> None:
         try:
-            with UPDATE_GATE.continue_reserved(activity):
+            with UPDATE_GATE.continue_reserved(activity), maintenance_scope(body):
                 if body.get('preserve_data'):
                     node = self.connection(row['id'])
                     path = node.private / 'maintenance/current.json'
@@ -1222,7 +1223,7 @@ class ClusterService:
         """在原节点版本内执行安装，持久保存结果并定向释放活动。"""
         try:
             context = UPDATE_GATE.continue_reserved(activity) if activity is not None else nullcontext()
-            with context:
+            with context, maintenance_scope(maintenance):
                 result = (self.synchronization.install(installer, node_id, revision, maintenance=maintenance, stage_only=stage_only, activity=activity) if self.synchronization
                     else installer.prepare(node_id, revision))
                 if not self.store.save_preparation(node_id, revision, result):
