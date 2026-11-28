@@ -49,7 +49,7 @@ from runtime_diagnostics import NetworkContextError, network_failure
 from runtime_files import atomic_json, atomic_text, directory_fd as _directory_fd
 from runtime_names import account_container_prefix
 from storage_maintenance import deduplicate_immutable_tree
-from system_update_gate import UPDATE_GATE, update_open
+from system_update_gate import UPDATE_GATE, background_activity, update_open
 from system_update_contract import safe_read, strict_json
 from tui_direct_selection import MULTI_SELECTION_LABEL, MULTI_SELECTION_VERSION
 from tui_direct_version import DIRECT_CLI_VERSION
@@ -2106,9 +2106,11 @@ class AccountRuntime:
 
         :return: 服务停止后释放游标。
         """
+        # 节点清理线程独立于中央调度，完整维护取证时须等当前批次退出并暂停新批次。
+        cycle = background_activity(self._capture_cleanup_cycle) if self.node_key else self._capture_cleanup_cycle
         try:
             while not self.stopping.is_set():
-                self._capture_cleanup_cycle()
+                cycle()
                 if self.stopping.wait(3600):
                     return
         finally:

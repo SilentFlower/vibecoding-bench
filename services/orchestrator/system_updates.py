@@ -30,6 +30,7 @@ from system_update_rollout import read_rollout
 from system_update_stopped import HOST_READ_PATH, stopped_environment
 from cluster_migration_maintenance import paused_migration_lease
 from cluster_store import ClusterStore
+from cluster_update_gate import GatePeer, coordinate_gate, gate_peers, maintenance_scope
 
 
 _PLATFORM_VERSION_FILE = Path(__file__).with_name('platform-version.json')
@@ -125,6 +126,16 @@ class ClusterUpdate(BaseModel):
     account_image: StrictStr | None = None
     account_release: StrictStr | None = None
     preserve_data: StrictBool = False
+
+
+class NodeGateUpdate(BaseModel):
+    """宿主按原维护代次协调一个实际参与历史停机取证的节点。"""
+
+    model_config = ConfigDict(extra='forbid', strict=True)
+    operation_id: StrictStr
+    epoch: StrictStr
+    peer: GatePeer
+    action: Literal['freeze', 'release']
 
 
 class EnvironmentUpdate(BaseModel):
@@ -268,6 +279,7 @@ def runtime_snapshot(runtime, central_only: bool = False, control_only: bool = F
     locality = getattr(runtime, 'locality', None)
     service = getattr(runtime, 'cluster_service', None)
     node_rows = service.store.list() if service else []
+    needs_node_gates = False
     removed_drafts = service.store.removed_draft_environments() if service else set()
     node_removals = [{'name': row['name'], 'state': row['removal']['state']} for row in node_rows if row.get('removal')]
     for removal in node_removals if not control_only else ():
@@ -308,6 +320,9 @@ def runtime_snapshot(runtime, central_only: bool = False, control_only: bool = F
                 except (ValueError, RuntimeError, AttributeError):
                     pass
             historical_blocker = None
+            if (not control_only and row['state'] == 'stopped' and row['account_id'] is not None
+                    and row['account_id'] not in accounts and any(row[column] for column in ROLE_COLUMNS.values())):
+                needs_node_gates = True
             if (not control_only and gate.get('phase') == 'blocked' and gate.get('operation_id')
                     and gate['active'] == 0 and row['state'] == 'stopped'
                     and row['account_id'] is not None and row['account_id'] not in accounts
@@ -431,7 +446,8 @@ def runtime_snapshot(runtime, central_only: bool = False, control_only: bool = F
     blockers = agy_update_blockers + blockers
     return {**gate, 'scope': scope, 'ready': gate['phase'] == 'blocked' and not blockers,
         'environments': environments, 'nodes': nodes, 'node_removals': node_removals, 'blockers': blockers[:256],
-        'agy_update_blockers': agy_update_blockers[:3]}
+        'agy_update_blockers': agy_update_blockers[:3],
+        **({'stopped_gate_nodes': gate_peers(service, node_rows)} if needs_node_gates and service else {})}
 
 
 def environment_sources(runtime, *, observe_remote: bool = True) -> list[dict]:
@@ -844,6 +860,19 @@ def system_updates_router(runtime_provider) -> APIRouter:
             return runtime_snapshot(runtime_provider(), True, True)
         return runtime_snapshot(runtime_provider(), body.central_only if body else False)
 
+    @router.post('/internal/v3/system-updates/stopped-node-gate')
+    def stopped_node_gate(request: Request, body: NodeGateUpdate) -> dict:
+        """沿宿主管理鉴权发送原节点冻结或释放。@param request 宿主证明。@param body 参与节点。@return 完成状态。"""
+        gate = internal_proof(request)
+        if (gate.get('phase'), gate.get('operation_id'), gate.get('epoch')) != ('blocked', body.operation_id, body.epoch):
+            raise HTTPException(409, '节点维护操作归属变化')
+        runtime = runtime_provider()
+        try:
+            done = coordinate_gate(runtime.cluster_service, runtime, body.peer, body.action, gate)
+        except (OSError, ValueError, RuntimeError):
+            raise HTTPException(409, '节点维护交接仍需核对') from None
+        return {'operation_id': body.operation_id, 'epoch': body.epoch, 'node_key': body.peer.node_key, 'done': done}
+
     @router.post('/internal/v3/system-updates/nodes')
     def nodes(request: Request, body: ClusterUpdate) -> dict:
         """沿原内部认证协调同代节点备份与恢复。:param request: 原宿主证明。:param body: 固定范围。:return: 节点进度。"""
@@ -855,7 +884,8 @@ def system_updates_router(runtime_provider) -> APIRouter:
         if service is None:
             return {'nodes': []}
         try:
-            return service.platform_nodes(body.model_dump())
+            with maintenance_scope(body.model_dump()):
+                return service.platform_nodes(body.model_dump())
         except (ValueError, RuntimeError):
             raise HTTPException(409, '节点平台维护仍需核对原任务') from None
 

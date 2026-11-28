@@ -19,6 +19,7 @@ from cluster_draft_login_operations import DRAFT_LOGIN_OPERATIONS, DRAFT_LOGIN_S
 from cluster_owner_operations import OWNER_OPERATIONS
 from cluster_environment_operations import ENVIRONMENT_OPERATIONS, response_limit
 from agy_node_contract import AGY_NODE_LONG, AGY_NODE_OPERATIONS, AGY_NODE_SHORT
+from cluster_update_gate import forwarding_scope
 from runtime_files import atomic_text, directory_fd
 
 
@@ -452,7 +453,7 @@ class SshNode:
         :param operation: 固定证明或终端动作。
         :return: 节点持久回执。
         """
-        if operation not in ('account-quiesce','review-admission','grant-create', 'grant-renew', 'grant-get', 'grant-close', 'credential-refresh-start', 'credential-refresh-get', 'credential-status', 'credential-material', 'credential-identity', 'credential-usage-get', 'account-login-get', 'account-login-observe', 'account-login-code-receipt', 'account-login-snapshot', 'account-login-input', 'account-bound-identity', 'account-bound-login-start', 'account-bound-login-get', 'account-bound-login-stop', 'account-bound-login-observe', 'account-bound-login-code', 'account-bound-login-code-receipt', 'account-bound-login-commit', 'account-bound-login-snapshot', 'account-bound-login-accept', 'account-bound-login-discard', 'account-bound-login-input', 'account-bound-login-publish', 'account-bound-login-abort', 'credential-refresh-stop', 'account-login-start', 'account-login-stop', 'account-login-code', 'account-login-commit', 'account-login-accept', 'account-login-discard', 'credential-usage-start', 'credential-usage-stop', 'terminal-assets',
+        if operation not in ('platform-gate','account-quiesce','review-admission','grant-create', 'grant-renew', 'grant-get', 'grant-close', 'credential-refresh-start', 'credential-refresh-get', 'credential-status', 'credential-material', 'credential-identity', 'credential-usage-get', 'account-login-get', 'account-login-observe', 'account-login-code-receipt', 'account-login-snapshot', 'account-login-input', 'account-bound-identity', 'account-bound-login-start', 'account-bound-login-get', 'account-bound-login-stop', 'account-bound-login-observe', 'account-bound-login-code', 'account-bound-login-code-receipt', 'account-bound-login-commit', 'account-bound-login-snapshot', 'account-bound-login-accept', 'account-bound-login-discard', 'account-bound-login-input', 'account-bound-login-publish', 'account-bound-login-abort', 'credential-refresh-stop', 'account-login-start', 'account-login-stop', 'account-login-code', 'account-login-commit', 'account-login-accept', 'account-login-discard', 'credential-usage-start', 'credential-usage-stop', 'terminal-assets',
                 'terminal-start', 'terminal-get', 'terminal-observe', 'terminal-send', 'terminal-input', 'terminal-control',
                 'terminal-conversation', 'terminal-usage', 'terminal-passive', 'terminal-passive-ack', 'terminal-quota-state', 'terminal-quota-read', 'api-quota-read', 'project-history-capture', 'terminal-capture', 'terminal-maintenance', 'terminal-recover', 'terminal-reconcile', 'terminal-snapshot', 'terminal-snapshot-get', 'terminal-verification-start', 'terminal-verification-get', 'terminal-verification-cancel', 'run-verification-start', 'run-verification-get', 'run-verification-cancel', 'run-review-input-stage', 'run-review-input-commit', 'run-review-input-facts', 'run-scenario-input-stage', 'run-scenario-input-commit', 'run-scenario-input-facts', 'run-scenario-input-archive', 'run-project-prepare', 'run-project-configure', 'run-project-decision', 'run-project-facts', 'run-project-native', 'run-project-permit', 'run-snapshot', 'run-snapshot-get', 'run-start', 'run-get', 'run-poll', 'run-control', 'run-recover', 'run-quota-state', 'run-quota-read', 'run-artifact', 'run-files', 'run-file', 'run-stats', 'run-capture', 'run-session', 'run-refresh', 'run-refresh-get', 'run-owner-refresh-defer', 'continue-start', 'continue-get', 'continue-input', 'continue-control', 'continue-recover', 'continue-quota-state', 'continue-quota-read', 'continue-quota-control', 'continue-credentials') and operation not in DRAFT_LOGIN_OPERATIONS and operation not in OWNER_OPERATIONS and operation not in ENVIRONMENT_OPERATIONS:
             raise ValueError('节点具体执行操作无效')
@@ -477,7 +478,7 @@ class SshNode:
         return self._execute_environment(container, payload, operation)
 
     def _execute_environment(self, container: str, payload: dict, operation: str) -> dict:
-        if operation not in ('health', 'prepare', 'inspect', 'account-quiesce', 'review-admission', 'fence', 'export', 'stage-import', 'verify-import',
+        if operation not in ('platform-gate', 'health', 'prepare', 'inspect', 'account-quiesce', 'review-admission', 'fence', 'export', 'stage-import', 'verify-import',
                 'prepare-import', 'activate-import', 'restore-source', 'revoke-import', 'restart-preserved', 'stage-preparation-files', 'prepare-files', 'grant-create', 'grant-renew',
                 'grant-get', 'grant-close', 'credential-refresh-start', 'credential-refresh-get', 'credential-status', 'credential-material', 'credential-identity', 'credential-usage-get', 'account-login-get', 'account-login-observe', 'account-login-code-receipt', 'account-login-snapshot', 'account-login-input', 'account-bound-identity', 'account-bound-login-start', 'account-bound-login-get', 'account-bound-login-stop', 'account-bound-login-observe', 'account-bound-login-code', 'account-bound-login-code-receipt', 'account-bound-login-commit', 'account-bound-login-snapshot', 'account-bound-login-accept', 'account-bound-login-discard', 'account-bound-login-input', 'account-bound-login-publish', 'account-bound-login-abort', 'credential-refresh-stop', 'account-login-start', 'account-login-stop', 'account-login-code', 'account-login-commit', 'account-login-accept', 'account-login-discard', 'credential-usage-start', 'credential-usage-stop', 'terminal-assets', 'terminal-start', 'terminal-get', 'terminal-observe',
                 'terminal-send', 'terminal-input', 'terminal-control', 'terminal-conversation', 'terminal-usage',
@@ -489,6 +490,8 @@ class SshNode:
         if len(body) > 2 * 1024 * 1024:
             raise ValueError('节点准备输入超过允许大小')
         arguments = ['docker', 'exec', '-i', container, 'python3', '/app/cluster_agent_client.py', operation]
+        if operation in ('fence', 'restore-source', 'restart-preserved', 'stage-preparation-files', 'prepare-files', 'prepare'):
+            arguments.extend(forwarding_scope(self.private) or ())
         command = shlex.join(arguments)
         timeout = 20 if operation in DRAFT_LOGIN_SHORT_OPERATIONS else 605 if operation in ('export', 'verify-import', 'terminal-assets', 'terminal-snapshot', 'terminal-snapshot-get', 'run-snapshot', 'run-snapshot-get') else 20 if operation in (
             'health', 'inspect', 'review-admission', 'stage-import', 'grant-create', 'grant-renew', 'grant-get', 'grant-close', 'credential-refresh-get', 'credential-status', 'credential-material', 'credential-identity', 'credential-usage-get', 'account-login-get', 'account-login-observe', 'account-login-code-receipt', 'account-login-snapshot', 'account-login-input', 'account-bound-identity', 'account-bound-login-get', 'account-bound-login-observe', 'account-bound-login-code-receipt', 'account-bound-login-snapshot', 'account-bound-login-input',
@@ -502,6 +505,8 @@ class SshNode:
             timeout = None
         elif operation in AGY_NODE_SHORT:
             timeout = 20
+        if operation == 'platform-gate':
+            timeout = 8
         result = json.loads(self._command(command, data=body, timeout=timeout, maximum_output=response_limit(operation)))
         if not isinstance(result, dict) or result.get('ok') is not True or not isinstance(result.get('result'), dict):
             failure = public_failure(result.get('failure')) if isinstance(result, dict) else None

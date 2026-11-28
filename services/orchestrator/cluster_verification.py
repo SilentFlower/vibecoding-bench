@@ -2,15 +2,16 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import re
 import shutil
 import threading
+
 from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr
 
+from cluster_update_gate import NodeJobThread
 from cluster_execution_grants import ExecutionScope
 from cluster_workspace import WorkspaceSnapshotArchive, WorkspaceSnapshotReference, read_workspace_bundle
 from project_library import canonical_json, digest_json, materialize_snapshot, read_document, safe_relative, snapshot_tree
@@ -190,7 +191,7 @@ class NodeVerifications:
                     'request_digest': digest_json(request.model_dump()), 'report': None, 'cancel_requested': False}
                 atomic_json(directory / 'state.json', state)
                 cancel = threading.Event()
-                worker = threading.Thread(target=self._run, args=(request, cancel), daemon=True)
+                worker = NodeJobThread(target=self._run, args=(request, cancel), daemon=True)
                 self.workers[request.attempt_id] = (worker, cancel)
                 worker.start()
                 return state
