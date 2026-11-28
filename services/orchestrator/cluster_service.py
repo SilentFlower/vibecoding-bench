@@ -809,7 +809,8 @@ class ClusterService:
             result = []
         else:
             return []
-        if first is None or previous[0] < first:
+        # 账号可能跨过多次换版才发起新轮。普通绑定和回退都沿用已完成的连续升级证据。
+        if first is not None and previous[0] < first:
             return result
 
         candidates = []
@@ -822,7 +823,8 @@ class ClusterService:
                     continue
                 predecessor = source_binding(archive)
                 target = archive.get('target_account_release')
-                if predecessor and predecessor[0] >= first and isinstance(target, str) and target and archive.get('job_id') == path.stem:
+                if (predecessor and (first is None or predecessor[0] >= first)
+                        and isinstance(target, str) and target and archive.get('job_id') == path.stem):
                     candidates.append((predecessor[0], path.stat().st_mtime_ns, target, predecessor))
             except (OSError, ValueError):
                 # 损坏的归档不能承接换版。其余有效证据仍可供同账号核对。

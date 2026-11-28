@@ -167,8 +167,8 @@ class TuiNodeTransitionTests(unittest.TestCase):
                     with self.subTest(journal=change):
                         self.assertEqual([], service.tui_transport_predecessors(account, runtime, binding))
 
-    def test_rollback_follows_completed_archives_for_the_same_account_and_node(self) -> None:
-        """复现 168、171、172、174 的历史，拒绝不同归属或未完成的换版。@return 无。"""
+    def test_running_binding_and_rollback_follow_completed_archives_for_the_same_account(self) -> None:
+        """同账号跨过两次换版时可核对原登记，拒绝不同归属或未完成的换版。@return 无。"""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             node_key, environment = 'b' * 32, 'a' * 32
@@ -204,11 +204,13 @@ class TuiNodeTransitionTests(unittest.TestCase):
             atomic_json(maintenance / ('3' * 32 + '.json'), journal('3' * 32, 170, 'ci-101-1', 'ci-102-1', phase='rolled_back'))
             atomic_json(maintenance / ('4' * 32 + '.json'), journal('4' * 32, 167, 'ci-100-1', 'ci-102-1'))
             compact = lambda values: [(entry['generation'], entry['release_id']) for entry in values]
-            self.assertEqual([(172, 'ci-103-1')], compact(service.tui_transport_predecessors(account, runtime, scope)))
+            expected = [(172, 'ci-103-1'), (171, 'ci-102-1')]
+            self.assertEqual([*expected, (167, 'ci-100-1')],
+                             compact(service.tui_transport_predecessors(account, runtime, scope)))
             reply = service.tui_rollback_status(account, runtime, {**scope, 'secret': 'synthetic'}, 168)
             self.assertEqual(scope, reply['scope'])
             self.assertFalse(reply['stopped'])
-            self.assertEqual([(172, 'ci-103-1'), (171, 'ci-102-1')], compact(reply['predecessors']))
+            self.assertEqual(expected, compact(reply['predecessors']))
             for changes in (
                 {'phase': 'rolled_back'}, {'config_sha256': 'changed'}, {'target_account_release': 'ci-999-1'},
                 {'accounts': [{'account': {**account, 'cc2api_account_id': 18}}]},
@@ -216,6 +218,8 @@ class TuiNodeTransitionTests(unittest.TestCase):
             ):
                 atomic_json(historical, {**good, **changes})
                 with self.subTest(changes=changes):
+                    self.assertEqual([(172, 'ci-103-1')],
+                                     compact(service.tui_transport_predecessors(account, runtime, scope)))
                     reply = service.tui_rollback_status(account, runtime, scope, 168)
                     self.assertEqual([(172, 'ci-103-1')], compact(reply['predecessors']))
 

@@ -897,7 +897,7 @@ async fn runtime_account_config(
         return Ok(Json(configuration));
     }
     Ok(Json(
-        serde_json::json!({"account_id": account.id, "proxy_url": account.proxy_url,
+        serde_json::json!({"account_id": account.id, "platform": account.platform, "proxy_url": account.proxy_url,
         "auth_type": account.auth_type, "status": account.status, "email": account.email,
         "request_backend": account.request_backend, "concurrency": account.concurrency,
         "account_uuid": account.account_uuid, "organization_uuid": account.organization_uuid,
@@ -4062,6 +4062,42 @@ mod tests {
             assert_eq!(updated["seven_day_usage_limit_percent"], expected.1);
             assert_eq!(updated["rpm_limit"], 50);
         }
+    }
+
+    /// 私有账号配置为编排提供当前平台、认证和状态，保留凭据的发放边界。
+    #[tokio::test]
+    async fn runtime_claude_config_exposes_platform_for_direct_preparation() {
+        let (app, _) = test_router_with_gateway().await;
+        let (status, created) = account_admin_json(
+            &app,
+            Method::POST,
+            "/admin/accounts",
+            json!({
+                "name": "direct-platform",
+                "email": "direct-platform@example.invalid",
+                "auth_type": "oauth",
+                "access_token": "synthetic-access",
+                "refresh_token": "synthetic-refresh",
+                "expires_at": (Utc::now() + ChronoDuration::hours(2)).timestamp_millis(),
+            }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED);
+        let id = created["id"].as_i64().unwrap();
+        let (status, config) = account_admin_json(
+            &app,
+            Method::GET,
+            &format!("/admin/runtime/accounts/{id}/config"),
+            json!({}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(config["account_id"], id);
+        assert_eq!(config["platform"], "claude_code");
+        assert_eq!(config["auth_type"], "oauth");
+        assert_eq!(config["status"], "active");
+        assert!(config.get("access_token").is_none());
+        assert!(config.get("refresh_token").is_none());
     }
 
     /// 活动 API 与 CLI 不妨碍普通配置保存，真正身份修改仍须排空且不能覆盖轮换凭据。
