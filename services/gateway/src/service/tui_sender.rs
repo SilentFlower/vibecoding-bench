@@ -2303,6 +2303,14 @@ mod tests {
                 "unsupported_parameter",
                 Some(StatusCode::UNPROCESSABLE_ENTITY),
             ),
+            (
+                "direct_required_tool_unsupported",
+                Some(StatusCode::UNPROCESSABLE_ENTITY),
+            ),
+            (
+                "direct_serial_tools_unsupported",
+                Some(StatusCode::UNPROCESSABLE_ENTITY),
+            ),
             ("untrusted", None),
         ] {
             let id = source.identity();

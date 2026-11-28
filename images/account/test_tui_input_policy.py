@@ -71,12 +71,16 @@ class InputPolicyTests(unittest.TestCase):
         for parameters, reason in (
             ({'output_config': {'format': {'type': 'json_schema'}}}, 'direct_output_format_unsupported'),
             ({'tool_choice': {'type': 'tool', 'name': 'Echo'}}, 'direct_tool_choice_unsupported'),
+            ({'tool_choice': {'type': 'any'}}, 'direct_required_tool_unsupported'),
+            ({'tool_choice': {'type': 'auto', 'disable_parallel_tool_use': True}}, 'direct_serial_tools_unsupported'),
             ({'temperature': 0.2}, 'direct_temperature_unsupported'),
         ):
             with self.subTest(parameters=parameters), self.assertRaisesRegex(InputRejection, reason):
                 validate_direct({**self.body, **parameters})
-        validate_direct({**self.body, 'output_config': {'effort': 'medium'}, 'tool_choice': {'type': 'auto'},
-                         'temperature': 1})
+        for choice in ({'type': 'auto'}, {'type': 'auto', 'disable_parallel_tool_use': False}, {'type': 'none'}):
+            with self.subTest(choice=choice):
+                validate_direct({**self.body, 'output_config': {'effort': 'medium'}, 'tool_choice': choice,
+                                 'temperature': 1})
 
     def test_native_and_api_have_different_allowlists(self):
         """API 根字段与 V1 逐项一致，原生保留扩展和空 MCP，非空服务器声明拒绝。@return 无。"""

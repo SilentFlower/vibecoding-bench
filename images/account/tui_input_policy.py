@@ -46,8 +46,15 @@ def validate_direct(body):
     if isinstance(output, dict) and output.get('format') is not None:
         raise InputRejection('direct_output_format_unsupported')
     choice = body.get('tool_choice')
-    if isinstance(choice, dict) and choice.get('type') == 'tool':
-        raise InputRejection('direct_tool_choice_unsupported')
+    if isinstance(choice, dict):
+        kind = choice.get('type')
+        # 固定 CLI 实收只支持默认工具调度，这三种约束会在出站时丢失。
+        if kind == 'tool':
+            raise InputRejection('direct_tool_choice_unsupported')
+        if kind == 'any':
+            raise InputRejection('direct_required_tool_unsupported')
+        if kind == 'auto' and choice.get('disable_parallel_tool_use') is True:
+            raise InputRejection('direct_serial_tools_unsupported')
     if 'temperature' in body and body['temperature'] != 1:
         raise InputRejection('direct_temperature_unsupported')
 

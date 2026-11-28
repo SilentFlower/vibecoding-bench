@@ -3026,7 +3026,8 @@ class AccountRuntimeTests(unittest.TestCase):
 
     @unittest.skipUnless(os.geteuid() == 0, '发行托管策略权限测试需要 root')
     def test_release_direct_prepares_on_v2_selection_without_an_account_list(self) -> None:
-        """共享发行策略由账号身份生成。准备 V2 之前只安装原生 V1 所需的 CLI。@return 无。"""
+        """SSH 私有掩码下发布可读策略。V2 准备按账号共享策略并独立绑定。@return 无。"""
+        self.addCleanup(os.umask, os.umask(0o077))
         containers = self._isolated_docker(unique_roles=True)
         labels = self.client.images.get.return_value.attrs['Config']['Labels']
         labels.update({
@@ -3060,7 +3061,12 @@ class AccountRuntimeTests(unittest.TestCase):
             self.assertFalse((self.root / DIRECT_DIRECTORY).exists())
             self.assertFalse((self.root / POLICY_DIRECTORY).exists())
             self.assertEqual([item.args[1] for item in install.call_args_list], ['2.1.293'])
-            mount = self.root / DEFAULT_POLICY_DIRECTORY / policy['release_bundle'] / 'marketplace'
+            policy_root = self.root / DEFAULT_POLICY_DIRECTORY
+            mount = policy_root / policy['release_bundle'] / 'marketplace'
+            self.assertEqual(policy_root.stat().st_mode & 0o777, 0o700)
+            self.assertEqual(mount.stat().st_mode & 0o777, 0o755)
+            for entry in mount.rglob('*'):
+                self.assertEqual(entry.stat().st_mode & 0o777, 0o755 if entry.is_dir() else 0o444)
             self.assertIn({'Type': 'bind', 'Source': str(mount), 'Destination': MANAGED_MARKETPLACE_PATH, 'RW': False},
                           containers[row['sender_container_id']].attrs['Mounts'])
             binding = self.runtime.transport(account, '', prepare_tui=True)

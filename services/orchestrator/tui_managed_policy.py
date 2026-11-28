@@ -91,7 +91,8 @@ def shipped_direct_policy(data: Path, *, account_id: int, environment_id: str) -
     key = sha256(encode({name: sha256(content).hexdigest() for name, content in files.items()})).hexdigest()
     root = data / DEFAULT_POLICY_DIRECTORY
     root.mkdir(mode=0o755, exist_ok=True)
-    _trusted(root, directory=True, sender_readable=True)
+    # 发布总目录只供编排访问。sender 分别挂载受管设置文件及目录市场。
+    _trusted(root, directory=True)
     bundle = root / key
     # 新版本的不同内容发布到新目录。已运行 sender 的只读绑定继续持有自己的文件。
     if not bundle.exists():
@@ -104,7 +105,9 @@ def shipped_direct_policy(data: Path, *, account_id: int, environment_id: str) -
                     for name, content in files.items():
                         target = stage / name
                         atomic_text(target, content.decode('utf-8'), 0o444)
-                    stage.chmod(0o755)
+                    # 节点服务以 umask 077 运行。在发布前固定 Docker 会挂入 sender 的目录权限。
+                    for directory, _, _ in os.walk(stage, topdown=False):
+                        Path(directory).chmod(0o755)
                     stage.rename(bundle)
                     os.fsync(fd)
         finally:

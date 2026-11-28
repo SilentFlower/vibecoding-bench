@@ -2143,6 +2143,16 @@ pub(super) fn tui_input_rejection(reason: &str) -> Option<AppError> {
             "当前交互 CLI 直发无法指定单个工具",
         ),
         (
+            "direct_required_tool_unsupported",
+            S::UNPROCESSABLE_ENTITY,
+            "当前交互 CLI 直发无法强制调用至少一个工具",
+        ),
+        (
+            "direct_serial_tools_unsupported",
+            S::UNPROCESSABLE_ENTITY,
+            "当前交互 CLI 直发无法禁止并行工具调用",
+        ),
+        (
             "direct_temperature_unsupported",
             S::UNPROCESSABLE_ENTITY,
             "当前交互 CLI 直发无法保留非默认 temperature",
