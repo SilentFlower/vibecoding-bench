@@ -46,6 +46,7 @@ SOURCE_FILES += ('orchestrator/runtime_names.py',)
 SOURCE_FILES += ('orchestrator/cluster_backup_index.py',)
 SOURCE_FILES += ('orchestrator/cli_telemetry_policy.py',)
 SOURCE_FILES += ('orchestrator/agy_auth.py',)
+SOURCE_FILES += ('deploy/v3/system_update_stopped_host.py', 'deploy/v3/stopped_node_observation.py')
 
 
 def prepare_installation(env: Path, release_dir: Path, root: Path, public_key: str, *, apply: bool = False,

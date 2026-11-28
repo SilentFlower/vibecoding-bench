@@ -820,6 +820,10 @@ class UpdateHTTPHandler(BaseHTTPRequestHandler):
                 result = engine.status()
             elif self.command == 'GET' and self.path == '/releases':
                 result = engine.releases()
+            elif self.command == 'POST' and self.path == '/maintenance/stopped-environment':
+                from system_update_stopped_host import stopped_evidence
+                self._reply(200, stopped_evidence(engine, body))
+                return
             elif self.command == 'POST' and self.path == '/check' and not body:
                 result = engine.check()
             elif self.command == 'POST' and self.path in ('/prepare', '/install', '/rollback'):
