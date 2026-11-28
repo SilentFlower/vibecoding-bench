@@ -1271,6 +1271,7 @@ mod tests {
             )
             .await;
             let mut account = oauth_account("prime-v2@example.test");
+            account.proxy_url = base.clone();
             account.concurrency = 1;
             account.rpm_limit = 0;
             accounts.create_account(&mut account).await.unwrap();
