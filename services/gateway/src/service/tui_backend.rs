@@ -14,8 +14,9 @@ use crate::service::account::{AccountQueue, AccountService};
 use crate::service::diagnostics::tui_admission_rejected;
 use crate::service::runtime_bridge::{account_config_permit, account_route_config_permit};
 use crate::service::runtime_transport::{
-    TuiBindingStatus, TuiReadySender, TuiRollbackReadiness, tui_fixture, tui_input_rejection,
-    tui_rollback_readiness, tui_same_binding, tui_scope, tui_switch_status, tui_transition_status,
+    TuiBindingStatus, TuiReadySender, TuiRollbackReadiness, TuiV2Unavailable, tui_fixture,
+    tui_input_rejection, tui_rollback_readiness, tui_same_binding, tui_scope, tui_switch_status,
+    tui_transition_status,
 };
 use crate::service::system_update::background_admission;
 use crate::service::tui_native_drain::{self, NativeTurn};
@@ -99,7 +100,8 @@ impl TuiRequestRoute {
             && sender.idle
             && let Ok(_permit) = account_route_config_permit(service, account).await
             && !tui_native_drain::occupied_v2(service.tui_database(), account.id).await?
-            && idle_binding(account, &state.binding).await.as_deref() == Some(sender.key.as_str())
+            && idle_binding(account, &state.binding, false).await.as_deref()
+                == Some(sender.key.as_str())
         {
             // 排空许可内重读编排登记和 sender 状态，确保保存的就是本次准备的代次。
             state = service
@@ -203,7 +205,7 @@ async fn reconcile_locked(
     if fixture
         && ((active_v2
             && tui_native_drain::occupied_v2(service.tui_database(), account.id).await?)
-            || idle_binding(account, &state.binding).await.is_none())
+            || idle_binding(account, &state.binding, false).await.is_none())
     {
         return Ok(state);
     }
@@ -232,7 +234,8 @@ async fn reconcile_locked(
         };
         (String::new(), readiness == TuiRollbackReadiness::Stopped)
     } else {
-        let Some(binding) = idle_binding(account, &state.binding).await else {
+        let require_direct = state.target == TUI_V2 && service.tui_direct_only().await?;
+        let Some(binding) = idle_binding(account, &state.binding, require_direct).await else {
             return Ok(state);
         };
         (binding, false)
@@ -252,9 +255,10 @@ async fn reconcile_locked(
     Ok(saved)
 }
 
-async fn idle_binding(account: &Account, registered: &str) -> Option<String> {
+async fn idle_binding(account: &Account, registered: &str, require_direct: bool) -> Option<String> {
     let status = tui_transition_status(account).await.ok()?;
-    (status.idle && status.can_advance(registered)).then_some(status.key)
+    (status.idle && status.can_advance(registered) && (!require_direct || status.direct_https))
+        .then_some(status.key)
 }
 
 /// 登记、取消或尝试提交账号配置。调用方持同账号的配置序列锁。
@@ -282,11 +286,12 @@ pub(crate) async fn change_locked(
             "当前账号未启用，无法切换到交互 V2".into(),
         ));
     }
+    let require_direct = !tui_fixture(account) && service.tui_direct_only().await?;
     let pending = if target == before.active { "" } else { target };
     // 相同意向的重试不推进配置，也不会重新执行 quiesce。
     if pending == before.target {
         let ready = tui_transition_status(account).await;
-        return Ok(view(account, &before, ready.as_ref().ok()));
+        return Ok(view(account, &before, ready.as_ref().ok(), require_direct));
     }
     if expected.is_some_and(|version| version != before.revision) {
         return Err(AppError::SchedulingConflict);
@@ -299,8 +304,14 @@ pub(crate) async fn change_locked(
     } else {
         tui_transition_status(account).await
     };
-    if target == TUI_V2 && target != before.active && ready.is_err() {
-        return Err(ready.unwrap_err());
+    if target == TUI_V2 && target != before.active {
+        match &ready {
+            Ok(status) if require_direct && !status.direct_https => {
+                return Err(TuiV2Unavailable::DirectUnavailable.into_error());
+            }
+            Err(_) => return Err(ready.unwrap_err()),
+            _ => {}
+        }
     }
     let binding = if pending.is_empty() && before.active != TUI_V2 {
         ""
@@ -316,16 +327,17 @@ pub(crate) async fn change_locked(
         .update_tui_backend(account.id, &before, &before.active, pending, binding)
         .await?;
     let state = reconcile_locked(service, account, queue, saved).await?;
-    Ok(view(account, &state, ready.as_ref().ok()))
+    Ok(view(account, &state, ready.as_ref().ok(), require_direct))
 }
 
 fn view(
     account: &Account,
     state: &TuiBackendSnapshot,
     runtime: Option<&TuiBindingStatus>,
+    require_direct: bool,
 ) -> Value {
     let mut value = json!(account);
-    attach_status(&mut value, account, state, runtime);
+    attach_status(&mut value, account, state, runtime, require_direct);
     value
 }
 
@@ -343,14 +355,16 @@ fn attach_status(
     account: &Account,
     state: &TuiBackendSnapshot,
     runtime: Option<&TuiBindingStatus>,
+    require_direct: bool,
 ) {
     value["request_backend"] = json!(state.active);
     value["request_backend_pending"] = json!((!state.target.is_empty()).then_some(&state.target));
     value["request_backend_revision"] = json!(state.revision);
     value["tui_v2_available"] = json!(runtime.is_some_and(|status| {
-        (state.active != TUI_V2 && state.binding.is_empty())
+        let bound = (state.active != TUI_V2 && state.binding.is_empty())
             || tui_same_binding(&state.binding, &status.key)
-            || (status.idle && status.can_advance(&state.binding))
+            || (status.idle && status.can_advance(&state.binding));
+        bound && (!require_direct || status.direct_https)
     }));
     value["tui_direct_available"] = json!(runtime.is_some_and(|status| status.direct_https));
     if state.active == TUI_V2 {
@@ -388,6 +402,7 @@ pub(crate) async fn append_view(
         account,
         &state,
         tui_transition_status(account).await.as_ref().ok(),
+        !tui_fixture(account) && service.tui_direct_only().await?,
     );
     Ok(())
 }

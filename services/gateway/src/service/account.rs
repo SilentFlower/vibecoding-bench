@@ -37,6 +37,7 @@ use crate::service::version_profile::{
 use crate::store::account_store::AccountStore;
 use crate::store::account_store::{TuiBackendSnapshot, TuiOAuthRefreshState};
 use crate::store::scheduling_store::SchedulingStore;
+use crate::store::settings_store::TUI_DIRECT_ONLY_SETTING;
 
 #[path = "agy_account.rs"]
 mod agy_account;
@@ -1195,6 +1196,19 @@ impl AccountService {
     /// 读取 V2 切换快照。@param id 归属账号。@return 生效值、目标及版本。
     pub(crate) async fn tui_backend(&self, id: i64) -> Result<TuiBackendSnapshot, AppError> {
         self.store.tui_backend(id).await
+    }
+
+    /// 读取部署的 V2 直发门禁。@return 管理员已保存的选择。配置无效时拒绝准入。
+    pub(super) async fn tui_direct_only(&self) -> Result<bool, AppError> {
+        let configured = self
+            .settings_store
+            .get_value(TUI_DIRECT_ONLY_SETTING, "false")
+            .await?;
+        match configured.as_str() {
+            "true" => Ok(true),
+            "false" => Ok(false),
+            _ => Err(AppError::ServiceUnavailable("V2 直发配置无效".into())),
+        }
     }
 
     /// 读取待原进程收口的 V2 轮次。@param id 已认证维护对应的账号。@return 是否阻止物理隔离。

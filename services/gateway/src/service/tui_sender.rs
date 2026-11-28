@@ -42,8 +42,9 @@ use crate::service::runtime_transport::{
     tui_input_rejection, tui_model_headers, tui_projection_marker, valid_tui_account_token,
 };
 use crate::service::runtime_transport::{
-    TUI_BODY_SOURCE, TUI_CAPTURE, TUI_CLI_INPUT_GUARD, TUI_CLI_SUBMISSION, TUI_ERROR_SOURCE,
-    TUI_FINAL_CAPTURE, TUI_INSTRUCTION_LOCATION, TUI_MODEL_ACCEPT_OMITTED, TUI_MODEL_HEADER_POLICY,
+    TUI_BODY_SOURCE, TUI_CAPTURE, TUI_CLI_INPUT_GUARD, TUI_CLI_SUBMISSION, TUI_DIRECT_HTTPS,
+    TUI_DIRECT_UNAVAILABLE, TUI_ERROR_SOURCE, TUI_FINAL_CAPTURE, TUI_INSTRUCTION_LOCATION,
+    TUI_MODEL_ACCEPT_OMITTED, TUI_MODEL_HEADER_POLICY,
     TUI_OPENING_USAGE_PLACEHOLDER, TUI_PREPARE_BIND, TUI_PREPARE_EXCHANGE, TUI_PREPARE_LEDGER,
     TUI_PROMPT_SUGGESTION, TUI_REPAIR_ATTEMPT, TUI_SEND_CLAIM, TUI_SENDER_CONFIG,
     TUI_SESSION_ORIGIN, TUI_SIGNATURE_REPAIR, TUI_SUBMISSION_LEDGER, TUI_SYSTEM_PROMPT_POLICY,
@@ -723,6 +724,7 @@ impl TuiSender {
             config.max_reservations,
         )?;
         let capture_requested = tui_projection_marker(request.headers(), TUI_CAPTURE, "1");
+        let direct_required = tui_projection_marker(request.headers(), TUI_DIRECT_HTTPS, "1");
         let wire_protocol = tui_projection_marker(request.headers(), TUI_FINAL_CAPTURE, "1");
         let offer_header_policy =
             tui_projection_marker(request.headers(), TUI_MODEL_HEADER_POLICY, "1");
@@ -774,6 +776,10 @@ impl TuiSender {
             } = verify_source(&self.path, binding, "bind", None)
                 .await
                 .map_err(|_| unavailable())?;
+            if direct_required && !(direct_https && oauth_file && managed_oauth) {
+                stage = TUI_DIRECT_UNAVAILABLE;
+                return Err(TuiV2Unavailable::DirectUnavailable.into_error());
+            }
             // 双方明确支持原生交付表示才采集。旧控制端继续使用其认识的来源。
             let offer_cli_capture = managed_oauth
                 && capture_requested
@@ -915,6 +921,10 @@ impl TuiSender {
             }
             if reply["error"] == "subagent_binding" && identity.agent_hint.is_some() {
                 return Err(invalid_identity());
+            }
+            if direct_required && (!oauth_file || reply["direct_https_protocol"] != 1) {
+                stage = TUI_DIRECT_UNAVAILABLE;
+                return Err(TuiV2Unavailable::DirectUnavailable.into_error());
             }
             let kind = match reply["kind"].as_str() {
                 Some("new") if !identity.continuation_only => "new",
@@ -1061,6 +1071,11 @@ impl TuiSender {
         slot.armed = false;
         observe("sender_private_prepare", "accepted");
         let mut response = (StatusCode::NO_CONTENT, [(HANDOFF_HEADER, kind)]).into_response();
+        if direct_required {
+            response
+                .headers_mut()
+                .insert(TUI_DIRECT_HTTPS, HeaderValue::from_static("1"));
+        }
         if identity.session_id.starts_with(SUGGESTION_SESSION_PREFIX) {
             response.headers_mut().insert(TUI_PROMPT_SUGGESTION, HeaderValue::from_static("1"));
         }

@@ -95,6 +95,8 @@ pub(super) const TUI_SYSTEM_PROMPT_POLICY: &str = "x-v3-tui-system-prompt-policy
 pub(super) const TUI_MODEL_HEADER_POLICY: &str = "x-v3-tui-model-header-policy";
 pub(super) const TUI_MODEL_ACCEPT_OMITTED: &str = "x-v3-tui-model-accept-omitted";
 pub(super) const TUI_OAUTH_FILE: &str = "x-v3-tui-oauth-file";
+pub(super) const TUI_DIRECT_HTTPS: &str = "x-v3-tui-direct-https";
+pub(super) const TUI_DIRECT_UNAVAILABLE: &str = "tui_direct_unavailable";
 pub(super) const TUI_ACCOUNT_EXPIRY: &str = "x-v3-tui-account-expiry";
 const TUI_ACCOUNT_MODEL: &str = "x-v3-tui-account-model";
 pub(super) const TUI_SIGNATURE_REPAIR: &str = "x-v3-tui-signature-repair";
@@ -377,14 +379,17 @@ pub(super) enum TuiV2Unavailable {
     ReadinessConfig,
     ReadinessLedger,
     ReadinessSource,
+    DirectUnavailable,
 }
 
 impl TuiV2Unavailable {
-    fn into_error(self) -> AppError {
+    /// 将受管发送器拒绝映射到公开错误。@return 投递前的不可用原因。
+    pub(super) fn into_error(self) -> AppError {
         AppError::ServiceUnavailable(
             match self {
                 Self::NotConfigured | Self::NotRunning => "V2 没有已配置并运行的账号发送器",
                 Self::BindingUnverified => "V2 账号发送器绑定未通过校验",
+                Self::DirectUnavailable => "V2 账号的 CLI 直发未就绪",
                 Self::MessagesToolAndUsageEventsUnavailable => {
                     "V2 缺少官方交互终端的完整 Messages 工具和用量事件源"
                 }
@@ -403,6 +408,7 @@ impl TuiV2Unavailable {
             Self::ReadinessConfig => "tui_readiness_config",
             Self::ReadinessLedger => "tui_readiness_ledger",
             Self::ReadinessSource => "tui_readiness_source",
+            Self::DirectUnavailable => TUI_DIRECT_UNAVAILABLE,
             _ => "tui_v2_readiness",
         }
     }
@@ -1384,6 +1390,7 @@ pub(super) async fn tui_switch_status(account: &Account) -> Result<TuiBindingSta
                 Instant::now() + Duration::from_millis(REQUEST_BUDGET_MS),
                 true,
                 None,
+                false,
             )
             .await?;
             Ok(TuiBindingStatus {
@@ -1520,6 +1527,7 @@ pub(super) struct TuiReadySender {
     agent_summary: bool,
     system_prompt_policy: bool,
     direct_https: bool,
+    direct_required: bool,
     predecessors: Vec<String>,
     tui_oauth_profile: Option<Map<String, Value>>,
 }
@@ -1541,12 +1549,14 @@ impl TuiReadySender {
 
 /// 解析账号登记并核验 sender 的实际能力。@param account 已授权账号。
 /// @param deadline 请求的单调时钟截止。@param wake 是否允许沿编排合同唤醒。
-/// @param registered 原回执已登记的绑定。@return 原传输及其就绪证明，新轮只使用当前发行。
+/// @param registered 原回执已登记的绑定。@param direct_only 是否要求正式 sender 直发。
+/// @return 原传输及其就绪证明，新轮只使用当前发行。
 pub(super) async fn ready_tui_sender(
     account: &Account,
     deadline: Instant,
     wake: bool,
     registered: Option<&str>,
+    direct_only: bool,
 ) -> Result<TuiReadySender, AppError> {
     let deadline_reached = || {
         super::diagnostics::tui_admission_rejected("tui_readiness_deadline");
@@ -1564,14 +1574,17 @@ pub(super) async fn ready_tui_sender(
             // 滚动更新的旧本机绑定仍可被发现。仅已登记回执可以继续使用该发行的发送器。
             return Err(TuiV2Unavailable::BindingUnverified);
         }
-        let idle = tui_status(
+        let (idle, agent_summary, system_prompt_policy, direct_https) = tui_status(
             &transport.client,
             &transport.binding,
             transport.fixture,
             None,
         )
         .await?;
-        Ok((transport, idle))
+        if direct_only && !transport.fixture && !direct_https {
+            return Err(TuiV2Unavailable::DirectUnavailable);
+        }
+        Ok((transport, (idle, agent_summary, system_prompt_policy, direct_https)))
     })
     .await
     .map_err(|_| deadline_reached())?
@@ -1596,6 +1609,7 @@ pub(super) async fn ready_tui_sender(
         agent_summary,
         system_prompt_policy,
         direct_https,
+        direct_required: direct_only && !fixture,
         predecessors,
         tui_oauth_profile,
     })
@@ -2245,6 +2259,7 @@ pub(super) async fn prepare_tui(
         client,
         binding,
         tui_oauth_profile,
+        direct_required,
         ..
     } = sender;
     let agent_hint = tui_agent_hint(&input)?;
@@ -2308,6 +2323,9 @@ pub(super) async fn prepare_tui(
     if input.oauth_file {
         prepare = prepare.header(TUI_OAUTH_FILE, "1");
     }
+    if direct_required {
+        prepare = prepare.header(TUI_DIRECT_HTTPS, "1");
+    }
     let observe = super::diagnostics::current_log_mode() == RequestLogMode::Debug;
     if observe {
         prepare = prepare.header(TUI_CAPTURE, "1").header(TUI_CLI_SUBMISSION, "1");
@@ -2368,6 +2386,7 @@ pub(super) async fn prepare_tui(
                 TUI_PREPARE_LEDGER,
                 TUI_PREPARE_BIND,
                 TUI_PREPARE_EXCHANGE,
+                TUI_DIRECT_UNAVAILABLE,
             ],
         );
         if let Some(stage) = stage.or_else(|| {
@@ -2398,6 +2417,13 @@ pub(super) async fn prepare_tui(
             reservation.oauth_file = tui_projection_marker(response.headers(), TUI_OAUTH_FILE, "1");
             if reservation.oauth_file && (!input.oauth_file || !reservation.managed_oauth) {
                 return Err(AppError::ServiceUnavailable("V2 文件凭据协议不匹配".into()));
+            }
+            if direct_required
+                && (!reservation.oauth_file
+                    || !tui_projection_marker(response.headers(), TUI_DIRECT_HTTPS, "1"))
+            {
+                super::diagnostics::error_stage(TUI_DIRECT_UNAVAILABLE);
+                return Err(TuiV2Unavailable::DirectUnavailable.into_error());
             }
             reservation.input_policy =
                 tui_projection_marker(response.headers(), TUI_INPUT_POLICY, "1");
@@ -6471,6 +6497,7 @@ mod tests {
                 agent_summary: false,
                 system_prompt_policy: false,
                 direct_https: false,
+                direct_required: false,
                 predecessors: Vec::new(),
                 tui_oauth_profile: None,
             };
@@ -6522,6 +6549,81 @@ mod tests {
                 let mut extra = base.clone();
                 extra["messages"][0]["custom"] = json!(true);
                 assert!(old.verify_input_policy(&extra).is_err());
+            }
+        }
+        server.abort();
+    }
+
+    /// 严格直发必须从当前一次预留收到直发和文件凭据确认。@return 用例成功时无返回值。
+    #[tokio::test]
+    async fn tui_direct_policy_requires_same_prepare_ack() {
+        let app = Router::new().route(
+            "/internal/tui-v2/prepare",
+            post(|headers: HeaderMap, body: Bytes| async move {
+                assert!(tui_projection_marker(&headers, TUI_DIRECT_HTTPS, "1"));
+                let mut reply = HeaderMap::new();
+                reply.insert("x-v3-tui-handoff-kind", HeaderValue::from_static("new"));
+                reply.insert(TUI_MANAGED_OAUTH, HeaderValue::from_static("1"));
+                if body.as_ref() != b"without-file" {
+                    reply.insert(TUI_OAUTH_FILE, HeaderValue::from_static("1"));
+                }
+                if body.as_ref() != b"without-direct" {
+                    reply.insert(TUI_DIRECT_HTTPS, HeaderValue::from_static("1"));
+                }
+                (StatusCode::NO_CONTENT, reply)
+            }),
+        );
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        for (body, allowed) in [
+            ("without-file", false),
+            ("without-direct", false),
+            ("both", true),
+        ] {
+            let binding = TransportBinding {
+                account_id: 12,
+                environment_id: "a".repeat(32),
+                generation: 3,
+                endpoint: endpoint.clone(),
+                secret: "fixture".into(),
+                release_id: "test".into(),
+            };
+            let sender = TuiReadySender {
+                client: Client::builder().no_proxy().build().unwrap(),
+                key: tui_sender_key(&binding, false),
+                binding,
+                idle: true,
+                agent_summary: false,
+                system_prompt_policy: false,
+                direct_https: true,
+                direct_required: true,
+                predecessors: Vec::new(),
+                tui_oauth_profile: None,
+            };
+            let input = TuiMessagesInput {
+                body: &Bytes::copy_from_slice(body.as_bytes()),
+                headers: &HeaderMap::new(),
+                native_cc: false,
+                signature_repair: None,
+                agent_summary: false,
+                oauth_file: true,
+                system_prompt_policy: TuiSystemPromptPolicy::Append,
+                body_policy: TuiBodyPolicy::default(),
+            };
+            let result = prepare_tui(
+                sender,
+                7,
+                "direct-session",
+                input,
+                Instant::now() + Duration::from_secs(2),
+                false,
+            )
+            .await;
+            if allowed {
+                assert!(result.unwrap().oauth_file);
+            } else {
+                assert!(matches!(result, Err(AppError::ServiceUnavailable(_))));
             }
         }
         server.abort();

@@ -89,7 +89,9 @@ python3 -B /app/tui_direct_admin.py --data-root "$NODE_DATA_ROOT" publish "$GATE
 
 同一节点可以重复发布不同账号。首条写入将已有的合法 `tui-direct/account.json` 一并迁移到 `tui-direct/accounts/<网关账号ID>.json`。发布后，各 sender 只读取自己的记录并核对当前代次和受管策略。账号重新绑定环境时，先按旧环境撤销，再按新的实际归属发布。
 
-已在兼容 V2 的账号可先沿原修订门禁排空到 `native293`。通过 `POST /api/environments/<环境ID>/maintenance` 提交 `operation=stop` 和当前 `expected_generation`，再从同一环境的 `native-preparation` 入口准备正式 sender。重读 `GET /admin/accounts/<网关账号ID>`，确认当前 sender 的 `tui_direct_available=true` 后，用 `PUT` 提交 `request_backend=tui_v2` 和实收 `request_backend_revision`。逐号确认公网 SSE 及同一预留的一次真实模型投递。
+已在兼容 V2 的账号先沿原修订门禁排空到 `native293`。要求本部署的 V2 强制直发时，用 `PUT /admin/settings` 提交 `{"tui_direct_only":"true"}`，通过 `GET /admin/settings` 重读。生效后，新请求、工具续轮和 V2 预热都需要当前 sender 及本轮预留确认 CLI 直发。缺少能力时，网关在投递前返回 503 和直发未就绪说明。
+
+通过 `POST /api/environments/<环境ID>/maintenance` 提交 `operation=stop` 和当前 `expected_generation`，再从同一环境的 `native-preparation` 入口准备正式 sender。重读 `GET /admin/accounts/<网关账号ID>`，确认当前 sender 的 `tui_direct_available=true` 后，用 `PUT` 提交 `request_backend=tui_v2` 和实收 `request_backend_revision`。逐号确认公网 SSE 及同一预留的一次真实模型投递。
 
 按账号回退时，保持其选择记录和托管策略，先用当前修订提交 `native293`。待已接请求及工具回执结束，确认生效后端为 `native293`、无待切换，再在原节点撤销并按当前代次重建该环境：
 
