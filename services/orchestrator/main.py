@@ -14651,6 +14651,8 @@ def _v3_environment_summary(row: dict, ownerships: dict, native_preparations: di
             row['native_preparation'] = None
             return row
     row["role_status"] = account_runtime.role_status(row)
+    if row['request_backend'] == 'tui_v2':
+        row['tui_runtime'] = account_runtime.tui_runtime_summary(row)
     blocker = account_runtime.reprofile_blocker(row)
     row["fingerprint"] = json.loads(row.pop("fingerprint_json"))
     row["run_window"] = _account_run_window(dict(account), public=True, zone=row["fingerprint"]["tz"]) if account else None

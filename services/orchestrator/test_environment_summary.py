@@ -28,6 +28,8 @@ class EnvironmentSummaryTests(unittest.TestCase):
                 patch.object(main, 'get_db', return_value=db), patch.object(main, 'effective_claude_code_version', return_value='2.1.293'):
             runtime._root.return_value = Path(directory)
             runtime._sender_config.return_value = Path(directory) / 'sender.json'
+            runtime.role_status.return_value = {'sender': 'running'}
+            runtime.tui_runtime_summary.return_value = {'ready': True, 'idle': True, 'direct': False}
             for kind in ('local', 'ssh'):
                 cluster.store.assignment.return_value = {'kind': kind}
                 for backend, expected in (('legacy', 'legacy'), ('native293', 'native293'), ('tui_v2', 'tui_v2'),
@@ -36,6 +38,11 @@ class EnvironmentSummaryTests(unittest.TestCase):
                         snapshots = {7: {'request_backend': backend, 'request_backend_pending': 'tui_v2'}} if backend else {}
                         result = main._v3_environment_summary(dict(row), {}, snapshots, None)
                         self.assertEqual(result['request_backend'], expected)
+                        if kind == 'local' and backend == 'tui_v2':
+                            self.assertEqual(result['tui_runtime'], runtime.tui_runtime_summary.return_value)
+                        else:
+                            self.assertNotIn('tui_runtime', result)
+            runtime.tui_runtime_summary.assert_called_once()
 
     def test_bounded_parallel_order_and_context(self):
         """慢环境并行读取后仍保持顺序及调用方上下文。@return None。"""

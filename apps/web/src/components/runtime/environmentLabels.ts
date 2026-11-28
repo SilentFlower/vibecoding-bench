@@ -1,3 +1,5 @@
+import type { RuntimeEnvironment } from './runtimeApi';
+
 /** 既有运行时状态的中文含义。 */
 export const criuStates:Record<string,string> = {disabled: '已关闭', not_installed: '镜像待升级', requires_rebuild: '待应用',
   preparing: '模板准备中', waiting: '等待准备模板', ready: '模板已就绪', unavailable: '当前使用普通启动', unknown: '状态待核对'};
@@ -51,3 +53,10 @@ export const tlsReasons:Record<string,string> = {OBSERVER_NOT_CONFIGURED: '采�
     OBSERVER_STATUS_UNAVAILABLE: '等待实际检查', IMAGE_NOT_ADMITTED: '当前内核尚未准入',
     PROBE_ATTACH_FAILED: '探针附着失败', BPF_LOAD_FAILED: '探针加载失败',
     OBSERVER_FAILED: '采集器已退出', CAPTURE_PREPARING: '后台准备中'};
+/** 按当前环境的发送器回执显示 V2。@param value 实际回执。@return 就绪与会话状态。 */
+export function tuiRuntimeLabel(value: RuntimeEnvironment['tui_runtime']): string {
+  if (!value) return 'V2 运行状态未观测';
+  if (!value.ready) return 'V2 发送器未就绪';
+  if (value.idle == null) return 'V2 发送器就绪';
+  return value.idle ? 'V2 会话空闲' : 'V2 会话使用中';
+}

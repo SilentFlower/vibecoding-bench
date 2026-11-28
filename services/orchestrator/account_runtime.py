@@ -1531,18 +1531,41 @@ class AccountRuntime:
         """读取现有私有发送配置。@param row 当前环境。@return 已校验文件形状的配置。"""
         return _read_json(self._sender_config(row))
 
-    def _sender_active(self, row: dict) -> int:
+    def _sender_status(self, row: dict, *, timeout: float = 5) -> dict:
         binding = _read_json(self._sender_config(row))["binding"]
         request = urllib.request.Request(binding["endpoint"] + "/internal/status",
             headers={"Authorization": "Bearer " + binding["secret"]})
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-        with opener.open(request, timeout=5) as response:
+        with opener.open(request, timeout=timeout) as response:
             value = json.load(response)
         if value["environment_id"] != row["environment_id"] or value["generation"] != row["generation"]:
             raise ValueError("发送器代次不一致")
         if value.get("evidence_ok") is False:
             raise ValueError("API 证据写入异常，账号环境需要维护")
-        return int(value["active"])
+        return value
+
+    def _sender_active(self, row: dict) -> int:
+        return int(self._sender_status(row)["active"])
+
+    def tui_runtime_summary(self, row: dict) -> dict | None:
+        """只读核对该账号及当前环境代次的 V2 发送器。@param row 已投影的环境。@return 公开状态或未知。"""
+        if row.get('role_status', {}).get('sender') != 'running':
+            return None
+        try:
+            value = self._sender_status(row, timeout=1).get('tui_v2')
+        except (KeyError, OSError, TypeError, ValueError):
+            return None
+        account = row.get('gateway_account_id')
+        if (not isinstance(value, dict) or type(value.get('protocol')) is not int or value['protocol'] != 1
+                or type(account) is not int
+                or type(value.get('account_id')) is not int or value['account_id'] != account
+                or type(value.get('ready')) is not bool):
+            return None
+        ready = value['ready']
+        idle = value.get('idle')
+        direct = value.get('direct_https_protocol')
+        return {'ready': ready, 'idle': idle if ready and type(idle) is bool else None,
+                'direct': type(direct) is int and direct == 1 if ready else None}
 
     def verify_native_installations(self, row: dict, versions: tuple[str, ...]) -> None:
         """在维护重建结束前核验完整安装表及发送器的固定制品。

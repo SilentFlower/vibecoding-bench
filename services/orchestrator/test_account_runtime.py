@@ -2963,6 +2963,26 @@ class AccountRuntimeTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 tui_host_memory(root, {'mem': '1g'}, transport, None)
 
+    def test_tui_runtime_summary_uses_current_sender_observation(self) -> None:
+        """V2 状态只来自原账号、当前代次的发送器。@return 无。"""
+        row = {'gateway_account_id': 12, 'environment_id': 'a' * 32, 'generation': 4,
+               'role_status': {'sender': 'running'}}
+        live = {'account_id': 12, 'protocol': 1, 'ready': True, 'idle': False, 'direct_https_protocol': 1}
+        with patch.object(self.runtime, '_sender_status', return_value={'tui_v2': live}) as status:
+            self.assertEqual(self.runtime.tui_runtime_summary(row), {'ready': True, 'idle': False, 'direct': True})
+            status.assert_called_once_with(row, timeout=1)
+            status.return_value = {'tui_v2': {**live, 'direct_https_protocol': None}}
+            self.assertEqual(self.runtime.tui_runtime_summary(row), {'ready': True, 'idle': False, 'direct': False})
+            status.return_value = {'tui_v2': {**live, 'ready': False}}
+            self.assertEqual(self.runtime.tui_runtime_summary(row), {'ready': False, 'idle': None, 'direct': None})
+            status.return_value = {'tui_v2': {**live, 'account_id': 21}}
+            self.assertIsNone(self.runtime.tui_runtime_summary(row))
+            status.side_effect = ValueError('发送器代次不一致')
+            self.assertIsNone(self.runtime.tui_runtime_summary(row))
+            status.reset_mock()
+            self.assertIsNone(self.runtime.tui_runtime_summary({**row, 'role_status': {'sender': 'exited'}}))
+            status.assert_not_called()
+
     def test_scratchpad_mount_and_copy_failure_protect_all_original_roles(self) -> None:
         """新CLI接收专有挂载，转存失败时三个原角色都保留。:return: None。"""
         containers = self._isolated_docker()

@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { Button } from '../ui/button';
 import { ChoiceSelect, type ChoiceOption } from '../ui/controls';
 import { agyToolContinuationLabels, runtimeRequest, type AgyKernelCatalog, type AgyToolContinuationPolicy, type RuntimeEnvironment } from './runtimeApi';
+import { tuiRuntimeLabel } from './environmentLabels';
 
 /** 读取内核的实际运行状态，并按同一环境代次切换已登记的反重力候选。 */
 const props = defineProps<{ environment: RuntimeEnvironment }>();
@@ -154,6 +155,12 @@ const observation = computed(() => props.environment.native_preparation?.version
       <p v-else-if="toolPolicy">保存后对新派发的请求生效。</p>
       <details class="runtime-technical"><summary>固定原版身份</summary><code>{{ environment.agy_runtime?.source_sha256 || '未提供' }}</code></details>
     </template>
+    <template v-else-if="environment.request_backend === 'tui_v2'">
+      <div class="kernel-version"><strong>交互运行时 V2</strong><span>{{ tuiRuntimeLabel(environment.tui_runtime) }}</span></div>
+      <div class="workspace-properties">
+        <div class="kv"><span>模型投递</span><strong>{{ environment.tui_runtime?.direct == null ? '未观测' : environment.tui_runtime.direct ? '受管 CLI 直发' : '兼容发送' }}</strong></div>
+      </div>
+    </template>
     <template v-else>
     <div class="kernel-version"><span>管理方式</span><strong>随 flower2api 版本统一交付</strong></div>
     <p>升级或回退平台时，账号自动采用目标镜像配套的请求内核。</p>
@@ -172,8 +179,7 @@ const observation = computed(() => props.environment.native_preparation?.version
         <details class="runtime-technical"><summary>完整制品摘要</summary><dl><dt>镜像内置分发 SHA256</dt><dd><code>{{ kernel.builtin?.launcher_sha256 || '未提供' }}</code></dd></dl></details>
       </template>
     </section>
-    <p v-if="environment.request_backend === 'tui_v2'">此环境当前使用交互运行时 V2。</p>
-    <p v-else-if="environment.request_backend === 'legacy'">此环境当前使用基础转发方式。</p>
+    <p v-if="environment.request_backend === 'legacy'">此环境当前使用基础转发方式。</p>
     </template>
   </section>
 </template>
