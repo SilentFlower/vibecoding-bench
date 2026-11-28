@@ -30,7 +30,7 @@ from runtime_files import atomic_text
 from tui_capacity import TuiCapacity, TuiCapacityError
 from tui_cold_history import (
     ColdHistory, MCP_PREFIX, MCP_SERVER, SIGNED_THINKING_TYPES, equivalent_auto_tool_choices, tool_result_has_cache_marker,
-    tool_result_has_images, tool_result_has_text_blocks, tool_result_is_empty,
+    direct_input_rejection, tool_result_has_images, tool_result_has_text_blocks, tool_result_is_empty,
 )
 from tui_direct import DirectModel, DirectRejected
 from tui_reconnect import ReceiptCheckpoints, digest
@@ -49,7 +49,6 @@ from tui_messages import (
     WireStep,
     history_digest,
     input_message,
-    passive_quota_headers,
     prompt_text,
     receipt_snapshot,
     provider_session,
@@ -255,7 +254,8 @@ class _Callback(BaseHTTPRequestHandler):
         bearer = actor.model_authorization() if model else actor.bearer
         if target.path.startswith('/direct/'):
             bearer = actor.direct.bearer if actor.direct is not None else None
-        if model and (actor.direct is not None or os.environ.get("V3_DEPLOYMENT_ID") == "us"):
+        if model and (actor.driver.managed_oauth or actor.direct is not None
+                      or os.environ.get("V3_DEPLOYMENT_ID") == "us"):
             bearer = None
         authorization = self.headers.get("Authorization", "")
         if bearer is None or not authorization.isascii() or not hmac.compare_digest(
@@ -1120,35 +1120,22 @@ class _Actor:
         """交付同一次已认领的模型响应。@param http 当前 TUI 连接。
         @param native 内层 CLI 请求。@param native_raw CLI 原始正文。@return 无。
         """
+        # 模型回环仅供隔离开发提供方。受管请求必须经原版进程的直发许可。
+        if self.driver.managed_oauth or self.direct is not None:
+            http.send_error(403)
+            return
         submission = self._claim_model(http.headers, native, native_raw)
         if submission is None:
             http.send_error(409, "No pending model step")
             return
-        if self.driver.managed_oauth and submission.account_token is None:
-            raise ModelResponseError(503, b"")
         step, handle = submission.step, submission.handle
         raw, headers = submission.body, submission.headers
-        account_token = submission.account_token
         options = {"headers": headers}
         if self.cold_history is not None:
             submission.record_cli_handoff()
         elif getattr(handle, "capture", None) is not None:
             options["capture"] = handle.capture
-        if self.driver.managed_oauth:
-            # CLI 原生请求的授权头只认证回环连接，实际模型发送取当前认领的账号 AT。
-            options["headers"] = {
-                **headers,
-                **{name: http.headers[name] for name in ("user-agent", "x-app", "anthropic-beta")
-                   if name not in headers and http.headers.get(name)},
-            }
-            if handle.capture_assembly:
-                options["capture_assembly"] = True
-            if handle.expires_at is not None:
-                options["expires_at"] = handle.expires_at
-            send_model = self.driver.launcher.managed_model_response
-            options.update(account_token=account_token, reservation=handle.reservation)
-        else:
-            send_model = self.driver.launcher.local_model_response
+        send_model = self.driver.launcher.local_model_response
         repair = handle.signature_exchange
         if repair is not None and handle.signature_known:
             prepared = repair(raw)
@@ -1168,15 +1155,13 @@ class _Actor:
                 ):
                     raise
                 raw, attempt_id = restored
-                if self.driver.managed_oauth:
-                    options["attempt_id"] = attempt_id
                 try:
                     upstream = active.enter_context(send_model(raw, **options))
                 except ModelResponseError as final_error:
                     # 本机发送器明确确认尚未出站时，仍交付已经取得的签名拒绝。
                     if final_error.before_send:
                         raise error from None
-                    if final_error.source in ("managed_oauth_http", "local_provider_http"):
+                    if final_error.source == "local_provider_http":
                         handle.repair_attempt_id = attempt_id
                     raise
                 handle.repair_attempt_id = attempt_id
@@ -1190,9 +1175,6 @@ class _Actor:
                 != "text/event-stream"
             ):
                 raise RuntimeError("受管本机提供方没有交付成功的 Messages 事件流")
-            if self.driver.managed_oauth:
-                # 发布首个模型事件前把同轮额度交给预留，避免事件源先发送私有响应头。
-                handle.quota_headers = passive_quota_headers(upstream.headers)
             http.model_stream_started = True
             http.send_response(200)
             http.send_header("Content-Type", "text/event-stream")
@@ -1537,7 +1519,8 @@ class SessionDriver:
             return (
                 not self.closed
                 and self.capacity.snapshot().limit > 0
-                and (os.environ.get("V3_DEPLOYMENT_ID") != "us" or (self.direct_mode and self.managed_oauth))
+                and (not self.managed_oauth or (self.direct_mode and self.oauth_file_available))
+                and (os.environ.get("V3_DEPLOYMENT_ID") != "us" or self.managed_oauth)
                 and self.launcher.account_ready()
             )
         except (ValueError, OSError):
@@ -1928,6 +1911,9 @@ class SessionDriver:
                         raise ValueError("原会话未准备接收该工具结果")
                     answers = tool_receipts(messages, actor.history, actor.expected,
                                             input_format=reservation.get("input_format"))
+                    if self.direct_mode and any(answer.get("is_error") is True and tool_result_has_images(answer)
+                                                for answer in answers.values()):
+                        raise InputRejection("direct_error_result_image_unsupported")
                     if actor.cold_history is not None and actor.cold_history.native_cc and (
                         not is_native or not all(ordinary_custom_tool(tool) for tool in body.get("tools", []))
                     ):
@@ -1986,7 +1972,9 @@ class SessionDriver:
                 raise ValueError("已提交的工具结果或模型参数与重试不符")
             recovery_history = cold.resume_receipts(messages, signed_tool_models=signed_tool_models)
             if recovery_history is None:
-                raise InputRejection("unsupported_parameter")
+                reason = (direct_input_rejection(messages, native_cc=is_native)
+                          if self.direct_mode else "unsupported_parameter")
+                raise InputRejection(reason)
         elif cold is None and (native_history_allowed and checkpoint is None or self.direct_mode and is_native):
             storage = getattr(self.launcher, "STORAGE", None)
             reader = partial(read_bound_history, reservation, storage) if storage is not None else None
@@ -1998,6 +1986,9 @@ class SessionDriver:
             else:
                 cold = ColdHistory.from_request(body, system_policy, cache_ttl=native_cache_ttl, read_history=reader,
                                                 direct_options=direct_options)
+        if self.direct_mode and cold is None:
+            # 直接改用最后一句提示会遗失已验证的历史及内容属性。
+            raise InputRejection(direct_input_rejection(messages, native_cc=is_native))
         if cold is None and (direct_options or system_policy != "append" and not is_native and checkpoint is None):
             raise InputRejection("unsupported_parameter")
         if retire_for_recovery is not None:

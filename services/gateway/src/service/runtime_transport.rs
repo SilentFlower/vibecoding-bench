@@ -25,7 +25,7 @@ use axum::body::to_bytes;
 use axum::body::{Body, Bytes};
 use axum::extract::{DefaultBodyLimit, Request, State};
 use axum::http::header::{
-    CONNECTION, CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE, RETRY_AFTER, USER_AGENT,
+    CONNECTION, CONTENT_ENCODING, CONTENT_TYPE, RETRY_AFTER, USER_AGENT,
 };
 use axum::http::{HeaderMap, HeaderValue, Method};
 use axum::middleware::{Next, from_fn_with_state};
@@ -34,7 +34,7 @@ use axum::routing::{get, post};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use futures_util::StreamExt;
-use futures_util::stream::{empty, once as stream_once, unfold};
+use futures_util::stream::{empty, unfold};
 use regex::Regex;
 use reqwest::redirect::Policy;
 use reqwest::{Body as RequestBody, Client, Response as PrivateResponse, StatusCode};
@@ -97,7 +97,7 @@ pub(super) const TUI_MODEL_ACCEPT_OMITTED: &str = "x-v3-tui-model-accept-omitted
 pub(super) const TUI_OAUTH_FILE: &str = "x-v3-tui-oauth-file";
 pub(super) const TUI_DIRECT_HTTPS: &str = "x-v3-tui-direct-https";
 pub(super) const TUI_DIRECT_UNAVAILABLE: &str = "tui_direct_unavailable";
-pub(super) const TUI_ACCOUNT_EXPIRY: &str = "x-v3-tui-account-expiry";
+const TUI_ACCOUNT_EXPIRY: &str = "x-v3-tui-account-expiry";
 const TUI_ACCOUNT_MODEL: &str = "x-v3-tui-account-model";
 pub(super) const TUI_SIGNATURE_REPAIR: &str = "x-v3-tui-signature-repair";
 pub(super) const TUI_REPAIR_ATTEMPT: &str = "x-v3-tui-repair-attempt";
@@ -537,22 +537,9 @@ async fn send_with_client(
     prepared: &PreparedRequest,
     body: impl Into<RequestBody>,
 ) -> Result<reqwest::Response, AppError> {
-    send_observed(client, prepared, body, None, false).await
-}
-
-async fn send_observed(
-    client: &Client,
-    prepared: &PreparedRequest,
-    body: impl Into<RequestBody>,
-    observer: Option<hyper::ext::AcceptedWrite>,
-    tui_account_model: bool,
-) -> Result<reqwest::Response, AppError> {
     let method = Method::from_bytes(prepared.method.as_bytes())
         .map_err(|_| AppError::BadRequest("invalid upstream method".into()))?;
     let mut request = client.request(method, &prepared.target_url);
-    if let Some(observer) = observer {
-        request = request.https_accepted_write(observer);
-    }
     if prepared.preserve_header_casing {
         request = request.http1_header_casing(
             prepared
@@ -568,8 +555,6 @@ async fn send_observed(
                 .map_err(|_| AppError::BadRequest("上游凭据格式无效".into()))?;
             authorization.set_sensitive(true);
             request = request.header(name, authorization);
-        } else if tui_account_model {
-            request = request.header(name, tui_header_value(value)?);
         } else {
             request = request.header(name, value);
         }
@@ -2150,6 +2135,36 @@ pub(super) fn tui_input_rejection(reason: &str) -> Option<AppError> {
             "unsupported_parameter",
             S::UNPROCESSABLE_ENTITY,
             "当前接口不支持该业务字段或策略",
+        ),
+        (
+            "direct_message_system_unsupported",
+            S::UNPROCESSABLE_ENTITY,
+            "当前交互 CLI 无法保留消息列表中的 system 指令位置",
+        ),
+        (
+            "direct_error_result_image_unsupported",
+            S::UNPROCESSABLE_ENTITY,
+            "当前交互 CLI 无法保留错误工具结果中的图片",
+        ),
+        (
+            "direct_current_cache_unsupported",
+            S::UNPROCESSABLE_ENTITY,
+            "当前交互 CLI 无法保留本轮用户文本的显式缓存断点",
+        ),
+        (
+            "direct_current_image_unsupported",
+            S::UNPROCESSABLE_ENTITY,
+            "当前交互 CLI 无法原样提交该本轮图片",
+        ),
+        (
+            "direct_signed_history_unsupported",
+            S::UNPROCESSABLE_ENTITY,
+            "交互 CLI 无法保留该签名历史。请使用已绑定且可核验来源的历史",
+        ),
+        (
+            "direct_input_unsupported",
+            S::UNPROCESSABLE_ENTITY,
+            "当前交互 CLI 无法完整提交该消息、工具或账号设置组合",
         ),
         (
             "direct_output_format_unsupported",
@@ -3892,6 +3907,10 @@ async fn forward(State(state): State<SenderState>, headers: HeaderMap, body: Byt
         async {
             let mut config = read_config(&state.config_path)?;
             authenticate(&headers, &config)?;
+            // 旧内核标记永远不获发送许可，升级期间的原轮由所属代次排空。
+            if headers.contains_key(TUI_ACCOUNT_MODEL) || headers.contains_key(TUI_ACCOUNT_EXPIRY) {
+                return Err(AppError::BadRequest("V2 模型请求须经账号 CLI 直发".into()));
+            }
             if config.agy.is_some() {
                 return Err(AppError::BadRequest("AGY账号只接受对应原生执行协议".into()));
             }
@@ -3907,23 +3926,8 @@ async fn forward(State(state): State<SenderState>, headers: HeaderMap, body: Byt
             let bytes = STANDARD
                 .decode(meta)
                 .map_err(|_| AppError::BadRequest("invalid runtime request".into()))?;
-            let mut prepared: PreparedRequest = serde_json::from_slice(&bytes)
+            let prepared: PreparedRequest = serde_json::from_slice(&bytes)
                 .map_err(|_| AppError::BadRequest("invalid runtime request".into()))?;
-            let tui_account_model = headers.contains_key(TUI_ACCOUNT_MODEL);
-            let oauth_expiry = headers
-                .get(TUI_ACCOUNT_EXPIRY)
-                .map(|value| {
-                    if !tui_account_model || headers.get_all(TUI_ACCOUNT_EXPIRY).iter().count() != 1
-                    {
-                        return Err(AppError::BadRequest("V2 账号到期时间的发送归属无效".into()));
-                    }
-                    value
-                        .to_str()
-                        .ok()
-                        .and_then(|value| value.parse::<u64>().ok())
-                        .ok_or_else(|| AppError::BadRequest("V2 账号到期时间无效".into()))
-                })
-                .transpose()?;
             let purpose = headers
                 .get(BACKGROUND_HEADER)
                 .map(|value| {
@@ -3946,93 +3950,18 @@ async fn forward(State(state): State<SenderState>, headers: HeaderMap, body: Byt
                         direct_claude_metadata_request(&prepared.method, url.path())
                     }),
                 };
-                if tui_account_model || !metadata {
+                if !metadata {
                     return Err(AppError::BadRequest(
                         "US Claude 模型请求须经账号 CLI 直发".into(),
                     ));
                 }
             }
-            if tui_account_model {
-                if !tui_projection_marker(&headers, TUI_ACCOUNT_MODEL, "1")
-                    || purpose.is_some()
-                    || prepared.method != "POST"
-                    || prepared.target_url != "https://api.anthropic.com/v1/messages"
-                    || config.proxy_url.trim().is_empty()
-                    || prepared
-                        .headers
-                        .iter()
-                        .any(|(name, _)| name.eq_ignore_ascii_case(CONTENT_LENGTH.as_str()))
-                {
-                    return Err(AppError::BadRequest(
-                        "V2 账号模型发送的目的或协议无效".into(),
-                    ));
-                }
-                prepared
-                    .headers
-                    .push((CONTENT_LENGTH.as_str().into(), body.len().to_string()));
-            }
             let deadline = validate_request(&prepared, &config)?;
-            #[cfg(target_os = "linux")]
-            let observer = if tui_account_model {
-                state
-                    .tui
-                    .take_wire_capture(&config.binding, &prepared.request_id)
-                    .and_then(|job| {
-                        let attempt = Uuid::parse_str(&prepared.request_id).ok()?;
-                        // 还原本入口收到的提交头。该入口已验证 Content-Length 只能由本发送器添加。
-                        let submitted = prepared
-                            .headers
-                            .iter()
-                            .filter(|(name, _)| !name.eq_ignore_ascii_case("content-length"))
-                            .cloned()
-                            .collect();
-                        let assembly = match headers
-                            .get("x-v3-tui-assembly")
-                            .and_then(|v| v.to_str().ok())
-                        {
-                            Some("explicit-version") => Some(true),
-                            Some("default-version") => Some(false),
-                            _ => None,
-                        };
-                        Some(job.start(
-                            prepared.account_id,
-                            attempt,
-                            prepared.generation,
-                            submitted,
-                            body.clone(),
-                            assembly,
-                        ))
-                    })
-            } else {
-                None
-            };
-            #[cfg(not(target_os = "linux"))]
-            let observer = None;
             state.active.fetch_add(1, Ordering::SeqCst);
             let guard = ActiveRequest(state.active.clone());
-            submitted = oauth_expiry.is_none();
+            submitted = true;
             let upstream = timeout_at(deadline, async {
-                if tui_account_model {
-                    // 固定目标和一次性正文同时防止重定向或客户端重放已认领的模型请求。
-                    let client = get_background_request_client_for_profile(
-                        &config.proxy_url,
-                        prepared.tls_profile,
-                    )
-                    .map_err(|_| AppError::BadGateway("V2 账号模型客户端不可用".into()))?;
-                    if oauth_expiry.is_some_and(|expiry| expiry <= now_ms()) {
-                        return Err(AppError::ServiceUnavailable("V2 账号凭据已过期".into()));
-                    }
-                    submitted = true;
-                    let stream = stream_once(async move { Ok::<_, IoError>(body) });
-                    send_observed(
-                        &client,
-                        &prepared,
-                        RequestBody::wrap_stream(stream),
-                        observer,
-                        true,
-                    )
-                    .await
-                } else if purpose.is_some() {
+                if purpose.is_some() {
                     let client = get_background_request_client_for_profile(
                         &config.proxy_url,
                         prepared.tls_profile,

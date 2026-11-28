@@ -1,6 +1,5 @@
 """从 sender 的受管安装和原生工作区启动同容器交互式 Claude Code。"""
 
-from base64 import b64encode
 from collections.abc import Iterator
 from contextlib import closing, contextmanager, suppress
 from ctypes import CDLL, c_int, c_ushort
@@ -25,8 +24,8 @@ from runtime_files import atomic_json, atomic_text, directory_fd, private_direct
 from tui_direct_selection import DIRECT_ACCOUNT_PATH, selector_matches
 from tui_direct_version import DIRECT_CLI_SHA256, DIRECT_CLI_VERSION
 from tui_messages import (
-    BODY_LIMIT, MODEL_PROTOCOL_HEADERS, MODEL_VERSION_HEADERS, OAUTH_FILE_LIMIT,
-    ModelResponseError, encode, passive_quota_headers, valid_model_header_value,
+    BODY_LIMIT, MODEL_PROTOCOL_HEADERS, OAUTH_FILE_LIMIT,
+    ModelResponseError, encode, valid_model_header_value,
 )
 from tui_workspace_launch import WorkspaceLaunchObservation, launch_workspace_cli
 
@@ -306,83 +305,6 @@ def local_model_response(raw: bytes, *, headers: dict[str, str] | None = None, c
             yield response
 
 
-@contextmanager
-def managed_model_response(
-    raw, *, account_token, reservation, headers, capture=None, expires_at=None,
-    capture_assembly=False, attempt_id=None,
-):
-    """经原账号 sender 的固定 TLS 出站路径发送已认领的模型请求。
-    @param raw 冻结的 Messages 正文。@param account_token 本轮账号 AT。
-    @param expires_at 文件模式的真实 UTC 毫秒有效期。
-    @param capture_assembly 是否按原预留提供已认证的组装标记。
-    @param attempt_id 经原预留确认的额外模型投递 UUID。
-    @param reservation 受信预留。@param headers 已核对的模型头。@param capture 可选脱敏采集。
-    @return 流式上游响应。
-    """
-    config, identity = _bound_sender(reservation)
-    binding = config["binding"]
-    beta = headers.get("anthropic-beta", "")
-    tokens = [part.strip() for part in beta.split(",") if part.strip()]
-    if reservation.get("model_header_policy") == 1:
-        # 扩展协议保留原生声明的顺序及表示，账号 OAuth 能力仍由发送器声明。
-        if "oauth-2025-04-20" not in tokens:
-            beta = ",".join(filter(None, (beta, "oauth-2025-04-20")))
-    else:
-        beta = ",".join(dict.fromkeys(tokens + ["oauth-2025-04-20"]))
-    model_headers = {
-        "authorization": "Bearer " + account_token,
-        "content-type": "application/json",
-        "accept": "text/event-stream",
-        "accept-encoding": "identity",
-        "anthropic-version": headers.get("anthropic-version", "2023-06-01"),
-        "anthropic-beta": beta,
-    }
-    for name, value in headers.items():
-        if (name in MODEL_PROTOCOL_HEADERS - MODEL_VERSION_HEADERS
-                or name in ("user-agent", "x-app", "x-claude-code-session-id")
-                or name.startswith("x-stainless-")):
-            model_headers[name] = value
-    metadata = {
-        **identity, "request_id": attempt_id or reservation["reservation_id"],
-        "deadline_unix_ms": reservation["deadline_unix_ms"],
-        "method": "POST", "target_url": ACCOUNT_ORIGIN + "/v1/messages",
-        "headers": list(model_headers.items()), "preserve_header_casing": False,
-    }
-    transport_headers = {
-        "Authorization": "Bearer " + binding["secret"],
-        "x-v3-request": b64encode(encode(metadata)).decode("ascii"),
-        "x-v3-tui-account-model": "1",
-    }
-    if capture_assembly:
-        # 标记只走已认证的回环控制头；远端模型头仍来自独立的 model_headers。
-        transport_headers["x-v3-tui-assembly"] = "explicit-version" if "anthropic-version" in headers else "default-version"
-    if expires_at is not None:
-        transport_headers["x-v3-tui-account-expiry"] = str(expires_at)
-    with closing(HTTPConnection("127.0.0.1", 8091, timeout=120)) as connection:
-        connection.request("POST", "/internal/send", raw, transport_headers)
-        with closing(connection.getresponse()) as response:
-            rejection = None
-            if response.status != 200:
-                error, complete = _read_model_error(response)
-                error = error.replace(account_token.encode(), b"[REDACTED]")
-                transport_error = response.getheader("x-v3-transport-error")
-                if transport_error:
-                    raise ModelResponseError(response.status, b"", before_send=transport_error == "before-send")
-                retry = response.headers.get_all("Retry-After", []) if response.status == 429 else []
-                rejection = ModelResponseError(
-                    response.status, error if len(error) <= BODY_LIMIT else b"",
-                    source="managed_oauth_http", retry_after=_retry_seconds(retry), complete=complete,
-                    quota_headers=passive_quota_headers(response.headers) if response.status == 429 else None,
-                )
-            if capture is not None and (rejection is None or rejection.signature_evidence is not None or attempt_id):
-                # 与首次拒绝关联的记录也在账号端移除真实授权。
-                capture.append(([(name, "[REDACTED]" if name == "authorization" else value)
-                                 for name, value in model_headers.items()], raw))
-            if rejection is not None:
-                raise rejection
-            yield response
-
-
 @lru_cache(maxsize=3)
 def _guard_usable(identity: tuple, check: str) -> bool:
     # 不同镜像的程序有不同 inode；缺失内核权限或制品时保持未就绪。
@@ -423,15 +345,16 @@ def _loopback_channel(port: int | None):
 def account_ready() -> bool:
     """核验当前角色的本机开发后端、官方程序和隔离能力。@return 是否可接受本机预留。"""
     try:
-        if direct_model_enabled():
+        oauth = managed_oauth_enabled()
+        if oauth:
+            if not file_oauth_enabled() or not direct_model_enabled():
+                return False
             _check_direct_policy(_sender_config())
+        elif _managed_policy_enabled() or direct_model_enabled():
+            return False
         official_program()
         info = GUARD.stat()
-        oauth = managed_oauth_enabled()
-        managed_policy = _managed_policy_enabled()
-        if managed_policy and not oauth:
-            return False
-        check = "--check-managed-policy" if managed_policy else "--check-oauth" if oauth else "--check"
+        check = "--check-managed-policy" if oauth else "--check"
         if not _guard_usable((info.st_dev, info.st_ino, info.st_ctime_ns), check):
             return False
         if oauth:
@@ -570,7 +493,7 @@ def launch_session(
     @param resume 是否读取同一绑定的原生历史；None 时按已验证记录决定。
     @param terminal_fd 驱动持有的 PTY 从端。
     @param mod_dir 只属于本原生会话的受信任 Mod 目录。
-    @param model_endpoint 会话回环端点与本次使用的账号凭据或开发口令。
+    @param model_endpoint 会话本机代理入口或隔离开发端点与口令。
     @param oauth_file 是否启用独占账号刷新与完整文件。
     @param prepare_history 可选，同一会话的外部历史导入函数。
     @param media_fd 可选，本会话私有图像暂存目录的 O_PATH 描述符。
@@ -581,41 +504,31 @@ def launch_session(
     home, mod = session_paths(command)
     if config_dir != home / ".claude" or mod_dir != mod:
         raise ValueError("交互进程的配置或 Mod 不属于当前会话")
-    direct = direct_model_enabled()
     managed_guard = []
-    if _managed_policy_enabled():
-        if not managed_oauth_enabled() or not oauth_file:
-            raise ValueError("Claude 托管策略需要本轮的完整账号凭据")
-        config, identity = _bound_sender(reservation)
-        policy = config.get("tui_managed_policy")
-        if not isinstance(policy, dict) or any(policy.get(name) != identity[name] for name in ("account_id", "environment_id")):
-            raise ValueError("Claude 托管策略的账号环境绑定已变化")
-        if direct:
-            _check_direct_policy(config)
-        managed_guard = ["--managed-policy"]
-    elif direct:
-        raise ValueError("账号直发需要管理员托管策略")
     if managed_oauth_enabled():
-        url, bearer = model_endpoint
-        target = urlsplit(url)
-        if target.scheme != "http" or target.hostname != "127.0.0.1" or not target.path.startswith("/model/"):
-            raise ValueError("受管交互模型回环地址无效")
-        auth = {"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"}
-        if oauth_file:
-            if target.port is None or target.username is not None or target.password is not None:
-                raise ValueError("完整凭据需要受信的本机代理入口")
-            # 模型与 Mod 走原回环。外部 OAuth 连接在当前回环监听的 CONNECT 入口终止。
-            proxy = f"http://127.0.0.1:{target.port}"
-            auth.update(HTTP_PROXY=proxy, HTTPS_PROXY=proxy, NO_PROXY="127.0.0.1,localhost")
-            if direct:
-                url = ACCOUNT_ORIGIN
-                auth["FLOWER_TUI_DIRECT_BINDING"] = str(config_dir / "flower-direct.json")
-                auth["FLOWER_TUI_DIRECT_REQUIRED"] = "1"
-        else:
-            auth["CLAUDE_CODE_OAUTH_TOKEN"] = bearer
+        if not oauth_file:
+            raise ValueError("Claude 托管策略需要本轮的完整账号凭据")
+        config, _ = _bound_sender(reservation)
+        if not direct_model_enabled():
+            raise ValueError("受管账号需要已授权的 CLI 直发")
+        _check_direct_policy(config)
+        managed_guard = ["--managed-policy"]
+        target = urlsplit(model_endpoint[0] if model_endpoint is not None else "")
+        if (target.scheme != "http" or target.hostname != "127.0.0.1" or target.port is None
+                or target.username is not None or target.password is not None):
+            raise ValueError("完整凭据需要受信的本机代理入口")
+        # 本机入口只承接 OAuth 控制和受管 CONNECT。模型 HTTPS 由 CLI 自身发起。
+        proxy = f"http://127.0.0.1:{target.port}"
+        url = ACCOUNT_ORIGIN
+        auth = {
+            "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+            "HTTP_PROXY": proxy, "HTTPS_PROXY": proxy, "NO_PROXY": "127.0.0.1,localhost",
+            "FLOWER_TUI_DIRECT_BINDING": str(config_dir / "flower-direct.json"),
+            "FLOWER_TUI_DIRECT_REQUIRED": "1",
+        }
     else:
-        if oauth_file:
-            raise ValueError("本机开发提供方不接受账号凭据文件")
+        if oauth_file or _managed_policy_enabled() or direct_model_enabled():
+            raise ValueError("本机开发提供方不接受受管账号授权")
         url, bearer, _, _ = _loopback_provider()
         if model_endpoint is not None:
             url, bearer, _, _ = _loopback_endpoint(*model_endpoint)

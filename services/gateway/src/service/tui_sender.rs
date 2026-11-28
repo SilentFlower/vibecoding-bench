@@ -27,7 +27,6 @@ use crate::model::account::TuiSystemPromptPolicy;
 use crate::model::request_diagnostics::{TuiBodySource, TuiInstructionLocation, TuiSessionOrigin};
 use crate::service::diagnostics::tui_startup_event;
 use crate::service::gateway::is_passive_usage_header;
-use crate::service::native_capture::tui_wire::CaptureJob;
 use crate::service::native_capture::{TuiCaptureInput, tui_writer};
 use crate::service::native_signature_repair::{
     SIGNATURE_ERROR_BODY_LIMIT, is_signature_rejection, wire::repair_body,
@@ -43,7 +42,7 @@ use crate::service::runtime_transport::{
 };
 use crate::service::runtime_transport::{
     TUI_BODY_SOURCE, TUI_CAPTURE, TUI_CLI_INPUT_GUARD, TUI_CLI_SUBMISSION, TUI_DIRECT_HTTPS,
-    TUI_DIRECT_UNAVAILABLE, TUI_ERROR_SOURCE, TUI_FINAL_CAPTURE, TUI_INSTRUCTION_LOCATION,
+    TUI_DIRECT_UNAVAILABLE, TUI_ERROR_SOURCE, TUI_INSTRUCTION_LOCATION,
     TUI_MODEL_ACCEPT_OMITTED, TUI_MODEL_HEADER_POLICY,
     TUI_OPENING_USAGE_PLACEHOLDER, TUI_PREPARE_BIND, TUI_PREPARE_EXCHANGE, TUI_PREPARE_LEDGER,
     TUI_PROMPT_SUGGESTION, TUI_REPAIR_ATTEMPT, TUI_SEND_CLAIM, TUI_SENDER_CONFIG,
@@ -210,14 +209,12 @@ struct SourceOptions {
     projection: ResponseProjection,
     managed: bool,
     oauth_file: bool,
-    wire: bool,
     cli_submission: Option<&'static str>,
     captured: bool,
 }
 
 struct Record {
     repair_attempt: Option<Uuid>,
-    wire_capture: Option<CaptureJob>,
     identity: Identity,
     agent_probe: bool,
     fork_borrowed_slot: bool,
@@ -238,20 +235,6 @@ struct Slot {
     armed: bool,
 }
 
-impl Slot {
-    fn install_wire_capture(&self, capture: CaptureJob) -> bool {
-        let mut book = self.book.lock().unwrap();
-        if let Some(record) = book.get_mut(&self.id).filter(|record| {
-            record.ticket == self.ticket && matches!(record.phase, Phase::Submitted)
-        }) {
-            record.wire_capture = Some(capture);
-            true
-        } else {
-            false
-        }
-    }
-}
-
 impl Drop for Slot {
     fn drop(&mut self) {
         if !self.armed {
@@ -266,7 +249,6 @@ impl Drop for Slot {
                 book.remove(&self.id);
             } else {
                 record.phase = Phase::Closed;
-                record.wire_capture = None;
             }
         }
     }
@@ -502,32 +484,6 @@ async fn verify_source(
 }
 
 impl TuiSender {
-    /// 仅在已提交的原预留中取走一次写入观察。@param binding 当前已认证绑定。
-    /// @param id 内层模型请求的实际尝试 ID。@return 对应的后台快照作业。
-    pub(super) fn take_wire_capture(
-        &self,
-        binding: &TransportBinding,
-        id: &str,
-    ) -> Option<CaptureJob> {
-        let mut book = self.book.lock().unwrap();
-        // 首发沿原索引。重试仍由原槽持有，只有已批准的额外尝试可以取走观察。
-        let record = if book.contains_key(id) {
-            book.get_mut(id)
-                .filter(|record| record.repair_attempt.is_none())?
-        } else {
-            let attempt = Uuid::parse_str(id).ok()?;
-            book.values_mut()
-                .find(|record| record.repair_attempt == Some(attempt))?
-        };
-        if record.wire_capture.is_some()
-            && matches!(record.phase, Phase::Submitted)
-            && record.binding_proof == binding_proof(binding)
-        {
-            record.wire_capture.take()
-        } else {
-            None
-        }
-    }
     /// 使用原预留的期限接收可选采集正文。@param binding 实际绑定。@param headers 私有头。@return 原截止。
     pub(super) fn capture_deadline(
         binding: &TransportBinding,
@@ -638,7 +594,6 @@ impl TuiSender {
                 id.clone(),
                 Record {
                     repair_attempt: None,
-                    wire_capture: None,
                     identity,
                     agent_probe,
                     fork_borrowed_slot: false,
@@ -725,7 +680,6 @@ impl TuiSender {
         )?;
         let capture_requested = tui_projection_marker(request.headers(), TUI_CAPTURE, "1");
         let direct_required = tui_projection_marker(request.headers(), TUI_DIRECT_HTTPS, "1");
-        let wire_protocol = tui_projection_marker(request.headers(), TUI_FINAL_CAPTURE, "1");
         let offer_header_policy =
             tui_projection_marker(request.headers(), TUI_MODEL_HEADER_POLICY, "1");
         let repair_requested =
@@ -1115,11 +1069,6 @@ impl TuiSender {
                 .insert(TUI_SIGNATURE_REPAIR, HeaderValue::from_static("1"));
         }
         if capture_requested && (capture_http || cli_submission.is_some()) {
-            if wire_protocol && cli_submission.is_none() {
-                response
-                    .headers_mut()
-                    .insert(TUI_FINAL_CAPTURE, HeaderValue::from_static("1"));
-            }
             response
                 .headers_mut()
                 .insert(TUI_CAPTURE, HeaderValue::from_static("1"));
@@ -1326,7 +1275,7 @@ impl TuiSender {
         }
         // 两种受管凭据都交给账号发送器。私有凭据帧不属于采集正文。
         let managed_oauth = account_token.is_some() || oauth_file.is_some();
-        let mut capture = capture.and_then(|(directory, input)| {
+        let capture = capture.and_then(|(directory, input)| {
             let id = Uuid::parse_str(&identity.reservation_id).ok()?;
             Some((directory, input, identity.account_id, id, tui_writer()?))
         });
@@ -1335,24 +1284,6 @@ impl TuiSender {
                 .is_some()
                 .then(|| (dir.clone(), input.clone(), *account))
         });
-        let wire_protocol =
-            cli_submission.is_none() && tui_projection_marker(headers, TUI_FINAL_CAPTURE, "1");
-        let wire_captured = if managed_oauth && wire_protocol {
-            capture
-                .take()
-                .is_some_and(|(directory, input, _, _, permit)| {
-                    slot.install_wire_capture(CaptureJob {
-                        directory,
-                        input,
-                        permit,
-                    })
-                })
-        } else {
-            false
-        };
-        if wire_captured {
-            command["capture_assembly"] = json!(true);
-        }
         if capture.is_some() {
             if cli_submission.is_some() {
                 command["capture_cli_submission"] = json!(true);
@@ -1367,9 +1298,8 @@ impl TuiSender {
             projection: ResponseProjection::from_headers(headers),
             managed: managed_oauth,
             oauth_file: oauth_file.is_some(),
-            wire: wire_protocol,
             cli_submission,
-            captured: capture.is_some() || wire_captured,
+            captured: capture.is_some(),
         };
         if let Some(candidate) = workspace {
             observe("sender_workspace_bind", "started");
@@ -1481,13 +1411,8 @@ impl TuiSender {
                 HeaderValue::from_static(TUI_JSON_PROJECTION_V1),
             );
         }
-        let first_capture = if let (Some(capture), Some((pairs, raw))) = (capture, first) {
+        if let (Some(capture), Some((pairs, raw))) = (capture, first) {
             save_provider_capture(capture, pairs, raw, options);
-            true
-        } else {
-            options.wire && options.managed && options.captured
-        };
-        if first_capture {
             response
                 .headers_mut()
                 .insert(TUI_CAPTURE, HeaderValue::from_static("queued"));
@@ -1509,22 +1434,10 @@ impl TuiSender {
                 return;
             }
             let result = async {
-                let mut capture = retry_capture.and_then(|(directory, input, account)| {
+                let capture = retry_capture.and_then(|(directory, input, account)| {
                     Some((directory, input, account, attempt, tui_writer()?))
                 });
-                let captured = if options.managed && options.wire {
-                    capture
-                        .take()
-                        .is_some_and(|(directory, input, _, _, permit)| {
-                            slot.install_wire_capture(CaptureJob {
-                                directory,
-                                input,
-                                permit,
-                            })
-                        })
-                } else {
-                    capture.is_some()
-                };
+                let captured = capture.is_some();
                 let head = timeout_at(deadline, async {
                     write_repair_body(&mut connection, Some(&repaired), Some(attempt)).await?;
                     read_json(&mut connection).await
@@ -1842,7 +1755,6 @@ impl TuiSender {
                     identity.reservation_id.clone(),
                     Record {
                         repair_attempt: None,
-                        wire_capture: None,
                         identity: identity.clone(),
                         agent_probe: false,
                         fork_borrowed_slot: false,
@@ -1905,7 +1817,7 @@ fn save_provider_capture(
                 pairs,
                 raw,
                 format,
-                !options.wire && options.cli_submission.is_none(),
+                options.cli_submission.is_none(),
                 None,
             )
             .is_err()

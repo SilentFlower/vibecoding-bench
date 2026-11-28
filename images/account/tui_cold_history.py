@@ -304,6 +304,27 @@ def _closed_history(rows, *, result_types=(str,), signed_rows=()):
     return not pending
 
 
+def direct_input_rejection(messages, *, native_cc):
+    """说明无法建立原生输入计划的具体边界。
+    @param messages 已验证的消息。@param native_cc 是否为完整官方外层请求。
+    @return 受信准备源可公开的固定错误码。
+    """
+    if any(row["role"] == "system" for row in messages):
+        return "direct_message_system_unsupported"
+    for row in messages:
+        if any(block["type"] == "tool_result" and block.get("is_error") is True
+               and tool_result_has_images(block) for block in _blocks(row)):
+            return "direct_error_result_image_unsupported"
+    current = _blocks(messages[-1])
+    if not native_cc and any(block["type"] == "text" and "cache_control" in block for block in current):
+        return "direct_current_cache_unsupported"
+    if any(_inline_image(block) and not _inline_image(block, for_paste=True) for block in current):
+        return "direct_current_image_unsupported"
+    if any(block["type"] in SIGNED_THINKING_TYPES for row in messages for block in _blocks(row)):
+        return "direct_signed_history_unsupported"
+    return "direct_input_unsupported"
+
+
 @dataclass(frozen=True)
 class ColdHistory:
     """记录已确认的普通输入、当前内容以及该会话的 MCP 工具映射。"""
@@ -313,7 +334,7 @@ class ColdHistory:
     prompt: str
     system: str | None
     tools: dict
-    max_tokens: int
+    max_tokens: int | None
     thinking: dict | None
     system_policy: str
     effort: str | None = None
@@ -340,14 +361,16 @@ class ColdHistory:
                   "tool_choice", "context_management"}
         if body.keys() - fields - ({"temperature"} if direct_options is not None else set()):
             return None
-        if type(body.get("max_tokens")) is not int or body["max_tokens"] <= 0:
-            return None
+        maximum = body.get("max_tokens")
+        if "max_tokens" in body or direct_options is None:
+            if type(maximum) is not int or maximum <= 0:
+                return None
         thinking = body.get("thinking")
         if isinstance(thinking, dict) and thinking.get("type") == "enabled":
             budget = thinking.get("budget_tokens")
             # 这两个模型允许关闭自适应。CLI 会将更大的配置钳制为输出上限或思考预算上限。
             if (body["model"] not in _FIXED_THINKING_MODELS or type(budget) is not int
-                    or not 1024 <= budget < body["max_tokens"] <= 128_000
+                    or maximum is None or not 1024 <= budget < maximum <= 128_000
                     or thinking.keys() != {"type", "budget_tokens", "display"}
                     or thinking["display"] not in ("updates", "summarized")):
                 return None
@@ -434,7 +457,7 @@ class ColdHistory:
         signed_models = signed_models or {}
         if requested.keys() != signed_models.keys():
             return None
-        return cls(history, body["model"], content[0].get("text", ""), system, tools, body["max_tokens"],
+        return cls(history, body["model"], content[0].get("text", ""), system, tools, maximum,
                    thinking, system_policy, output.get("effort"),
                    tuple(content) if len(content) > 1 or not _plain_text(content[0]) else (), choice, cache_ttl,
                    tuple(sorted(signed_models.items())), context_management=context_management, native_cc=native_cc)

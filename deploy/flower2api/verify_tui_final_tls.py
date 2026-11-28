@@ -40,7 +40,6 @@ sys.path[:0] = [
 from native_capture import read_capture
 from tls_clienthello import parse_body
 from tls_http import certificates
-from tui_sender_launch import managed_model_response
 from tui_session import _Actor
 from tui_source import _oauth_file
 from tui_messages import ModelResponseError, input_message
@@ -111,6 +110,9 @@ def verify(folder, gateway, sender):
     """核对真实 TLS、私有文件与管理接口。@param folder 隔离目录。@param gateway 网关。
     @param sender 验证构建的发送器。@return 仅含合成数值的验收结果。
     """
+    # 历史 TLS 复验须在具有旧受管代发入口的冻结 checkout 运行。
+    from tui_sender_launch import managed_model_response
+
     binding_secret, admin, internal = (uuid4().hex for _ in range(3))
     deployment, environment = 'tls-test', uuid4().hex
     host = 'flower2api-' + sha256(deployment.encode()).hexdigest()[:12] + '-' + environment

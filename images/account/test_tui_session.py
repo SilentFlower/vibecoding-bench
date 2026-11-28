@@ -2,7 +2,6 @@
 
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from contextlib import closing
-from email.message import Message
 from hashlib import sha256
 from io import BytesIO
 import json
@@ -17,6 +16,7 @@ from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/orchestrator"))
 from tui_capacity import TuiCapacity
+from tui_input_policy import InputRejection
 from tui_reconnect import ReceiptCheckpoints, digest
 from tui_session import SessionDriver, _cc_fork_scope, _install_mod, _receipt_request
 from tui_messages import (
@@ -37,6 +37,26 @@ from tui_messages import (
 
 class SessionTests(unittest.TestCase):
     """固定版结构化事件和账号内原生进程预留的回归。"""
+
+    def test_direct_prepares_supported_input_and_rejects_loss_before_reserving(self):
+        """拒绝会丢数据的原生输入时尚未占用进程，合法对照仍可准备。@return 无。"""
+        with closing(self._driver()) as driver:
+            driver.managed_oauth = driver.direct_mode = True
+            identity = {**self._identity("content-plan"), "native_cold_history": True}
+            request = self._body()
+            marked = {"type": "text", "text": "保留明确断点", "cache_control": {"type": "ephemeral"}}
+            user = {"role": "user", "content": [marked]}
+            with self.assertRaises(InputRejection) as error:
+                driver.prepare(identity, encode({**request, "messages": [user]}))
+            self.assertEqual(error.exception.code, "direct_current_cache_unsupported")
+            self.assertTrue(driver.idle())
+            self.assertFalse(driver.waiters)
+            request.pop("max_tokens")
+            request["messages"][:0] = [user, {"role": "assistant", "content": "已收到"}]
+            with closing(driver.prepare(identity, encode(request))) as handle:
+                plan = handle.actor.cold_history
+                self.assertTrue(plan.has_history_cache_markers())
+                self.assertIsNone(plan.max_tokens)
 
     def test_cc_fork_scope_is_bound_to_the_current_receipt_revision(self):
         """完整 CC 分叉按根选项核验，保留旧原回执的读取与提交。@return 无。"""
@@ -155,49 +175,18 @@ class SessionTests(unittest.TestCase):
             self.assertFalse(actor.step.claimed)
             driver.launcher.local_model_response.assert_not_called()
 
-    def test_account_sender_uses_one_authorized_frozen_submission(self):
-        """并发的同轮种子只能认领一次，错误账号授权及过期凭据保留原语义。@return 无。"""
-        raw = encode(self._body())
-        with closing(self._driver()) as driver, closing(driver.prepare(self._identity("native-send"), raw)) as handle:
+    def test_managed_model_callback_rejects_without_claiming(self):
+        """已绑定的受管账号仍不可用旧回环认领模型。@return 无。"""
+        with closing(self._driver()) as driver, closing(driver.prepare(self._identity("native-send"),
+                                                                      encode(self._body()))) as handle:
             driver.managed_oauth = True
-            driver.launcher = SimpleNamespace(managed_model_response=Mock())
-            response = BytesIO(b"data: {\"type\":\"error\",\"error\":{\"type\":\"api_error\"}}\n\n")
-            response.status = 200
-            response.headers = Message()
-            response.headers["Content-Type"] = "text/event-stream"
-            response.getheader = response.headers.get
-            driver.launcher.managed_model_response.return_value = response
             actor = handle.actor
-            actor.oauth_file = True
-            actor.step = SimpleNamespace(native=("turn", 1), native_model="chosen", claimed=False)
-            handle.account_token = "synthetic-local-token"
-            handle.expires_at = int(time.time() * 1000) + 5000
-            request = {**self._body(), "messages": [{"role": "user", "content": [
-                {"type": "text", "text": "<system-reminder>\nprompt.submit hook additional context: "
-                 + actor.guard_text + "\n</system-reminder>"}]}]}
-            wrong = Mock(headers={"Authorization": "Bearer different"})
-            actor.serve_model(wrong, request)
-            wrong.send_error.assert_called_once_with(409, "No pending model step")
-            self.assertFalse(actor.step.claimed)
-            self.assertIsNone(handle.body_source)
-            failed = Mock(headers={"Authorization": "Bearer " + handle.account_token})
-            expires_at, handle.expires_at = handle.expires_at, 1
-            with self.assertRaises(ModelResponseError) as expired:
-                actor.serve_model(failed, request)
-            self.assertEqual(expired.exception.status, 503)
-            handle.expires_at = expires_at
-            driver.launcher.managed_model_response.assert_not_called()
-            peers = [Mock(headers=failed.headers) for _ in range(2)]
-            with ThreadPoolExecutor(2) as pool:
-                list(pool.map(lambda peer: actor.serve_model(peer, request), peers))
-            driver.launcher.managed_model_response.assert_called_once()
-            self.assertEqual(sum(peer.send_error.call_count for peer in peers), 1)
-            sent = driver.launcher.managed_model_response.call_args
-            self.assertEqual(sent.args, (raw,))
-            self.assertEqual(sent.kwargs["account_token"], handle.account_token)
-            self.assertIs(sent.kwargs["reservation"], handle.reservation)
-            self.assertEqual(handle.body_source, "account_sender")
-            self.assertIsNone(handle.raw)
+            with patch.object(actor, "_claim_model") as claim:
+                http = Mock(headers={"Authorization": "Bearer synthetic-local-token"})
+                actor.serve_model(http, self._body())
+                http.send_error.assert_called_once_with(403)
+                claim.assert_not_called()
+                self.assertIsNone(handle.body_source)
 
     def test_cli_generation_plan_mismatch_is_local_before_model_submission(self):
         """思考显示、固定预算、输出上限或强度不符时保留本地校验来源。@return 无。"""
@@ -217,18 +206,18 @@ class SessionTests(unittest.TestCase):
                     actor = handle.actor
                     self.assertIsNotNone(actor.cold_history)
                     actor.step = SimpleNamespace(native=("turn", 1), native_model=body["model"], claimed=False)
-                    driver.launcher = SimpleNamespace(managed_model_response=Mock())
+                    driver.launcher = SimpleNamespace(local_model_response=Mock())
                     marker = "<system-reminder>\nprompt.submit hook additional context: " + actor.guard_text
                     native = {**body, **actual, "messages": [
                         {"role": "user", "content": [{"type": "text", "text": marker + "\n</system-reminder>"}]},
                     ]}
                     with self.assertRaises(ModelResponseError) as caught:
-                        actor.serve_model(Mock(headers={}), native, native_raw=encode(native))
+                        actor._claim_model({}, native, native_raw=encode(native))
                     self.assertEqual(caught.exception.status, 422)
                     self.assertEqual(caught.exception.source, "tui_cli_input_guard")
                     self.assertEqual(json.loads(caught.exception.private_body)["error"]["code"], "unsupported_parameter")
                     self.assertFalse(actor.step.claimed)
-                    driver.launcher.managed_model_response.assert_not_called()
+                    driver.launcher.local_model_response.assert_not_called()
 
     def test_cli_tool_preservation_guards_are_local_before_model_submission(self):
         """工具选择或历史保真检查失败时标明本地来源。@return 无。"""
@@ -247,18 +236,18 @@ class SessionTests(unittest.TestCase):
                     actor = handle.actor
                     self.assertIsNotNone(actor.cold_history)
                     actor.step = SimpleNamespace(native=("turn", 1), native_model=body["model"], claimed=False)
-                    driver.launcher = SimpleNamespace(managed_model_response=Mock())
+                    driver.launcher = SimpleNamespace(local_model_response=Mock())
                     with (
                         patch.object(actor, "_main_request", return_value=True),
                         patch.object(type(actor.cold_history), name, return_value=False) as guard,
                         self.assertRaises(ModelResponseError) as caught,
                     ):
-                        actor.serve_model(Mock(headers={}), body, native_raw=encode(body))
+                        actor._claim_model({}, body, native_raw=encode(body))
                     guard.assert_called_once_with(body)
                     self.assertEqual((caught.exception.status, caught.exception.source), (422, "tui_cli_input_guard"))
                     self.assertEqual(json.loads(caught.exception.private_body)["error"]["code"], "unsupported_parameter")
                     self.assertFalse(actor.step.claimed)
-                    driver.launcher.managed_model_response.assert_not_called()
+                    driver.launcher.local_model_response.assert_not_called()
 
     def test_non_stream_accept_uses_sdk_for_upstream_sse(self):
         """公开非流式请求向模型取流时使用同轮 SDK 的 Accept。@return 无。"""
@@ -2186,48 +2175,6 @@ class SessionTests(unittest.TestCase):
                         actor._main_request({**wire, "messages": wrong}, h)
                     )
             self.assertFalse(actor._main_request({**wire, "model": "其他模型"}, h))
-
-    def test_managed_quota_headers_follow_reserved_response(self):
-        """实际事件发布前登记本轮上游额度。@return 无。"""
-        events = [
-            {"type": "message_start", "message": {}},
-            {"type": "message_delta", "delta": {"stop_reason": "end_turn"}},
-            {"type": "message_stop"},
-        ]
-        wire = b"".join(b"data: " + encode(event) + b"\n\n" for event in events)
-        quota = {"anthropic-ratelimit-unified-5h-utilization": "0.25",
-                 "anthropic-ratelimit-unified-5h-reset": "2030-01-01T12:00:00Z"}
-        response = BytesIO(wire)
-        response.status = 200
-        response.headers = Message()
-        response.headers["Content-Type"] = "text/event-stream"
-        for name, value in quota.items():
-            response.headers[name] = value
-        response.getheader = response.headers.get
-
-        with closing(self._driver()) as driver, ThreadPoolExecutor(1) as pool:
-            driver.managed_oauth = True
-            driver.launcher = Mock()
-            driver.launcher.managed_model_response.return_value = response
-            request = self._body()
-            with closing(driver.prepare(self._identity("quota"), encode(request))) as handle:
-                actor = handle.actor
-                with patch.object(actor, "start"):
-                    output = pool.submit(list, handle.send({"account_token": "synthetic"}))
-                    try:
-                        with actor.changed:
-                            self.assertTrue(actor.changed.wait_for(lambda: actor.step is not None, 2))
-                        turn = {"turn": "quota", "step": 0, "model": "chosen"}
-                        actor.callback("/begin", turn)
-                        marker = f"<system-reminder>\nprompt.submit hook additional context: {actor.guard_text}\n</system-reminder>"
-                        native = {**request, "messages": [{"role": "user", "content": [{"type": "text", "text": marker}]}]}
-                        actor.serve_model(Mock(headers={}), native)
-                        self.assertEqual(handle.quota_headers, quota)
-                        actor.callback("/end", {**turn, "reason": "end_turn"})
-                        actor.callback("/complete", {"turn": turn["turn"], "aborted": False})
-                        self.assertEqual(b"".join(output.result(2)), wire)
-                    finally:
-                        actor.abort()
 
     def test_signature_repair_sends_twice_in_one_claimed_native_step(self):
         """签名拒绝由原步骤恢复，同一请求的原生回调只认领一次。@return 无。"""

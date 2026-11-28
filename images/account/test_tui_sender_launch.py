@@ -1,9 +1,8 @@
 """用部署者拥有的合成配置检查本机提供方的地址和文件归属边界。"""
 
-from base64 import b64decode
 from contextlib import nullcontext
 from hashlib import sha256
-from http.client import HTTPConnection, HTTPResponse
+from http.client import HTTPResponse
 import json
 import os
 from subprocess import run
@@ -79,10 +78,14 @@ class ManagedOAuthTests(TestCase):
         with TemporaryDirectory() as directory:
             root = Path(directory)
             config = root / 'sender.json'
+            hook = Path(launch.__file__).with_name("tui-direct-mod") / "hooks/engine.js"
+            policy = {'account_id': 42, 'environment_id': 'account-environment', 'managed_order': True,
+                      'direct_hook_sha256': sha256(hook.read_bytes()).hexdigest()}
             config.write_text(json.dumps({'binding': binding, 'allowed_origin': launch.ACCOUNT_ORIGIN,
-                'tui_managed_policy': {'account_id': 42, 'environment_id': 'account-environment'}}))
+                'tui_managed_policy': policy, 'tui_direct': True, 'tui_direct_from_release': True}))
             with (patch.object(launch, 'STORAGE', root / 'native'), patch.dict(os.environ, {
-                    'V3_TUI_MANAGED_POLICY': '1', 'V3_TUI_MANAGED_OAUTH': '1', 'V3_SENDER_CONFIG': str(config)}),
+                    'V3_TUI_MANAGED_POLICY': '1', 'V3_TUI_MANAGED_OAUTH': '1', 'V3_TUI_DIRECT': '1',
+                    'V3_SENDER_CONFIG': str(config)}),
                   patch.object(launch, 'launch_workspace_cli') as workspace,
                   patch.object(launch, '_open_program', side_effect=lambda: nullcontext((None, 9))),
                   patch.object(launch, '_loopback_channel', side_effect=lambda port: nullcontext((
@@ -100,10 +103,22 @@ class ManagedOAuthTests(TestCase):
                 self.assertEqual(workspace.call_args.kwargs['arguments'][:4],
                                  ['--oauth-loopback', '8476', '8', '--managed-policy'])
                 self.assertEqual(workspace.call_args.kwargs['inherited_fds'], (8,))
-                self.assertEqual(workspace.call_args.kwargs['environment']['HTTPS_PROXY'], 'http://127.0.0.1:8476')
+                environment = workspace.call_args.kwargs['environment']
+                self.assertEqual(environment['HTTPS_PROXY'], 'http://127.0.0.1:8476')
+                self.assertEqual(environment['ANTHROPIC_BASE_URL'], launch.ACCOUNT_ORIGIN)
+                self.assertEqual(environment['FLOWER_TUI_DIRECT_REQUIRED'], '1')
+                self.assertNotIn('CLAUDE_CODE_OAUTH_TOKEN', environment)
+                workspace.reset_mock()
+                with patch.dict(os.environ, {'V3_TUI_DIRECT': '0'}):
+                    self.assertFalse(launch.account_ready())
+                    with self.assertRaisesRegex(ValueError, "需要已授权的 CLI 直发"):
+                        launch.launch_session(binding, command, oauth_file=True, **options)
+                workspace.assert_not_called()
                 with patch.dict(os.environ, {'V3_TUI_MANAGED_POLICY': ''}):
-                    launch.launch_session(binding, command, oauth_file=True, **options)
-                self.assertNotIn('--managed-policy', workspace.call_args.kwargs['arguments'])
+                    self.assertFalse(launch.account_ready())
+                    with self.assertRaisesRegex(ValueError, "缺少同发行的管理员 Mod"):
+                        launch.launch_session(binding, command, oauth_file=True, **options)
+                workspace.assert_not_called()
 
     def test_model_error_completeness_follows_http_framing(self):
         """同一签名 400 的修复资格取决于完整 HTTP 正文。@return 无。"""
@@ -163,101 +178,6 @@ class ManagedOAuthTests(TestCase):
             retained.write_text("{}")
             launch.clear_oauth_file(config)
             self.assertEqual(set(config.iterdir()), {retained})
-
-    def test_oauth_forward_uses_bound_sender_with_frozen_body(self):
-        """实际 HTTP 验证对应的 AT、正文和脱敏采集。@return 无。"""
-        calls = []
-        body = b'{ "messages": [{"role":"user","content":"synthetic"}] }'
-        token = "synthetic-account-at"
-        binding = {"account_id": 42, "environment_id": "test-environment", "generation": 3}
-        reservation = {**binding, "reservation_id": "test-round", "deadline_unix_ms": 55}
-        quota = {"anthropic-ratelimit-unified-5h-utilization": "1",
-                 "anthropic-ratelimit-unified-5h-reset": "2030-01-01T12:00:00Z",
-                 "anthropic-ratelimit-unified-5h-status": "rejected"}
-
-        class Sender(BaseHTTPRequestHandler):
-            """接收本次模型请求的私有 sender。"""
-
-            def log_message(self, *_):
-                """省略验收 HTTP 日志。@return 无。"""
-
-            def do_POST(self):
-                """记录私有发送请求。@return 无。"""
-                raw = self.rfile.read(int(self.headers["Content-Length"]))
-                calls.append((self.path, self.headers["Authorization"], raw,
-                              json.loads(b64decode(self.headers["x-v3-request"]))))
-                if len(calls) == 1:
-                    self.send_response(200)
-                    self.send_header("Content-Type", "text/event-stream")
-                    self.end_headers()
-                    self.wfile.write(b"data: isolated\n\n")
-                    return
-                self.send_response(429)
-                self.send_header("Retry-After", "42")
-                for name, value in quota.items():
-                    self.send_header(name, value)
-                self.send_header("anthropic-ratelimit-unified-7d-utilization", "0.4")
-                self.send_header("anthropic-ratelimit-unified-7d-utilization", "0.6")
-                self.send_header("anthropic-ratelimit-unified-overage-status", "rejected")
-                if len(calls) == 3:
-                    self.send_header("x-v3-transport-error", "submitted")
-                self.end_headers()
-
-        capture = []
-        with TemporaryDirectory() as root, ThreadingHTTPServer(("127.0.0.1", 0), Sender) as server:
-            config = Path(root) / "sender.json"
-            config.write_text(json.dumps({"binding": {**binding, "secret": "private-sender-binding"},
-                                          "allowed_origin": launch.ACCOUNT_ORIGIN}))
-            thread = Thread(target=server.serve_forever)
-            thread.start()
-            try:
-                with (patch.dict(os.environ, {"V3_SENDER_CONFIG": str(config)}),
-                      patch.object(launch, "HTTPConnection",
-                                   side_effect=lambda host, _, **opts: HTTPConnection(host, server.server_port, **opts))):
-                    with launch.managed_model_response(
-                        body, account_token=token, reservation=reservation,
-                        headers={"anthropic-beta": "test-beta", "x-claude-code-session-id": "test-session",
-                                 "accept": "application/json", "accept-language": "café",
-                                 "anthropic-dangerous-direct-browser-access": "false",
-                                 "x-stainless-os": "fixture-sdk"},
-                        capture=capture,
-                    ) as response:
-                        self.assertEqual(response.read(), b"data: isolated\n\n")
-                    with self.assertRaises(ValueError), launch.managed_model_response(
-                        body, account_token=token, reservation={**reservation, "account_id": 43}, headers={},
-                    ):
-                        self.fail("错绑请求不能到达 sender")
-                    for transport_error in (False, True):
-                        with self.assertRaises(launch.ModelResponseError) as caught, launch.managed_model_response(
-                            body, account_token=token, headers={},
-                            reservation={**reservation, "reservation_id": f"quota-{transport_error}"},
-                        ):
-                            self.fail("429 不应启动事件流")
-                        error = caught.exception
-                        self.assertEqual(error.status, 429)
-                        self.assertEqual(error.retry_after, None if transport_error else 42)
-                        self.assertEqual(error.quota_headers, None if transport_error else quota)
-            finally:
-                server.shutdown()
-                thread.join()
-
-        self.assertEqual(len(calls), 3)
-        path, auth, actual, meta = calls[0]
-        self.assertEqual((path, auth, actual), ("/internal/send", "Bearer private-sender-binding", body))
-        self.assertEqual({key: meta[key] for key in binding}, binding)
-        self.assertEqual(meta["request_id"], reservation["reservation_id"])
-        self.assertEqual(meta["deadline_unix_ms"], reservation["deadline_unix_ms"])
-        self.assertEqual(meta["target_url"], "https://api.anthropic.com/v1/messages")
-        headers = dict(meta["headers"])
-        self.assertEqual(headers["authorization"], "Bearer " + token)
-        self.assertEqual(headers["anthropic-beta"], "test-beta,oauth-2025-04-20")
-        self.assertEqual(headers["x-claude-code-session-id"], "test-session")
-        self.assertEqual(headers["accept"], "application/json")
-        self.assertEqual(headers["accept-language"], "café")
-        self.assertEqual(headers["anthropic-dangerous-direct-browser-access"], "false")
-        self.assertEqual(headers["x-stainless-os"], "fixture-sdk")
-        self.assertNotIn(token, repr(capture))
-
 
 @skipUnless(os.geteuid() == 0, "需要与生产配置发布相同的文件所有者")
 class LocalProviderTests(TestCase):

@@ -32,9 +32,6 @@ pub(super) const SNAPSHOT_LIMIT: usize = 6 * 1024 * 1024;
 // 完整入站只存一份正文，为脱敏替换、JSON 字符串转义及请求头预留空间。
 const REJECTED_SNAPSHOT_LIMIT: usize = 4 * GEMINI_BODY_LIMIT;
 const HEADER_LIMIT: usize = 128 * 1024;
-#[cfg(target_os = "linux")]
-#[path = "tui_wire_capture.rs"]
-pub(super) mod tui_wire;
 const STORAGE_LIMIT: u64 = 1024 * 1024 * 1024;
 const GATEWAY_RETENTION: Duration = Duration::from_secs(7 * 86400);
 static WRITERS: Semaphore = Semaphore::const_new(2);
