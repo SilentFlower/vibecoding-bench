@@ -959,6 +959,7 @@ impl PrimePollerService {
                     &sender,
                     false,
                     None,
+                    None,
                 )
                 .await?;
             let session = format!("{SERVER_SESSION_PREFIX}prime-{}", Uuid::new_v4());
@@ -978,6 +979,7 @@ impl PrimePollerService {
                     agent_summary: false,
                     oauth_file: account.auth_type == AccountAuthType::Oauth,
                     body_policy: TuiBodyPolicy::default(),
+                    system_prompt_policy: Default::default(),
                 },
                 deadline,
                 false,
@@ -1043,15 +1045,14 @@ impl PrimePollerService {
         .map_err(|_| timeout_error())??;
         let (mut prepared, credentials, failed_token, _slot, _activity, send, config) =
             prepared_run;
-        let remaining = deadline
-            .checked_duration_since(TokioInstant::now())
-            .filter(|duration| !duration.is_zero())
-            .ok_or_else(timeout_error)?;
+        if deadline <= TokioInstant::now() {
+            return Err(timeout_error());
+        }
         send.submitted();
         drop(config);
         // 发送开始后由 sender 持有单次预留。私有首包超时仍保留提交状态未知。
         let mut response = prepared
-            .submit_with_account_credentials(remaining, credentials)
+            .submit_with_account_credentials(deadline, credentials, None)
             .await?;
         runtime_transport::recover_tui_oauth_after_response(
             &self.account_svc,
@@ -1731,6 +1732,7 @@ mod tests {
             agy_gif_frames_enabled: false,
             agy_disable_safety_filtering: false,
             agy_system_prompt_as_user_reminder: false,
+            tui_system_prompt_policy: Default::default(),
             id: 0,
             name: "Prime 测试账号".into(),
             email: email.into(),

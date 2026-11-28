@@ -180,6 +180,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
 - 头部处理保留动作文字：删除行 `danger-bg` 底、左侧 3px `danger` 竖线与危险色标签，保留为 `success`、运行时处理为 `primary-container`、提取上下文为 `info`。筛选动作时高亮继续生效，不能只靠颜色传达含义。
 - 采集按发生时模式和capture_status判断，模式切换只影响后续请求；组装中间值与最终TLS证据分开。空字段展示未观测，0毫秒/0Token保留真实零值。
 - **诊断设置与拒绝说明**（主线移植）：`saveDiagnostics(value)` 同时保存日志模式（`info|debug`，概览卡「后续请求日志」点击切换）与拒绝正文范围（`preview|full`）。debug 时 `PageHeader` 的 actions 显示 `ChoiceSelect`「正文采集范围」（限长预览 / 完整正文 · 脱敏，`.request-diagnostics-settings`，宽 190），info 时隐藏。详情概览的 `NoticeStrip.request-error-explanation`：错误阶段 `system_update` / `upstream_model` 显示「系统更新中断 / 上游模型」，末次尝试 `error_type=RESOURCE_EXHAUSTED` 时追加「上游额度不足或触发限流（RESOURCE_EXHAUSTED）」，HTTP 200 且末次 `partial === false` 为「模型响应已结束」；本地拒绝显示 `input_rejection_field`，无 `native_rejection` 但有 `context.input_rejection_reason` 时为「请求在上游发送前被拒绝」并可「查看入站请求」。阶段证据 `saved` 与 `available` 同为已读取。
+- V2 的 502 / `tui_send_http` 记录按提交状态未知展示。概览、原始数据及无尝试 ID 的读取入口共用拒绝证据判定，忽略该类旧记录的 `native_rejection`。`verify_rejected_request_ui.py` 在 390px 核对原始数据页的零次采集读取和已确认拒绝的正常读取。
 - **AGY 实际出站证据**（`NativeStageDetails.vue`）：`wire_final.source` 为 `native_tls_uprobe` 时显示原生 TLS 接受证据（`tlsWire`），为 `agy_http_transport` / `agy_native_tls` 时显示 `details[data-agy-wire-final]`「实际出站证据」（实体完整性、上游 HTTP 码、来源说明），头部处理表增加「阶段」列（网关入口 / 出站适配）。`agy_ingress` 或只有入口阶段的拒绝快照不显示头部处理与正文变化；原文阶段按 `rawStages` 取值。说明文字用 `.request-wire-note`、原因用 `.request-wire-reason`，不得用 `text-muted-foreground` / `text-amber-*`。
 
 ### 会话封禁列表

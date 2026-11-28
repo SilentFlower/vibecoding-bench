@@ -106,6 +106,16 @@ def _model_head(handle, status, content_type):
     fields = {"status": status, "content_type": content_type, "message_id_mode": "gateway"}
     if attempt_id := getattr(handle, "repair_attempt_id", None):
         fields["repair_attempt_id"] = attempt_id
+    # 只在收到模型帧后随成功响应发布正文归属。预留成功或选定候选正文不足以记录此事实。
+    if status == 200:
+        if body_source := getattr(handle, "body_source", None):
+            fields["body_source"] = body_source
+        if session_origin := getattr(handle, "session_origin", None):
+            fields["session_origin"] = session_origin
+        if instruction_location := getattr(handle, "instruction_location", None):
+            fields["instruction_location"] = instruction_location
+        if content_type == "text/event-stream" and getattr(handle, "opening_usage_placeholder", False) is True:
+            fields["opening_usage_placeholder"] = True
     return fields
 
 
@@ -180,8 +190,7 @@ class AccountSource:
         action = hello["action"]
         ready = driver.ready()
         managed_oauth = getattr(driver, "managed_oauth", False)
-        # 调试采集与签名恢复由现有账号发送器实施。使用原生投递时须按其实际能力协商。
-        sender_features = not (managed_oauth and getattr(driver, "native_dispatch", None) is not None)
+        direct = getattr(driver, 'direct_mode', False)
         state = {
             **proof,
             "ready": ready,
@@ -193,11 +202,11 @@ class AccountSource:
             "agent_scope_protocol": 1,
             "agent_summary_protocol": 1,
             "upstream_session_protocol": 1,
+            "title_session_mapping_protocol": 1,
+            "prompt_suggestion_protocol": 1,
+            "capture_http_protocol": 1,
+            "signature_repair_protocol": 1,
         }
-        if sender_features:
-            state.update(capture_http_protocol=1, signature_repair_protocol=1)
-        elif getattr(driver, "cli_handoff_capture", False):
-            state["capture_cli_submission_protocol"] = 1
         receipt = hello.get("receipt") if action == "status" else None
         inspect = getattr(driver, "receipt_idle", None)
         if ready and inspect is not None and isinstance(receipt, dict):
@@ -209,9 +218,15 @@ class AccountSource:
                 ))
         if managed_oauth:
             state["managed_oauth_protocol"] = 1
+            state["client_system_prompt_policy_protocol"] = 1
         file_available = managed_oauth and getattr(driver, "oauth_file_available", False)
         if file_available:
             state["oauth_file_protocol"] = 1
+        if direct:
+            state['direct_https_protocol'] = 1
+            for incompatible in ('signature_repair_protocol', 'upstream_session_protocol',
+                                 'title_session_mapping_protocol', 'capture_http_protocol'):
+                state.pop(incompatible)
         _reply(writer, state)
         if not ready or action == "status":
             return
@@ -222,6 +237,9 @@ class AccountSource:
             return
         file_offer = prepared.get("oauth_file_protocol")
         if file_offer is not None and (not file_available or type(file_offer) is not int or file_offer != 1):
+            return
+        if direct and (prepared.get('direct_https_protocol') != 1 or file_offer != 1):
+            _reply(writer, {**state, 'error': 'oauth_file_required'})
             return
         reservation = prepared["reservation"]
         if any(
@@ -249,6 +267,21 @@ class AccountSource:
             ):
                 return
             reservation = {**reservation, "body_policy": policy}
+        if "native_cold_history_protocol" in prepared:
+            if (type(prepared["native_cold_history_protocol"]) is not int
+                    or prepared["native_cold_history_protocol"] != 1 or not managed_oauth):
+                return
+            reservation = {**reservation, "native_cold_history": True}
+        if "receipt_fork_session_protocol" in prepared:
+            version = prepared["receipt_fork_session_protocol"]
+            if reservation.get("native_cold_history") is not True or type(version) is not int or version != 1:
+                return
+            reservation = {**reservation, "receipt_fork_session_protocol": True}
+        if "client_system_prompt_policy" in prepared:
+            policy = prepared["client_system_prompt_policy"]
+            if reservation.get("native_cold_history") is not True or policy not in ("replace", "user_reminder"):
+                return
+            reservation = {**reservation, "client_system_prompt_policy": policy}
         size = prepared["body_len"]
         if type(size) is not int or not 0 < size <= BODY_LIMIT:
             return
@@ -312,16 +345,35 @@ class AccountSource:
                 _reply(writer, {**state, "error": "oauth_file_required"})
                 return
             oauth_file = file_offer == 1 and (handle.kind != "continuation" or existing_file)
+            if direct and not oauth_file:
+                _reply(writer, {**state, 'error': 'oauth_file_required'})
+                return
             reply = {
                 **state,
                 "kind": handle.kind,
                 "workspace_protocol": 1,
                 "workspace_resume": getattr(handle, "workspace_resume", False),
             }
+            if "client_system_prompt_policy" in reservation:
+                reply["client_system_prompt_policy"] = reservation["client_system_prompt_policy"]
+            cold = bool(getattr(getattr(handle, "actor", None), "cold_history", None))
+            if cold:
+                if reservation.get("native_cold_history") is not True:
+                    return
+                reply["native_cold_history_protocol"] = 1
+                reply.pop("capture_http_protocol", None)
+                reply.pop("signature_repair_protocol", None)
+                if not direct:
+                    reply["capture_cli_submission_protocol"] = 1
             if not oauth_file:
                 reply.pop("oauth_file_protocol", None)
             if reservation.get("agent_hint") is not None:
                 reply["agent_session"] = handle.actor.reservation["session_id"]
+            elif (reservation.get("receipt_fork_session_protocol") is True
+                  and getattr(handle.actor, "fork_session", None) is not None):
+                reply["receipt_fork_session"] = handle.actor.fork_session
+                if handle.kind == "new" and getattr(handle.actor, "fork_borrowed_slot", False):
+                    reply["receipt_fork_borrowed_slot"] = True
             if handle.kind not in ("new", "continuation", "recovered") or (
                 reservation["continuation_only"] and handle.kind == "new"
             ):
@@ -338,10 +390,17 @@ class AccountSource:
                 return
             if "oauth_file" in command:
                 return
-            if not sender_features and ("signature_repair" in command or command.get("capture_http") is True):
+            if direct and any(key in command for key in ('signature_repair', 'upstream_session_id',
+                                                          'capture_http', 'capture_assembly', 'capture_cli_submission')):
+                return
+            if cold and (
+                "signature_repair" in command or command.get("capture_http") is True
+            ):
+                return
+            if cold and "capture_assembly" in command:
                 return
             if "capture_cli_submission" in command and (
-                command["capture_cli_submission"] is not True or "capture_cli_submission_protocol" not in state
+                command["capture_cli_submission"] is not True or "capture_cli_submission_protocol" not in reply
                 or "capture_http" in command or "capture_assembly" in command
             ):
                 return

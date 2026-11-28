@@ -1,9 +1,11 @@
 """把同一 sender 内的官方交互会话绑定到一次次受权的客户端工具往返。"""
 
+from base64 import b64decode
 from collections import Counter, deque
 from contextlib import ExitStack, closing, suppress
 from dataclasses import dataclass, field
 import fcntl
+from functools import partial
 import gzip
 from hashlib import sha256
 from io import BytesIO
@@ -17,17 +19,28 @@ import select
 import shutil
 import struct
 from subprocess import TimeoutExpired
+from tempfile import TemporaryDirectory
 import termios
 import time
 from threading import Condition, Event, Thread
 from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 
+from runtime_files import atomic_text
 from tui_capacity import TuiCapacity, TuiCapacityError
+from tui_cold_history import (
+    ColdHistory, MCP_SERVER, SIGNED_THINKING_TYPES, equivalent_auto_tool_choices, tool_result_has_cache_marker,
+    tool_result_has_images, tool_result_has_text_blocks, tool_result_is_empty,
+)
+from tui_direct import DirectModel, DirectRejected
 from tui_reconnect import ReceiptCheckpoints, digest
-from tui_input_policy import CONTEXT_BETA, InputRejection, native_input
+from tui_input_policy import (
+    CONTEXT_BETA, SYSTEM_CLEAR_AT_BETA, SYSTEM_EFFORT_BETA, InputRejection,
+    custom_tool_type, legacy_custom_tool_lists, native_input,
+)
 from tui_messages import (
     BODY_LIMIT,
+    MessageInputObservation,
     MODEL_PROTOCOL_HEADERS,
     ModelResponseError,
     SubagentAmbiguousError,
@@ -45,6 +58,7 @@ from tui_messages import (
     valid_model_header_value,
     wire_events,
 )
+from tui_workspace_launch import WorkspaceLaunchObservation, read_bound_history
 
 # 与网关的 BINDING_TTL_MS 一致，客户端确认工具时原进程和资源名额仍随会话保留。
 _RECEIPT_SECONDS = 60 * 60
@@ -56,6 +70,8 @@ _AGENT_HANDOFF_SECONDS = 2.0
 _BACKGROUND_AGENT_LIMIT = 1024
 # 与网关保留的服务端会话命名空间一致，对外自报不能打开子代理私有工作区。
 AGENT_SESSION_PREFIX = "gateway-tools-"
+TITLE_SESSION_PREFIX = AGENT_SESSION_PREFIX + "title-"
+SUGGESTION_SESSION_PREFIX = AGENT_SESSION_PREFIX + "suggestion-"
 
 
 @dataclass
@@ -96,6 +112,8 @@ class _Waiting:
     offer: _AgentOffer | None = None
     agent_summary: bool = False
     recovering: bool = False
+    fork: bool = False
+    fork_origin: tuple[tuple, str] | None = None
     exact_receipt_only: bool = False
     groups: frozenset | None = None
 
@@ -214,8 +232,16 @@ class _Callback(BaseHTTPRequestHandler):
         """省略可能包含客户数据的访问日志。@return 无。"""
 
     def do_CONNECT(self):
-        """终止官方子进程发起的外部代理连接。@return 无。"""
-        self.send_error(403)
+        """将已许可的直发转交同一账号代理。@return 无。"""
+        direct = self.server.actor.direct
+        if direct is None:
+            self.send_error(403)
+        else:
+            direct.connect(self)
+
+    def do_GET(self):
+        """声明 MCP 使用单次 JSON 应答。@return 无。"""
+        self.send_error(405)
 
     def do_POST(self):
         """按会话令牌校验并分发结构化事件。@return 无。"""
@@ -224,8 +250,13 @@ class _Callback(BaseHTTPRequestHandler):
             self.send_error(403)
             return
         actor = self.server.actor
+        mcp = target.path == "/mcp" and actor.cold_history is not None
         model = target.path == actor.model_path + "/v1/messages"
         bearer = actor.model_authorization() if model else actor.bearer
+        if target.path.startswith('/direct/'):
+            bearer = actor.direct.bearer if actor.direct is not None else None
+        if model and actor.direct is not None:
+            bearer = None
         authorization = self.headers.get("Authorization", "")
         if bearer is None or not authorization.isascii() or not hmac.compare_digest(
             authorization, "Bearer " + bearer
@@ -245,15 +276,22 @@ class _Callback(BaseHTTPRequestHandler):
                 raise ValueError("回调正文编码无效")
             data = json.loads(raw)
             if model:
-                actor.serve_model(self, data)
+                actor.serve_model(self, data, native_raw=raw)
                 return
-            payload = _json(actor.callback(self.path, data)).encode()
+            reply = actor.cold_history.mcp(data) if mcp else actor.callback(self.path, data)
+            if reply is None:
+                self.send_response(202)
+                self.end_headers()
+                return
+            payload = _json(reply).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(payload)))
             self.end_headers()
             self.wfile.write(payload)
-        except _StaleReceipt:
+            if mcp and data.get("method") == "tools/list":
+                actor.mcp_ready.set()
+        except (_StaleReceipt, DirectRejected):
             with suppress(OSError):
                 self.send_error(409)
         except ModelResponseError as error:
@@ -266,7 +304,7 @@ class _Callback(BaseHTTPRequestHandler):
                 self.send_header("Content-Length", str(len(error.body)))
                 self.end_headers()
                 self.wfile.write(error.body)
-        except (ValueError, KeyError, OSError, RuntimeError):
+        except (ValueError, TypeError, KeyError, OSError, RuntimeError):
             actor.abort()
             self.close_connection = True
             if not getattr(self, "model_stream_started", False):
@@ -289,9 +327,11 @@ class _Actor:
         self.agent_offers = {}
         self.completed_normally = False
         self.settings = settings
+        self.direct = DirectModel(self) if getattr(driver, 'direct_mode', False) else None
         self.prompt = prompt
         self.prompt_hash = sha256(prompt.encode()).digest()
         self.marker = "Flower session " + uuid4().hex
+        self.media_paths: tuple[str, ...] = ()
         self.bearer = secrets.token_urlsafe(32)
         self.model_bearer = secrets.token_urlsafe(32)
         self.model_path = "/model/" + self.model_bearer if driver.managed_oauth else ""
@@ -301,11 +341,13 @@ class _Actor:
         self.guard_text = "Flower2API 会话 " + uuid4().hex
         self.changed = Condition()
         self.ready = Event()
+        self.mcp_ready = Event()
         self.dead = Event()
         self.retired = Event()
         self.failure = None
         self.master = None
         self.process = None
+        self.launch_observation = WorkspaceLaunchObservation()
         self.step = None
         self.frame_batch = []
         self.finished = False
@@ -319,6 +361,12 @@ class _Actor:
         self.claim = None
         self.port = None
         self.worker = None
+        self.cold_history = None
+        self.recovery_history = None
+        self.fork_session = None
+        self.fork_borrowed_slot = False
+        self.fork_results = {}
+        self.signed_tool_models = {}
 
     def model_authorization(self):
         """读取当前模型回环的账号授权。@return 当前回合 AT 或原会话口令。"""
@@ -346,12 +394,32 @@ class _Actor:
             self.abort()
             raise
 
+    def _stage_current_images(self, home, resources):
+        sources = [block["source"] for block in self.cold_history.current_blocks if block["type"] == "image"]
+        if not sources:
+            return None
+        # 原生文件粘贴会附带来源。使用本进程内的目录别名，模型不会收到账号私有目录路径。
+        folder = Path(resources.enter_context(TemporaryDirectory(prefix="images-", dir=home / "tmp")))
+        descriptor = os.open(folder, os.O_PATH | os.O_DIRECTORY)
+        resources.callback(os.close, descriptor)
+        aliases = []
+        for index, source in enumerate(sources, 1):
+            name = f"attachment-{index}.{source['media_type'].split('/')[1]}"
+            with os.fdopen(os.open(folder / name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as stream:
+                stream.write(b64decode(source["data"], validate=True))
+            aliases.append(f"/proc/self/fd/{descriptor}/{name}")
+        self.media_paths = tuple(aliases)
+        return descriptor
+
+    def _terminal_marker(self):
+        return "".join(f"[Image #{index}] " for index in range(1, len(self.media_paths) + 1)) + self.marker
+
     def _monitor(self, command):
         master, slave = None, None
         try:
             home, mod = self.driver.launcher.session_paths(command)
             server = ThreadingHTTPServer(("127.0.0.1", 0), _Callback)
-            with closing(server):
+            with closing(server), ExitStack() as history_resources:
                 server.actor = self
                 self.port = server.server_address[1]
                 endpoint = "http://127.0.0.1:" + str(self.port)
@@ -359,10 +427,14 @@ class _Actor:
                 # 原版进程只能读取自己的 mod 根目录。启动前只复制镜像内的固定程序。
                 plugin = mod
                 _install_mod(version, plugin)
+                direct_binding = home / '.claude/flower-direct.json'
                 try:
                     (plugin / "hooks/binding.js").write_text(
                         f"export const endpoint = {_json(endpoint)}\nexport const bearer = {_json(self.bearer)}\n"
+                        f"export const direct = {_json(self.direct is not None)}\n"
                     )
+                    if self.direct is not None:
+                        atomic_text(direct_binding, _json({'endpoint': endpoint, 'bearer': self.direct.bearer}))
                     # 第二层拒绝用于 Mod 未能截获工具的情况，客户端从不触达服务器工具。
                     classic = {
                         "hooks": {
@@ -379,6 +451,10 @@ class _Actor:
                             ]
                         }
                     }
+                    plan = self.cold_history
+                    launch_plan = self.recovery_history or plan
+                    if plan is not None and (plan.thinking or {}).get("display") == "summarized":
+                        classic["showThinkingSummaries"] = True
                     opts = [
                         # 同一预留会话的显示名稳定。传成单个参数，兼容以连字符开头的合法会话 ID。
                         f"--name={self.reservation['session_id']}",
@@ -397,10 +473,45 @@ class _Actor:
                         "--plugin-dir",
                         str(plugin),
                     ]
+                    launch_options = {}
+                    resume = None
+                    wait_for_mcp = False
+                    if plan is not None:
+                        # 本轮设置来自当前账号，恢复时也应按当前轮构造系统正文。
+                        opts.extend(["--system-prompt-snapshot", "off"])
+                        if system_prompt := plan.system_argument():
+                            flag, text = system_prompt
+                            instructions = plugin / "instructions.md"
+                            atomic_text(instructions, text)
+                            opts.extend([flag, str(instructions)])
+                        if plan.effort:
+                            opts.extend(["--effort", plan.effort])
+                        if plan.tools:
+                            wait_for_mcp = True
+                            mcp = plugin / "mcp.json"
+                            atomic_text(mcp, _json({"mcpServers": {MCP_SERVER: {
+                                "type": "http", "url": endpoint + "/mcp", "headers": {
+                                    "Authorization": "Bearer " + self.bearer,
+                                },
+                            }}}))
+                            opts.extend(["--mcp-config", str(mcp)])
+                        launch_options["prepare_history"] = launch_plan.import_session
+                        if self.recovery_history is None:
+                            launch_options["prepare_history"] = partial(
+                                launch_plan.import_session, replay_resources=history_resources,
+                                observation=self.launch_observation,
+                            )
+                            if (media := self._stage_current_images(home, history_resources)) is not None:
+                                launch_options["media_fd"] = media
+                        resume = bool(launch_plan.history)
+                    elif self.receipt_revision is not None:
+                        launch_options["recover_incomplete_history"] = True
                     master, slave = os.openpty()
                     self.master = master
+                    # 纯图文提交先显示附件标记。让当前编号留在固定 CLI 的提示行可视范围内。
+                    columns = min(0xffff, max(100, len(self._terminal_marker()) + 4))
                     fcntl.ioctl(
-                        slave, termios.TIOCSWINSZ, struct.pack("HHHH", 32, 100, 0, 0)
+                        slave, termios.TIOCSWINSZ, struct.pack("HHHH", 32, columns, 0, 0)
                     )
                     if self.dead.is_set():
                         raise RuntimeError("原预留已经取消")
@@ -410,19 +521,28 @@ class _Actor:
                         if type(budget) is int and budget > 0
                         else {}
                     )
-                    if self.settings.get("thinking", {}).get("type") == "disabled":
+                    thinking = self.settings.get("thinking", {})
+                    if thinking.get("type") == "disabled":
                         env["MAX_THINKING_TOKENS"] = "0"
+                    elif plan is not None and thinking.get("type") == "enabled":
+                        env["CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING"] = "1"
+                        env["MAX_THINKING_TOKENS"] = str(thinking["budget_tokens"])
+                    if launch_plan is not None and launch_plan.has_history_cache_markers():
+                        # CLI 的自动断点会与客户前缀同时出现，还可能改变 TTL 顺序。
+                        env["DISABLE_PROMPT_CACHING"] = "1"
                     self.process = self.driver.launcher.launch_session(
                         self.reservation,
                         command,
                         arguments=opts,
                         config_dir=home / ".claude",
                         environment=env,
-                        resume=None,
+                        resume=resume,
                         terminal_fd=slave,
                         mod_dir=plugin,
                         model_endpoint=(endpoint + self.model_path, self.launch_token or self.model_bearer),
+                        observation=self.launch_observation,
                         **({"oauth_file": True} if self.oauth_file else {}),
+                        **launch_options,
                     )
                     os.close(slave)
                     slave = None
@@ -434,6 +554,7 @@ class _Actor:
                     callback.start()
                     try:
                         seen, tail, submitted = False, b"", False
+                        media_index, waiting_for_image = 0, b""
                         while not self.dead.is_set() and self.process.poll() is None:
                             with self.changed:
                                 if self.claim and self.claim.disconnected and self.claim.disconnected.is_set():
@@ -448,15 +569,31 @@ class _Actor:
                                 data = os.read(master, 65536)
                                 if not data:
                                     break
-                                seen |= "❯".encode() in tail + data
-                                tail = data[-4:]
+                                screen = tail + data
+                                seen |= "❯".encode() in screen
+                                if waiting_for_image and waiting_for_image in screen:
+                                    waiting_for_image = b""
+                                tail = screen[-max(4, len(waiting_for_image)):]
                             if (
                                 seen
                                 and self.ready.is_set()
+                                and (self.direct is None or self.direct.started.is_set())
+                                and (not wait_for_mcp or self.mcp_ready.is_set())
                                 and not submitted
                                 and not self.dead.is_set()
+                                and not waiting_for_image
                             ):
-                                # 成员内容经 prompt.submit 传送；控制字符和斜杠始终不会写进 PTY。
+                                if media_index:
+                                    os.write(master, b" ")
+                                if media_index < len(self.media_paths):
+                                    path = self.media_paths[media_index].encode()
+                                    os.write(master, b"\x1b[200~" + path + b"\x1b[201~")
+                                    media_index += 1
+                                    # CLI 用光标定位显示标记中的空格。等实际渲染出编号再贴下一张。
+                                    waiting_for_image = f"#{media_index}]".encode()
+                                    tail = b""
+                                    continue
+                                # 客户正文交给 Mod。PTY 只接收服务端生成的标记和附件别名。
                                 os.write(master, self.marker.encode())
                                 if not self.dead.wait(0.18):
                                     os.write(master, b"\r")
@@ -474,6 +611,11 @@ class _Actor:
                             self.process.kill()
                             self.process.wait()
                     (plugin / "hooks/binding.js").unlink(missing_ok=True)
+                    if self.direct is not None:
+                        direct_binding.unlink(missing_ok=True)
+                    if self.cold_history is not None:
+                        (plugin / "mcp.json").unlink(missing_ok=True)
+                        (plugin / "instructions.md").unlink(missing_ok=True)
         except Exception:
             # 任何启动、归属或终端错误都会由等待中的发送者以中断报告；不记录客户正文。
             self.abort()
@@ -486,6 +628,18 @@ class _Actor:
 
     def callback(self, path, data):
         """按回合次序接受 Mod 事件并施加背压。@param path 回调类型。@param data 官方事件。@return 回执。"""
+        if self.direct is not None:
+            if path == '/direct/ready':
+                self.direct.started.set()
+                return {}
+            if path == '/direct/permit':
+                return self.direct.permit(data)
+            if path == '/direct/response':
+                return self.direct.response(data)
+            if path in ('/direct-chunk', '/direct-signed'):
+                return self.direct.observe(data, signed=path == '/direct-signed')
+            if path == '/end':
+                self.direct.close_response(data)
         with self.changed:
             if self.dead.is_set():
                 raise ValueError("进程已取消")
@@ -494,15 +648,24 @@ class _Actor:
             elif (
                 path == "/prompt"
                 and self.prompt is not None
-                and data.get("marker") == self.marker
+                and data.get("marker") == self._terminal_marker()
             ):
                 prompt, self.prompt = self.prompt, None
+                if self.cold_history is not None and self.cold_history.current_blocks and self.recovery_history is None:
+                    blocks = self.cold_history.submitted_blocks()
+                    if self.media_paths:
+                        # 内容块中的图像由实际 PTY 粘贴提供。回调只描述它们在图文中的位置。
+                        blocks = [{"type": "image"} if block["type"] == "image" else block for block in blocks]
+                    return {"prompt": data["marker"], "guard": self.guard_text, "blocks": blocks,
+                            "media": bool(self.media_paths)}
                 return {"prompt": prompt, "guard": self.guard_text}
             elif path == "/results":
                 return self._tool_results(data)
             elif path == "/begin":
                 if self.step is None or self.claim is None or self.dead.is_set():
                     raise ValueError("缺少已提交的有效预留")
+                if self.direct is not None and self.step.terminal_seen:
+                    raise DirectRejected('本次直发已经收口')
                 if set(self.answers) != self.delivered:
                     raise ValueError("原工具尚未接到全部回执")
                 if (
@@ -521,7 +684,12 @@ class _Actor:
                     or self.step.native != (data.get("turn"), data.get("step"))
                     or self.finished
                     or not self.step.stopped
-                    or self.step.reason != data.get("reason")
+                ):
+                    raise ValueError("原版 CLI 未确认相同模型响应的终态")
+                native_reason = data.get("reason")
+                # 原版 CLI 对空内容拒答可能省略结束原因。仅在同一步的原模型流已确认拒答时接受该确认。
+                if self.step.reason != native_reason and not (
+                    native_reason is None and self.step.reason == "refusal" and not self.step.blocks
                 ):
                     raise ValueError("原版 CLI 未确认相同模型响应的终态")
                 if (
@@ -533,7 +701,7 @@ class _Actor:
                     raise ValueError("模型响应未完整结束")
                 self.step.terminal_seen = True
                 # 2.1.293 确认模型拒答后会尝试开启下一步。原响应已完整结束，此时即可交付。
-                if self.step.reason in ("tool_use", "refusal"):
+                if self.step.reason in ("tool_use", "refusal") or self.direct is not None and self.step.reason == "max_tokens":
                     self._finish_step()
             elif path == "/complete" and self.step is not None:
                 if (
@@ -619,9 +787,16 @@ class _Actor:
     def _finish_step(self):
         self.expected = self.step.blocks if self.step.reason == "tool_use" else None
         if self.expected:
+            native = self.cold_history.receipt_boundary() if self.cold_history is not None else None
+            if native is not None:
+                if self.step.response_model and any(b["type"] in SIGNED_THINKING_TYPES for b in self.expected):
+                    self.signed_tool_models.update(dict.fromkeys(self.step.tool_ids, self.step.response_model))
+                if self.signed_tool_models:
+                    native["signed_tool_models"] = self.signed_tool_models
             self.receipt_revision = self.driver.checkpoints.offer(
                 self.identity, self.reservation["session_id"], self.history,
                 [receipt_snapshot(b) for b in self.expected], _RECEIPT_SECONDS,
+                native=native, cc_fork_scope=getattr(self.claim, "cc_fork_scope", None),
             )
             self.wait_until = time.monotonic() + _RECEIPT_SECONDS
             for offer in self.agent_offers.values():
@@ -641,6 +816,27 @@ class _Actor:
             raise RuntimeError("公开输出已中断")
         self.frame_batch = batch
         self.changed.notify_all()
+
+    def _matches_current_blocks(self, content):
+        if not isinstance(content, list):
+            return False
+        expected = self.cold_history.submitted_blocks()
+        if not self.media_paths:
+            actual = [block.get("text") if isinstance(block, dict) and block.get("type") == "text" else None
+                      for block in content[-len(expected):]]
+            return actual == [block["text"] for block in expected]
+        sources = [{"type": "text", "text": f"[Image: source: {path}]"} for path in self.media_paths]
+        tail = content[-(len(expected) + len(sources)):]
+        if any(not isinstance(block, dict) for block in tail):
+            return False
+        normalized = [{key: value for key, value in block.items() if key != "cache_control"} for block in tail]
+        actual = normalized[:len(expected)]
+        if normalized[len(expected):] != sources:
+            return False
+        # 固定 CLI 会在追加来源说明前为最后一个文本块补一个换行。
+        if expected[-1]["type"] == "text" and actual[-1] == {**expected[-1], "text": expected[-1]["text"] + "\n"}:
+            actual[-1] = expected[-1]
+        return actual == expected
 
     def _main_request(self, body, handle):
         if (
@@ -664,6 +860,14 @@ class _Actor:
                 and set(ids) == self.delivered == set(handle.answers)
                 and len(ids) == len(self.delivered)
             )
+        if self.recovery_history is not None:
+            # 恢复会话可能在已闭合的结果后生成额外助理边界。核对完整历史中的原调用 ID 后再查本轮标记。
+            expected_ids = set(handle.answers) | self.fork_results.keys()
+            ids = [block.get("tool_use_id") for row in rows if isinstance(row.get("content"), list)
+                   for block in row["content"] if block.get("type") == "tool_result"
+                   and block.get("tool_use_id") in expected_ids]
+            if set(ids) != expected_ids or len(ids) != len(expected_ids):
+                return False
         # 2.1.293 在新轮或恢复后都只用最近用户输入及紧随的系统行认领本次许可。
         last_user = next(
             (
@@ -677,6 +881,10 @@ class _Actor:
             return False
         content = rows[last_user].get("content")
         line = "prompt.submit hook additional context: " + self.guard_text
+        multiple = self.cold_history is not None and self.cold_history.current_blocks and self.recovery_history is None
+        # Mod 失效时 CLI 可能保留标记。只有按顺序保留原图文和已知附件来源才能认领本轮。
+        if multiple and not self._matches_current_blocks(content):
+            return False
         if isinstance(content, list):
             marker = "<system-reminder>\n" + line + "\n</system-reminder>"
             guard_count = sum(
@@ -694,7 +902,7 @@ class _Actor:
                 return False
             content = latest.get("text")
         # 合并用户行和原生字符串用户行都要求精确提示和单独的当前系统标记行。
-        if (
+        if not multiple and (
             not isinstance(content, str)
             or sha256(content.encode()).digest() != self.prompt_hash
         ):
@@ -733,7 +941,7 @@ class _Actor:
             raise ModelResponseError(422, _json({"type": "error", "error": {
                 "type": "invalid_request_error", "code": "unsupported_parameter",
                 "message": "请求的协议版本或 beta 超出本轮原生 SDK 能力",
-            }}).encode())
+            }}).encode(), source="tui_cli_input_guard")
         actual = {}
         for name, value in sdk_headers.items():
             name = name.lower()
@@ -751,10 +959,12 @@ class _Actor:
                 actual.pop("anthropic-beta", None)
         return actual
 
-    def _claim_model(self, sdk_headers, native):
+    def _claim_model(self, sdk_headers, native, native_raw=None):
         """在当前预留中认领一次模型提交。@param sdk_headers 该 CLI 的本轮头。
-        @param native 内层 CLI 用于配对的请求。@return 完成策略及会话映射的输入，未匹配时为空。
+        @param native 内层 CLI 用于配对的请求。@param native_raw CLI 已提交的原始正文。
+        @return 本次模型提交的输入，未匹配时为空。
         """
+        inferred_thinking = None
         with self.driver.lock, self.changed:
             step, handle = self.step, self.claim
             pending = not (
@@ -790,6 +1000,73 @@ class _Actor:
                 if handle.kind == "new" and self.agent_offer is not None:
                     self.agent_offer.messages.clear()
                     self.agent_messages.clear()
+                if self.cold_history is not None:
+                    thinking = self.cold_history.thinking
+                    if thinking is not None and thinking["type"] != "disabled" and (
+                        native.get("thinking") != thinking
+                        or (thinking["type"] == "enabled" and native.get("max_tokens") != self.cold_history.max_tokens)
+                    ):
+                        message = ("CLI 未保留请求的自适应思考显示模式" if thinking["type"] == "adaptive"
+                                   else "CLI 未保留请求的固定思考预算或输出上限")
+                        raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
+                            "code": "unsupported_parameter", "message": message}}),
+                            source="tui_cli_input_guard")
+                    context_management = self.cold_history.context_management
+                    if context_management is not None and (
+                        native.get("context_management") != context_management
+                        or CONTEXT_BETA not in {value.strip() for value in sdk_headers.get("anthropic-beta", "").split(",")}
+                    ):
+                        raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
+                            "code": "unsupported_parameter", "message": "CLI 未保留请求的历史管理策略"}}),
+                            source="tui_cli_input_guard")
+                    if self.cold_history.effort is not None:
+                        output = native.get("output_config")
+                        if not isinstance(output, dict) or output.get("effort") != self.cold_history.effort:
+                            raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
+                                "code": "unsupported_parameter", "message": "CLI 当前模型未生成请求的推理强度"}}),
+                                source="tui_cli_input_guard")
+                    if not self.cold_history.matches_tool_choice(native):
+                        raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
+                            "code": "unsupported_parameter", "message": "CLI 未保留请求的工具选择"}}),
+                            source="tui_cli_input_guard")
+                    output_history = self.recovery_history or self.cold_history
+                    if self.fork_results and not output_history.matches_imported_receipts(
+                        native, self.fork_results.values()
+                    ):
+                        raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
+                            "code": "unsupported_parameter", "message": "CLI 未保留分叉的原工具回执"}}),
+                            source="tui_cli_input_guard")
+                    if not output_history.matches_history_cache_markers(native):
+                        raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
+                            "code": "unsupported_parameter", "message": "CLI 未保留历史缓存标记"}}),
+                            source="tui_cli_input_guard")
+                    if not output_history.matches_history_tool_images(native):
+                        raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
+                            "code": "unsupported_parameter", "message": "CLI 未保留历史工具结果中的图文"}}),
+                            source="tui_cli_input_guard")
+                    if not output_history.matches_history_empty_tool_results(native):
+                        raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
+                            "code": "unsupported_parameter", "message": "CLI 未保留空工具结果"}}),
+                            source="tui_cli_input_guard")
+                    if not output_history.matches_history_tool_text_blocks(native):
+                        raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
+                            "code": "unsupported_parameter", "message": "CLI 未保留工具结果中的原始文本块"}}),
+                            source="tui_cli_input_guard")
+                    if handle.kind != "continuation" and not output_history.matches_recovered_signatures(native):
+                        raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
+                            "code": "unsupported_parameter", "message": "CLI 未保留已核对的签名工具历史"}}),
+                            source="tui_cli_input_guard")
+                elif handle.api_context is not None:
+                    offered = {v.strip() for v in sdk_headers.get("anthropic-beta", "").split(",")}
+                    thinking = handle.thinking if handle.thinking is not None else native.get("thinking", {})
+                    clears = any(edit["type"] == "clear_thinking_20251015" for edit in handle.api_context.get("edits", []))
+                    # 历史管理的本地能力拒绝发生在消费原工具组的恢复许可之前。
+                    if CONTEXT_BETA not in offered or (clears and thinking.get("type") not in ("enabled", "adaptive")):
+                        raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
+                            "code": "unsupported_parameter", "message": "本轮 CLI 不支持请求的历史管理策略"}}),
+                            source="tui_cli_input_guard")
+                    if clears and handle.thinking is None:
+                        inferred_thinking = thinking
                 if handle.kind == "recovered" and not self.driver.checkpoints.submit(
                     self.identity, self.receipt_revision, handle.request_digest, True
                 ):
@@ -805,44 +1082,53 @@ class _Actor:
                 self.changed.notify_all()
         if not pending:
             return None
+        if self.cold_history is not None:
+            if native_raw is None:
+                raise RuntimeError("冷导入缺少实际 CLI 正文")
+            handle.body_source = "interactive_cli"
+            plan = self.recovery_history or self.cold_history
+            handle.instruction_location = plan.observed_instruction_location(native)
+            return _ModelSubmission(step, handle, native_raw, headers, account_token)
         # 旧进程仍校验启动 AT。文件模式的令牌已经与原生步骤绑定。
         if handle.api_context is not None:
-            offered = {v.strip() for v in sdk_headers.get("anthropic-beta", "").split(",")}
-            thinking = handle.thinking if handle.thinking is not None else native.get("thinking", {})
-            clears = any(edit["type"] == "clear_thinking_20251015" for edit in handle.api_context.get("edits", []))
-            if CONTEXT_BETA not in offered or (clears and thinking.get("type") not in ("enabled", "adaptive")):
-                raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
-                    "code": "unsupported_parameter", "message": "本轮 CLI 不支持请求的历史管理策略"}}))
-            if clears and handle.thinking is None:
+            if inferred_thinking is not None:
                 # 只有清理思考且客户端省略 thinking 时，复用同一原版步骤实际启用的配置。
-                raw = _json({**json.loads(raw), "thinking": thinking}).encode()
+                raw = _json({**json.loads(raw), "thinking": inferred_thinking}).encode()
             beta = headers.get("anthropic-beta", "")
             if CONTEXT_BETA not in {v.strip() for v in beta.split(",")}:
                 headers = {**headers, "anthropic-beta": ",".join(filter(None, (beta, CONTEXT_BETA)))}
+        if handle.system_control_betas:
+            # CLI 根据自己的输入生成 beta。兼容正文保留原消息级控制，由发送器补齐对应声明。
+            beta = headers.get("anthropic-beta", sdk_headers.get("anthropic-beta", ""))
+            offered = {part.strip() for part in beta.split(",")}
+            missing = [item for item in handle.system_control_betas if item not in offered]
+            if missing:
+                headers = {**headers, "anthropic-beta": ",".join(filter(None, (beta, *missing)))}
         raw, headers = provider_session(
-            raw, headers, self.identity[4], handle.upstream_session_id,
+            raw, headers, self.identity[4].removeprefix(TITLE_SESSION_PREFIX).removeprefix(SUGGESTION_SESSION_PREFIX),
+            handle.upstream_session_id,
         )
+        handle.body_source = "account_sender"
+        handle.instruction_location = handle.input_observation.instruction_location
         return _ModelSubmission(step, handle, raw, headers, account_token)
 
-    def serve_model(self, http, native):
+    def serve_model(self, http, native, *, native_raw=None):
         """交付同一次已认领的模型响应。@param http 当前 TUI 连接。
-        @param native 内层 CLI 请求。@return 无。
+        @param native 内层 CLI 请求。@param native_raw CLI 原始正文。@return 无。
         """
-        submission = self._claim_model(http.headers, native)
+        submission = self._claim_model(http.headers, native, native_raw)
         if submission is None:
             http.send_error(409, "No pending model step")
             return
         if self.driver.managed_oauth and submission.account_token is None:
             raise ModelResponseError(503, b"")
-        if self.driver.native_dispatch is not None and self.driver.managed_oauth:
-            # 只有镜像的受信入口能安装原生投递器；两条路径使用同一份一次认领结果。
-            self.driver.native_dispatch(self, http, submission)
-            return
         step, handle = submission.step, submission.handle
         raw, headers = submission.body, submission.headers
         account_token = submission.account_token
         options = {"headers": headers}
-        if getattr(handle, "capture", None) is not None:
+        if self.cold_history is not None:
+            submission.record_cli_handoff()
+        elif getattr(handle, "capture", None) is not None:
             options["capture"] = handle.capture
         if self.driver.managed_oauth:
             # CLI 原生请求的授权头只认证回环连接，实际模型发送取当前认领的账号 AT。
@@ -919,6 +1205,12 @@ class _Actor:
         """
         tail = bytearray()
         for wire, event in wire_events(upstream):
+            if (self.reservation["session_id"].startswith(SUGGESTION_SESSION_PREFIX)
+                    and event is not None and event.get("type") == "content_block_start"
+                    and event.get("content_block", {}).get("type") in ("tool_use", "server_tool_use")):
+                # 声明保留用于前缀缓存。建议是文本回复，工具输出不能进入客户端或终端执行。
+                event = {"type": "error", "error": {"type": "api_error", "message": "建议回复包含工具调用"}}
+                wire = b"event: error\ndata: " + _json(event).encode() + b"\n\n"
             terminal_error = event is not None and event.get("type") == "error"
             with self.changed:
                 if self.dead.is_set():
@@ -932,6 +1224,17 @@ class _Actor:
             if terminal_error:
                 yield wire
                 return
+            public = wire
+            if (self.cold_history is not None and event is not None
+                    and event.get("type") == "content_block_start"
+                    and event.get("content_block", {}).get("type") == "tool_use"):
+                block = event["content_block"]
+                tool = self.cold_history.tools.get(block.get("name"))
+                if tool is None:
+                    raise ValueError("模型工具不属于当前会话的 MCP 声明")
+                # 内层使用原生 MCP 名称，外层仍用客户工具名称和同一模型调用 ID。
+                event = {**event, "content_block": {**block, "name": tool["name"]}}
+                public = b"event: content_block_start\ndata: " + _json(event).encode() + b"\n\n"
             self._observe(step, event)
             with self.changed:
                 if step.stopped:
@@ -939,7 +1242,7 @@ class _Actor:
                         raise ValueError("模型终态后的数据超限")
                     tail.extend(wire)
                 else:
-                    self._publish([wire])
+                    self._publish([public])
             yield wire
         with self.changed:
             if not step.stopped or not tail:
@@ -979,16 +1282,70 @@ class _Actor:
                 return
 
 
-def _receipt_request(body, reservation):
+def _fork_instruction(message):
+    content = message["content"]
+    if message["role"] != "user" or not isinstance(content, list) or len(content) < 2:
+        return None
+    instruction = content[-1]
+    if (instruction.keys() == {"type", "text"} and instruction["type"] == "text"
+            and isinstance(instruction["text"], str) and instruction["text"].strip()
+            and all(block["type"] == "tool_result" for block in content[:-1])):
+        return instruction["text"]
+    return None
+
+
+def _fork_key(identity, messages):
+    return (*identity, "receipt-fork", history_digest(messages))
+
+
+def _cc_fork_scope(body, reservation):
+    # 历史另按已交付工具组比较，响应表示可以随原版客户端选择变化。
+    options = {key: value for key, value in body.items() if key not in ("messages", "stream")}
+    return digest([options, reservation.get("model_headers") or {}, reservation.get("body_policy"),
+                   reservation.get("input_format")])
+
+
+def _receipt_request(body, reservation, *, cache_ttl=None, previous=None):
     # 只绑定实际支持的生成参数和返回表示，连接 ID 与预留期限可随重试变化。
-    return digest([body, dict(reservation.get("model_headers") or {}),
-                   reservation.get("body_policy"), reservation.get("input_format")])
+    policy = reservation.get("body_policy")
+    if cache_ttl is not None and cache_ttl != (policy["ttl"] if policy else "off"):
+        # 原生续轮沿根轮的 TTL。网关省略默认策略，摘要也要沿用这种旧表示。
+        policy = {**(policy or {"sub2api": False, "adaptive": False}), "ttl": cache_ttl}
+        if cache_ttl == "off" and not policy["sub2api"] and not policy["adaptive"]:
+            policy = None
+    input_format = reservation.get("input_format")
+    scope = (dict(reservation.get("model_headers") or {}), policy, input_format)
+    choice = body.get("tool_choice", {"type": "auto"})
+    tools = body.get("tools")
+    equivalents = equivalent_auto_tool_choices(choice) if choice is not None else ()
+    if not isinstance(tools, list) or not tools or native_input(body, input_format):
+        return digest([body, *scope])
+    normalized = {**body, "tools": [custom_tool_type(tool) for tool in tools]}
+    if equivalents:
+        normalized["tool_choice"] = equivalents[0]
+    request = digest([normalized, *scope])
+    if previous is not None and previous != request:
+        # 旧写入者仍按原表示保留认领摘要。匹配原摘要后才沿用数据库的条件写入。
+        for declarations in legacy_custom_tool_lists(tools):
+            normalized["tools"] = declarations
+            for shape in equivalents or (choice,):
+                if equivalents:
+                    if shape is None:
+                        normalized.pop("tool_choice", None)
+                    else:
+                        normalized["tool_choice"] = shape
+                if digest([normalized, *scope]) == previous:
+                    return previous
+    return request
 
 
 class _Reserved:
     """账号内只准单次提交的交互预留。"""
 
-    def __init__(self, actor, kind, history, answers, body, stream, raw, reservation, request_digest=None):
+    def __init__(
+        self, actor, kind, history, answers, body, stream, raw, reservation, request_digest=None,
+        *, input_observation,
+    ):
         self.actor = actor
         self.kind = kind
         self.history = history
@@ -998,10 +1355,22 @@ class _Reserved:
         self.raw = raw
         self.model_headers = dict(reservation.get("model_headers") or {})
         self.model_header_policy = reservation.get("model_header_policy") == 1
-        self.preserve_model_beta = self.model_header_policy and (
-            native_input(body, reservation.get("input_format"))
-            or any(row["role"] == "system" for row in body["messages"])
+        is_native = native_input(body, reservation.get("input_format"))
+        self.cc_fork_scope = (
+            _cc_fork_scope(body, reservation)
+            if is_native and reservation.get("input_format") == "claude_code"
+            and reservation.get("receipt_fork_session_protocol") is True and reservation.get("agent_hint") is None
+            else None
         )
+        system_rows = [row for row in body["messages"] if row["role"] == "system"]
+        self.preserve_model_beta = self.model_header_policy and bool(is_native or system_rows)
+        self.system_control_betas = ()
+        if system_rows and not is_native:
+            self.system_control_betas = tuple(beta for beta, required in (
+                (SYSTEM_CLEAR_AT_BETA, any(row.get("clear_at") in ("never", "next_user_message") for row in system_rows)),
+                (SYSTEM_EFFORT_BETA, any(row["content"] == [] and "effort" in (row.get("output_config") or {})
+                                        for row in system_rows)),
+            ) if required)
         self.upstream_session_id = None
         self.reservation = reservation
         self.account_token = None
@@ -1015,8 +1384,18 @@ class _Reserved:
         self.signature_exchange = None
         self.signature_known = False
         self.repair_attempt_id = None
+        self.body_source = None
+        self.input_observation = input_observation
+        self.instruction_location = None
         self.sent = self.completed = False
         self.request_digest = request_digest
+
+    @property
+    def session_origin(self) -> str | None:
+        """返回本次尝试对应的实际会话来源。@return 复用或启动来源。"""
+        if self.kind == "continuation":
+            return "live_process"
+        return self.actor.launch_observation.origin
 
     def send(self, command):
         """实际启动或恢复一个模型步骤。@param command 已核验工作区。@return 逐帧输出。"""
@@ -1094,9 +1473,9 @@ class _Reserved:
 class SessionDriver:
     """绑定当前账号的真实 TUI 会话。@param config 受信预留配置。@param launcher 原版账号启动器。"""
 
-    def __init__(self, config, launcher=None, capacity=None, *, native_dispatch=None):
+    def __init__(self, config, launcher=None, capacity=None):
         """创建该账号的进程表。@param config 源配置。@param launcher 受信启动器。
-        @param capacity 账号容量。@param native_dispatch 镜像提供的原生模型投递回调。@return 无。
+        @param capacity 账号容量。@return 无。
         """
         if launcher is None:
             import tui_sender_launch as launcher
@@ -1104,15 +1483,15 @@ class SessionDriver:
         self.checkpoints = ReceiptCheckpoints(getattr(launcher, "STORAGE", None))
         self.managed_oauth = getattr(launcher, "managed_oauth_enabled", lambda: False)()
         self.oauth_file_available = getattr(launcher, "file_oauth_enabled", lambda: False)()
-        self.native_dispatch = native_dispatch
+        self.direct_mode = getattr(launcher, 'direct_model_enabled', lambda: False)()
         # 编排每个 HTTP 并发配置两个预留。等待新 TUI 的队列必须留下至少一个传输名额还工具。
         limit = max(1, config["max_reservations"] // 2)
-        self.summary_only_headroom = False
+        self.unlimited_memory = False
         if capacity is None:
             memory = Path("/sys/fs/cgroup/memory.max").read_text().strip()
             # 1GiB 账号实测同时持有三个 TUI。预留 256MiB 基础开销及每进程 256MiB。
             reserve = 256 * 1024**2
-            self.summary_only_headroom = memory == "max"
+            self.unlimited_memory = memory == "max"
             budget = (
                 (limit + 2) * reserve
                 if memory == "max"
@@ -1121,7 +1500,7 @@ class SessionDriver:
                 else 0
             )
             # 暂停等 Agent 的父进程继续记入 RAM；只多规划一个经验证的子进程。
-            # 无硬预算时把最后一位仅用于等工具的子代理查询进度；其它入口沿用之前的上限。
+            # 无硬预算时最后一位留给等工具的子代理进度和已核对原回执的分叉。
             capacity = TuiCapacity(
                 limit + 1,
                 budget_bytes=budget,
@@ -1335,9 +1714,20 @@ class SessionDriver:
                 owner is not None and owner.expected is not None and not owner.dead.is_set()
                 and not any(w.offer and any(w.offer.waiting_ancestors()) for w in self.waiters)
             )
+        if not ordinary_room and ticket.fork_origin is not None:
+            parent_key, revision = ticket.fork_origin
+            if (parent := self.sessions.get(parent_key)) is not None:
+                with parent.changed:
+                    # 父进程保留原回执。只有仍等待这一修订的父轮才为分叉借用已有余位。
+                    if (parent.receipt_revision == revision and parent.expected is not None
+                            and parent.wait_until is not None and time.monotonic() < parent.wait_until
+                            and not parent.dead.is_set()):
+                        return True
+        if not ordinary_room and self.unlimited_memory:
+            return False
         if ticket.recovering:
-            return ordinary_room or len(key) > 5
-        return (len(key) == 5 or offer is not None) and (
+            return ordinary_room or (len(key) > 5 and not ticket.fork)
+        return (len(key) == 5 or ticket.fork or offer is not None) and (
             ordinary_room or offer is not None and any(offer.waiting_ancestors())
         )
 
@@ -1357,9 +1747,11 @@ class SessionDriver:
         """只预留身份和物理容量，收到 send 才启动。@param reservation 身份。@param raw 正文。
         @param cancel_event 准备连接断开信号。@return 可单次提交的预留。
         """
+        input_observation = MessageInputObservation()
         body, stream, frozen = input_message(
             raw, native=reservation.get("input_format"), session_id=reservation["session_id"],
             body_policy=reservation.get("body_policy"),
+            observation=input_observation,
         )
         # 在认领工具回执之前检查退避期，等待结束后客户端仍能将回执交还原进程。
         check_wait = getattr(self.launcher, "check_provider_backoff", None)
@@ -1386,8 +1778,24 @@ class SessionDriver:
             # 只有认证的网关在核对原工具组后设置此位。用独立 actor 和工作区运行原始正文。
             # 同一个子代理的重复查询串行使用自己的进度工作区，避免每次心跳创建一份持久 HOME。
             actor_key = (*actor_key, "agent-summary")
-        returned = split_reply(messages)[1]
+        offered, returned = split_reply(messages)
+        policy = reservation.get("body_policy")
+        # disabled 经平台改写后也会呈现 adaptive/updates，仍须与客户端显式指定区分。
+        native_body_policy = not policy or not (policy["sub2api"] or policy["adaptive"])
+        native_cache_ttl = policy["ttl"] if policy else "off"
         deadline = reservation["deadline_unix_ms"] / 1000
+        input_format = reservation.get("input_format")
+        is_native = native_input(body, input_format)
+        native_history_allowed = (self.managed_oauth and reservation.get("native_cold_history") is True
+                                  and native_body_policy and agent_hint is None and not is_native)
+        cc_fork = is_native and input_format == "claude_code" and agent_hint is None
+        fork_allowed = native_history_allowed or (self.managed_oauth and cc_fork)
+        instruction = (
+            _fork_instruction(messages[-1])
+            if not summary and not reservation["continuation_only"] and offered == len(messages) - 2
+            and offered >= 0 and agent_hint is None and (not is_native or cc_fork)
+            else None
+        )
 
         def remaining():
             result = deadline - time.time()
@@ -1396,16 +1804,85 @@ class SessionDriver:
             return result
 
         checkpoint = None
-        if not summary and (returned or reservation["continuation_only"]):
+        native_checkpoint = None
+        retire_for_recovery = None
+        cold = recovery_history = None
+        fork_results = {}
+        fork_origin = None
+        signed_tool_models = {}
+        if returned and fork_allowed:
+            # 有后续工具调用的分支沿当前回执所证明的历史定位自己的账号工作区。
+            previous = history_digest(messages[:offered])
+            for index in range(offered - 1, 0, -1):
+                if messages[index - 1]["role"] != "assistant" or not _fork_instruction(messages[index]):
+                    continue
+                candidate = _fork_key(identity, messages[:index + 1])
+                proof = self.checkpoints.find(candidate, for_fork=True)
+                if proof is not None and proof[1] == previous:
+                    if reservation.get("receipt_fork_session_protocol") is not True:
+                        raise InputRejection("unsupported_parameter")
+                    actor_key = candidate
+                    break
+        if instruction is not None:
+            proof = self.checkpoints.find(actor_key, for_fork=True)
+            if proof is None:
+                raise InputRejection("unrecoverable_tool")
+            _, previous, expected, parent_request, revision, boundary = proof
+            if not fork_allowed or reservation.get("receipt_fork_session_protocol") is not True:
+                raise InputRejection("unsupported_parameter")
+            parent_messages = [*messages[:-1], {**messages[-1], "content": messages[-1]["content"][:-1]}]
+            parent_body = {**body, "messages": parent_messages}
+            fork_results = tool_receipts(parent_messages, previous, expected,
+                                         input_format=input_format, checkpoint=True)
+            if cc_fork:
+                # 完整 CC 继续发送已冻结正文。旧回执有实际提交摘要时仍可验证原输入。
+                scope = self.checkpoints.cc_fork_scope(actor_key, revision)
+                if (scope is None and parent_request is None) or (
+                    scope is not None and scope != _cc_fork_scope(parent_body, reservation)
+                ):
+                    raise InputRejection("unsupported_parameter")
+                fork_results = {}
+            else:
+                if boundary is None:
+                    raise InputRejection("unsupported_parameter")
+                signed_tool_models = boundary.pop("signed_tool_models", {})
+                cold = ColdHistory.from_receipt_boundary(parent_body, boundary)
+                if cold is None:
+                    raise InputRejection("unsupported_parameter")
+                recovery_history = cold.resume_receipts(
+                    parent_messages, signed_tool_models=signed_tool_models, prompt=instruction,
+                )
+                if recovery_history is None:
+                    raise InputRejection("unsupported_parameter")
+            if parent_request is not None and parent_request != _receipt_request(
+                parent_body, reservation, cache_ttl=cold.cache_ttl if cold is not None else None,
+                previous=parent_request,
+            ):
+                raise InputRejection("unsupported_parameter")
+            fork_origin = (actor_key, revision)
+            actor_key = _fork_key(identity, messages)
+        elif not summary and (returned or reservation["continuation_only"]):
             if not returned:
                 raise ValueError("缺少原轮工具结果")
+            tool_results_only = all(
+                row["role"] == "user" and isinstance(row["content"], list) and row["content"]
+                and all(block["type"] == "tool_result" for block in row["content"])
+                for row in messages[offered + 1:]
+            )
             request = _receipt_request(body, reservation)
+            active_request, active_ttl = request, native_cache_ttl
             with self.lock:
                 while (actor := self.sessions.get(actor_key)) is not None:
                     with actor.changed:
+                        root = actor.cold_history
+                        frozen_ttl = root.cache_ttl if root is not None else native_cache_ttl
+                        if frozen_ttl != active_ttl:
+                            active_ttl = frozen_ttl
+                            active_request = (request if active_ttl == native_cache_ttl
+                                              else _receipt_request(body, reservation, cache_ttl=active_ttl))
                         prior = actor.claim
                         retiring = actor.dead.is_set() or (prior is not None and prior.sent
-                                                           and prior.request_digest == request)
+                                                           and prior.request_digest == active_request)
                     if not retiring:
                         break
                     # 原网关退出时，发送器可能正在释放同一请求。只等待该步骤的监护线程。
@@ -1415,11 +1892,6 @@ class SessionDriver:
                     checkpoint = self.checkpoints.find(actor_key)
                     if checkpoint is None:
                         raise InputRejection("unrecoverable_tool")
-                    branch, previous, expected, prior_request, revision = checkpoint
-                    answers = tool_receipts(messages, previous, expected,
-                                            input_format=reservation.get("input_format"), checkpoint=True)
-                    if prior_request is not None and prior_request != request:
-                        raise ValueError("已提交的工具结果或模型参数与重试不符")
             if actor is not None:
                 with actor.changed:
                     # 对外终帧可稍早于上一传输线程归还句柄。只等本次已经确认完成的交接。
@@ -1439,21 +1911,78 @@ class SessionDriver:
                         raise ValueError("原会话未准备接收该工具结果")
                     answers = tool_receipts(messages, actor.history, actor.expected,
                                             input_format=reservation.get("input_format"))
-                    handle = _Reserved(
-                        actor,
-                        "continuation",
-                        history,
-                        answers,
-                        body,
-                        stream,
-                        frozen,
-                        reservation,
-                        request,
-                    )
-                    actor.claim = handle
-                    return handle
+                    if actor.cold_history is not None:
+                        prompt_index = len(actor.cold_history.history) + 1
+                        # 继续使用原进程的生效设置，校验通过后才把回执交给等待工具。
+                        plan = ColdHistory.from_request(
+                            {**body, "messages": messages[:prompt_index]}, actor.cold_history.system_policy,
+                            cache_ttl=actor.cold_history.cache_ttl,
+                            signed_models=dict(actor.cold_history.recovered_models),
+                        )
+                        if not native_body_policy or not actor.cold_history.matches_receipt_plan(plan) or not tool_results_only:
+                            raise InputRejection("unsupported_parameter")
+                        requires_recovery = any(tool_result_has_images(answer) or tool_result_is_empty(answer)
+                                                for answer in answers.values())
+                        # 文本数组和外层断点仅在整轮可恢复时切换。签名缺少来源时仍交回活跃进程。
+                        if requires_recovery or (
+                            any(tool_result_has_text_blocks(answer) or tool_result_has_cache_marker(answer)
+                                for answer in answers.values())
+                            and plan.resume_receipts(messages, signed_tool_models=actor.signed_tool_models) is not None
+                        ):
+                            checkpoint = self.checkpoints.find(actor_key)
+                            if checkpoint is None or checkpoint[4] != actor.receipt_revision or checkpoint[5] is None:
+                                raise InputRejection("unrecoverable_tool")
+                            retire_for_recovery = actor
+                    if retire_for_recovery is None:
+                        handle = _Reserved(actor, "continuation", history, answers, body, stream, frozen, reservation,
+                                           active_request, input_observation=input_observation)
+                        actor.claim = handle
+                        return handle
+            if checkpoint is not None:
+                branch, previous, expected, prior_request, revision, native_checkpoint = checkpoint
+                answers = tool_receipts(messages, previous, expected,
+                                        input_format=reservation.get("input_format"), checkpoint=True)
+                if native_checkpoint is None and prior_request is not None:
+                    request = _receipt_request(body, reservation, previous=prior_request)
+                    if prior_request != request:
+                        raise ValueError("已提交的工具结果或模型参数与重试不符")
 
-        prompt = prompt_text(messages)
+        system_policy = reservation.get("client_system_prompt_policy", "append")
+        if native_checkpoint is not None:
+            if not native_history_allowed or not tool_results_only:
+                raise InputRejection("unsupported_parameter")
+            boundary = dict(native_checkpoint)
+            signed_tool_models = boundary.pop("signed_tool_models", {})
+            cold = ColdHistory.from_receipt_boundary(body, boundary)
+            if cold is None:
+                raise InputRejection("unsupported_parameter")
+            request = _receipt_request(body, reservation, cache_ttl=cold.cache_ttl, previous=prior_request)
+            if prior_request is not None and prior_request != request:
+                raise ValueError("已提交的工具结果或模型参数与重试不符")
+            recovery_history = cold.resume_receipts(messages, signed_tool_models=signed_tool_models)
+            if recovery_history is None:
+                raise InputRejection("unsupported_parameter")
+        elif cold is None and native_history_allowed and checkpoint is None:
+            storage = getattr(self.launcher, "STORAGE", None)
+            reader = partial(read_bound_history, reservation, storage) if storage is not None else None
+            cold = ColdHistory.from_request(body, system_policy, cache_ttl=native_cache_ttl, read_history=reader)
+        if cold is None and system_policy != "append" and not is_native and checkpoint is None:
+            raise InputRejection("unsupported_parameter")
+        if retire_for_recovery is not None:
+            # 热续轮会改写空结果和纯文本数组，或移除图片。校验完整回执后沿同一修订恢复。
+            with self.lock:
+                with retire_for_recovery.changed:
+                    if retire_for_recovery.claim is not None or retire_for_recovery.receipt_revision != revision:
+                        raise ValueError("原工具回执已经换轮")
+                    remaining()
+                    retire_for_recovery.abort()
+                while self.sessions.get(actor_key) is retire_for_recovery:
+                    self.lock.wait(min(remaining(), 0.05))
+                if actor_key in self.sessions:
+                    raise ValueError("原工具回执已被认领")
+        launch_plan = recovery_history or cold
+        prompt = launch_plan.submitted_prompt() if launch_plan is not None else prompt_text(messages)
+        fork_actor = agent_hint is None and actor_key != identity
         with self.lock:
             if agent_hint is not None and not summary and (
                 actor_key in self.sessions
@@ -1466,12 +1995,15 @@ class SessionDriver:
                 if child_text.endswith("\n"):
                     prompts.append(sha256(child_text[:-1].encode()).digest())
             offer = None
-            ticket = _Waiting(actor_key, agent_summary=summary, recovering=checkpoint is not None)
+            ticket = _Waiting(actor_key, agent_summary=summary, recovering=checkpoint is not None,
+                              fork=fork_actor, fork_origin=fork_origin)
             handoff_limit = time.monotonic() + _AGENT_HANDOFF_SECONDS
             try:
                 while True:
                     if self.closed:
                         raise RuntimeError("当前账号事件源已关闭")
+                    if fork_actor and actor_key in self.sessions:
+                        raise ValueError("分叉的原会话仍在使用")
                     try:
                         timeout = remaining()
                     except TimeoutError:
@@ -1479,8 +2011,7 @@ class SessionDriver:
                             raise SubagentAmbiguousError("本次预留结束前未收到对应启动回执") from None
                         raise
                     capacity = self.capacity.snapshot()
-                    physical_limit = self.ordinary_limit if self.summary_only_headroom and not summary else capacity.limit
-                    if (summary and capacity.in_use >= physical_limit and self.sessions
+                    if (summary and capacity.in_use >= capacity.limit and self.sessions
                             and all(actor.expected and actor.claim is None for actor in self.sessions.values())):
                         # 全部物理位都在等外部工具。让进度请求退避，把下一次准入留给真回执。
                         raise TimeoutError("原工具等待已占满账号物理进程额度")
@@ -1496,6 +2027,7 @@ class SessionDriver:
                     if offer is not None:
                         if not self._valid_agent(offer, agent_hint, extras):
                             raise SubagentBindingError("子代理所属原轮已结束或取消")
+                        physical_limit = self.ordinary_limit if self.unlimited_memory else capacity.limit
                         if (
                             capacity.in_use >= physical_limit
                             and not offer.asynchronous
@@ -1521,7 +2053,7 @@ class SessionDriver:
                         None,
                     )
                     if (
-                        capacity.in_use < physical_limit
+                        capacity.in_use < capacity.limit
                         and self._eligible(ticket, ordinary_room)
                         and first in (None, ticket)
                     ):
@@ -1534,6 +2066,9 @@ class SessionDriver:
                             actor_reservation = {**reservation, "session_id": AGENT_SESSION_PREFIX + str(branch_id)}
                         elif checkpoint is not None:
                             actor_reservation = {**reservation, "session_id": branch}
+                        elif fork_actor:
+                            branch_id = UUID(bytes=sha256(_json(actor_key).encode()).digest()[:16], version=4)
+                            actor_reservation = {**reservation, "session_id": AGENT_SESSION_PREFIX + str(branch_id)}
                         elif offer is not None:
                             actor_reservation = {**reservation, "session_id": AGENT_SESSION_PREFIX + str(uuid4())}
                         actor = _Actor(
@@ -1549,6 +2084,13 @@ class SessionDriver:
                             slot,
                             offer,
                         )
+                        actor.cold_history = cold
+                        actor.recovery_history = recovery_history
+                        if fork_actor:
+                            actor.fork_session = actor_reservation["session_id"]
+                            actor.fork_borrowed_slot = fork_origin is not None and not ordinary_room
+                            actor.fork_results = fork_results
+                        actor.signed_tool_models = signed_tool_models
                         if checkpoint is not None:
                             actor.receipt_revision = revision
                         if offer is not None:
@@ -1564,13 +2106,14 @@ class SessionDriver:
                             frozen,
                             reservation,
                             request if checkpoint is not None else None,
+                            input_observation=input_observation,
                         )
                         actor.claim = handle
                         return handle
                     if ticket not in self.waiters:
                         # 源端与 sender 都给一个可信子依赖留下有界位置。
                         # 已占满普通队列时，合法子轮仍可等下一次物理释放。
-                        reserved = any(len(item.actor_key) > 5 and not item.agent_summary for item in self.waiters)
+                        reserved = any(len(item.actor_key) == 6 and not item.agent_summary for item in self.waiters)
                         if len(self.waiters) - int(reserved) >= self.max_waiters and (
                             reserved or agent_hint is None or summary
                         ):

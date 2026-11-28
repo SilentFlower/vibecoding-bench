@@ -10,6 +10,15 @@ use crate::service::request_body_codec::REQUEST_BODY_LIMIT;
 use crate::service::request_session::hash_json;
 
 pub(super) const SERVER_SESSION_PREFIX: &str = "gateway-tools-";
+pub(super) const TITLE_SESSION_PREFIX: &str = "gateway-tools-title-";
+pub(super) const SUGGESTION_SESSION_PREFIX: &str = "gateway-tools-suggestion-";
+
+/// 从辅助轮的执行键取出公开会话。@param session 私有执行键。@return 原公开会话。
+pub(super) fn auxiliary_original_session(session: &str) -> Option<&str> {
+    session
+        .strip_prefix(TITLE_SESSION_PREFIX)
+        .or_else(|| session.strip_prefix(SUGGESTION_SESSION_PREFIX))
+}
 
 /// 按最近一轮区分历史与回传。CLI 会在 user 工具回执后追加 system 上下文。
 /// @param body 原始 Messages 正文。@return 末轮前的消息及末轮切片，均借用原文。
@@ -58,6 +67,24 @@ pub(super) fn has_result(body: &Value) -> bool {
             .iter()
             .any(|message| result_blocks(message).next().is_some())
     })
+}
+
+/// 识别紧随工具组的独立文字指令。@param body 公开 Messages。@return 是否为支持的分叉形状。
+pub(super) fn has_fork_instruction(body: &Value) -> bool {
+    let Some((before, [reply])) = split_last_turn(body) else {
+        return false;
+    };
+    let Some((instruction, results)) = reply["content"].as_array().and_then(|v| v.split_last())
+    else {
+        return false;
+    };
+    before.last().is_some_and(|row| row["role"] == "assistant")
+        && reply["role"] == "user"
+        && !results.is_empty()
+        && results.iter().all(|block| block["type"] == "tool_result")
+        && instruction.as_object().is_some_and(|block| block.len() == 2)
+        && instruction["type"] == "text"
+        && instruction["text"].as_str().is_some_and(|text| !text.trim().is_empty())
 }
 
 fn nonempty(value: &Value) -> Option<&str> {

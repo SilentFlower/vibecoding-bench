@@ -143,6 +143,8 @@ apps/web/src/components/Accounts.vue
 
 `accounts.request_backend TEXT NOT NULL DEFAULT 'legacy'` 同步双库建表、幂等补列、投影、绑定、局部更新及 DTO；账号配置及空闲切换语义由 [按账号选择固定 293 原生后端](service-architecture.md#scenario-按账号选择固定-293-原生后端)所有。
 
+`accounts.tui_system_prompt_policy` 由 SQLite 第 16 版登记迁移及 PostgreSQL 初始化补齐。存储值为 `append`、`replace`、`user_reminder`，缺省追加。管理接口为 `client_system_prompt_policy`。账号切换回 V1 后保留已存的 V2 动作。凭据刷新和省略动作的全量账号更新保持原值。非默认动作写入前核对当前 V2 绑定的发送器能力。
+
 `five_hour_usage_limit_percent`、`seven_day_usage_limit_percent` 的账号字段、双库升级和局部更新合同见 [每账号 5h/7d 用量控制线](service-architecture.md#scenario-每账号-5h7d-用量控制线)。凭据刷新、进程指标更新和状态快捷操作必须保留这两个配置；状态与控制线同时提交时用独立控制线 SQL 避免旧 Account 快照覆盖新凭据或状态。
 
 ## 时间字段
@@ -315,8 +317,15 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - 在网关 Token 鉴权后的精确 `/v1/messages` 及AGY Gemini生成入口建立根请求 UUID；每次真实提交建立独立尝试 UUID。多平台扩展遵循本文的AGY请求记录合同。`count_tokens`、模型目录、Hello、后台遥测不混入此请求尝试链。
 - 下游新增 `X-CC2API-Request-Id` 根 UUID；保留已有 `X-Request-Id`，缺失时补根 UUID。根 UUID、最终响应 ID、上游 `request-id/x-request-id` 可用于列表反查；标准 UUID 和 `req_` 字母数字 ID 保留，其它头值先 SHA256。诊断 ID 不增加到发往上游的业务 headers/body。
 - 尝试记录实际冻结画像 key/选择方式、最终模型/max_tokens/thinking 类型与预算/effort/stream/工具数量、匿名 session/thread、响应模型与消息、stop_reason、六类 token、partial、状态、耗时、重试原因和受控错误阶段/类型。未知字段保留 `null`；累计 usage 使用每字段最大值，5m/1h 缓存写明细不重复加入总量。
+- V2 尝试的 `context.tui_body_source` 取自收到模型帧后的同次私有发送器回执。 `interactive_cli` 表示采用交互 CLI 的实际请求正文，`account_sender` 表示采用账号发送器组装的正文。两种诊断模式均可记录。历史回复、缺少确认的尝试和本地拒绝保持字段缺省。公开响应过滤私有字段。该字段不包含正文，也不代表最终 TLS 写出采集。
+- 同次私有回执可携带 `context.tui_session_origin`。`live_process` 表示原进程承接工具续轮，`new_session` 表示启动时没有载入历史，`disk_resume` 表示载入已登记档案或由持久工具回执核对的恢复前缀，`external_import` 表示本次实际发布并载入外部历史。重复导入命中已有确认分叉时记录 `disk_resume`。该字段不保存文件位置、会话正文或凭据。旧记录和缺少成功模型帧的尝试保持字段缺省。
+- `context.tui_instruction_location` 仅记录普通 Messages 显式非空顶层业务指令在实际选中正文的落点。系统文本为 `system`。在用户直接文本中核对完整提醒为 `user_reminder`。CLI 正文从同次认领的已组装请求核对，旧账号代发从本次实际冻结正文核对。省略、空指令、完整 CC 客户端自带身份、仅消息级 system 和缺少确认的尝试保持字段缺省。旧记录兼容缺省。指令原文不上报管理摘要或公开响应。
 - 根记录包含起止时间、下游状态、最终选中账号、结果、尝试数和可选的会话字段。根状态与尝试实际上游状态分开；中间认证或签名错误不得覆盖后续尝试结果。首字节字段 `ttft_ms` 测量响应头到达耗时，不解释为首个模型文本 token。
+- V2 根记录的 `context.tui_confirmed_model_responses` 仅累计同次私有发送确认的模型帧或可信上游 HTTP 错误。一条已标记的尝试仍可能发生在确认之前。已确认的准备拒绝或发送前拒绝可记录零。只有超时或传输中断的记录保持缺省。存在较早的已确认模型响应时，保留该计数。管理界面的「已确认模型响应数」与「已记录尝试次数」独立呈现。实际投递总数仍取决于后续证据。最终 TLS 写出采集维持未采集。
 - 本地拒绝、模拟和缓存命中有根记录，但无虚构的上游尝试。EOF、末帧、读取错误和 Drop 只终结一次；HTTP 200 内的错误事件与成功区分，缺用量或采样失败标记 `incomplete/partial`。发送错误不伪造上游 HTTP 状态或断言未提交。
+- 下游在网关形成响应前取消时，根记录保持 `cancelled`、`status_code=null`，缺省错误阶段为 `downstream_headers`，管理详情显示「生成响应头前」。响应正文读取期间取消时沿用 `downstream_body`。已经记录的错误阶段和维护中断继续优先。列表和详情将已结束记录的空 HTTP 状态显示为「未观测」。同一记录缺少已记录尝试时，执行节点显示为「节点未观测」。上游提交状态按实际尝试及确认记录独立核对。
+- V2 模型投递前的本地守卫拒绝时，已绑定事件源通过私有 JSON 首帧的 `error_source=tui_cli_input_guard` 标明来源。适用校验包括本轮 SDK 协议版本和 beta、CLI 生成的历史缓存断点和历史管理形状，以及顶层推理强度、自适应显示、固定思考预算和对应的输出上限。sender 只接受对应的 422，并在私有 HTTP 响应转发这一受信标记。管理记录保留按原预留关联的一次 CLI 尝试，根与尝试均为 `local_rejected/tui_cli_input_guard`，已确认模型响应为零，实际提交模型留空。公开响应保留既有 422、错误类型及消息。真正模型 422 仍以实际响应来源记录 `upstream_rejected/upstream_headers`。错误正文、公开请求头及提供方自定义头均不授予守卫归属。
+- 兼容发送路径的历史管理守卫，以及原生路径的工具选择、历史工具图文、空结果、原始文本块和已核对的签名守卫，都在消费冷恢复许可前执行。网关收到上述受信 422 后归还已认领的原工具组，原回执仍须通过主体、会话、工具 ID 和冻结输入核对。真正的模型 422 按原消费语义收口。`verify_tui_context_guard.py --gateway <网关> --sender <发送器>` 在隔离账号容器中核对两种公开表示的同文 422，并验证恢复 CLI 能力后原冷回执仅新增一次投递、成功后重复 400。模型确实返回 422 的冷回执对照重复仍为 400、零新增。
 - 本地 503 的 `error_stage` 由实际失败边界写入：选号为 `account_selection`，凭据解析为 `credentials`，V3 环境/传输绑定准备为 `runtime_prepare`，原生能力检查及原生准备拒绝为 `native_prepare`。`RequestTraceGuard::error` 保留已记录阶段；通用 `AppError::ServiceUnavailable` 缺少边界信息时回退 `gateway`，不能仅凭错误类型归为选号失败。诊断标记不改变响应、准入超时或重试行为。
 - 尝试中的 session/thread/响应消息仅存带账号及标识类型域的 SHA256 前 128 位；线程前驱和响应消息使用同一消息域。只观察既有池解析结果，不能额外 resolve 或刷新 TTL；上游 session 摘要以实际最终 body 为准。
 - `original_session_id` 是管理员关联客户端日志的明文例外。Claude 在入站正文解码后、会话封禁与正文策略前冻结，依次尝试既有 JSON-string/legacy 提取器、`X-Claude-Code-Session-Id`，V3 路径再接受 `X-Session-Id`。反重力 Gemini 读取 `X-Session-Id`。只保存非空白、无控制字符、UTF-8 最多 256 字节的完整值，不 trim 或截断。正文提取值异常时沿原路由并保持诊断原值未知。
@@ -340,6 +349,8 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 | 已核验的反重力工具接续或重读，缺少客户端值 | 记录原工具轮派生键，保留原工具账号归属 |
 | 账号改名 / 删除 / 旧记录缺展示字段 | 查询当前名称邮箱 / LEFT JOIN 保留诊断及 ID，资料为空 / 兼容读取 |
 | 流内错误、读取异常、取消 | 保留部分 token，受控终态，响应原始字节继续透传 |
+| 生成公开响应前取消且缺少已知错误阶段 | `cancelled/downstream_headers`，HTTP 状态为空，保留实际尝试与预留 |
+| V2 历史缓存守卫 422 / 模型返回同形 422 | 均保留一次实际尝试；已确认模型响应分别为 0 / 1，阶段由受信来源决定 |
 | 损坏压缩、采样超限、非法 JSON | `partial=true`，受控错误类型与观察失败计数，不阻断业务 |
 | 队列满、写入或清理失败 | 记录脱敏失败信号，不改变转发/费用，不返回假完整覆盖 |
 | 非法分页、账号、时间或结果筛选 | 400 |
@@ -374,18 +385,51 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - Gateway 现有真实 HTTP 回归：`gateway_usage_records_real_responses_once_without_telemetry` 验证 JSON/SSE/gzip/取消、缓存/count_tokens 与费用次数；签名重试、OAuth 恢复、setup 换号及 `gateway_hello_probe_reuses_resolved_upstream_session` 核对独立尝试、实际画像和会话归属。
 - `raw_body_header_order_and_upstream_error_survive_bridge`：sender 证据保留尝试 UUID，上游业务 headers 不泄漏该 UUID，原字节/头顺序不变。执行 `cargo fmt --check` 与完整 `cargo test --locked`；协议改写变化复用完整测试中的 CCH 回归或补定向验证。
 
+## V2 受管直发零块拒答的诊断
+
+### 1. 适用范围
+
+- 同一已认领模型步骤明确报告 `refusal`，缺少可交付内容及同轮用量，账号事件源以 `502/api_error` 结束公开 JSON 或 SSE 请求。
+
+### 2. 接口
+
+- 受管 Mod 向会话绑定的 `POST /direct-http-reply` 回报 `{"ticket":"…","status":200}`。事件源以当前步骤、预留及一次性票据核对回包。管理详情通过 `GET /admin/request-diagnostics/:request_id` 读取同次记录。
+
+### 3. 契约
+
+- 已绑定事件源的私有 502 使用 `local_provider_event`，并在 `_tui_policy_evidence.stop_reason` 提供 `refusal`。经同次回包票据确认的 HTTP 200 可以写入整数 `_tui_upstream_http_status`。公开 JSON 错误信封过滤这两个私有字段。
+- 根 `status_code=502`。根与尝试阶段为 `transport_error/tui_response_projection`。同一预留的一次尝试记录 `stop_reason=refusal`，模型响应确认计数增加一次。
+
+### 4. 验证和错误矩阵
+
+- 同次票据的实际 HTTP 200 → 尝试 `status_code=200`。
+- 票据无效、旧运行件省略状态、状态值类型不符 → 尝试 `status_code=null`。可独立确认拒答时仍保留 `refusal`。
+- 真实上游 HTTP 502 → 尝试 `status_code=502`，阶段 `upstream_headers`。提供方正文中同名字段无私有归属。
+
+### 5. 观察示例
+
+- 模型 HTTP 200 后发出零块拒答，网关公开 502，管理端分别读取根的 502、尝试的 200 和 `refusal`。缺少同轮用量时各 token 字段为空。缺少可核验的模型响应头耗时和请求 ID 时两项为空。
+- 启用会话封禁后，原主体同会话重试使用既有 `400/session_policy_blocked` 和零新增模型投递。普通空 `end_turn` 通过公开失败的原分支记账，后续同会话问题仍可提交。
+
+### 6. 回归入口
+
+- `verify_tui_installed_direct_stop.py --reason refusal --representation json --empty-refusal-retry`，并将表示切换到 `sse`。逐一核对公开状态、同预留尝试状态、停止原因、空用量、实际投递和后续封禁。
+- 响应投影与诊断 Rust 测试覆盖缺失及畸形状态、上游真 502 和没有模型证据的私有 502。
+
 ## Scenario: Messages 响应的有界事件观察
 
 ### 1. Scope / Trigger
 
 - 修改 `UsageCapture`、响应统计解码、`AttemptTrace`／`SlotGuardBody` 接线或缓冲响应观察时适用；正式用量与独立诊断共用解析和解码实现，各自持有终结责任。
 - 只观察响应副本，不改下游原始 frame、状态、编码头、重试或调度；不扩展为响应保活、补 message_stop、TTFT、请求 codec／CCH、stateful 锚点或自动遥测改造。
+- V2 受管直发 SSE 可在同轮实际用量到达前交付文本。开场占位的来源由已认领响应提供，诊断、账本和接续流共用这一标识。
 
 ### 2. Signatures
 
 - `UsageCapture::configure_codings(&mut self, codings: &[String])`：首块响应前配置既有头解析所得编码；无编码可直接调用 `observe`。
 - `UsageCapture::observe(&mut self, bytes: &[u8])`：逐块输入原始响应；`observe_encoded(&mut self, bytes: &[u8], codings: &[String])` 供已有整包缓冲入口一次性配置并 feed。
 - `UsageCapture::observation(self, complete: bool) -> MessageObservation` 同步返回诊断摘要；`finish(self, complete: bool)` 生成正式用量并异步记录，不等待数据库。
+- `UsageCapture::ignore_opening_usage(&mut self)` 在首块前配置账本观察器。 `AttemptTrace::ignore_opening_usage(&mut self)` 配置诊断持有的观察器。
 - 内部 `ResponseBodyDecoder<W: Write>`：`configure(&mut self, &[String])`、`feed(&mut self, &[u8])`、`finish(&mut self)` 均返回 `Result<(), ResponseDecodeError>`；`take_sink(&mut self) -> Option<W>` 一次性移交末端解析状态。
 - `ResponseDecodeError::{InvalidData, SamplingLimit}` 映射为既有 `decode_error`／`sampling_limit`；事件／JSON 语法或 usage 字段非法沿用 `invalid_payload`，不新增 HTTP 错误或设置。
 
@@ -394,6 +438,8 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - 流首一个 UTF-8 BOM 可跨 chunk；明文首个非空白字符决定 JSON／SSE，前导空白受采样预算限制。JSON 与 SSE 缓冲互斥。
 - SSE 识别 LF、CRLF、CR，跨 chunk 的 CRLF 只结束一行；字段名大小写敏感，按首个冒号划分并去掉值首至多一个 ASCII 空格。注释及无 data 的块忽略，同一事件的多 data 用 LF 连接，空行才派发并做一次 JSON 解析。
 - EOF 不派发残缺 data，缺 message_stop 仍 partial，不主动补帧。完整未知事件忽略非摘要字段，保留 [DONE] 兼容、既有累计最大值、缓存分项和部分费用语义；未知 token 与真实零值分别为 None 与 Some(0)。
+- 直发投影生成开场时在本轮预留标记 `opening_usage_placeholder`。账号事件源可在私有 `200 text/event-stream` 首部 JSON 发布 `{"opening_usage_placeholder": true}`。已绑定的受管发送器核对 `body_source=interactive_cli` 后转为单值私有头 `x-v3-tui-opening-usage-placeholder: 1`。
+- 网关核对同次模型响应来源、单值标识和投影成功后，诊断和账本仅跳过 `message_start` 的 `message.usage`。完整事件中随后出现的真实用量继续参与累计，包含真实零值。公开响应维持原帧格式，私有标识只在内部传递。
 - `USAGE_BUFFER_LIMIT=1 MiB` 分别约束完整 JSON、单个原始 SSE 行和合并后 data；大行／事件丢弃整个事件至下个空行再同步。字节缓冲容量也封顶，SSE 行与事件合计最多 2 MiB；此值不包含解析树、摘要字符串和 allocator 开销。
 - gzip／x-gzip、zlib／raw-deflate、标准 br、zstd 按 Content-Encoding 逆序解码，最多 4 个有效层，identity 不计。支持完整多 gzip member 和多 zstd frame／skippable frame；deflate／br 第二条流作为尾随输入失败。
 - 持久递归 Write 下游直接消费每层输出，末端拥有解析状态，不使用整流 Vec sink／自引用回调／后台无界队列。普通 codec 输出块 8 KiB，gzip 库内暂存 32 KiB；HTTP chunk、gzip member、zstd frame 和 flush 均不等于 SSE 事件或请求终点。
@@ -413,12 +459,15 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 | 未知编码、截断、CRC／Adler／已声明 checksum 错误、非法尾随、超窗口 | decode_error／partial，保留已观察摘要，业务响应继续原样转发 |
 | deflate zlib 头碰撞／晚期失败 | 保守 partial，不新发上游请求或伪造完整 raw 结果 |
 | 缺结束帧／尾空行、body error、下游取消 | 不补事件，不派发残缺 data；已有部分用量仍可折算费用，未知不伪装完整零值 |
+| 私有占位标识缺省、值无效或重复，或响应来源为兼容发送器 | 沿既有用量观察规则；真实开场零值与非零值照常记录 |
+| 已标识开场后截断，且只有开场占位 | 诊断 token 未观测，账本一条 `partial=true`、`cost_usd=null`，两个窗口各计一次部分请求和未定价请求 |
 | EOF／末帧后 Drop／重复终结 | 每次正式调用只记一条用量，根与 attempt 终态不被迟到快照覆盖 |
 
 ### 5. Scenarios and Examples
 
 - 正常：流式 gzip 回复总长超过 1 MiB，但每个事件约 2 KiB，头部 input 与尾部 output 均保留；客户端仍收到同一 gzip 字节。
 - 边界：完整 JSON 或合并后 data 恰好 1 MiB 可观察，SSE 各行仍须在行上限内；多一字节标 partial。gzip 多 member 和 zstd 多 frame 的每个结尾都要验证。
+- 直发样本的模型开场为 37/2，公开读到文本 A 后截断时，以 `api_error` 结束并记录用量未知。相同开场完整交付时，从真实终态记录 37/19 与 `partial=false`。同样完整交付的真实 0/0 保留为已观测零值。单凭公开开场 0/0 判断是否占位会混淆这几组，观察器以已绑定私有标识为准。
 - 错误用法：每条 data 行独立解析 JSON、把整个压缩响应塞入 Vec，或看到 message_stop 就跳过 footer。正确处理：一次配置、逐块 feed、空行派发完整事件、传输收口时验证整个 codec 链。
 
 ```rust
@@ -437,6 +486,7 @@ let observed = capture.observation(complete);
 - `gateway_usage_observes_all_sse_layouts_and_response_codings`、`gateway_usage_long_compressed_responses_keep_head_and_tail`：实际 Gateway＋本地上游＋SQLite／DiagnosticsStore，API／CC、JSON／SSE、两类 >1 MiB 长流，响应逐字节和头匹配，六类 token 与一次计数一致。
 - `gateway_usage_response_failures_preserve_bytes_and_partial_semantics`、`gateway_usage_compressed_cancellation_and_body_error_finalize_once`：CRC／截断／未知／大 JSON／缺 message_stop、已收到前缀后的取消与上游读错、partial／费用／诊断终态及原错误传播。
 - `diagnostics_buffered_compression_uses_the_same_event_observer`：缓冲入口的多 data／CR-only gzip 与 complete=false，原字节不变、一次 attempt、根终态正确。
+- `marked_opening_usage_keeps_unknown_and_real_zero_distinct` 覆盖带标识截断、真实终态零值、真实终态非零和未标识的部分零值。隔离回放核对公开文本及终态、每组单次投递和记账、5h／7d 聚合、私有标识过滤，以及兼容发送器断流 10/1。
 - 完整 Rust 回归继续覆盖请求压缩、CCH、keepalive、定价与历史汇总；改动本规则不需要前端构建或新增数据库迁移。
 
 ## Common Mistakes

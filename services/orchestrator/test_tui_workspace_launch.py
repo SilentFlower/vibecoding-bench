@@ -5,9 +5,12 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
-from tui_workspace_launch import _key, launch_workspace_cli
+from tui_workspace_launch import (
+    IMPORT_BOUNDARY, HistoryReplay, WorkspaceLaunchObservation, _key, _project_history_dir,
+    launch_workspace_cli, publish_workspace_history, read_bound_history,
+)
 
 
 class BoundLaunchTests(TestCase):
@@ -51,14 +54,15 @@ class BoundLaunchTests(TestCase):
         }
         self.config = self.root / "config"
         self.history = (
-            self.config
-            / "projects"
-            / str(self.cwd).replace("/", "-")
+            _project_history_dir(self.config, self.cwd)
             / (self.native + ".jsonl")
         )
         self.history.parent.mkdir(parents=True)
 
-    def _start(self, *, resume=False, who=None, launch=None):
+    def _start(
+        self, *, resume=False, who=None, launch=None, prepare_history=None,
+        recover_incomplete_history=False, observation=None,
+    ):
         command = {
             "action": "send",
             "reservation_id": self.who["reservation_id"],
@@ -74,6 +78,9 @@ class BoundLaunchTests(TestCase):
             resume=resume,
             terminal_fd=0,
             storage=self.root,
+            prepare_history=prepare_history,
+            recover_incomplete_history=recover_incomplete_history,
+            observation=observation,
         )
 
     def test_wrong_subject_session_and_workspace_never_reach_spawn(self):
@@ -96,6 +103,45 @@ class BoundLaunchTests(TestCase):
                 with self.subTest(field=field), self.assertRaises(ValueError):
                     self._start(launch={**self.launch, field: value})
             spawn.assert_not_called()
+
+    def test_read_history_uses_the_original_binding_to_verify_branches(self):
+        """同项目的相邻会话分叉仍由各自绑定确定。@return 无。"""
+        boundary = "a" * 64
+
+        def config(native):
+            return self.root / "tui-sessions" / native / "home" / ".claude"
+
+        def publish(native):
+            return publish_workspace_history(
+                config(native), self.cwd, native, lambda _: False,
+                lambda selected: json.dumps({
+                    "type": "user", "sessionId": selected, "cwd": str(self.cwd), IMPORT_BOUNDARY: boundary,
+                }) + "\n", boundary=boundary,
+            )
+
+        self.assertEqual(publish(self.native), self.native)
+        own_branches = (publish(self.native), publish(self.native))
+        neighbor = str(uuid4())
+        who = {**self.who, "session_id": "相邻会话"}
+        key = _key((self.source, who["session_id"]))
+        record = self.base / (key + ".json")
+        record.write_text(json.dumps({
+            "session_key": key, "client_path": self.client, "native_session_id": neighbor,
+        }))
+        record.chmod(0o600)
+        self.assertEqual(publish(neighbor), neighbor)
+        neighbor_branch = publish(neighbor)
+        name = neighbor_branch + ".jsonl"
+        moved = _project_history_dir(config(self.native), self.cwd) / name
+        moved.write_bytes((_project_history_dir(config(neighbor), self.cwd) / name).read_bytes())
+        moved.chmod(0o600)
+
+        def read(rows):
+            return [row["sessionId"] for row in rows]
+
+        self.assertCountEqual(list(read_bound_history(self.who, self.root, read)),
+                              [[self.native], *([item] for item in own_branches)])
+        self.assertCountEqual(list(read_bound_history(who, self.root, read)), [[neighbor], [neighbor_branch]])
 
     def test_resume_checks_stored_main_chain_and_missing_history(self):
         """缺失、空白或属于别处的原生记录不能恢复。@return 无。"""
@@ -149,18 +195,156 @@ class BoundLaunchTests(TestCase):
     def test_auto_resume_only_when_the_bound_history_exists(self):
         """普通对话结束后重开时恢复原记录，损坏或跨项目的同名历史须报错。@return 无。"""
         with patch("tui_workspace_launch.Popen") as spawn:
-            self._start(resume=None)
+            first = WorkspaceLaunchObservation()
+            self._start(resume=None, observation=first)
+            self.assertEqual(first.origin, "new_session")
             self.assertEqual(spawn.call_args.args[0][-2:], ["--session-id", self.native])
             row = {"type": "assistant", "cwd": str(self.cwd), "sessionId": self.native}
             self.history.write_text(json.dumps(row))
             self.history.chmod(0o600)
-            self._start(resume=None)
+            reopened = WorkspaceLaunchObservation()
+            self._start(resume=None, observation=reopened)
+            self.assertEqual(reopened.origin, "disk_resume")
             self.assertEqual(spawn.call_args.args[0][-2:], ["--resume", str(self.history)])
             self.history.write_text(json.dumps({**row, "cwd": "/other"}))
+            rejected = WorkspaceLaunchObservation()
             with self.assertRaises(ValueError):
-                self._start(resume=None)
+                self._start(resume=None, observation=rejected)
+            self.assertIsNone(rejected.origin)
             self.history.unlink()
             self.history.symlink_to(self.record)
             with self.assertRaises(OSError):
                 self._start(resume=None)
             self.assertEqual(spawn.call_count, 2)
+
+    def test_legacy_receipt_reopens_without_consuming_metadata_only_archive(self):
+        """仅经核对的旧回执可跳过未写主轮的原档。@return 无。"""
+        snapshot = b'{"type":"permission-mode","permissionMode":"dontAsk"}\n'
+        self.history.write_bytes(snapshot)
+        self.history.chmod(0o600)
+        binding = self.record.read_bytes()
+        with patch("tui_workspace_launch.Popen") as spawn:
+            with self.assertRaisesRegex(ValueError, "缺少原生主轮"):
+                self._start(resume=None)
+            with self.assertRaisesRegex(ValueError, "缺少原生主轮"):
+                self._start(resume=True, recover_incomplete_history=True)
+            with self.assertRaisesRegex(ValueError, "缺少原生主轮"):
+                self._start(resume=None, prepare_history=lambda *_: self.native, recover_incomplete_history=True)
+            spawn.assert_not_called()
+
+            self._start(resume=None, recover_incomplete_history=True)
+            option, session = spawn.call_args.args[0][-2:]
+            self.assertEqual((option, UUID(session).version), ("--session-id", 4))
+            self.assertNotEqual(session, self.native)
+            self.assertEqual(self.history.read_bytes(), snapshot)
+            self.assertEqual(self.record.read_bytes(), binding)
+
+            row = {"type": "assistant", "cwd": str(self.cwd), "sessionId": self.native}
+            self.history.write_text(json.dumps(row))
+            self._start(resume=None, recover_incomplete_history=True)
+            self.assertEqual(spawn.call_args.args[0][-2:], ["--resume", str(self.history)])
+            for invalid in (b"{", json.dumps({**row, "cwd": "/other"}).encode()):
+                self.history.write_bytes(invalid)
+                with self.assertRaises(ValueError):
+                    self._start(resume=None, recover_incomplete_history=True)
+            self.history.write_bytes(snapshot)
+            self.history.chmod(0o644)
+            with self.assertRaisesRegex(ValueError, "归属或权限"):
+                self._start(resume=None, recover_incomplete_history=True)
+            self.assertEqual(spawn.call_count, 2)
+
+    def test_import_returns_bound_session_for_standard_restart(self):
+        """首次发布和再次启动均使用经过归属校验的原生记录。@return 无。"""
+        # 真实账号进程继承 0077 umask，历史项目目录须为当前服务私有。
+        self.history.parent.chmod(0o700)
+        self.history.parent.parent.chmod(0o700)
+
+        def prepare(config, work, native_id):
+            self.assertEqual(native_id, self.native)
+            return publish_workspace_history(config, work, native_id, lambda rows: bool(list(rows)), lambda sid: json.dumps(
+                {"type": "user", "cwd": str(work), "sessionId": sid, "message": {"role": "user", "content": "合成历史"}}
+            ) + "\n", boundary="fixture-boundary", observation=observation)
+
+        with patch("tui_workspace_launch.Popen") as spawn:
+            observation = WorkspaceLaunchObservation()
+            self._start(prepare_history=prepare, resume=None, observation=observation)
+            self.assertEqual(observation.origin, "external_import")
+            snapshot = self.history.read_bytes()
+            self.assertEqual(spawn.call_args.args[0][-2:], ["--resume", str(self.history)])
+            self.who = {**self.who, "reservation_id": str(uuid4())}
+            self._start(resume=True)
+            self.assertEqual(spawn.call_args.args[0][-2:], ["--resume", str(self.history)])
+            observation = WorkspaceLaunchObservation()
+            self._start(prepare_history=prepare, resume=None, observation=observation)
+            self.assertEqual(observation.origin, "disk_resume")
+            self.assertEqual(spawn.call_args.args[0][-2:], ["--resume", str(self.history)])
+            self._start(resume=None)
+            self.assertEqual(spawn.call_args.args[0][-2:], ["--resume", str(self.history)])
+            self.assertEqual(spawn.call_count, 4)
+            self.assertEqual(list(self.history.parent.iterdir()), [self.history])
+            self.assertEqual(self.history.read_bytes(), snapshot)
+
+    def test_prepared_session_checks_fork_history_before_launch(self):
+        """回调选中的分支执行与绑定历史一致的校验。@return 无。"""
+        fork_id = str(uuid4())
+        fork = self.history.with_name(fork_id + ".jsonl")
+        row = {"type": "user", "cwd": str(self.cwd), "sessionId": fork_id}
+
+        def prepare(config, work, native_id):
+            self.assertEqual((config, work, native_id), (self.config, self.cwd, self.native))
+            return fork_id
+
+        with patch("tui_workspace_launch.Popen") as spawn:
+            with self.assertRaises(FileNotFoundError):
+                self._start(prepare_history=prepare, resume=None)
+            for invalid in ({**row, "cwd": "/other"}, {**row, "sessionId": self.native}):
+                fork.write_text(json.dumps(invalid))
+                fork.chmod(0o600)
+                for resume in (None, False):
+                    with self.subTest(row=invalid, resume=resume), self.assertRaisesRegex(ValueError, "工作区不匹配"):
+                        self._start(prepare_history=prepare, resume=resume)
+            fork.write_text(json.dumps(row))
+            fork.chmod(0o644)
+            with self.assertRaisesRegex(ValueError, "归属或权限"):
+                self._start(prepare_history=prepare, resume=None)
+            fork.chmod(0o600)
+            with self.assertRaisesRegex(ValueError, "已有历史记录"):
+                self._start(prepare_history=prepare, resume=False)
+            spawn.assert_not_called()
+
+            self._start(prepare_history=prepare, resume=None)
+            self.assertEqual(spawn.call_args.args[0][-2:], ["--resume", str(fork)])
+            fork.unlink()
+            self._start(prepare_history=prepare, resume=False)
+            self.assertEqual(spawn.call_args.args[0][-2:], ["--session-id", fork_id])
+
+    def test_replay_checks_both_the_archive_and_private_prefix(self):
+        """临时前缀与账号档案均通过原生会话归属检查。@return 无。"""
+        fork_id = str(uuid4())
+        archive = self.history.with_name(fork_id + ".jsonl")
+        replay_dir = self.config / "history-replay-fixture"
+        replay_dir.mkdir(mode=0o700)
+        prefix = replay_dir / archive.name
+        row = {"type": "user", "cwd": str(self.cwd), "sessionId": fork_id}
+        prefix.write_text(json.dumps(row))
+        prefix.chmod(0o600)
+
+        def prepare(config, work, native_id):
+            return HistoryReplay(fork_id, prefix)
+
+        with patch("tui_workspace_launch.Popen") as spawn:
+            with self.assertRaises(FileNotFoundError):
+                self._start(prepare_history=prepare, resume=True)
+            archive.write_text(json.dumps(row))
+            archive.chmod(0o600)
+            prefix.write_text(json.dumps({**row, "sessionId": self.native}))
+            with self.assertRaisesRegex(ValueError, "工作区不匹配"):
+                self._start(prepare_history=prepare, resume=True)
+            prefix.write_text(json.dumps(row))
+            replay_dir.chmod(0o755)
+            with self.assertRaisesRegex(ValueError, "目录的归属或权限"):
+                self._start(prepare_history=prepare, resume=True)
+            replay_dir.chmod(0o700)
+            spawn.assert_not_called()
+            self._start(prepare_history=prepare, resume=True)
+            self.assertEqual(spawn.call_args.args[0][-2:], ["--resume", str(prefix)])

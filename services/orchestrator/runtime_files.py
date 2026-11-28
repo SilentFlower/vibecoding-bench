@@ -1,6 +1,7 @@
 """账号运行文件的安全目录访问与原子发布，供管理端和网络角色共用。"""
 from __future__ import annotations
 
+from ctypes import CDLL, c_char_p, c_int, c_uint, get_errno
 import json
 import os
 import uuid
@@ -68,12 +69,23 @@ def atomic_json(path: Path, value: dict, mode: int = 0o600) -> None:
     atomic_text(path, json.dumps(value, ensure_ascii=False), mode)
 
 
-def atomic_text(path: Path, value: str, mode: int = 0o600) -> None:
+def _rename_without_replace(directory: int, source: str, destination: str) -> None:
+    # 账号容器使用 Linux 原子的 RENAME_NOREPLACE。断电或退出时目标文件也只有一条链接。
+    rename = CDLL(None, use_errno=True).renameat2
+    rename.argtypes = (c_int, c_char_p, c_int, c_char_p, c_uint)
+    rename.restype = c_int
+    if rename(directory, os.fsencode(source), directory, os.fsencode(destination), 1) != 0:
+        error = get_errno()
+        raise OSError(error, os.strerror(error), destination)
+
+
+def atomic_text(path: Path, value: str, mode: int = 0o600, *, replace: bool = True) -> None:
     """通过受控目录 fd 原子保存文本，供 JSON 和只读画像共同使用。
 
     :param path: 目标文件。
     :param value: 完整 UTF-8 文本。
     :param mode: 文件权限。
+    :param replace: 是否允许替换已存在的文件。
     :return: None。
     """
     directory = directory_fd(path.parent, create=True)
@@ -87,7 +99,10 @@ def atomic_text(path: Path, value: str, mode: int = 0o600) -> None:
             output.write(value)
             output.flush()
             os.fsync(output.fileno())
-        os.replace(temporary, path.name, src_dir_fd=directory, dst_dir_fd=directory)
+        if replace:
+            os.replace(temporary, path.name, src_dir_fd=directory, dst_dir_fd=directory)
+        else:
+            _rename_without_replace(directory, temporary, path.name)
         os.fsync(directory)
     finally:
         try:

@@ -22,11 +22,12 @@ from urllib.parse import urlsplit
 from uuid import UUID
 
 from runtime_files import atomic_json, atomic_text, directory_fd, private_directory
+from tui_direct_version import DIRECT_CLI_SHA256, DIRECT_CLI_VERSION
 from tui_messages import (
     BODY_LIMIT, MODEL_PROTOCOL_HEADERS, MODEL_VERSION_HEADERS, OAUTH_FILE_LIMIT,
     ModelResponseError, encode, passive_quota_headers, valid_model_header_value,
 )
-from tui_workspace_launch import launch_workspace_cli
+from tui_workspace_launch import WorkspaceLaunchObservation, launch_workspace_cli
 
 
 VERSION = "2.1.293"
@@ -36,6 +37,7 @@ STORAGE = Path("/native")
 GUARD = Path("/opt/flower/tui/tui-guard")
 CONNECT_SHIM = GUARD.with_name("tui-connect.so")
 LOCAL_PROVIDER = Path("/run/v3/tui-local-provider.json")
+DIRECT_ACCOUNT = Path('/run/flower/tui-direct/account.json')
 _OAUTH_FILE_NAME = ".credentials.json"
 ACCOUNT_ORIGIN = "https://api.anthropic.com"
 _program_lock = Lock()
@@ -44,30 +46,32 @@ _SECOND_NS = 1_000_000_000
 _MAX_RETRY_SECONDS = (1 << 64) - 1
 
 
-def _verify_inode(identity: tuple, descriptor: int) -> None:
+def _verify_inode(identity: tuple, descriptor: int, expected: str) -> None:
     global _verified_program
-    # 多个准备线程的 FD 编号各异。同一已核验的只读 inode 只读一次 293 的完整程序。
+    # 多个准备线程的 FD 编号各异。同一已核验的只读 inode 只读一次固定版本程序。
     with _program_lock:
         if identity == _verified_program:
             return
         with os.fdopen(os.dup(descriptor), "rb") as stream:
-            if file_digest(stream, "sha256").hexdigest() != PROGRAM_SHA256:
+            if file_digest(stream, "sha256").hexdigest() != expected:
                 raise ValueError("账号受管 CLI 摘要与 V2 的固定版本不符")
         _verified_program = identity
 
 
 @contextmanager
 def _open_program():
-    if INSTALL.resolve(strict=True) != INSTALL or not (INSTALL / ".ready").is_file():
+    install, expected = ((INSTALL.with_name(DIRECT_CLI_VERSION), DIRECT_CLI_SHA256)
+                         if direct_model_enabled() else (INSTALL, PROGRAM_SHA256))
+    if install.resolve(strict=True) != install or not (install / ".ready").is_file():
         raise ValueError("账号尚未安装 V2 的官方 CLI")
-    path = (INSTALL / "node_modules/.bin/claude").resolve(strict=True)
-    if not path.is_relative_to(INSTALL):
+    path = (install / "node_modules/.bin/claude").resolve(strict=True)
+    if not path.is_relative_to(install):
         raise ValueError("官方 CLI 程序越过账号固定版本目录")
     with path.open("rb") as stream:
         info = os.fstat(stream.fileno())
         if not S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
             raise ValueError("官方 CLI 文件归属或权限不符")
-        _verify_inode((info.st_dev, info.st_ino, info.st_ctime_ns, info.st_size), stream.fileno())
+        _verify_inode((info.st_dev, info.st_ino, info.st_ctime_ns, info.st_size, expected), stream.fileno(), expected)
         yield path, stream.fileno()
 
 
@@ -180,6 +184,53 @@ def managed_oauth_enabled() -> bool:
     return os.environ.get("V3_TUI_MANAGED_OAUTH") == "1"
 
 
+def _managed_policy_enabled() -> bool:
+    return os.environ.get("V3_TUI_MANAGED_POLICY") == "1"
+
+
+def direct_model_enabled() -> bool:
+    """报告本角色的独立直发选择。@return 控制端是否绑定了直发。"""
+    return os.environ.get("V3_TUI_DIRECT") == "1"
+
+
+def _sender_config():
+    return json.loads(Path(os.environ.get("V3_SENDER_CONFIG", "/run/v3/sender.json")).read_bytes())
+
+
+def _check_direct_policy(config):
+    policy = config.get("tui_managed_policy") or {}
+    engine = Path(__file__).with_name("tui-direct-mod") / "hooks/engine.js"
+    if (config.get("tui_direct") is not True or not _managed_policy_enabled()
+            or not policy.get("managed_order") or policy.get("direct_hook_sha256") != sha256(engine.read_bytes()).hexdigest()):
+        raise ValueError("账号直发缺少同发行的管理员 Mod")
+    with os.fdopen(os.open(DIRECT_ACCOUNT, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), 'rb') as source:
+        info = os.fstat(source.fileno())
+        if not S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_nlink != 1 or info.st_mode & 0o022:
+            raise ValueError('直发开关须由部署管理员发布')
+        target = json.load(source)
+    if (not isinstance(target, dict) or type(target.get('account_id')) is not int
+            or any(target.get(key) != config['binding'][key] for key in ('account_id', 'environment_id'))):
+        raise ValueError('原账号的直发开关已关闭或改变')
+
+
+def _bound_sender(reservation: dict) -> tuple[dict, dict]:
+    config = _sender_config()
+    binding = config["binding"]
+    identity = {name: reservation[name] for name in ("account_id", "environment_id", "generation")}
+    if any(binding[name] != value for name, value in identity.items()) or config.get("allowed_origin") != ACCOUNT_ORIGIN:
+        raise ValueError("V2 模型投递的账号绑定已变化")
+    return config, identity
+
+
+def direct_proxy(reservation: dict) -> str:
+    """取本轮已校验账号的冻结代理配置。@param reservation 同轮预留。@return 账号代理 URL。"""
+    config, _ = _bound_sender(reservation)
+    if not direct_model_enabled():
+        raise ValueError("账号未选定直发")
+    _check_direct_policy(config)
+    return config["proxy_url"]
+
+
 class _ObservedHTTPConnection(HTTPConnection):
     """保留由 HTTPConnection 编码的请求头顺序，包括其自动生成的字段。"""
 
@@ -265,11 +316,8 @@ def managed_model_response(
     @param reservation 受信预留。@param headers 已核对的模型头。@param capture 可选脱敏采集。
     @return 流式上游响应。
     """
-    config = json.loads(Path(os.environ.get("V3_SENDER_CONFIG", "/run/v3/sender.json")).read_bytes())
+    config, identity = _bound_sender(reservation)
     binding = config["binding"]
-    identity = {name: reservation[name] for name in ("account_id", "environment_id", "generation")}
-    if any(binding[name] != value for name, value in identity.items()) or config.get("allowed_origin") != ACCOUNT_ORIGIN:
-        raise ValueError("V2 模型投递的账号绑定已变化")
     beta = headers.get("anthropic-beta", "")
     tokens = [part.strip() for part in beta.split(",") if part.strip()]
     if reservation.get("model_header_policy") == 1:
@@ -332,10 +380,10 @@ def managed_model_response(
             yield response
 
 
-@lru_cache(maxsize=2)
-def _guard_usable(identity: tuple, oauth: bool = False) -> bool:
+@lru_cache(maxsize=3)
+def _guard_usable(identity: tuple, check: str) -> bool:
     # 不同镜像的程序有不同 inode；缺失内核权限或制品时保持未就绪。
-    return run([GUARD, "--check-oauth" if oauth else "--check"], stdin=DEVNULL,
+    return run([GUARD, check], stdin=DEVNULL,
                stdout=DEVNULL, stderr=DEVNULL, check=False).returncode == 0
 
 
@@ -372,10 +420,16 @@ def _loopback_channel(port: int | None):
 def account_ready() -> bool:
     """核验当前角色的本机开发后端、官方程序和隔离能力。@return 是否可接受本机预留。"""
     try:
+        if direct_model_enabled():
+            _check_direct_policy(_sender_config())
         official_program()
         info = GUARD.stat()
         oauth = managed_oauth_enabled()
-        if not _guard_usable((info.st_dev, info.st_ino, info.st_ctime_ns), oauth):
+        managed_policy = _managed_policy_enabled()
+        if managed_policy and not oauth:
+            return False
+        check = "--check-managed-policy" if managed_policy else "--check-oauth" if oauth else "--check"
+        if not _guard_usable((info.st_dev, info.st_ino, info.st_ctime_ns), check):
             return False
         if oauth:
             _loopback_broker()
@@ -498,6 +552,10 @@ def launch_session(
     environment: dict[str, str], resume: bool | None, terminal_fd: int, mod_dir: Path,
     model_endpoint: tuple[str, str] | None = None,
     oauth_file: bool = False,
+    prepare_history=None,
+    media_fd: int | None = None,
+    recover_incomplete_history: bool = False,
+    observation: WorkspaceLaunchObservation | None = None,
 ) -> Popen:
     """用账号内核限定工作区后，在真实 PTY 上运行固定版本。
 
@@ -511,11 +569,29 @@ def launch_session(
     @param mod_dir 只属于本原生会话的受信任 Mod 目录。
     @param model_endpoint 会话回环端点与本次使用的账号凭据或开发口令。
     @param oauth_file 是否启用独占账号刷新与完整文件。
+    @param prepare_history 可选，同一会话的外部历史导入函数。
+    @param media_fd 可选，本会话私有图像暂存目录的 O_PATH 描述符。
+    @param recover_incomplete_history 仅旧工具账本已核对原回执时，允许为缺少主轮的原档另开 CLI。
+    @param observation 可选，本轮实际启动的会话来源。
     @return 直属交互进程，退出由账号执行器回收。
     """
     home, mod = session_paths(command)
     if config_dir != home / ".claude" or mod_dir != mod:
         raise ValueError("交互进程的配置或 Mod 不属于当前会话")
+    direct = direct_model_enabled()
+    managed_guard = []
+    if _managed_policy_enabled():
+        if not managed_oauth_enabled() or not oauth_file:
+            raise ValueError("Claude 托管策略需要本轮的完整账号凭据")
+        config, identity = _bound_sender(reservation)
+        policy = config.get("tui_managed_policy")
+        if not isinstance(policy, dict) or any(policy.get(name) != identity[name] for name in ("account_id", "environment_id")):
+            raise ValueError("Claude 托管策略的账号环境绑定已变化")
+        if direct:
+            _check_direct_policy(config)
+        managed_guard = ["--managed-policy"]
+    elif direct:
+        raise ValueError("账号直发需要管理员托管策略")
     if managed_oauth_enabled():
         url, bearer = model_endpoint
         target = urlsplit(url)
@@ -528,6 +604,9 @@ def launch_session(
             # 模型与 Mod 走原回环。外部 OAuth 连接在当前回环监听的 CONNECT 入口终止。
             proxy = f"http://127.0.0.1:{target.port}"
             auth.update(HTTP_PROXY=proxy, HTTPS_PROXY=proxy, NO_PROXY="127.0.0.1,localhost")
+            if direct:
+                url = ACCOUNT_ORIGIN
+                auth["FLOWER_TUI_DIRECT_BINDING"] = str(config_dir / "flower-direct.json")
         else:
             auth["CLAUDE_CODE_OAUTH_TOKEN"] = bearer
     else:
@@ -539,16 +618,21 @@ def launch_session(
         auth = {"ANTHROPIC_AUTH_TOKEN": bearer}
     with (_open_program() as (_, fd),
           _loopback_channel(target.port if oauth_file else None) as (network_guard, network_fds)):
+        media_guard = [f"--media-fd={media_fd}"] if media_fd is not None else []
+        media_fds = (media_fd,) if media_fd is not None else ()
         return launch_workspace_cli(
             reservation, command, program=GUARD,
-            arguments=[*network_guard, str(home), str(mod), f"/proc/self/fd/{fd}", *arguments],
+            arguments=[*network_guard, *managed_guard, *media_guard, str(home), str(mod), f"/proc/self/fd/{fd}", *arguments],
             config_dir=config_dir, environment={
-                **{k: environment[k] for k in ("CLAUDE_CODE_MAX_OUTPUT_TOKENS", "MAX_THINKING_TOKENS")
+                **{k: environment[k] for k in ("CLAUDE_CODE_MAX_OUTPUT_TOKENS", "MAX_THINKING_TOKENS",
+                                               "CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING", "DISABLE_PROMPT_CACHING")
                    if k in environment},
                 "HOME": str(home), "TMPDIR": str(home / "tmp"), "PATH": "/usr/bin:/bin",
                 "SHELL": "/bin/bash", "LANG": "C.UTF-8", "TERM": "xterm-256color",
                 "ANTHROPIC_BASE_URL": url, **auth,
             }, resume=resume, terminal_fd=terminal_fd, storage=STORAGE, program_fd=fd,
-            inherited_fds=network_fds,
+            inherited_fds=(*network_fds, *media_fds),
             initialize_profile=lambda work: _initialize_local_profile(config_dir, work),
+            prepare_history=prepare_history, recover_incomplete_history=recover_incomplete_history,
+            observation=observation,
         )

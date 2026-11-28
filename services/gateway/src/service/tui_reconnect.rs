@@ -19,9 +19,9 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc, watch};
 use tokio::time::{Instant, sleep_until};
 
 use super::diagnostics;
-use super::request_session::hash_json;
+use super::request_session::{hash_json, hash_json_object};
 use super::runtime_transport::{
-    TuiBodyPolicy, tui_agent_header, tui_cli_format, tui_model_headers,
+    TuiBodyPolicy, has_tui_billing_marker, tui_agent_header, tui_cli_format, tui_model_headers,
 };
 use super::system_update::{InferenceCutover, UpdateActivity};
 use super::tui_native_drain::Delivery;
@@ -77,8 +77,57 @@ pub(super) fn key(
         ]),
         false,
     );
-    hash_json(&mut hash, body, false);
+    if !native
+        && !has_tui_billing_marker(body)
+        && let Some(fields) = body.as_object()
+        && let Some(tools) = fields.get("tools").and_then(Value::as_array)
+    {
+        let default_choice = !tools.is_empty()
+            && fields.get("tool_choice").is_some_and(|choice| {
+                *choice == json!({"type": "auto"})
+                    || *choice == json!({"type": "auto", "disable_parallel_tool_use": false})
+            });
+        // 普通工具的默认选择与类型只在响应索引归一，保持发往发送器的原正文。
+        hash_json_object(
+            &mut hash,
+            fields
+                .iter()
+                .filter(|(key, _)| *key != "tools" && !(default_choice && *key == "tool_choice")),
+            false,
+        );
+        hash.update(b"[");
+        for tool in tools {
+            hash_receipt_tool(&mut hash, tool);
+        }
+        hash.update(b"]");
+    } else {
+        hash_json(&mut hash, body, false);
+    }
     Ok(hash.finalize().into())
+}
+
+fn hash_receipt_tool(hash: &mut Sha256, tool: &Value) {
+    if let Some(fields) = tool.as_object()
+        && tool["type"] == "custom"
+        && fields.keys().all(|key| {
+            matches!(
+                key.as_str(),
+                "type" | "name" | "input_schema" | "description"
+            )
+        })
+        && tool["name"].as_str().is_some_and(|name| {
+            !name.is_empty()
+                && name
+                    .bytes()
+                    .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, b'_' | b'-'))
+        })
+        && tool["input_schema"].is_object()
+        && fields.get("description").is_none_or(Value::is_string)
+    {
+        hash_json_object(hash, fields.iter().filter(|(key, _)| *key != "type"), false);
+    } else {
+        hash_json(hash, tool, false);
+    }
 }
 
 #[derive(Clone)]
@@ -180,8 +229,33 @@ impl Reconnects {
     }
 }
 
-#[derive(Clone, Default)]
-pub(super) struct BeforeHeaders(Arc<Mutex<Option<(Weak<Reply>, Arc<Delivery>)>>>);
+#[derive(Clone)]
+pub(super) struct BeforeHeaders {
+    submitted: Arc<Mutex<Option<PendingSubmission>>>,
+    state: watch::Sender<HeaderWait>,
+}
+
+struct PendingSubmission {
+    reply: Weak<Reply>,
+    delivery: Arc<Delivery>,
+    trace: Option<diagnostics::TraceContext>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum HeaderWait {
+    Waiting,
+    Expired,
+    Detached,
+}
+
+impl Default for BeforeHeaders {
+    fn default() -> Self {
+        Self {
+            submitted: Default::default(),
+            state: watch::channel(HeaderWait::Waiting).0,
+        }
+    }
+}
 
 struct PendingHeaders {
     operation: Option<Pin<Box<dyn Future<Output = Response> + Send>>>,
@@ -221,24 +295,57 @@ async fn no_readers(mut readers: watch::Receiver<Readers>) {
 impl BeforeHeaders {
     /// 在实际提交边界登记可接回的唯一生成。@param writer 本轮写者。@param delivery 数据库步骤。
     pub(super) fn submitted(&self, writer: &Writer, delivery: &Arc<Delivery>) {
-        *self.0.lock().unwrap() = Some((Arc::downgrade(&writer.reply), delivery.clone()));
+        *self.submitted.lock().unwrap() = Some(PendingSubmission {
+            reply: Arc::downgrade(&writer.reply),
+            delivery: delivery.clone(),
+            trace: diagnostics::current_trace(),
+        });
+    }
+
+    /// 公共等待已到期时，等原读者离开，再收取同一个私有响应。@return 无。
+    pub(super) async fn public_timeout(&self) {
+        let mut state = self.state.subscribe();
+        self.state.send_if_modified(|state| {
+            if *state != HeaderWait::Waiting {
+                return false;
+            }
+            *state = HeaderWait::Expired;
+            true
+        });
+        let _ = state.wait_for(|state| *state == HeaderWait::Detached).await;
     }
 
     /// 在公开连接上执行，只有已提交的工具轮才在连接断开时继续等待原回复。
-    /// @param future 已鉴权请求。@param cutover 维护取消信号。@return 公开响应。
+    /// @param future 已鉴权请求。@param cutover 维护取消信号。
+    /// @param timeout 已确定的公开超时响应。@return 公开响应。
     pub(super) async fn run(
         self,
         future: impl Future<Output = Response> + Send + 'static,
         cutover: Option<InferenceCutover>,
+        timeout: impl FnOnce() -> Response,
     ) -> Response {
+        let mut state = self.state.subscribe();
         let mut pending = PendingHeaders {
             operation: Some(Box::pin(future)),
             owner: self,
             cutover,
         };
-        let response = pending.operation.as_mut().unwrap().await;
-        pending.operation.take();
-        response
+        tokio::select! {
+            response = pending.operation.as_mut().unwrap() => {
+                pending.operation.take();
+                response
+            }
+            _ = state.wait_for(|state| *state == HeaderWait::Expired) => {
+                let trace = pending.owner.submitted.lock().unwrap().as_ref()
+                    .and_then(|submitted| submitted.trace.clone());
+                let response = timeout();
+                match trace {
+                    Some(trace) => trace.finish_tui_header_timeout(response),
+                    None => response,
+                }
+                // PendingHeaders 在返回前把同一个私有请求移交给后台。
+            }
+        }
     }
 }
 
@@ -247,7 +354,10 @@ impl Drop for PendingHeaders {
         let Some(operation) = self.operation.take() else {
             return;
         };
-        let Some((reply, delivery)) = self.owner.0.lock().unwrap().take() else {
+        let Some(PendingSubmission {
+            reply, delivery, ..
+        }) = self.owner.submitted.lock().unwrap().take()
+        else {
             return;
         };
         let Some(reply) = reply.upgrade() else { return };
@@ -256,6 +366,7 @@ impl Drop for PendingHeaders {
             out.disconnected = true;
             out.original.take();
         }
+        self.owner.state.send_replace(HeaderWait::Detached);
         let mut cutover = self.cutover.take();
         tokio::spawn(async move {
             let cancel = async {
@@ -481,12 +592,17 @@ impl Drop for Writer {
     fn drop(&mut self) {
         self.release_entry();
         let mut out = self.reply.output.lock().unwrap();
-        if !out.complete {
+        let pending = !out.complete;
+        if pending {
             out.failed = true;
             out.complete = true;
         }
         out.readers.clear();
         self.reply.changed.send_replace(());
+        drop(out);
+        if pending {
+            diagnostics::tui_reply_event("gateway_tui_reply_cache", "no_reply");
+        }
     }
 }
 
@@ -585,17 +701,26 @@ impl Writer {
             if cancelled && let Err(error) = delivery.cancel().await {
                 tracing::warn!(%error,"维护取消的工具回执待核对");
             }
-            {
+            let cached = {
                 let mut out = self.reply.output.lock().unwrap();
                 out.complete = true;
                 out.failed = !complete;
                 out.readers.clear();
                 self.reply.changed.send_replace(());
-            }
+                complete && out.disconnected && !out.overflow
+            };
             if !complete {
                 // 已知残缺的前缀不能交给重试。用量收口可能等待数据库，新的恢复继续走原绑定核验。
                 self.release_entry();
             }
+            let cache_result = if cached {
+                "ready"
+            } else if complete {
+                "not_replayable"
+            } else {
+                "incomplete"
+            };
+            diagnostics::tui_reply_event("gateway_tui_reply_cache", cache_result);
             if let Some(usage) = usage {
                 usage.finish(complete).await;
             }
@@ -617,8 +742,121 @@ impl Writer {
 
 #[cfg(test)]
 mod tests {
-    use super::{GRACE, Reconnects, Reservation};
+    use axum::http::HeaderMap;
+    use serde_json::json;
     use tokio::time::Instant;
+
+    use super::{GRACE, Reconnects, Reservation, key};
+
+    /// 只合并声明工具的普通回执的三种默认 auto 形状。
+    #[test]
+    fn ordinary_auto_receipt_reconnect_identity() {
+        let headers = HeaderMap::new();
+        let reconnect = |principal, session, body: &_, native| {
+            key(
+                principal,
+                Some(session),
+                body,
+                &headers,
+                native,
+                Default::default(),
+                "",
+            )
+            .unwrap()
+        };
+        let bare = json!({"tools": [{"name": "LookupNote"}], "tool_choice": {"type": "auto"}, "stream": true});
+        let mut explicit = bare.clone();
+        explicit["tool_choice"]["disable_parallel_tool_use"] = json!(false);
+        let mut omitted = bare.clone();
+        omitted.as_object_mut().unwrap().remove("tool_choice");
+        let original = reconnect(1, "same-session", &omitted, false);
+        assert_eq!(original, reconnect(1, "same-session", &bare, false));
+        assert_eq!(original, reconnect(1, "same-session", &explicit, false));
+        assert_ne!(original, reconnect(2, "same-session", &explicit, false));
+        assert_ne!(original, reconnect(1, "other-session", &explicit, false));
+        let index = Reconnects::default();
+        let _writer = index.reserve(original, 1, "binding").unwrap();
+        let equivalent = reconnect(1, "same-session", &explicit, false);
+        assert!(index.reserve(equivalent, 2, "binding").is_err());
+        assert!(index.reserve(equivalent, 1, "different-binding").is_err());
+        assert_ne!(
+            reconnect(1, "same-session", &omitted, true),
+            reconnect(1, "same-session", &explicit, true)
+        );
+        let mut billed_omitted = omitted.clone();
+        let mut billed_explicit = explicit.clone();
+        let billing = json!([{"type": "text", "text": "x-anthropic-billing-header: cc_version=2.1.293.abc; cc_entrypoint=cli;"}]);
+        billed_omitted["system"] = billing.clone();
+        billed_explicit["system"] = billing;
+        assert_ne!(
+            reconnect(1, "same-session", &billed_omitted, false),
+            reconnect(1, "same-session", &billed_explicit, false)
+        );
+        for changed in [json!(true), json!(0), json!(null)] {
+            explicit["tool_choice"]["disable_parallel_tool_use"] = changed;
+            assert_ne!(original, reconnect(1, "same-session", &explicit, false));
+        }
+        explicit["tool_choice"] = json!(null);
+        assert_ne!(original, reconnect(1, "same-session", &explicit, false));
+        explicit["tool_choice"] = json!({"type": "auto", "disable_parallel_tool_use": false});
+        explicit["stream"] = json!(false);
+        assert_ne!(original, reconnect(1, "same-session", &explicit, false));
+        let no_tools = json!({"tools": [], "stream": true});
+        let mut no_tools_auto = no_tools.clone();
+        no_tools_auto["tool_choice"] = json!({"type": "auto"});
+        assert_ne!(
+            reconnect(1, "same-session", &no_tools, false),
+            reconnect(1, "same-session", &no_tools_auto, false)
+        );
+    }
+
+    /// 原样和等价类型共用响应索引，真实类型、schema 和归属差异保持独立。
+    #[test]
+    fn ordinary_custom_tool_receipt_reconnect_identity() {
+        let headers = HeaderMap::new();
+        let reconnect = |principal, session, body: &_, native| {
+            key(
+                principal,
+                Some(session),
+                body,
+                &headers,
+                native,
+                Default::default(),
+                "",
+            )
+            .unwrap()
+        };
+        let tool = json!({"name": "LookupNote", "input_schema": {"type": "object", "additionalProperties": false}});
+        let mut second = tool.clone();
+        second["name"] = json!("SetTag");
+        let mut first_custom = tool.clone();
+        first_custom["type"] = json!("custom");
+        let mut second_custom = second.clone();
+        second_custom["type"] = json!("custom");
+        let original = json!({"tools": [first_custom, second], "stream": true});
+        let equivalent = json!({
+            "tools": [tool, second_custom], "tool_choice": {"type": "auto"}, "stream": true
+        });
+        let original_key = reconnect(1, "original", &original, false);
+        assert_eq!(original_key, reconnect(1, "original", &equivalent, false));
+        assert_ne!(original_key, reconnect(2, "original", &equivalent, false));
+        assert_ne!(original_key, reconnect(1, "other", &equivalent, false));
+        assert_ne!(
+            reconnect(1, "original", &original, true),
+            reconnect(1, "original", &equivalent, true)
+        );
+        let mut changed = equivalent.clone();
+        changed["tools"].as_array_mut().unwrap().swap(0, 1);
+        assert_ne!(original_key, reconnect(1, "original", &changed, false));
+        changed = equivalent.clone();
+        changed["tools"][0]["input_schema"]["additionalProperties"] = json!(0);
+        assert_ne!(original_key, reconnect(1, "original", &changed, false));
+        for kind in [json!(null), json!("text_editor_20250728")] {
+            changed = equivalent.clone();
+            changed["tools"][0]["type"] = kind;
+            assert_ne!(original_key, reconnect(1, "original", &changed, false));
+        }
+    }
 
     /// 拒绝超预算的重连后，原空闲截止时间和观察通知均保持一致。
     #[tokio::test]

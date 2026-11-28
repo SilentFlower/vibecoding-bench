@@ -51,6 +51,8 @@ from runtime_names import account_container_prefix
 from storage_maintenance import deduplicate_immutable_tree
 from system_update_gate import UPDATE_GATE, update_open
 from system_update_contract import safe_read, strict_json
+from tui_direct_version import DIRECT_CLI_VERSION
+from tui_managed_policy import direct_account_selected, managed_policy
 from system_profile import (MAX_CPUINFO_BYTES, generate_computer_profile, generate_system_profile,
     render_computer_profile, render_system_profile, validate_computer_profile, validate_system_profile,
     verify_computer_profile, verify_system_profile)
@@ -903,9 +905,18 @@ class AccountRuntime:
                           if image_labels.get('vibebench.tui-session-host') == '1' and account.get('cc2api_account_id') else None)
             tui_managed_oauth = bool(tui_budget and supports_managed_tui
                                     and not (root / 'runtime/sender/tui-local-provider.json').is_file())
+            tui_policy = managed_policy(self.data, account_id=account.get('cc2api_account_id'),
+                                        environment_id=row['environment_id'])
+            if tui_policy and (not tui_managed_oauth or image_labels.get('vibebench.tui-managed-policy') != '1'):
+                raise ValueError('Claude 托管策略需要同批正式账号镜像和受管 OAuth sender')
+            tui_direct = bool(tui_policy and direct_account_selected(self.data, account_id=account.get('cc2api_account_id'),
+                                                                     environment_id=row['environment_id']))
+            if tui_direct and (not tui_policy or not tui_policy['managed_order'] or not tui_policy['direct_hook_sha256']
+                               or image_labels.get('vibebench.tui-direct-protocol') != '1'):
+                raise ValueError('直发需要同批账号镜像及保留内建 guard 的管理员 Mod')
             account = {**account, "native_sender": native, "native_migration": native_migration,
                        'tui_transport': tui_transport, 'tui_host_memory': tui_budget,
-                       'tui_managed_oauth': tui_managed_oauth}
+                       'tui_managed_oauth': tui_managed_oauth, 'tui_managed_policy': tui_policy, 'tui_direct': tui_direct}
             if native and image_labels.get("vibebench.native-runtime") != "293-raw-1":
                 raise ValueError("账号镜像缺少固定 293 原生能力")
             configuration = None
@@ -941,11 +952,16 @@ class AccountRuntime:
                         # 内核选择属于 sender 进程代次；只有部署预算及路径变化才要求重建角色。
                         actual_native = native_resource_layout(actual_native)
                     restore = restore_policy(native, fingerprint, image_labels.get('vibebench.native-criu') == '1')
-                    if (prepare_sender or not any(current.status == 'running' for current in containers.values())) and (actual_native != native
+                    running = any(current.status == 'running' for current in containers.values())
+                    policy_changed = (configuration.get('tui_managed_policy') != tui_policy
+                                      or bool(configuration.get('tui_direct')) != tui_direct)
+                    if policy_changed and running:
+                        raise RuntimeBusy('Claude 托管策略已变更，请先排空并停止当前账号环境')
+                    if policy_changed or ((prepare_sender or not running) and (actual_native != native
                             or configuration.get('tui_host_memory') != tui_budget
                             or bool(configuration.get('tui_managed_oauth')) != tui_managed_oauth
                             or bool(configuration.get('native_criu_enabled')) != restore['eligible']
-                            or configuration.get("native_capture_dir") != ("/flows/api/cc-prepared" if (native or tui_budget) and capture_enabled(fingerprint) else None)):
+                            or configuration.get("native_capture_dir") != ("/flows/api/cc-prepared" if (native or tui_budget) and capture_enabled(fingerprint) else None))):
                         if startup_prewarm:
                             raise RuntimeBusy("后台预启动跳过需要重建的账号环境")
                         if pending_upgrade(root) or self.environment_jobs(row["environment_id"]) or self._running_sender_active(row):
@@ -1045,6 +1061,8 @@ class AccountRuntime:
         # 只有具备运行额度且已装配同容器 TUI 时，才首次安装其固定版本。
         if tui_budget and not (root / 'cli/2.1.293/.ready').is_file() and version != '2.1.293':
             self._ensure_version(container, '2.1.293')
+        if tui_direct and not (root / 'cli' / DIRECT_CLI_VERSION / '.ready').is_file() and version != DIRECT_CLI_VERSION:
+            self._ensure_version(container, DIRECT_CLI_VERSION)
         # 版本缓存准备不持有环境生命周期锁。
         if version is not None:
             self.check_system_profile(row, container)

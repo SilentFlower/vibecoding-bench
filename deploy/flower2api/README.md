@@ -176,6 +176,32 @@ python3 deploy/flower2api/verify_forwarding.py --manifest /absolute/path/v3-veri
 
 官方 Claude Code CLI 的遥测和错误上报默认关闭，配置 `V3_CLI_TELEMETRY=off|on`，空值按 `off` 处理。`off` 为受控 CLI 设置和执行环境写入 `DISABLE_TELEMETRY=1`、`DISABLE_ERROR_REPORTING=1`；`on` 移除这两个关闭键，恢复官方默认许可。任务、养号、项目及交互 CLI 在下次启动时应用策略。CLI 自动更新继续由平台单独关闭。原生发送栈的遥测设置沿其自身配置。
 
+### 结构化工具轮的镜像内置运行件验收
+
+使用同一批额外 CA 验证清单和固定 2.1.293 CLI 卷。夹具只将控制镜像的网关二进制挂入账号容器，账号发送器与事件源直接使用镜像内的制品。两个场景依次核对活跃续轮与结束原 CLI、重启发送器后的恢复。
+
+```bash
+manifest=/absolute/path/verification-manifest.json
+cli=/absolute/path/cli
+control=$(jq -er '.images.control.digest' "$manifest")
+account=$(jq -er '.images.account.digest' "$manifest")
+runtime=$(mktemp -d)
+control_container=$(docker create --pull never "$control")
+trap 'docker rm "$control_container" >/dev/null; rm -r "$runtime"' EXIT
+docker cp "$control_container:/app/claude-code-gateway" "$runtime/claude-code-gateway"
+
+for mode in live restart; do
+  docker run --rm --pull never --init --network none --tmpfs /tmp:rw,nosuid,nodev,mode=1777 \
+    -v "$PWD:/checkout:ro" -v "$cli:/cli:ro" \
+    -v "$runtime/claude-code-gateway:/verification/claude-code-gateway:ro" \
+    --entrypoint python3 "$account" -B /checkout/deploy/flower2api/verify_tui_cold_history.py \
+    --gateway /verification/claude-code-gateway --sender /usr/local/bin/account-sender \
+    --structured-output-tool-round "$mode" --installed-runtime || exit
+done
+```
+
+在仓库根目录执行。结果的公开状态、预留与尝试、发送路径及恢复方式来自网关与管理诊断，正文摘要和工具结果来自隔离 HTTPS 模型实收。源码观察模式另外提供 CLI 回调原始摘要、回调的 format 字段有无以及回调与认领正文字节的比较。
+
 ## 完整开发周期的外接需求方
 
 内容 schema 3 的新批次需要给 orchestrator 配置 `PROJECT_REQUESTER_BASE_URL=https://ai.flower-cli.com/v1`、`PROJECT_REQUESTER_MODEL=gemini-3-flash-agent`、`PROJECT_REQUESTER_FALLBACK_MODEL=deepseek-flash` 和受保护的 `PROJECT_REQUESTER_API_KEY`。沿用部署 env 的权限保护方式；环境值用于初始配置；项目页也可动态编辑一个 Base URL、私有密钥和 1～8 个有序模型，保存后无需重启。页面覆盖以 0600 原子存入 `bench/settings/project-requester.json`，API 只返回密钥是否已配置，留空保存沿用当前密钥，并可恢复环境配置。密钥不传给账号 CLI、sender 或浏览器响应。未配置或配置不合法时拒绝新完整任务，历史批次仍可读。

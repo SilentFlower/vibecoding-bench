@@ -4,7 +4,7 @@ import json
 import unittest
 
 from tui_input_policy import InputRejection
-from tui_messages import input_message
+from tui_messages import MessageInputObservation, input_message
 
 
 class InputPolicyTests(unittest.TestCase):
@@ -108,6 +108,20 @@ class InputPolicyTests(unittest.TestCase):
             )
         with self.assertRaisesRegex(InputRejection, "invalid_native_request"):
             input_message(json.dumps(self.native), native="claude_code_280")
+
+    def test_sender_instruction_location_uses_ordinary_top_level_system(self):
+        """代发观测只使用实际普通顶层文本。@return 无。"""
+        for body, expected in (
+            (self.body, None),
+            ({**self.body, "system": "  "}, None),
+            ({**self.body, "system": [{"type": "text", "text": "业务指令"}]}, "system"),
+            (self.native, None),
+        ):
+            with self.subTest(expected=expected, native=body is self.native):
+                observed = MessageInputObservation()
+                input_message(json.dumps(body), native="claude_code_293" if body is self.native else False,
+                              observation=observed)
+                self.assertEqual(observed.instruction_location, expected)
 
     def test_api_and_context_message_system_blocks(self):
         """业务 system 依 V1 的普通构造与显式消息级 system 区分；不以系统提示冒充原生。@return 无。"""

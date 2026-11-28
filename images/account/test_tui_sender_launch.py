@@ -1,6 +1,7 @@
 """用部署者拥有的合成配置检查本机提供方的地址和文件归属边界。"""
 
 from base64 import b64decode
+from contextlib import nullcontext
 from http.client import HTTPConnection, HTTPResponse
 import json
 import os
@@ -21,6 +22,39 @@ import tui_sender_launch as launch
 
 class ManagedOAuthTests(TestCase):
     """受管凭据只随匹配的账号模型请求走原 sender。"""
+
+    def test_managed_policy_guard_requires_same_account_and_generation(self):
+        """策略守卫只在真实账号模式和本代预留同时成立时启用。@return 无。"""
+        binding = {'account_id': 42, 'environment_id': 'account-environment', 'generation': 3}
+        command = {'workspace': {'native_session_id': 'e9067436-4d42-4582-bd00-e864bfc29d66'}}
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = root / 'sender.json'
+            config.write_text(json.dumps({'binding': binding, 'allowed_origin': launch.ACCOUNT_ORIGIN,
+                'tui_managed_policy': {'account_id': 42, 'environment_id': 'account-environment'}}))
+            with (patch.object(launch, 'STORAGE', root / 'native'), patch.dict(os.environ, {
+                    'V3_TUI_MANAGED_POLICY': '1', 'V3_TUI_MANAGED_OAUTH': '1', 'V3_SENDER_CONFIG': str(config)}),
+                  patch.object(launch, 'launch_workspace_cli') as workspace,
+                  patch.object(launch, '_open_program', side_effect=lambda: nullcontext((None, 9))),
+                  patch.object(launch, '_loopback_channel', side_effect=lambda port: nullcontext((
+                      ['--oauth-loopback', str(port), '8'], (8,))))):
+                home, mod = launch.session_paths(command)
+                options = {'arguments': [], 'config_dir': home / '.claude', 'environment': {}, 'resume': False, 'terminal_fd': 7,
+                    'mod_dir': mod, 'model_endpoint': ('http://127.0.0.1:8476/model/current', '')}
+                for mismatch in ({'account_id': 41}, {'environment_id': 'other'}, {'generation': 2}):
+                    with self.assertRaisesRegex(ValueError, '账号绑定已变化'):
+                        launch.launch_session({**binding, **mismatch}, command, oauth_file=True, **options)
+                with self.assertRaisesRegex(ValueError, '完整账号凭据'):
+                    launch.launch_session(binding, command, **options)
+                workspace.assert_not_called()
+                launch.launch_session(binding, command, oauth_file=True, **options)
+                self.assertEqual(workspace.call_args.kwargs['arguments'][:4],
+                                 ['--oauth-loopback', '8476', '8', '--managed-policy'])
+                self.assertEqual(workspace.call_args.kwargs['inherited_fds'], (8,))
+                self.assertEqual(workspace.call_args.kwargs['environment']['HTTPS_PROXY'], 'http://127.0.0.1:8476')
+                with patch.dict(os.environ, {'V3_TUI_MANAGED_POLICY': ''}):
+                    launch.launch_session(binding, command, oauth_file=True, **options)
+                self.assertNotIn('--managed-policy', workspace.call_args.kwargs['arguments'])
 
     def test_model_error_completeness_follows_http_framing(self):
         """同一签名 400 的修复资格取决于完整 HTTP 正文。@return 无。"""

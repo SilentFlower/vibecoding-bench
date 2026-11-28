@@ -46,6 +46,7 @@ src/tlsfp/
 ### 3. Contracts
 
 - 创建、编辑、列表、OAuth 默认与表单重置同步后端值。切换进入现有排空门禁；非 V3 同样检查本地活动。状态快捷操作单独保存该字段，避免用旧 Account 快照覆盖凭据。
+- 当前生效内核为 `native293` 时，管理视图回报只读 `client_system_prompt_policy: "replace"`，与 V2 保存值各自独立。账号页显示默认替换动作。普通 Messages 省略 `system` 时保留 CLI 工作正文，非空业务文本按顺序替换，显式空串或空数组清空工作正文。CLI 身份和计费块仍由运行时组装。
 - 普通准入、账号选择、凭据解析及加权许可仍由 Gateway 所有。原生分支在 Rust 正文/头部/CCH 重写前接管精确 Messages；保留逻辑 JSON 与 HeaderMap 多值，头值在私有信封中按 Latin-1 字节串传递。
 - 账号 Fast/1M 权限先明确拒绝越权申请；允许时保持原始输入交给二进制。当前 bearer 和受控身份进入工作进程，RT 留在既有凭据所有者。原生池的 Linux x64、身份、封存、预算及回收规则由 [V3 原生 sender](../../orchestrator/backend/account-runtime-v3.md#scenario-v3-原生-sender-共享映像池与资源预算)所有。
 - 每个原生作业最多一次模型提交；签名修复仅在完整收到明确的 `invalid_request_error` 签名 400 后，同账号、冻结版本追加一次 thinking 降级作业。复用 legacy 既有 thinking 转 text、移除 redacted_thinking 及根 thinking 和依赖清理策略；工具历史保持。两次准备与发送共享首次冻结的剩余预算，已耗尽则返回首次 400。普通 400、传输失败及状态不明保持原响应路径；明确 429 由 Gateway 共用分类决定透传、有限退避或换号。legacy 的两阶段 signature 等既有重试沿原路径。调度 submitted 记录每次实际内部 POST，各作业有独立 UUID，收到可信上游观察后各自记录诊断尝试。
@@ -104,6 +105,9 @@ src/tlsfp/
 ### 6. Tests Required
 
 - `account_backend_defaults_validate_and_obey_busy_gate`、`historical_backend_migration_and_account_updates_are_independent`：默认/非法值/忙门禁/两账号和回退。
+- `native293_reports_its_fixed_client_system_prompt_policy` 核对创建、详情、列表、普通编辑及拒绝策略写入。`services/runtime/tests/native/native.test.ts` 的普通 Messages 样本在隔离模型实收核对省略、单文本、显式空和多段提示词。
+- `deploy/flower2api/verify_tui_cold_history.py --v1-runtime <固定分发体>` 使用真实公开网关、账号发送器和固定 2.1.293。隔离模型逐项比对省略、空串、空数组、字符串和有序文本块的系统正文、身份计费块及显式工具。将实际生成的完整 CC 正文再次经公开入口投递，核对消息、系统段和工具保真。
+- 同一 V1 公开验收核对受支持模型实收的消息级 system、`clear_at`、轮次 effort、缓存断点和功能头。受限模型返回 400 且模型零投递。独立用例核对命名的 `tool_choice` 和完整的 `output_config.format`。
 - `native_backend_preserves_account_feature_authorization_without_rewriting`：Fast/1M 权限拒绝且正文保持；前端 `npm run build` 及创建/编辑/reset 链路核对。
 - `runtime_transport_test` 覆盖私有 POST 鉴权早于正文、原绑定拒绝、过滤上游保留头和实际状态字节保真。`native_execution_logs_error_event_eof_and_deadline` 核对首响应等待与输入管道阻塞分别受原期限约束，并验证输入超时按提交状态未知处理。
 - `tests/native_signature_fixture.py`经真实Gateway及回环sender覆盖280/293首次400→2xx、续轮单发、同一实际会话跨账号/版本/模型复用、正文与头部会话关联、不同/缺失实际会话独立判断、失败不学习、独立诊断尝试、普通400/业务透传429/提交未知保持单发和预算耗尽；`native_signature_repair`单测覆盖完整思考前缀、不同会话及变更历史隔离、跨模型复用、新建实例重新学习、7天过期及4096项上限。
@@ -136,6 +140,7 @@ src/tlsfp/
 - 结束或重建会话时清理运行副本。两个归档形态均排除原生会话的完整凭据文件及原子写盘残留。敏感私有字段仅把凭据交给已认领的事件源。日志、诊断和采集屏蔽凭据原文。
 - 新控制端和发送器协商最终写出采集后，单 AT 与完整文件两种受管模式均标记 `request_to_account_sender`。同次模型提交的最终 TLS 证据和缺口遵循 [V2 发送器最终写出](settings-database.md#v2-发送器最终写出)。旧快照继续按原来源读取。
 - V2 收到明确的思考签名拒绝后，沿原预留取得额外的同账号发送许可。文件凭据、尝试 ID 和节点中继的收口见 [V2 思考签名 400 同轮恢复](../../orchestrator/backend/account-runtime-v3.md#v2-思考签名-400-同轮恢复)。
+- 混合发行时，V2 新轮只对当前账号发行的发送器准入。宿主滚动记录授权的旧本机绑定仍可读回。原工具回执继续按主体、会话、工具组和绑定认领。原轮排空后，Gateway 根据编排提供的前驱证明采用新代次。
 
 ### 4. Validation & Error Matrix
 
@@ -159,6 +164,10 @@ src/tlsfp/
 - 账号快照、Sender 私有帧和工具回执用例核对多账号绑定、AT/RT 一致性、时钟边界、文件复用与单次发送。
 - `deploy/flower2api/verify_tui_guard.py` 用原生和 ABI 2 兼容路径验证串联回环、直接连接失败、地址/端口错配和文件隔离。
 - 隔离的固定官方 CLI、真实 Gateway 和两个 Sender 用例覆盖临期、过期、后台慢换票、重启、混跑、旧 Gateway 回切和原进程两次续轮。分段记录首回包、真实刷新、文件写入和模型发送计数。
+- `deploy/flower2api/verify_tui_cold_history.py --mixed-release` 用两个版本的真实网关、发送器和事件源验收。隔离编排夹具持续暴露受信旧本机绑定；公开入口核对新轮拒绝、旧轮回执的归属和单次收口，并在新代次核对原生正文及定向采集。
+- `deploy/flower2api/verify_tui_mixed_images.py` 使用两批配对的 `verification-control`、`verification-account` 镜像及固定 CLI 安装卷。四个角色容器共享仅回环网络。实际网关、发送器及事件源来自各自镜像。验收证据记录四个实际镜像 ID 和源码修订。
+- `deploy/flower2api/verify_tui_cold_history.py --failure-boundaries` 在真实 V2 新轮的账号代理握手和隔离模型收件后分别断开连接。核对模型投递次数分别为零和一。后续独立新轮成功一次，采集正文对应真实 CLI。
+- `deploy/flower2api/verify_tui_cold_history.py --reconnect-tool-stream` 在隔离模型发送工具续轮首段后断开公开 SSE。六秒后接回仍在生成的响应，再次断开后读取已保存的原响应。核对相同消息和工具 ID、两次重读零模型投递、新工具回执收口及旧回执拒绝。
 - SQLite 与 PostgreSQL 迁移测试覆盖历史记录、同一 RT 重复发送保护和同 RT 刷新成功后的状态清理。
 
 ## Scenario: 原生持续预热、实时就绪与请求进程诊断
@@ -1790,6 +1799,7 @@ transport.submit(prepared, body, ttfb_timeout).await
 - 入口检查在账号选择、Hello、排队及遥测激活之前；排队后与真正提交前复查。最终复查必须先于 `AttemptTrace::commit` 和 `SendPermit::submitted`，本地拦截保持零上游调用、零真实 attempt。许可在复查期间保持持有；已有在途调用沿原生命周期结束。
 - 仅识别结构化错误、SSE error、refusal 内容块及 `stop_reason=refusal`；`reasoning_extraction`、safeguards flagged、Usage Policy 等匹配限定错误字段，普通回答引用保持正常处理。HTTP 401/429 保留原分类，明确策略拒答不进入账号停用或签名修复重试。
 - 响应观察独立于诊断，复用有界解码与增量解析。SSE 拒答在当前帧交付前等待持久写入，原协议字节及 trailers 保留；完整 JSON 在结束观察时登记。观察上下文由响应流持有，不能依赖请求 task-local 在流读取时仍存在。
+- V2 兼容发送器已从同一步的原模型 SSE 收到完整空内容拒答时，允许原生 `/end` 回调省略结束原因。仍须核对原步骤标识、模型 `stop_reason=refusal` 和完整 `message_stop`。公开 JSON 与 SSE 保留模型原用量。用量和终态字段均以这一模型响应为依据。
 - 有效封禁返回 HTTP 400 Anthropic error，`error.type=invalid_request_error`、`error.code=session_policy_blocked`，`error.details` 含 `retryable=false`、RFC3339 `expires_at` 与向上取整的 `remaining_seconds`；封禁查询失败返回本地 503。`count_tokens` 只查已有封禁。
 - 列表返回 `items,total,page,page_size,observed_at_ms,counts`；`counts {active,expired,released,all}` 与列表同一 `now`、同一会话前缀，不随 `state` 参数变化，三种状态判定与列表 `FILTER` 一致（聚合 SQL 的 `SUM(CASE …)` 与 `FILTER` 分支须同步修改；`all` 是保留字，列别名用 `all_count`；`SUM` 套 `COALESCE(…,0)`）。`total` 由同一聚合结果按 `state` 取值，与 `counts` 来自同一快照。条目包含匿名会话、令牌/账号摘要、模型、原因、诊断关联、起止及解除时间、本地拦截次数/最近命中与 `active|expired|released`。时间字段为 UTC 毫秒。`state` 接受 `all|active|expired|released`，默认 active；前缀最多 64 位十六进制，page≥1，page_size 为 1–100，默认20。列表仅读取，解除幂等并保留首次解除时间。
 - 页面 `/session-blocks` 位于“网关 → 请求记录”下方，设置位于“系统设置 → 会话与调度 → 会话策略封禁”。状态为带计数的分段（封禁中 / 已到期 / 已解除 / 全部记录），计数取接口 `counts`，旧网关缺失时显示「—」。复用共享控件、确认与反馈；错误保留上次记录，离页取消并丢弃旧回包。可见且未读取、未打开解除确认时每5秒刷新；倒计时以 `observed_at_ms` 加本地单调耗时计算，避免浏览器时钟偏差。
@@ -2087,12 +2097,12 @@ transport.submit(prepared, body, ttfb_timeout).await
 
 ### 2. Signatures
 
-- `POST /admin/accounts`、`PUT /admin/accounts/{id}` 和账号读回使用 `agy_system_prompt_as_user_reminder: boolean`。账号表存为 `INTEGER NOT NULL DEFAULT 0`。SQLite 由 `gateway.agy-system-reminder.10` 追加，PostgreSQL 初始化沿同名列。
+- `POST /admin/accounts`、`PUT /admin/accounts/{id}`、账号详情和列表使用 `client_system_prompt_policy`。AGY 的值为 `independent` 或 `user_reminder`。兼容旧管理字段 `agy_system_prompt_as_user_reminder: boolean`。同次保存同时传两个字段时，显式动作优先。账号表继续使用 `gateway.agy-system-reminder.10` 登记的布尔列，旧值 0 对应独立系统段，旧值 1 对应用户提醒。
 - `AgySubmission.system_prompt_policy` 的 `schema_version=1` 增加可选 `user_reminder_index`，为 `contents` 的非负下标。启用同形体仍由 `enabled` 表示。原生回执沿现有字段，用户提醒落点使用 `source="cortex_user_reminder"`。
 
 ### 3. Contracts
 
-- 账号管理页独立保存两个布尔值，新旧账号的位置开关默认关闭。网关按实际选中的 AGY 账号冻结设置。普通 Messages 生成有独立系统文本时选择第一条不含函数结果的用户内容，公开请求正文不提供策略索引。
+- 账号管理页提供一个客户端系统提示词选择，默认独立系统段。同形体、GIF 和安全选项独立保存。网关按实际选中的 AGY 账号冻结设置。普通 Messages 生成有独立系统文本时选择第一条不含函数结果的用户内容，公开请求正文不提供策略索引。
 - 原生入口以换行合并系统文本，先执行现有 `transform_system`，再按可选索引追加一个 `<system-reminder>` 文本块。此时独立系统段使用 `REMINDER_SYSTEM_INSTRUCTION`。字符映射只处理原系统文本。标签、固定英文指令和已有消息逐字保留。Gemini 原生直连沿独立系统段。
 - `REMINDER_SYSTEM_INSTRUCTION` 为 `Use the provided context to answer the user's request. When working on multi-step tasks or calling tools, briefly share your progress and explain what you are doing and why. For strict-format requests such as JSON-only output, or auxiliary tasks such as compaction, summaries, titles, and classification, return only the requested output.`
 - 领取和历史续轮依据投影前正文及原有工具签名、调用 ID 和结果定位。新生成采用当前账号值。同一 HTTP 的认证恢复复用首次策略。开启位置或同形体时，网关先核对实际落点和转换回执再交付源帧。
@@ -2103,7 +2113,7 @@ transport.submit(prepared, body, ttfb_timeout).await
 | --- | --- |
 | 省略位置字段或保存关闭 | 私有信封省略索引。两个策略均关闭时省略策略扩展 |
 | 系统文本为空或缺少普通用户内容 | 沿独立系统段，保留同形体开关语义 |
-| 非 AGY 账号启用或更新字段类型无效 | 管理请求受控拒绝 |
+| 当前账号不支持提交的动作，或更新字段类型无效 | 管理请求受控拒绝 |
 | 私有索引畸形、越界或指向工具结果 | 原生组装前拒绝 |
 | 运行组件缺少位置策略支持或回执不符 | 受控失败，公开响应不交付未经验证的源帧 |
 
@@ -2117,6 +2127,7 @@ transport.submit(prepared, body, ttfb_timeout).await
 
 - 真实管理 HTTP、SQLite 和浏览器覆盖两个账号独立保存、旧账号默认关闭、非 AGY 约束、重新编辑与 390px 布局。迁移核对旧版本台账、重跑幂等与原数据。
 - `verify_agy_native_loopback.py --system-reminder` 在断网容器核对四种组合的实际原生 TLS 体和回执来源。覆盖领取、历史续轮、历史兜底、待回填切换、签名及单次回填。
+- 候选镜像同一用例使用 `--image <账号镜像> --installed-adapter --control-image <控制镜像> --system-reminder`。账号容器使用内置适配器、发送器和运行文件。网关取自同批控制镜像，验收报告记录两个镜像 ID。默认挂载源码的结果单独记录。
 - `verify_agy_gemini.py` 覆盖两个账号的私有快照、首次冻结及认证恢复。Python 单测覆盖已存在提醒、工具历史、非法索引及快照读回。
 
 ## Scenario: 反重力工具续轮与开流失败边界
@@ -2206,3 +2217,19 @@ transport.submit(prepared, body, ttfb_timeout).await
 ### 6. Tests Required
 
 - `agent_summary_response_provides_local_receipt_and_zero_usage` 核对流式及非流式的回执、内容、零用量与完整终态，并验证普通生成响应头。
+- `verify_tui_cold_history.py --agent-progress <sample.json>` 使用固定 2.1.293 从隔离模型录得的真实父子轮和回执，以及现有服务支持的完整进度模板。在父轮的 `Agent` 和子轮的 `Read` 均等待原回执时，经公开入口核对本地与转发两种模式的 SSE/JSON、用量和尝试归属。进度完成期间父子原档与工具登记保持，原回执各成功一次，异主体、异会话及重复回执为 400。测试通过隔离模型收件核对正文，最终 TLS 写出未采集。
+
+## V2 公开会话标题的归属
+
+- 固定 2.1.293 客户端的标题请求具备已知标题系统提示词摘要、单条会话包装和只声明 `title` 的结构化响应。入口核对原生版本、会话、消息形状和空工具集合。模型与预算沿用客户端实际请求。
+- 标题沿公开会话选择账号，在该账号和主体下使用服务端保留的独立执行键。它有自己的预留、响应和用量，原工具登记、主会话档案和回执仍归原轮。标题继续使用普通发送准入和排空规则。
+- 已启用上游会话池时，账号发送器和会话源协商标题映射能力，仍使用公开会话 UUID 作为池键。缺少配套能力时在投递前报告 503。启用本地标题拦截时返回本地 SSE，模型尝试和业务用量为零。
+- 调试模式只协商标题入口和组装快照。标题最终 TLS 写出未采集。
+- `verify_tui_cold_history.py --interleaved-title` 以从隔离模型导出的真实 CLI 标题请求验证转发、本地拦截、会话池和旧发送器拒绝四种模式。各模式核对模型实收、用量、原档字节及原回执的单次提交。
+
+## V2 公开提示建议的归属
+
+- 固定 2.1.293 的交互入口和 `--prompt-suggestions` 可生成实际建议请求。网关核对同一公开会话、固定客户端来源和完整末条建议指令摘要。前一条消息为 assistant。历史、工具声明和缓存断点保留给模型。
+- 建议在原账号及主体下通过独立执行键投递，沿用公开会话的账号池映射。账号发送器与会话源须确认独立建议能力。旧组件在投递前返回 503。现有本地拦截返回空建议且不产生模型用量。
+- 建议使用账号转发，正常回复和用量归建议请求。工具块终止建议 SSE，外部工具回执仍归原轮。调试快照保留入口及组装，最终 TLS 写出未采集。
+- `verify_tui_cold_history.py --interleaved-suggestion` 通过实际 CLI 请求核对待回执时的建议投递、本地拦截、池映射、旧发送器及模型误出工具。主会话档案和工具登记须逐字节保持。

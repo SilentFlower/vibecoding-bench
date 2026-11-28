@@ -32,7 +32,7 @@ use crate::model::account::{
     Account, AccountAuthType, AccountStatus, CanonicalEnvData, CanonicalProcessData,
     CanonicalPromptEnvData, CliProcessImport, DEFAULT_ALLOW_1M_MODELS,
     DEFAULT_UPSTREAM_SESSION_POOL_SIZE, DEFAULT_UPSTREAM_SESSION_REFRESH_POLICY,
-    DEFAULT_UPSTREAM_SESSION_TTL_MINUTES, OAuthCredentialImport,
+    DEFAULT_UPSTREAM_SESSION_TTL_MINUTES, OAuthCredentialImport, TuiSystemPromptPolicy,
 };
 use crate::model::api_token::{self, ApiToken};
 use crate::model::credential_ownership::CredentialOwnershipInput;
@@ -574,7 +574,7 @@ async fn list_accounts(
         .map(|account| {
             let service = state.account_svc.clone();
             async move {
-                let mut value = serde_json::to_value(&account).unwrap_or_default();
+                let mut value = account_api_value(&account);
                 crate::service::tui_backend::append_view(&service, &account, &mut value).await?;
                 Ok::<_, AppError>(value)
             }
@@ -672,12 +672,43 @@ async fn list_accounts(
     })))
 }
 
+/// 管理端的客户端系统提示词动作，按已验证的内核能力提供。
+#[derive(Clone, Copy, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum ClientSystemPromptPolicy {
+    Independent,
+    UserReminder,
+}
+
+impl ClientSystemPromptPolicy {
+    /// 转换为 AGY 原生配置可读取的历史账号选项。@return 是否写入用户提醒。
+    fn agy_user_reminder(self) -> bool {
+        matches!(self, Self::UserReminder)
+    }
+}
+
+fn account_api_value(account: &Account) -> Value {
+    let mut value = json!(account);
+    if account.is_antigravity() {
+        let policy = if account.agy_system_prompt_as_user_reminder {
+            ClientSystemPromptPolicy::UserReminder
+        } else {
+            ClientSystemPromptPolicy::Independent
+        };
+        value["client_system_prompt_policy"] = json!(policy);
+    } else if account.is_claude_code() {
+        crate::service::tui_backend::append_v1_system_prompt(&mut value, &account.request_backend);
+    }
+    value
+}
+
 /// 管理端创建账号载荷，省略账号用量控制线时默认关闭。
 #[derive(Deserialize)]
 struct CreateAccountRequest {
     platform: Option<String>,
     agy_system_prompt_homoglyph_enabled: Option<bool>,
     agy_system_prompt_as_user_reminder: Option<bool>,
+    client_system_prompt_policy: Option<ClientSystemPromptPolicy>,
     agy_gif_frames_enabled: Option<bool>,
     agy_disable_safety_filtering: Option<bool>,
     cli_identity: Option<CliIdentityImport>,
@@ -1163,7 +1194,7 @@ async fn get_account(
     Path(id): Path<i64>,
 ) -> Result<Json<Value>, AppError> {
     let account = state.account_svc.get_account(id).await?;
-    let mut value = json!(account);
+    let mut value = account_api_value(&account);
     crate::service::tui_backend::append_view(&state.account_svc, &account, &mut value).await?;
     if account.is_antigravity() {
         value["credential_state"] = state.account_svc.agy_state(id).await?;
@@ -1209,7 +1240,7 @@ async fn create_account(
     State(state): State<AppState>,
     headers: HeaderMap,
     Json(req): Json<CreateAccountRequest>,
-) -> Result<(StatusCode, Json<Account>), AppError> {
+) -> Result<(StatusCode, Json<Value>), AppError> {
     let _proxy_guard = state.proxy_svc.mutations.lock().await;
     let selected_proxy = if let Some(id) = req.proxy_id.as_deref() {
         if req.proxy_url.is_some() {
@@ -1241,7 +1272,10 @@ async fn create_account(
     if platform == "claude_code" && req.agy_system_prompt_homoglyph_enabled == Some(true) {
         return Err(AppError::BadRequest("同形体开关仅适用于 AGY 账号".into()));
     }
-    if platform != "antigravity" && req.agy_system_prompt_as_user_reminder == Some(true) {
+    if platform != "antigravity"
+        && (req.agy_system_prompt_as_user_reminder == Some(true)
+            || req.client_system_prompt_policy.is_some())
+    {
         return Err(AppError::BadRequest(
             "提示词位置试验仅适用于 AGY 账号".into(),
         ));
@@ -1276,8 +1310,11 @@ async fn create_account(
             .agy_system_prompt_homoglyph_enabled
             .unwrap_or(false),
         agy_system_prompt_as_user_reminder: req
-            .agy_system_prompt_as_user_reminder
+            .client_system_prompt_policy
+            .map(ClientSystemPromptPolicy::agy_user_reminder)
+            .or(req.agy_system_prompt_as_user_reminder)
             .unwrap_or_default(),
+        tui_system_prompt_policy: Default::default(),
         agy_gif_frames_enabled: req.agy_gif_frames_enabled.unwrap_or_default(),
         agy_disable_safety_filtering: req.agy_disable_safety_filtering.unwrap_or_default(),
         id: 0,
@@ -1380,7 +1417,7 @@ async fn create_account(
     } else {
         state.account_svc.create_account(&mut account).await?;
     }
-    Ok((StatusCode::CREATED, Json(account)))
+    Ok((StatusCode::CREATED, Json(account_api_value(&account))))
 }
 
 /// 仅导入已绑定账号的进程实测值，不调用凭据解析或停止发送器。
@@ -1557,6 +1594,17 @@ async fn update_account(
         return Err(AppError::BadRequest("未知账号平台，请核对原记录".into()));
     }
     if existing.is_antigravity() {
+        if let Some(fields) = updates.as_object_mut()
+            && let Some(value) = fields.remove("client_system_prompt_policy")
+        {
+            let policy: ClientSystemPromptPolicy = serde_json::from_value(value)
+                .map_err(|_| AppError::BadRequest("当前账号的客户端系统提示词动作无效".into()))?;
+            // 新管理动作覆盖同一请求中的旧兼容字段，持久化仍只有一个账号值。
+            fields.insert(
+                "agy_system_prompt_as_user_reminder".into(),
+                json!(policy.agy_user_reminder()),
+            );
+        }
         let proxy_changed = updates
             .get("proxy_url")
             .is_some_and(|value| value.as_str() != Some(existing.proxy_url.as_str()));
@@ -1573,9 +1621,38 @@ async fn update_account(
         } else {
             None
         };
-        return Ok(Json(json!(
-            state.account_svc.update_agy_fields(id, &updates).await?
-        )));
+        let saved = state.account_svc.update_agy_fields(id, &updates).await?;
+        return Ok(Json(account_api_value(&saved)));
+    }
+
+    let system_prompt_changed = if let Some(value) = updates.get("client_system_prompt_policy") {
+        let policy = value
+            .as_str()
+            .and_then(TuiSystemPromptPolicy::parse)
+            .ok_or_else(|| AppError::BadRequest("当前账号的客户端系统提示词动作无效".into()))?;
+        let mut view = json!({});
+        crate::service::tui_backend::append_view(&state.account_svc, &existing, &mut view).await?;
+        if view["request_backend"] != crate::service::tui_backend::TUI_V2 {
+            return Err(AppError::BadRequest(
+                "当前账号内核未提供可保存的提示词动作".into(),
+            ));
+        }
+        if policy != TuiSystemPromptPolicy::Append
+            && view["tui_system_prompt_policy_available"] != true
+        {
+            return Err(AppError::ServiceUnavailable(
+                "账号发送器尚未确认系统提示词动作能力".into(),
+            ));
+        }
+        existing.tui_system_prompt_policy = policy;
+        true
+    } else {
+        false
+    };
+    if updates.get("tui_system_prompt_policy").is_some() {
+        return Err(AppError::BadRequest(
+            "请使用公开的客户端系统提示词动作".into(),
+        ));
     }
 
     if updates
@@ -1610,7 +1687,13 @@ async fn update_account(
         .as_object()
         .ok_or_else(|| AppError::BadRequest("账号更新必须是对象".into()))?
         .keys()
-        .map(String::as_str)
+        .map(|field| {
+            if field == "client_system_prompt_policy" {
+                "tui_system_prompt_policy"
+            } else {
+                field.as_str()
+            }
+        })
         .collect();
     if let Some(value) = updates.get("request_backend") {
         existing.request_backend = validate_request_backend(
@@ -1800,6 +1883,12 @@ async fn update_account(
                         .update_account_options(&existing, &["request_backend"])
                         .await?;
                 }
+                if system_prompt_changed {
+                    state
+                        .account_svc
+                        .update_account_options(&existing, &["tui_system_prompt_policy"])
+                        .await?;
+                }
                 existing = state.account_svc.get_account(id).await?;
                 drop(_runtime_permit);
                 if updates.get("request_backend").is_some()
@@ -1808,7 +1897,16 @@ async fn update_account(
                 {
                     state.account_svc.request_native_wake(id);
                 }
-                return Ok(Json(json!(existing)));
+                let mut result = account_api_value(&existing);
+                if system_prompt_changed {
+                    crate::service::tui_backend::append_view(
+                        &state.account_svc,
+                        &existing,
+                        &mut result,
+                    )
+                    .await?;
+                }
+                return Ok(Json(result));
             }
         }
     }
@@ -1867,7 +1965,13 @@ async fn update_account(
     }
 
     if runtime_update {
-        state.account_svc.update_account(&existing).await?;
+        state
+            .account_svc
+            .update_account_with_system_prompt(
+                &existing,
+                system_prompt_changed.then_some(existing.tui_system_prompt_policy),
+            )
+            .await?;
     } else {
         state
             .account_svc
@@ -1883,7 +1987,12 @@ async fn update_account(
     {
         state.account_svc.request_native_wake(id);
     }
-    Ok(Json(json!(existing)))
+    let mut result = account_api_value(&existing);
+    if system_prompt_changed {
+        crate::service::tui_backend::append_view(&state.account_svc, &existing, &mut result)
+            .await?;
+    }
+    Ok(Json(result))
 }
 
 /// 在 cc2api 账号锁内解析满足有效期要求的 OAuth 凭据。
@@ -3291,6 +3400,7 @@ async fn request_native_capture(
         .iter()
         .find(|attempt| attempt.attempt_id == attempt_id)
         .ok_or(AppError::NotFound)?;
+    let tui = attempt.context.as_ref().and_then(|c| c.kernel.as_deref()) == Some("tui_v2");
     let value = if attempt.capture_status.as_deref() == Some("disabled") {
         serde_json::json!({"state":"disabled", "message":"本次请求发生时账号内容采集已关闭，设置对后续请求生效"})
     } else if attempt.capture_status.as_deref() == Some("not_submitted") {
@@ -3304,10 +3414,10 @@ async fn request_native_capture(
         "native280_cc_prepared" | "native293_cc_prepared"
     ) {
         runtime_bridge::native_capture(attempt.account_id, &attempt.attempt_id).await?
-    } else if attempt.context.as_ref().and_then(|c| c.kernel.as_deref()) == Some("tui_v2")
-        && attempt.capture_status.as_deref() == Some("queued")
-    {
+    } else if tui && attempt.capture_status.as_deref() == Some("queued") {
         runtime_bridge::tui_capture(attempt.account_id, &attempt.attempt_id).await?
+    } else if tui && attempt.capture_status.as_deref() == Some("dropped") {
+        serde_json::json!({"state":"missing", "message":"本次 V2 请求采集未进入保存队列"})
     } else {
         serde_json::json!({"state":"unsupported", "message":"此尝试使用其他转发方式"})
     };
@@ -3335,7 +3445,7 @@ mod tests {
         normalize_oauth_credential_validity_seconds, validate_model_id_list,
     };
     use crate::config::{AdminConfig, Config, DatabaseConfig, ServerConfig};
-    use crate::model::account::{Account, CanonicalEnvData, CanonicalPromptEnvData};
+    use crate::model::account::{Account, CanonicalEnvData, CanonicalPromptEnvData, TuiSystemPromptPolicy};
     use crate::service::account::{AccountSelectionContext, AccountService};
     use crate::service::gateway::GatewayService;
     use crate::service::oauth::TokenTester;
@@ -4224,6 +4334,158 @@ mod tests {
             assert_eq!(summary["config"]["weights"][1], 0.0);
             assert_eq!(summary["config"]["reset_weight"], 0.0);
         }
+    }
+
+    /// 旧 AGY 值经统一动作读回，两账号各自保存，位置更新只写入同一个持久字段。@return 无。
+    #[tokio::test]
+    async fn agy_client_system_prompt_policy_preserves_legacy_values_and_other_options() {
+        let (app, _, _, pool, service) = test_router_with_scheduling(true).await;
+        let mut ids = Vec::new();
+        for legacy in [false, true] {
+            let (status, saved) = account_admin_json(
+                &app,
+                Method::POST,
+                "/admin/accounts",
+                json!({"email":format!("agy-{legacy}@example.invalid"),"setup_token":"synthetic"}),
+            )
+            .await;
+            assert_eq!(status, StatusCode::CREATED);
+            let id = saved["id"].as_i64().unwrap();
+            sqlx::query(
+                "UPDATE accounts SET platform='antigravity',auth_type='oauth',
+                 agy_system_prompt_as_user_reminder=$2,agy_system_prompt_homoglyph_enabled=1,
+                 agy_gif_frames_enabled=1,agy_disable_safety_filtering=1 WHERE id=$1",
+            )
+            .bind(id)
+            .bind(i32::from(legacy))
+            .execute(&pool)
+            .await
+            .unwrap();
+            sqlx::query("INSERT INTO account_credential_states(account_id,generation,phase,updated_at_ms) VALUES($1,1,'ready',0)")
+                .bind(id).execute(&pool).await.unwrap();
+            let (status, detail) = account_admin_json(
+                &app,
+                Method::GET,
+                &format!("/admin/accounts/{id}"),
+                Value::Null,
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK);
+            let expected = if legacy {
+                "user_reminder"
+            } else {
+                "independent"
+            };
+            assert_eq!(detail["client_system_prompt_policy"], expected);
+            ids.push(id);
+        }
+
+        let path = format!("/admin/accounts/{}", ids[0]);
+        let (status, _) = account_admin_json(
+            &app,
+            Method::PUT,
+            &path,
+            json!({"client_system_prompt_policy":"unsupported"}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        let (status, saved) = account_admin_json(
+            &app, Method::PUT, &path, json!({
+                "client_system_prompt_policy":"user_reminder","agy_system_prompt_as_user_reminder":false
+            }),
+        ).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(saved["client_system_prompt_policy"], "user_reminder");
+
+        let (status, saved) = account_admin_json(
+            &app,
+            Method::PUT,
+            &format!("/admin/accounts/{}", ids[1]),
+            json!({"agy_system_prompt_as_user_reminder":false}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(saved["client_system_prompt_policy"], "independent");
+        let (status, listed) = account_admin_json(
+            &app,
+            Method::GET,
+            "/admin/accounts?platform=antigravity",
+            Value::Null,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        for (id, reminder) in ids.into_iter().zip([true, false]) {
+            let account = service.get_account(id).await.unwrap();
+            assert_eq!(account.agy_system_prompt_as_user_reminder, reminder);
+            assert!(account.agy_system_prompt_homoglyph_enabled);
+            assert!(account.agy_gif_frames_enabled);
+            assert!(account.agy_disable_safety_filtering);
+            let view = listed["data"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|row| row["id"] == id)
+                .unwrap();
+            let expected = if reminder {
+                "user_reminder"
+            } else {
+                "independent"
+            };
+            assert_eq!(view["client_system_prompt_policy"], expected);
+        }
+        let (status, _) = account_admin_json(
+            &app, Method::POST, "/admin/accounts",
+            json!({"email":"cc-policy@example.invalid","setup_token":"synthetic","client_system_prompt_policy":"user_reminder"}),
+        ).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    /// V1 的固定动作随生效内核回报，暂未交付的动作不会写入 V2 的保存值。@return 无。
+    #[tokio::test]
+    async fn native293_reports_its_fixed_client_system_prompt_policy() {
+        let (app, _, _, _, service) = test_router_with_scheduling(true).await;
+        let (status, created) = account_admin_json(
+            &app,
+            Method::POST,
+            "/admin/accounts",
+            json!({"email":"native-v1@example.invalid","setup_token":"synthetic","request_backend":"native293"}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED);
+        assert_eq!(created["client_system_prompt_policy"], "replace");
+        let id = created["id"].as_i64().unwrap();
+        let path = format!("/admin/accounts/{id}");
+        for action in ["append", "replace", "user_reminder"] {
+            let (status, _) = account_admin_json(
+                &app,
+                Method::PUT,
+                &path,
+                json!({"client_system_prompt_policy":action}),
+            )
+            .await;
+            assert_eq!(status, StatusCode::BAD_REQUEST);
+        }
+        let (status, saved) = account_admin_json(
+            &app,
+            Method::PUT,
+            &path,
+            json!({"name":"已编辑的 V1"}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(saved["client_system_prompt_policy"], "replace");
+        let (status, detail) = account_admin_json(&app, Method::GET, &path, Value::Null).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(detail["client_system_prompt_policy"], "replace");
+        assert_eq!(detail["name"], "已编辑的 V1");
+        let (status, list) =
+            account_admin_json(&app, Method::GET, "/admin/accounts", Value::Null).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(list["data"][0]["client_system_prompt_policy"], "replace");
+        assert_eq!(
+            service.get_account(id).await.unwrap().tui_system_prompt_policy,
+            TuiSystemPromptPolicy::Append
+        );
     }
 
     /// 已验证字段映射必须与精确版本绑定，旧请求观察继续兼容。

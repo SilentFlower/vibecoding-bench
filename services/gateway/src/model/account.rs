@@ -3,6 +3,37 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+/// 让固定版 V2 运行时组装普通 Messages 客户端的系统指令。
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TuiSystemPromptPolicy {
+    #[default]
+    Append,
+    Replace,
+    UserReminder,
+}
+
+impl TuiSystemPromptPolicy {
+    /// 读取持久层或私有预留中的动作。@param value 原始字符串。@return 匹配的动作。
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "append" => Some(Self::Append),
+            "replace" => Some(Self::Replace),
+            "user_reminder" => Some(Self::UserReminder),
+            _ => None,
+        }
+    }
+
+    /// 编码持久层及私有预留的动作。@return 固定协议串。
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Append => "append",
+            Self::Replace => "replace",
+            Self::UserReminder => "user_reminder",
+        }
+    }
+}
+
 /// 新账号默认允许透传 `context-1m-2025-08-07` 的模型白名单。
 pub const DEFAULT_ALLOW_1M_MODELS: &str = "opus,claude-sonnet-5";
 /// 上游 session 池默认容量；只有账号显式开启时生效。
@@ -178,6 +209,9 @@ pub struct Account {
     /// AGY Messages 提示词位置试验，缺省关闭。
     #[serde(default)]
     pub agy_system_prompt_as_user_reminder: bool,
+    /// V2 专用设置由管理响应按已核验能力展示。
+    #[serde(default, skip_serializing)]
+    pub tui_system_prompt_policy: TuiSystemPromptPolicy,
     /// AGY 账号的 GIF 抽帧策略，缺省关闭。
     #[serde(default)]
     pub agy_gif_frames_enabled: bool,

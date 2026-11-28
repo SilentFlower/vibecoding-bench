@@ -19,6 +19,8 @@
 #ifndef CONNECT_SHIM
 #define CONNECT_SHIM "/opt/flower/tui/tui-connect.so"
 #endif
+#define MANAGED_SETTINGS "/etc/claude-code/managed-settings.json"
+#define MANAGED_MARKETPLACE "/opt/flower/managed-plugins"
 
 /* ABI 3 才限制既有文件截断。旧发行版头文件可能尚未命名此位。 */
 #ifndef LANDLOCK_ACCESS_FS_TRUNCATE
@@ -40,22 +42,38 @@ static void fail(const char *operation) {
     _exit(125);
 }
 
-static void permit(int rules, const char *path, uint64_t access, int optional) {
-    struct stat st;
+static void permit_fd(int rules, int fd, uint64_t access, const struct stat *st) {
     struct landlock_path_beneath_attr rule = {0};
-    rule.parent_fd = open(path, O_PATH | O_CLOEXEC);
-    if (rule.parent_fd < 0) {
-        if (optional && errno == ENOENT) return;
-        fail("打开 TUI 隔离路径");
-    }
-    if (fstat(rule.parent_fd, &st) < 0) fail("检查 TUI 隔离路径");
-    if (!S_ISDIR(st.st_mode))
+    rule.parent_fd = fd;
+    if (!S_ISDIR(st->st_mode))
         access &= LANDLOCK_ACCESS_FS_EXECUTE | LANDLOCK_ACCESS_FS_READ_FILE |
                   LANDLOCK_ACCESS_FS_WRITE_FILE | LANDLOCK_ACCESS_FS_TRUNCATE;
     rule.allowed_access = access;
     if (syscall(SYS_landlock_add_rule, rules, LANDLOCK_RULE_PATH_BENEATH, &rule, 0))
         fail("登记 TUI 隔离路径");
-    close(rule.parent_fd);
+    close(fd);
+}
+
+static void permit(int rules, const char *path, uint64_t access, int optional) {
+    struct stat st;
+    int fd = open(path, O_PATH | O_CLOEXEC);
+    if (fd < 0) {
+        if (optional && errno == ENOENT) return;
+        fail("打开 TUI 隔离路径");
+    }
+    if (fstat(fd, &st) < 0) fail("检查 TUI 隔离路径");
+    permit_fd(rules, fd, access, &st);
+}
+
+static void permit_managed(int rules, const char *path, mode_t type) {
+    struct stat st;
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
+    if (fd < 0 || fstat(fd, &st) < 0) fail("读取 Claude 托管策略");
+    if ((st.st_mode & S_IFMT) != type || st.st_uid != 0 || (st.st_mode & 0022)) {
+        errno = EPERM;
+        fail("核对 Claude 托管策略归属");
+    }
+    permit_fd(rules, fd, READ, &st);
 }
 
 static void check(int result) {
@@ -123,6 +141,23 @@ static void retain_loopback_channel(int channel, unsigned short port) {
         fail("发布 TUI 回环连接通道");
 }
 
+static int private_media_directory(int descriptor, const char *home) {
+    struct stat info;
+    int flags = fcntl(descriptor, F_GETFL);
+    if (flags < 0 || !(flags & O_PATH) || fstat(descriptor, &info)
+        || !S_ISDIR(info.st_mode) || info.st_uid != geteuid() || (info.st_mode & 0777) != 0700)
+        return 0;
+    /* 暂存目录已经在原 HOME 权限内。保留 O_PATH 只为让 CLI 用当前进程的别名读取图像。 */
+    char alias[64], target[PATH_MAX], parent[PATH_MAX];
+    snprintf(alias, sizeof(alias), "/proc/self/fd/%d", descriptor);
+    int prefix = snprintf(parent, sizeof(parent), "%s/tmp/", home);
+    ssize_t length = readlink(alias, target, sizeof(target) - 1);
+    if (prefix < 0 || prefix >= (int)sizeof(parent) || length <= prefix || length >= (ssize_t)sizeof(target) - 1)
+        return 0;
+    target[length] = '\0';
+    return !memcmp(target, parent, (size_t)prefix) && !strchr(target + prefix, '/');
+}
+
 static void private_process(int abi2, int oauth) {
     scmp_filter_ctx filter = seccomp_init(SCMP_ACT_ALLOW);
     if (!filter) fail("创建 TUI 进程限制");
@@ -166,7 +201,8 @@ int main(int argc, char **argv) {
                              (size_t)0, LANDLOCK_CREATE_RULESET_VERSION);
     if (abi < 2) return 125;
     const int abi2 = abi == 2;
-    int oauth_probe = argc == 2 && !strcmp(argv[1], "--check-oauth");
+    const int managed_probe = argc == 2 && !strcmp(argv[1], "--check-managed-policy");
+    int oauth_probe = managed_probe || (argc == 2 && !strcmp(argv[1], "--check-oauth"));
     int probe = oauth_probe || (argc == 2 && !strcmp(argv[1], "--check"));
     unsigned short port = 0;
     int channel = -1;
@@ -180,6 +216,22 @@ int main(int argc, char **argv) {
         channel = (int)parsed;
         argv += 3;
         argc -= 3;
+    }
+    int managed_policy = managed_probe;
+    if (port && argc >= 5 && !strcmp(argv[1], "--managed-policy")) {
+        managed_policy = 1;
+        argv += 1;
+        argc -= 1;
+    }
+    int media = -1;
+    if (argc >= 5 && !strncmp(argv[1], "--media-fd=", 11)) {
+        char *end;
+        unsigned long parsed = strtoul(argv[1] + 11, &end, 10);
+        if (*end || parsed < 3 || parsed > INT_MAX || !private_media_directory((int)parsed, argv[2]))
+            return 125;
+        media = (int)parsed;
+        argv += 1;
+        argc -= 1;
     }
     const int oauth = oauth_probe || port != 0;
     if (!probe && (argc < 4 || argv[1][0] != '/' || argv[2][0] != '/' || argv[3][0] != '/'))
@@ -197,6 +249,11 @@ int main(int argc, char **argv) {
     if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) fail("锁定 TUI 权限");
     permit(rules, ".", edit, 0);
     if (oauth) permit(rules, CONNECT_SHIM, RUN, 0);
+    if (managed_policy) {
+        /* 管理策略和市场由控制端只读挂载，进程只可读这两个固定路径。 */
+        permit_managed(rules, MANAGED_SETTINGS, S_IFREG);
+        permit_managed(rules, MANAGED_MARKETPLACE, S_IFDIR);
+    }
     if (probe) {
         if (syscall(SYS_landlock_restrict_self, rules, 0)) fail("核验 TUI 文件隔离");
         private_process(abi2, oauth);
@@ -222,6 +279,7 @@ int main(int argc, char **argv) {
     /* 原版程序用已核验的 FD 执行，exec 成功时一并关闭它和工作目录描述符。 */
     if (close_range(3, ~0U, CLOSE_RANGE_CLOEXEC)) fail("关闭 TUI 继承描述符");
     if (port) retain_loopback_channel(channel, port);
+    if (media >= 0 && fcntl(media, F_SETFD, 0) < 0) fail("保留本轮图像目录");
     if (syscall(SYS_landlock_restrict_self, rules, 0)) fail("启用 TUI 文件隔离");
     private_process(abi2, oauth);
     execv(argv[3], argv + 3);

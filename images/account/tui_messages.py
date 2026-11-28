@@ -1,5 +1,6 @@
 """受管本机推理服务的冻结 Messages 输入和同一响应的原始 SSE 观察。"""
 
+from dataclasses import dataclass
 from email.message import Message
 import hashlib
 import json
@@ -50,6 +51,20 @@ def encode(value):
     return json.dumps(
         value, ensure_ascii=False, separators=(",", ":"), allow_nan=False
     ).encode()
+
+
+def same_json_value(actual, expected):
+    """核对回执及已冻结输入中的 JSON 值。
+    @param actual 实际值。@param expected 已记录的值。@return 忽略对象键序后的语义是否相同。
+    """
+    # Python 认为 False 等于 0。工具字段中的布尔类型必须参与比较。
+    if isinstance(actual, bool) or isinstance(expected, bool):
+        return actual is expected
+    if isinstance(actual, dict) and isinstance(expected, dict):
+        return actual.keys() == expected.keys() and all(same_json_value(actual[key], expected[key]) for key in expected)
+    if type(actual) is type(expected) and isinstance(actual, (list, tuple)):
+        return len(actual) == len(expected) and all(same_json_value(a, b) for a, b in zip(actual, expected, strict=True))
+    return actual == expected
 
 
 def valid_model_header_value(value):
@@ -163,7 +178,19 @@ class ModelResponseError(RuntimeError):
         )
         if public_fields:
             error = {"type": data["type"], "message": data["message"]}
-        self.body = encode({"type": "error", "error": error})
+        envelope = {"type": "error", "error": error}
+        if complete and 400 <= status < 600 and public_fields and value.get("type") == "error" and source in (
+            "local_provider_http", "managed_oauth_http",
+        ):
+            # 只保留已完整接收的 Messages 标准字段。其余错误详情继续留在提供方。
+            request_id = value.get("request_id")
+            if isinstance(request_id, str) and re.fullmatch(r"req_[A-Za-z0-9]{1,124}", request_id):
+                envelope["request_id"] = request_id
+            details = data.get("details")
+            code = details.get("error_code") if isinstance(details, dict) else None
+            if isinstance(code, str) and re.fullmatch(r"[A-Za-z0-9_]+", code):
+                error["details"] = {"error_code": code}
+        self.body = encode(envelope)
         if not isinstance(data, dict):
             data = value if isinstance(value, dict) and value.get("type") == "error" else {}
         evidence = {
@@ -171,8 +198,8 @@ class ModelResponseError(RuntimeError):
             if isinstance(data.get(key), str)
         }
         self.private_body = self.body
-        if public_fields and evidence != error:
-            self.private_body = encode({"type": "error", "error": evidence})
+        if public_fields and (private_error := {**evidence, **error}) != error:
+            self.private_body = encode({**envelope, "error": private_error})
         elif not public_fields and evidence:
             # 旧网关只交付 error 的公开字段。原始残缺信封只用于新网关判断会话策略。
             self.private_body = encode({
@@ -211,9 +238,20 @@ def _finite(value):
         return False
 
 
-def input_message(raw, *, native=False, body_policy=None, session_id=None):
+@dataclass
+class MessageInputObservation:
+    """记录账号代发正文可核对的普通 Messages 指令落点。@param instruction_location 已组装的顶层落点。"""
+
+    instruction_location: str | None = None
+
+
+def input_message(
+    raw, *, native=False, body_policy=None, session_id=None,
+    observation: MessageInputObservation | None = None,
+):
     """核验公开 Messages 业务输入，冻结本轮提供方请求。@param raw 原始字节。
     @param native 原版 CLI 来源线索。@param body_policy 受信预留的本轮设置。@param session_id 网关原会话。
+    @param observation 可选，记录实际组装的普通 Messages 顶层业务指令落点。
     @return 带启动参数的原始历史、外层流选项、内部取流正文。
     """
     body = json.loads(raw, object_pairs_hook=_unique, parse_constant=_invalid_number)
@@ -299,6 +337,11 @@ def input_message(raw, *, native=False, body_policy=None, session_id=None):
         # 已知的无效改写应在工具回执认领前拒绝；调用方仍可用有效配置提交同一结果。
         raise InputRejection("unsupported_parameter")
     wire = raw if stream and not removed and outgoing is body else encode({**outgoing, "stream": True})
+    if observation is not None and not native:
+        system = outgoing.get("system", "")
+        texts = (system,) if isinstance(system, str) else (block["text"] for block in system)
+        if any(text.strip() for text in texts):
+            observation.instruction_location = "system"
     if outgoing.get("thinking") is not body.get("thinking"):
         # 启动器与上游模型共用本轮推理参数；工具校验、子代理归属仍读取原始历史。
         body = {**body, "thinking": outgoing["thinking"]}
@@ -403,10 +446,10 @@ def tool_receipts(messages, previous, expected, *, input_format=None, checkpoint
     offered = [_snapshot(b) for b in _blocks(messages[pos])]
     if checkpoint:
         offered = [receipt_snapshot(b) for b in offered]
-    if (input_format == "claude_code" and any(b.get("name") in ("Agent", "Task") for b in expected)
+    if (input_format == "claude_code"
             and all(b["type"] in ("text", "tool_use") for b in expected)
             and [b["type"] for b in offered] != [b["type"] for b in expected]):
-        # 2.1.293 把并发工具之间的文本放到工具组前。只重建比较顺序，逐块继续核对。
+        # 原版客户端把并发工具之间的文本放到工具组前。只重建比较顺序，逐块继续核对。
         expected = [b for b in expected if b["type"] == "text"] + [
             b for b in expected if b["type"] == "tool_use"
         ]
@@ -415,7 +458,7 @@ def tool_receipts(messages, previous, expected, *, input_format=None, checkpoint
                 and "caller" not in block):
             # 只在比较快照里补齐直接调用标记，向模型发送的历史仍沿用客户端正文。
             block["caller"] = original["caller"]
-    if offered != expected:
+    if not same_json_value(offered, expected):
         raise ValueError("原轮助手内容或工具声明发生变化")
     ids = {b["id"] for b in expected if b["type"] == "tool_use"}
     results = {}
@@ -475,6 +518,7 @@ class WireStep:
         self._argument_bytes = 0
         self.started = self.stopped = False
         self.reason = None
+        self.response_model = None
         self.native = None
         self.native_model = None
         self.claimed = False
@@ -505,6 +549,9 @@ class WireStep:
             and isinstance(event.get("message"), dict)
         ):
             self.started = True
+            model = event["message"].get("model")
+            if isinstance(model, str) and model:
+                self.response_model = model
         elif not self.started:
             raise ValueError("模型流缺少首帧")
         elif (

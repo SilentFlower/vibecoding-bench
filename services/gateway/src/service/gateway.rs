@@ -33,6 +33,7 @@ use crate::model::api_token::ApiToken;
 use crate::model::identity::device_profile;
 use crate::model::request_diagnostics::{
     DiagnosticParameters, NATIVE_OBSERVATION_HEADER, NativeRequestObservation, RequestLogMode,
+    TuiBodySource, TuiInstructionLocation, TuiSessionOrigin,
 };
 use crate::model::request_usage::RequestUsage;
 use crate::service::access_policy::{
@@ -81,10 +82,14 @@ use crate::service::telemetry::{
 };
 use crate::service::tui_backend::{self, TUI_V2};
 use crate::service::tui_native_drain::{
-    NativeTurn, active_agent_account, continuation_account, recovery_row, summary_account,
+    NativeTurn, active_agent_account, continuation_account, receipt_fork, recovery_row,
+    summary_account,
 };
 use crate::service::tui_reconnect::{self, BeforeHeaders, Reconnects, Reservation};
-use crate::service::tui_tool_history::{self, SERVER_SESSION_PREFIX};
+use crate::service::tui_sender_response::RefusalProjectionFailure;
+use crate::service::tui_tool_history::{
+    self, SERVER_SESSION_PREFIX, SUGGESTION_SESSION_PREFIX, TITLE_SESSION_PREFIX,
+};
 use crate::service::usage::{ReconnectUsage, UsageCapture};
 use crate::service::v3_scheduling::{RequestPhase, SchedulingRequest};
 use crate::service::version_profile::{
@@ -1767,6 +1772,11 @@ impl GatewayService {
             .run(
                 async move { self.handle_request(req, Some(&token)).await },
                 cutover,
+                || {
+                    count_tokens_app_error_response(
+                        runtime_transport::tui_submission_unknown_error(),
+                    )
+                },
             )
             .await
     }
@@ -2374,6 +2384,31 @@ impl GatewayService {
             (vec![], vec![])
         };
         let original_session = session.as_ref().and_then(RequestSession::original);
+        let auxiliary_session_prefix = if method == "POST"
+            && path == "/v1/messages"
+            && client_type == ClientType::ClaudeCode
+            && original_session.is_some()
+            && runtime_transport::tui_cli_format(&native_header_map) == Some("claude_code")
+            && !native_header_map.contains_key("x-claude-code-agent-id")
+            && native_session_candidate(
+                native_header_map.get_all("x-claude-code-session-id").iter(),
+                |value| value.to_str().ok(),
+                &body_map,
+            )
+            .as_deref()
+                == original_session
+        {
+            if is_tui_session_title(&body_map) {
+                Some(TITLE_SESSION_PREFIX)
+            } else if is_tui_prompt_suggestion(&body_map) {
+                Some(SUGGESTION_SESSION_PREFIX)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        let native_title = auxiliary_session_prefix == Some(TITLE_SESSION_PREFIX);
         let summary = if method == "POST"
             && path == "/v1/messages"
             && client_type == ClientType::ClaudeCode
@@ -2436,36 +2471,62 @@ impl GatewayService {
                 Err(error) => return Err(error),
             }
         }
-        let mut recovery = if reconnect_key.is_some()
-            && replay_owner.is_none()
-            && let Some(token) = api_token
+        let has_billing = runtime_transport::has_tui_billing_marker(&body_map);
+        let cc_fork = client_type == ClientType::ClaudeCode
+            && has_billing
+            && runtime_transport::tui_cli_format(&native_header_map) == Some("claude_code")
+            && !native_header_map.contains_key("x-claude-code-agent-id");
+        let ordinary_fork = client_type != ClientType::ClaudeCode && !has_billing;
+        let fork = if (ordinary_fork || cc_fork)
+            && let (Some(key), Some(token), Some(session)) =
+                (reconnect_key.as_ref(), api_token, original_session)
+            && !session.starts_with(SERVER_SESSION_PREFIX)
+            && tui_tool_history::has_fork_instruction(&body_map)
         {
-            recovery_row(
-                &self.account_svc.tui_database(),
-                token.id,
-                original_session,
-                &body_map,
-            )
-            .await?
+            if cc_fork
+                && native_session_candidate(
+                    native_header_map.get_all("x-claude-code-session-id").iter(),
+                    |value| value.to_str().ok(),
+                    &body_map,
+                )
+                .as_deref()
+                    != Some(session)
+            {
+                return Err(AppError::BadRequest("V2 分叉的原生会话不符".into()));
+            }
+            receipt_fork(&self.account_svc.tui_database(), token.id, session, &body_map, key).await?
         } else {
             None
         };
         let tool_owner = if let Some((owner, ..)) = &summary {
             Some(*owner)
-        } else if let Some(owner) = replay_owner.or_else(|| recovery.as_ref().map(|r| r.account_id))
-        {
+        } else if let Some(owner) = replay_owner {
             Some(owner)
+        } else if let Some(fork) = &fork {
+            Some(fork.account)
         } else if method == "POST"
             && path == "/v1/messages"
             && runtime_transport::tui_runtime_configured()
             && let Some(principal) = api_token
         {
-            continuation_account(
-                self.account_svc.tui_database(),
-                (principal.id, original_session),
-                &body_map,
-            )
-            .await?
+            let pool = self.account_svc.tui_database();
+            let current =
+                continuation_account(pool.clone(), (principal.id, original_session), &body_map)
+                    .await;
+            // 先读活动归属，再读恢复凭据。后台可能在两次读取间确认原进程退出。
+            if reconnect_key.is_some()
+                && let Some(row) = recovery_row(&pool, principal.id, original_session, &body_map)
+                    .await
+                    .inspect_err(|_| diagnostics::tui_admission_rejected("tui_recovery_lookup"))?
+            {
+                Some(row.account_id)
+            } else {
+                current.inspect_err(|error| {
+                    if matches!(error, AppError::ServiceUnavailable(_)) {
+                        diagnostics::tui_admission_rejected("tui_tool_owner_lookup");
+                    }
+                })?
+            }
         } else {
             None
         };
@@ -2592,6 +2653,9 @@ impl GatewayService {
             let selected = match selection.inspect_err(|error| {
                 if matches!(error, AppError::ServiceUnavailable(_)) {
                     diagnostics::error_stage("account_selection");
+                    if tool_owner.is_some() {
+                        diagnostics::tui_admission_rejected("tui_tool_account_selection");
+                    }
                 }
             }) {
                 Ok(selected) => {
@@ -2683,7 +2747,13 @@ impl GatewayService {
                     request_profile.unwrap_or_else(|| {
                         profile_for_version(&device_profile(&account).env.version)
                     }),
-                ) {
+                )
+                .or_else(|| {
+                    (account.request_backend == TUI_V2
+                        && native_title
+                        && warmup_config.title_enabled)
+                        .then_some(WarmupInterceptType::JsonTitle)
+                }) {
                     if should_bind_session {
                         let _ = self
                             .account_svc
@@ -2757,15 +2827,22 @@ impl GatewayService {
             if method == "POST" && path == "/v1/messages" && account.request_backend == TUI_V2 {
                 let route = tui_route
                     .as_ref()
-                    .ok_or_else(|| AppError::ServiceUnavailable("V2 路由未就绪".into()))?;
+                    .ok_or_else(|| {
+                        diagnostics::tui_admission_rejected("tui_route_missing");
+                        AppError::ServiceUnavailable("V2 路由未就绪".into())
+                    })?;
                 let principal = api_token.ok_or(AppError::Unauthorized)?;
                 let request = scheduling_request
                     .as_ref()
-                    .ok_or_else(|| AppError::ServiceUnavailable("V2 入口需要 v3 准入".into()))?;
+                    .ok_or_else(|| {
+                        diagnostics::tui_admission_rejected("tui_admission_missing");
+                        AppError::ServiceUnavailable("V2 入口需要 v3 准入".into())
+                    })?;
                 if let Some(response) = session_policy_block::check_current().await? {
                     return Ok(response);
                 }
                 if route.binding.is_empty() {
+                    diagnostics::tui_admission_rejected("tui_binding_unregistered");
                     diagnostics::error_stage("tui_v2_readiness");
                     return Err(runtime_transport::tui_unbound(&account).await);
                 }
@@ -2773,16 +2850,17 @@ impl GatewayService {
                     return Err(AppError::BadRequest("V2 服务端会话不可由客户端声明".into()));
                 }
                 let fixture = runtime_transport::tui_fixture(&account);
-                let owner = (!native_summary && (original_session.is_none() || !fixture))
+                let auxiliary = native_summary || auxiliary_session_prefix.is_some();
+                let owner = (!auxiliary && (original_session.is_none() || !fixture))
                     .then_some((principal.id, original_session));
-                let returning_tool = !native_summary && tui_tool_history::has_result(&body_map);
+                let returning_tool = !auxiliary && tui_tool_history::has_result(&body_map);
                 if owner.is_some() && returning_tool && tool_owner != Some(account.id) {
                     return Err(AppError::BadRequest(
                         "未找到可接续的工具轮，请用原入口令牌和会话提交原工具组。若原轮已结束，请发起新一轮".into(),
                     ));
                 }
                 if (returning_tool || agent_account == Some(account.id))
-                    && !native_summary
+                    && !auxiliary
                     && let Some(signal) = cutover.as_ref()
                 {
                     signal.protect_tui();
@@ -2794,19 +2872,7 @@ impl GatewayService {
                         .tui_reconnects
                         .reserve(key, account.id, &route.binding)?
                     {
-                        Reservation::First(writer) => {
-                            if replay_owner.is_some() && recovery.is_none() {
-                                // 选号期间旧缓存可能已回收。重新读取原回执，冷恢复仍须发送器出具证明。
-                                recovery = recovery_row(
-                                    &self.account_svc.tui_database(),
-                                    principal.id,
-                                    original_session,
-                                    &body_map,
-                                )
-                                .await?;
-                            }
-                            Some(writer)
-                        }
+                        Reservation::First(writer) => Some(writer),
                         Reservation::Existing(reply) => {
                             diagnostics::selected_account(account.id);
                             return reply.subscribe(false).await;
@@ -2826,6 +2892,19 @@ impl GatewayService {
                     (returning_tool && owner.is_some()).then_some(route.binding.as_str()),
                 )
                 .await?;
+                // 选号与就绪检查期间原进程可能已退出。持原账号路由读锁时按最新回执阶段准备。
+                let recovery = if reconnect.is_some() && fork.is_none() {
+                    recovery_row(
+                        &self.account_svc.tui_database(),
+                        principal.id,
+                        original_session,
+                        &body_map,
+                    )
+                    .await
+                    .inspect_err(|_| diagnostics::tui_admission_rejected("tui_recovery_lookup"))?
+                } else {
+                    None
+                };
                 let checking_recovery = recovery.is_some();
                 let (binding, mut turn, draining) = route
                     .begin_v2(
@@ -2835,14 +2914,26 @@ impl GatewayService {
                         &body_map,
                         &sender,
                         returning_tool,
-                        recovery.take(),
+                        recovery,
+                        fork.as_ref(),
                     )
-                    .await?;
+                    .await
+                    .inspect_err(|error| {
+                        if matches!(error, AppError::ServiceUnavailable(_)) {
+                            diagnostics::error_stage("tui_v2_binding");
+                        }
+                    })?;
                 let assigned_session = turn
                     .as_ref()
                     .and_then(NativeTurn::stateless_session)
                     .map(|session_id| format!("{SERVER_SESSION_PREFIX}{session_id}"));
-                let sender_session = original_session
+                // 辅助轮复用公开会话的账号和用量归属。执行键独立，避免等原轮归还工具会话。
+                let auxiliary_session = auxiliary_session_prefix
+                    .zip(original_session)
+                    .map(|(prefix, session)| format!("{prefix}{session}"));
+                let sender_session = auxiliary_session
+                    .as_deref()
+                    .or(original_session)
                     .or(assigned_session.as_deref())
                     .ok_or_else(|| AppError::Internal("V2 会话登记缺失".into()))?;
                 let owned_tool_group = turn.as_ref().is_some_and(NativeTurn::owns_continuation);
@@ -2853,7 +2944,7 @@ impl GatewayService {
                         &body_map,
                     )
                 });
-                let mut prepared = runtime_transport::prepare_tui(
+                let prepared = runtime_transport::prepare_tui(
                     sender,
                     principal.id,
                     sender_session,
@@ -2864,6 +2955,7 @@ impl GatewayService {
                         agent_summary: native_summary,
                         oauth_file: account.auth_type == AccountAuthType::Oauth,
                         body_policy,
+                        system_prompt_policy: account.tui_system_prompt_policy,
                         signature_repair: Some(repair_session.as_deref().is_some_and(|session| {
                             self.native_signature_repairs.contains(session, &body_map)
                         })),
@@ -2879,12 +2971,24 @@ impl GatewayService {
                         message: "当前账号发送器未确认这轮的恢复凭据。请核对原会话、工具回执和请求参数，使用旧版账号后台时请更新后重试",
                     },
                     error => error,
-                })
-                .inspect_err(|error| {
-                    if let Some(writer) = &reconnect {
-                        writer.rejected(error);
+                });
+                let mut prepared = match prepared {
+                    Ok(prepared) => prepared,
+                    Err(error) => {
+                        diagnostics::observe_tui_model(
+                            diagnostics::TuiModelObservation::RejectedBeforeSend,
+                        );
+                        if let Some(turn) = turn.take()
+                            && let Err(release_error) = turn.release_rejected_prepare().await
+                        {
+                            warn!(account_id = account.id, %release_error, "V2 准备拒绝后的回执待对账");
+                        }
+                        if let Some(writer) = &reconnect {
+                            writer.rejected(&error);
+                        }
+                        return Err(error);
                     }
-                })?;
+                };
                 prepared.verify_input_policy(&body_map)?;
                 if let Some(turn) = &mut turn {
                     turn.confirm_recovery(prepared.recovered).await?;
@@ -2900,7 +3004,7 @@ impl GatewayService {
                         session.as_ref().and_then(|s| s.source_header),
                     );
                 }
-                if (turn.is_some() || native_summary) && owned_tool_group != prepared.continuation {
+                if (turn.is_some() || auxiliary) && owned_tool_group != prepared.continuation {
                     return Err(AppError::ServiceUnavailable(
                         "V2 sender 工具归属与登记不符".into(),
                     ));
@@ -2932,14 +3036,20 @@ impl GatewayService {
                 if account.upstream_session_pool_enabled
                     && account.upstream_session_pool_size > 0
                     && client_type == ClientType::ClaudeCode
-                    && prepared.supports_session_mapping()
                     && let Some(real_session) = native_session_candidate(
                         native_header_map.get_all("x-claude-code-session-id").iter(),
                         |value| value.to_str().ok(),
                         &body_map,
                     )
                     && Some(real_session.as_str()) == original_session
+                    && (native_title || prepared.supports_session_mapping())
                 {
+                    if native_title && !prepared.supports_title_session_mapping() {
+                        diagnostics::error_stage("tui_prepare_exchange");
+                        return Err(AppError::ServiceUnavailable(
+                            "V2 标题会话池需要配套的账号发送器".into(),
+                        ));
+                    }
                     // 池只接触已获准提交的原生会话。原预留和工具归属始终使用入站值。
                     rewrite = await_preparation(
                         Some(request),
@@ -2981,8 +3091,10 @@ impl GatewayService {
                         prepared.continuation,
                     )
                     .await?;
-                let ttfb_timeout = request.remaining()?.min(UPSTREAM_TTFB_TIMEOUT);
-                let repair_deadline = TokioInstant::now() + ttfb_timeout;
+                request.check_deadline()?;
+                let ttfb_deadline = request
+                    .deadline()
+                    .min(TokioInstant::now() + UPSTREAM_TTFB_TIMEOUT);
                 let started = std::time::Instant::now();
                 let usage_started_at = Utc::now();
                 let delivery = if let (Some(writer), Some(turn)) = (&reconnect, &mut turn) {
@@ -3017,13 +3129,50 @@ impl GatewayService {
                     trace.commit_native(started);
                 }
                 let response = prepared
-                    .submit_with_account_credentials(ttfb_timeout, credentials)
+                    .submit_with_account_credentials(
+                        ttfb_deadline,
+                        credentials,
+                        delivery.as_ref().and(before_headers.as_ref()),
+                    )
                     .await
-                    .inspect_err(|_| {
+                    .inspect_err(|error| {
+                        diagnostics::tui_reply_event("gateway_tui_private_body", "no_response");
+                        if matches!(error, AppError::BadGateway(_)) {
+                            diagnostics::tui_submission_unknown();
+                        } else {
+                            diagnostics::error_stage("tui_send_http");
+                        }
                         if let Some(trace) = &mut wire_attempt {
                             trace.transport_error();
                         }
                     })?;
+                let sender_rejected_before_model = matches!(
+                    response.status(),
+                    StatusCode::TOO_MANY_REQUESTS | StatusCode::SERVICE_UNAVAILABLE
+                )
+                .then(|| {
+                    runtime_transport::tui_failure_stage(
+                        response.headers(),
+                        &[
+                            runtime_transport::TUI_SENDER_CONFIG,
+                            runtime_transport::TUI_SEND_CLAIM,
+                            runtime_transport::TUI_SUBMISSION_LEDGER,
+                            runtime_transport::TUI_WORKSPACE_BIND,
+                        ],
+                    )
+                })
+                .flatten();
+                if let Some(stage) = sender_rejected_before_model {
+                    diagnostics::error_stage(stage);
+                }
+                let release_sender_rejection = matches!(
+                    sender_rejected_before_model,
+                    Some(
+                        runtime_transport::TUI_SUBMISSION_LEDGER
+                            | runtime_transport::TUI_WORKSPACE_BIND
+                    )
+                ) || (!fixture
+                    && runtime_transport::tui_cli_input_rejected(&response));
                 let file_rejected_before_model = failed_token.is_some()
                     && response.status() == StatusCode::SERVICE_UNAVAILABLE
                     && runtime_transport::tui_projection_marker(
@@ -3031,11 +3180,11 @@ impl GatewayService {
                         runtime_transport::TUI_ERROR_SOURCE,
                         "oauth_file_before_model",
                     );
-                if file_rejected_before_model
+                if (file_rejected_before_model || release_sender_rejection)
                     && let Some(turn) = &turn
                     && let Err(error) = turn.release_tui_before_model().await
                 {
-                    warn!(account_id = account.id, %error, "V2 凭据拒绝后的回执待对账");
+                    warn!(account_id = account.id, %error, "V2 发送前拒绝后的回执待对账");
                 }
                 if !prepared.repair_pending {
                     runtime_transport::recover_tui_oauth_after_response(
@@ -3057,7 +3206,7 @@ impl GatewayService {
                         capture_state,
                         started,
                         fixture,
-                        file_rejected_before_model,
+                        file_rejected_before_model || sender_rejected_before_model.is_some(),
                         false,
                     )
                     .await?;
@@ -3073,7 +3222,7 @@ impl GatewayService {
                         .await
                         .map_err(|_| AppError::BadGateway("V2 签名拒绝响应无效".into()))?;
                     response = Response::from_parts(parts, Body::from(rejection));
-                    let admission = timeout_at(repair_deadline, async {
+                    let admission = timeout_at(ttfb_deadline, async {
                         let permit = request.admit(&account).await?;
                         let configuration = route
                             .allow_submit(
@@ -3093,7 +3242,7 @@ impl GatewayService {
                     .await;
                     if let Ok(Ok(Some((permit, configuration)))) = admission
                         && let Some(remaining) =
-                            repair_deadline.checked_duration_since(TokioInstant::now())
+                            ttfb_deadline.checked_duration_since(TokioInstant::now())
                         && !remaining.is_zero()
                     {
                         let retry_id = Uuid::new_v4();
@@ -3140,6 +3289,7 @@ impl GatewayService {
                 }
                 let codings = response_content_codings(response.headers());
                 if response.status().is_client_error()
+                    && !release_sender_rejection
                     && let Some(turn) = turn.as_mut()
                     && let Err(error) = turn.retire_v2_rejection().await
                 {
@@ -3147,12 +3297,20 @@ impl GatewayService {
                 }
                 let status = response.status().as_u16();
                 let mut usage = response.status().is_success().then(|| {
-                    UsageCapture::new(
+                    let mut capture = UsageCapture::new(
                         self.usage_store.clone(),
                         account.id,
                         &body_map,
                         usage_started_at,
-                    )
+                    );
+                    if response
+                        .extensions()
+                        .get::<runtime_transport::TuiOpeningUsagePlaceholder>()
+                        .is_some()
+                    {
+                        capture.ignore_opening_usage();
+                    }
+                    capture
                 });
                 let retained_usage = if reconnect.is_some() && status == 200 {
                     usage
@@ -4268,11 +4426,13 @@ impl GatewayService {
         capture_state: Option<&'static str>,
         started: std::time::Instant,
         fixture: bool,
-        file_rejected_before_model: bool,
+        rejected_before_model: bool,
         repaired: bool,
     ) -> Result<Response, AppError> {
+        let cli_input_rejected = !fixture && runtime_transport::tui_cli_input_rejected(&response);
+        let rejected_before_model = rejected_before_model || cli_input_rejected;
         // 账号端在模型提交前终止时，这次预留不会再产生 TLS 快照。
-        let capture_state = if capture_state == Some("queued") && file_rejected_before_model {
+        let capture_state = if capture_state == Some("queued") && rejected_before_model {
             Some("not_submitted")
         } else if capture_state == Some("queued") {
             match response
@@ -4296,6 +4456,59 @@ impl GatewayService {
         if !fixture {
             self.observe_tui_passive_usage(account.id, &response);
         }
+        let body_source = response
+            .headers()
+            .get(runtime_transport::TUI_BODY_SOURCE)
+            .and_then(|header| header.to_str().ok())
+            .and_then(TuiBodySource::from_wire);
+        let session_origin = response
+            .headers()
+            .get(runtime_transport::TUI_SESSION_ORIGIN)
+            .and_then(|header| header.to_str().ok())
+            .and_then(TuiSessionOrigin::from_wire);
+        let instruction_location = response
+            .headers()
+            .get(runtime_transport::TUI_INSTRUCTION_LOCATION)
+            .and_then(|header| header.to_str().ok())
+            .and_then(TuiInstructionLocation::from_wire);
+        let provider_error_source = runtime_transport::tui_failure_stage(
+            response.headers(),
+            &[
+                "local_provider_http",
+                "managed_oauth_http",
+                "local_provider_event",
+            ],
+        );
+        let model_response_received = body_source.is_some_and(|source| {
+            runtime_transport::tui_projection_marker(
+                response.headers(),
+                runtime_transport::TUI_BODY_SOURCE,
+                source.as_str(),
+            )
+        }) || matches!(
+            provider_error_source,
+            Some("local_provider_http" | "managed_oauth_http")
+        );
+        let opening_usage_placeholder = !fixture
+            && model_response_received
+            && body_source == Some(TuiBodySource::InteractiveCli)
+            && runtime_transport::tui_projection_marker(
+                response.headers(),
+                runtime_transport::TUI_OPENING_USAGE_PLACEHOLDER,
+                "1",
+            );
+        if !fixture {
+            if rejected_before_model {
+                diagnostics::observe_tui_model(
+                    diagnostics::TuiModelObservation::RejectedBeforeSend,
+                );
+            } else if model_response_received {
+                // 私有头已经收到模型证据，公开投影或正文读取随后仍可能失败。
+                diagnostics::observe_tui_model(
+                    diagnostics::TuiModelObservation::ResponseReceived,
+                );
+            }
+        }
         let mut response =
             runtime_transport::tui_public_response(response, (!fixture).then_some(account.id))
                 .await
@@ -4304,11 +4517,37 @@ impl GatewayService {
                         trace.transport_error();
                     }
                 })?;
+        let refusal_projection = response
+            .extensions_mut()
+            .remove::<RefusalProjectionFailure>()
+            .filter(|_| !fixture && provider_error_source == Some("local_provider_event"));
+        if refusal_projection.is_some() && !model_response_received {
+            diagnostics::observe_tui_model(diagnostics::TuiModelObservation::ResponseReceived);
+        }
         let projected = !fixture
             && response
                 .extensions_mut()
                 .remove::<runtime_transport::TuiGatewayIds>()
                 .is_some();
+        let opening_usage_placeholder =
+            opening_usage_placeholder && projected && response.status() == StatusCode::OK;
+        if opening_usage_placeholder {
+            response
+                .extensions_mut()
+                .insert(runtime_transport::TuiOpeningUsagePlaceholder);
+        }
+        let submission_unknown = !fixture
+            && response.status() == StatusCode::BAD_GATEWAY
+            && !model_response_received
+            && provider_error_source.is_none()
+            && !rejected_before_model;
+        if submission_unknown {
+            // JSON 委托只证明账号侧交付了私有响应。缺少模型来源时，仍需保留提交状态未知。
+            diagnostics::tui_submission_unknown();
+            if !projected && let Some(mut attempt) = wire_attempt.take() {
+                attempt.transport_error();
+            }
+        }
         if projected || wire_attempt.is_some() {
             // 诊断反馈仍使用实际正文终态。收到 HTTP 200 只代表已经打开响应。
             if let Some(mut attempt) =
@@ -4317,21 +4556,41 @@ impl GatewayService {
                 if repaired {
                     attempt.tui_thinking_removed();
                 }
+                if cli_input_rejected {
+                    attempt.tui_cli_input_rejected();
+                }
+                if let Some(failure) = &refusal_projection {
+                    attempt.tui_refusal_projection_failed(failure.upstream_status);
+                }
+                if submission_unknown {
+                    attempt.tui_submission_unknown();
+                    // 与裸私有 502 一致，账号调度仍收到传输失败反馈。
+                    request.response_headers(account.id, response.status().as_u16());
+                } else {
+                    attempt.with_feedback(request.clone());
+                }
+                attempt.tui_sources(body_source, session_origin, instruction_location);
+                if opening_usage_placeholder {
+                    attempt.ignore_opening_usage();
+                }
                 attempt.tui_capture(attempt_id, capture_state);
-                attempt.with_feedback(request.clone());
                 attempt.commit_native(started);
-                attempt.headers(
-                    response.status().as_u16(),
-                    response.headers(),
-                    response_content_codings(response.headers()),
-                );
+                if !submission_unknown && refusal_projection.is_none() {
+                    attempt.headers(
+                        response.status().as_u16(),
+                        response.headers(),
+                        response_content_codings(response.headers()),
+                    );
+                }
                 return Ok(attempt.wrap(response));
             }
             if response.status().is_success() {
                 return Ok(response);
             }
         }
-        request.response_headers(account.id, response.status().as_u16());
+        if refusal_projection.is_none() {
+            request.response_headers(account.id, response.status().as_u16());
+        }
         Ok(response)
     }
 
@@ -7847,6 +8106,83 @@ fn is_json_title_request(body: &serde_json::Value, profile: &ClaudeCodeProfile) 
         })
 }
 
+/// 核对固定客户端自动生成的结构化标题。@param body 已核对来源的公开 Messages。
+/// @return 是否可使用不拥有主轮的标题预留。
+fn is_tui_session_title(body: &JsonValue) -> bool {
+    if body["stream"] != true
+        || body.get("tool_choice").is_some()
+        || body
+            .get("tools")
+            .is_some_and(|tools| tools.as_array().is_none_or(|tools| !tools.is_empty()))
+    {
+        return false;
+    }
+    let Some([billing, identity, title_system]) = body["system"].as_array().map(Vec::as_slice)
+    else {
+        return false;
+    };
+    // 模型和预算随客户端配置而变。摘要与运行时固定 2.1.293 的标题提示词一致。
+    const TITLE_SYSTEM_SHA: &str =
+        "765b5ba2fa0a315a3c749c7e54bf5cef450084a745eb01e66371b8b6359d4752";
+    if !is_claude_code_billing_system_block(billing)
+        || !is_claude_code_identity_system_block(identity)
+        || title_system["type"] != "text"
+        || !title_system["text"].as_str().is_some_and(|text| {
+            format!("{:x}", Sha256::digest(text.as_bytes())) == TITLE_SYSTEM_SHA
+        })
+    {
+        return false;
+    }
+    let Some([message]) = body["messages"].as_array().map(Vec::as_slice) else {
+        return false;
+    };
+    let Some([content]) = message["content"].as_array().map(Vec::as_slice) else {
+        return false;
+    };
+    let format = &body["output_config"]["format"];
+    let schema = &format["schema"];
+    message["role"] == "user"
+        && content["type"] == "text"
+        && content["text"].as_str().is_some_and(|text| {
+            text.strip_prefix("<session>\n")
+                .is_some_and(|transcript| transcript.contains("\n</session>\n\n"))
+        })
+        && format["type"] == "json_schema"
+        && schema["type"] == "object"
+        && schema["required"] == serde_json::json!(["title"])
+        && schema["additionalProperties"] == false
+        && schema["properties"].as_object().is_some_and(|properties| {
+            properties.len() == 1
+                && properties
+                    .get("title")
+                    .is_some_and(|title| title["type"] == "string")
+        })
+}
+
+/// 核对固定 2.1.293 建议请求。@param body 已核对来源的公开 Messages。
+/// @return 是否为已经观测的独立建议输入。
+fn is_tui_prompt_suggestion(body: &JsonValue) -> bool {
+    const SUGGESTION_SHA: &str = "848ab6d7d37cb9e01ff58d81467438a21ff26e5287bbf510e76d387df592fb0d";
+    let Some((last, history)) = body["messages"]
+        .as_array()
+        .and_then(|rows| rows.split_last())
+    else {
+        return false;
+    };
+    // 原版保留普通对话与工具声明用于缓存。独立建议指令是最后一条完整 user 消息。
+    body["stream"] == true
+        && last["role"] == "user"
+        && history.last().is_some_and(|row| row["role"] == "assistant")
+        && body
+            .pointer("/system/0/text")
+            .and_then(JsonValue::as_str)
+            .is_some_and(|text| text.starts_with("x-anthropic-billing-header: cc_version=2.1.293."))
+        && last["content"].as_str().is_some_and(|text| {
+            text.starts_with("[SUGGESTION MODE:")
+                && format!("{:x}", Sha256::digest(text.as_bytes())) == SUGGESTION_SHA
+        })
+}
+
 fn is_text_title_or_warmup_request(body: &serde_json::Value) -> bool {
     request_text_items(body).any(|text| {
         text.contains("Please write a 5-10 word title for the following conversation:")
@@ -10557,6 +10893,7 @@ mod tests {
             agy_gif_frames_enabled: false,
             agy_disable_safety_filtering: false,
             agy_system_prompt_as_user_reminder: false,
+            tui_system_prompt_policy: Default::default(),
             id: 42,
             name: "测试账号".into(),
             email: "user@example.com".into(),

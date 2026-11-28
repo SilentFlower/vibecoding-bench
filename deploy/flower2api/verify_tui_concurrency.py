@@ -207,23 +207,28 @@ class ModelHandler(BaseHTTPRequestHandler):
 class Terminal:
     """以普通 PTY 驱动官方进程，名额仍由真正的执行器管理。"""
 
-    def __init__(self, binary, folder, session_id, base_url, token, setsid, *, tools='', extra_args=(), hooks=None):
+    def __init__(self, binary, folder, session_id, base_url, token, setsid, *, tools='', extra_args=(), hooks=None,
+                 model=DEFAULT_MODEL, resume=None):
         """建隔离 HOME 和官方 Popen。@param binary 官方程序。@param folder 私有目录。@param session_id 会话。
         @param base_url 回环端点。@param token 合成凭据。@param setsid PTY 工具。
-        @param tools 可用内置工具。@param extra_args 公开 CLI 参数。@param hooks 公开 hook 设置。@return 无。
+        @param tools 可用内置工具。@param extra_args 公开 CLI 参数。@param hooks 公开 hook 设置。
+        @param model 本轮模型。@param resume CLI 已保存的原生会话档案。@return 无。
         """
         self.stop_file = folder/'stop.jsonl'
         self.stopped = Event()
         self.ready = Event()
-        folder.mkdir(mode=0o700)
         home, workspace = folder/'home', folder/'work'
         config = home/'.claude'
-        config.mkdir(parents=True)
-        workspace.mkdir()
-        # 使用官方已经写出的最小引导字段，仅信任此次新建的空工作目录。
-        write_json(config/'.claude.json', {
-            'hasCompletedOnboarding': True, 'lastOnboardingVersion': VERSION,
-            'projects': {str(workspace): {'hasTrustDialogAccepted': True}}})
+        if resume is None:
+            folder.mkdir(mode=0o700)
+            config.mkdir(parents=True)
+            workspace.mkdir()
+            # 使用官方已经写出的最小引导字段，仅信任此次新建的空工作目录。
+            write_json(config/'.claude.json', {
+                'hasCompletedOnboarding': True, 'lastOnboardingVersion': VERSION,
+                'projects': {str(workspace): {'hasTrustDialogAccepted': True}}})
+        session_args = ['--session-id', session_id] if resume is None else ['--resume', str(resume)]
+        log_suffix = '' if resume is None else '-resume'
         hook = shlex.join([sys.executable, str(Path(__file__).resolve()), '--record-stop'])
         settings = folder/'settings.json'
         write_json(settings, {'hooks': {'Stop': [{'hooks': [{'type': 'command', 'command': hook}]}], **(hooks or {})}})
@@ -238,9 +243,9 @@ class Terminal:
         try:
             ioctl(slave, TIOCSWINSZ, pack('HHHH', 35, 110, 0, 0))
             self.process = Popen(
-                [setsid, '--ctty', str(binary), '--model', DEFAULT_MODEL, '--session-id', session_id,
+                [setsid, '--ctty', str(binary), '--model', model, *session_args,
                  '--name', 'Local capacity verification', '--strict-mcp-config', '--tools', tools,
-                 '--settings', str(settings), '--debug-file', str(folder/'cli-debug.log'), *extra_args],
+                 '--settings', str(settings), '--debug-file', str(folder/f'cli-debug{log_suffix}.log'), *extra_args],
                 stdin=slave, stdout=slave, stderr=slave, cwd=workspace, env=environment, close_fds=True,
             )
         except BaseException:
@@ -248,7 +253,7 @@ class Terminal:
             raise
         finally:
             os.close(slave)
-        self.reader = Thread(target=self._drain, args=(folder/'terminal.raw',), daemon=True)
+        self.reader = Thread(target=self._drain, args=(folder/f'terminal{log_suffix}.raw',), daemon=True)
         self.reader.start()
 
     def _drain(self, path):

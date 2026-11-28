@@ -18,6 +18,7 @@ use crate::model::account::{
     CliProcessImport, DEFAULT_UPSTREAM_SESSION_REFRESH_POLICY,
     DEFAULT_UPSTREAM_SESSION_TTL_MINUTES, MAX_UPSTREAM_SESSION_POOL_SIZE,
     MAX_UPSTREAM_SESSION_TTL_MINUTES, MIN_UPSTREAM_SESSION_TTL_MINUTES, OAuthCredentialImport,
+    TuiSystemPromptPolicy,
 };
 use crate::model::credential_ownership::CredentialOwnershipInput;
 use crate::service::account_work::{AccountWorkAdmission, AccountWorkControls};
@@ -1078,12 +1079,23 @@ impl AccountService {
     /// @param a 需要持久化的完整账号配置。
     /// @return 保存结果；无效控制线不会写入。
     pub async fn update_account(&self, a: &Account) -> Result<(), AppError> {
+        self.update_account_with_system_prompt(a, None).await
+    }
+
+    /// 校验并保存账号配置及同批显式提交的 V2 动作。
+    /// @param a 需要持久化的完整账号配置。@param system_prompt 可选的显式动作。
+    /// @return 校验或保存结果。
+    pub async fn update_account_with_system_prompt(
+        &self,
+        a: &Account,
+        system_prompt: Option<TuiSystemPromptPolicy>,
+    ) -> Result<(), AppError> {
         let mut normalized = a.clone();
         normalize_account_auth(&mut normalized)?;
         normalize_account_subscription(&mut normalized)?;
         normalize_upstream_session_pool_config(&mut normalized)?;
         validate_account_usage_limits(&normalized)?;
-        self.store.update(&normalized).await?;
+        self.store.update_with_system_prompt(&normalized, system_prompt).await?;
         if let Some(scheduler) = &self.scheduler {
             scheduler.account_updated(a.id);
         }
@@ -3924,6 +3936,7 @@ mod tests {
             agy_gif_frames_enabled: false,
             agy_disable_safety_filtering: false,
             agy_system_prompt_as_user_reminder: false,
+            tui_system_prompt_policy: Default::default(),
             id: 1,
             name: "测试账号".into(),
             email: "user@example.com".into(),
@@ -3977,6 +3990,7 @@ mod tests {
             agy_gif_frames_enabled: false,
             agy_disable_safety_filtering: false,
             agy_system_prompt_as_user_reminder: false,
+            tui_system_prompt_policy: Default::default(),
             id: 0,
             name: "测试账号".into(),
             email: email.into(),

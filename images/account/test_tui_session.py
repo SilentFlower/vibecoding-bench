@@ -17,8 +17,8 @@ from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/orchestrator"))
 from tui_capacity import TuiCapacity
-from tui_reconnect import ReceiptCheckpoints
-from tui_session import SessionDriver, _install_mod
+from tui_reconnect import ReceiptCheckpoints, digest
+from tui_session import SessionDriver, _cc_fork_scope, _install_mod, _receipt_request
 from tui_messages import (
     ModelResponseError,
     SubagentAmbiguousError,
@@ -29,6 +29,7 @@ from tui_messages import (
     history_digest,
     input_message,
     provider_session,
+    receipt_snapshot,
     tool_receipts,
     wire_events,
 )
@@ -36,6 +37,99 @@ from tui_messages import (
 
 class SessionTests(unittest.TestCase):
     """固定版结构化事件和账号内原生进程预留的回归。"""
+
+    def test_cc_fork_scope_is_bound_to_the_current_receipt_revision(self):
+        """完整 CC 分叉按根选项核验，保留旧原回执的读取与提交。@return 无。"""
+        key = ("account", "generation", "principal", "session")
+        identity = {**self._identity("cc-fork"), "input_format": "claude_code",
+                    "model_headers": {"anthropic-beta": "original"}}
+        body = self._body()
+        scope = _cc_fork_scope(body, identity)
+        self.assertEqual(_cc_fork_scope({**body, "messages": [], "stream": False}, identity), scope)
+        self.assertNotEqual(_cc_fork_scope({**body, "max_tokens": 999}, identity), scope)
+        self.assertNotEqual(_cc_fork_scope(
+            body, {**identity, "model_headers": {"anthropic-beta": "changed"}},
+        ), scope)
+        with TemporaryDirectory() as directory:
+            with closing(ReceiptCheckpoints(directory)) as checkpoints:
+                old = checkpoints.offer(key, "session", "history", [], 60)
+                self.assertIsNone(checkpoints.cc_fork_scope(key, old))
+                self.assertTrue(checkpoints.submit(key, old, "回执摘要", recovered=False))
+                revision = checkpoints.offer(key, "session", "history", [], 60, cc_fork_scope=scope)
+            with closing(ReceiptCheckpoints(directory)) as checkpoints:
+                self.assertEqual(checkpoints.cc_fork_scope(key, revision), scope)
+                self.assertIsNone(checkpoints.cc_fork_scope(key, old))
+                self.assertIsNone(checkpoints.cc_fork_scope((*key, "other"), revision))
+                self.assertIsNone(checkpoints.find(key)[5])
+                next_revision = checkpoints.offer(key, "session", "history", [], 60)
+                self.assertIsNone(checkpoints.cc_fork_scope(key, next_revision))
+                self.assertIsNone(checkpoints.cc_fork_scope(key, revision))
+                self.assertTrue(checkpoints.submit(key, next_revision, "下一回执摘要", recovered=True))
+
+    def test_receipt_digest_uses_the_frozen_ttl_and_preserves_old_default(self):
+        """原生重交只沿根轮归一 TTL，兼容旧存储的摘要。@return 无。"""
+        body = self._body()
+        default = self._identity("frozen-ttl")
+        forced = {**default, "body_policy": {"sub2api": False, "ttl": "5m", "adaptive": False}}
+        self.assertEqual(_receipt_request(body, default, cache_ttl="5m"), _receipt_request(body, forced))
+        self.assertEqual(_receipt_request(body, forced, cache_ttl="off"), _receipt_request(body, default))
+        self.assertNotEqual(_receipt_request(body, forced), _receipt_request(body, default))
+        changed = {**forced, "body_policy": {**forced["body_policy"], "adaptive": True}}
+        self.assertNotEqual(_receipt_request(body, changed, cache_ttl="off"), _receipt_request(body, default))
+
+    def test_equivalent_auto_receipt_uses_original_claimed_digest(self):
+        """三种 auto 表示接续旧认领摘要，保留其它字段比较。@return 无。"""
+        omitted = {**self._body(), "tools": [{"name": "LookupNote"}]}
+        bare = {**omitted, "tool_choice": {"type": "auto"}}
+        explicit = {**omitted, "tool_choice": {"type": "auto", "disable_parallel_tool_use": False}}
+        identity = self._identity("auto-choice")
+        shapes = (omitted, bare, explicit)
+        stored = [digest([body, {}, None, None]) for body in shapes]
+        for body in shapes:
+            self.assertEqual(_receipt_request(body, identity), stored[1])
+            for previous in stored:
+                self.assertEqual(_receipt_request(body, identity, previous=previous), previous)
+        for changed in ({**omitted, "stream": False}, {**omitted, "tools": []}, {**omitted, "tool_choice": None},
+                        {**omitted, "tool_choice": {"type": "auto", "disable_parallel_tool_use": 0}},
+                        {**omitted, "tool_choice": {"type": "auto", "disable_parallel_tool_use": True}}):
+            with self.subTest(changed=changed):
+                self.assertNotIn(_receipt_request(changed, identity, previous=stored[0]), stored)
+        with TemporaryDirectory() as directory:
+            key = ("auto-choice", "session-1")
+            with closing(ReceiptCheckpoints(directory)) as checkpoints:
+                revision = checkpoints.offer(key, "session-1", "history", [], 60)
+                self.assertTrue(checkpoints.submit(key, revision, stored[0], recovered=False))
+            with closing(ReceiptCheckpoints(directory)) as checkpoints:
+                previous = checkpoints.find(key)[3]
+                self.assertTrue(checkpoints.submit(
+                    key, revision, _receipt_request(explicit, identity, previous=previous), recovered=True,
+                ))
+
+    def test_custom_tool_receipt_keeps_the_old_claim_and_rejects_real_changes(self):
+        """新旧摘要支持等价类型，工具表与条件消费继续绑定原回执。@return 无。"""
+        tool = {"name": "LookupNote", "input_schema": {"type": "object", "additionalProperties": False}}
+        other = {**tool, "name": "SetTag"}
+        original = {**self._body(), "tools": [{**tool, "type": "custom"}, other]}
+        switched = {**original, "tools": [tool, {**other, "type": "custom"}]}
+        identity = self._identity("custom-tool")
+        old = digest([{**original, "tool_choice": {"type": "auto"}}, {}, None, None])
+        self.assertEqual(_receipt_request(original, identity), _receipt_request(switched, identity))
+        self.assertEqual(_receipt_request(switched, identity, previous=old), old)
+        for changed in (
+            [*reversed(switched["tools"])],
+            [{**tool, "type": None}, other],
+            [{**tool, "type": "text_editor_20250728"}, other],
+            [{**tool, "input_schema": {**tool["input_schema"], "additionalProperties": 0}}, other],
+        ):
+            with self.subTest(changed=changed):
+                self.assertNotEqual(_receipt_request({**switched, "tools": changed}, identity, previous=old), old)
+        with TemporaryDirectory() as directory, closing(ReceiptCheckpoints(directory)) as checkpoints:
+            key = ("custom-tool", "session-1")
+            revision = checkpoints.offer(key, "session-1", "history", [], 60)
+            self.assertTrue(checkpoints.submit(key, revision, old, recovered=False))
+            restored = _receipt_request(switched, identity, previous=checkpoints.find(key)[3])
+            self.assertTrue(checkpoints.submit(key, revision, restored, recovered=True))
+            self.assertFalse(checkpoints.submit(key, revision, restored, recovered=True))
 
     def test_protocol_headers_use_current_sdk_and_reject_unsupported_beta(self):
         """普通 API 校验同轮原生能力，协议值按准入结果覆盖默认值。@return 无。"""
@@ -56,16 +150,23 @@ class SessionTests(unittest.TestCase):
             with patch.object(actor, "_main_request", return_value=True), self.assertRaises(ModelResponseError) as caught:
                 actor.serve_model(SimpleNamespace(headers=sdk), {})
             self.assertEqual(caught.exception.status, 422)
+            self.assertEqual(caught.exception.source, "tui_cli_input_guard")
             self.assertEqual(json.loads(caught.exception.private_body)["error"]["code"], "unsupported_parameter")
             self.assertFalse(actor.step.claimed)
             driver.launcher.local_model_response.assert_not_called()
 
-    def test_native_dispatch_uses_one_authorized_frozen_submission(self):
+    def test_account_sender_uses_one_authorized_frozen_submission(self):
         """并发的同轮种子只能认领一次，错误账号授权及过期凭据保留原语义。@return 无。"""
         raw = encode(self._body())
         with closing(self._driver()) as driver, closing(driver.prepare(self._identity("native-send"), raw)) as handle:
             driver.managed_oauth = True
-            driver.native_dispatch = Mock()
+            driver.launcher = SimpleNamespace(managed_model_response=Mock())
+            response = BytesIO(b"data: {\"type\":\"error\",\"error\":{\"type\":\"api_error\"}}\n\n")
+            response.status = 200
+            response.headers = Message()
+            response.headers["Content-Type"] = "text/event-stream"
+            response.getheader = response.headers.get
+            driver.launcher.managed_model_response.return_value = response
             actor = handle.actor
             actor.oauth_file = True
             actor.step = SimpleNamespace(native=("turn", 1), native_model="chosen", claimed=False)
@@ -78,23 +179,86 @@ class SessionTests(unittest.TestCase):
             actor.serve_model(wrong, request)
             wrong.send_error.assert_called_once_with(409, "No pending model step")
             self.assertFalse(actor.step.claimed)
+            self.assertIsNone(handle.body_source)
             failed = Mock(headers={"Authorization": "Bearer " + handle.account_token})
             expires_at, handle.expires_at = handle.expires_at, 1
             with self.assertRaises(ModelResponseError) as expired:
                 actor.serve_model(failed, request)
             self.assertEqual(expired.exception.status, 503)
             handle.expires_at = expires_at
-            driver.native_dispatch.assert_not_called()
+            driver.launcher.managed_model_response.assert_not_called()
             peers = [Mock(headers=failed.headers) for _ in range(2)]
             with ThreadPoolExecutor(2) as pool:
                 list(pool.map(lambda peer: actor.serve_model(peer, request), peers))
-            driver.native_dispatch.assert_called_once()
+            driver.launcher.managed_model_response.assert_called_once()
             self.assertEqual(sum(peer.send_error.call_count for peer in peers), 1)
-            submission = driver.native_dispatch.call_args.args[2]
-            self.assertIs(submission.step, actor.step)
-            self.assertEqual(submission.body, raw)
-            self.assertNotIn(handle.account_token, repr(submission))
+            sent = driver.launcher.managed_model_response.call_args
+            self.assertEqual(sent.args, (raw,))
+            self.assertEqual(sent.kwargs["account_token"], handle.account_token)
+            self.assertIs(sent.kwargs["reservation"], handle.reservation)
+            self.assertEqual(handle.body_source, "account_sender")
             self.assertIsNone(handle.raw)
+
+    def test_cli_generation_plan_mismatch_is_local_before_model_submission(self):
+        """思考显示、固定预算、输出上限或强度不符时保留本地校验来源。@return 无。"""
+        adaptive = {"type": "adaptive", "display": "updates"}
+        fixed = {"type": "enabled", "budget_tokens": 1024, "display": "updates"}
+        for name, requested, actual in (
+            ("display", {"thinking": adaptive}, {"thinking": {**adaptive, "display": "summarized"}}),
+            ("thinking_budget", {"thinking": fixed}, {"thinking": {**fixed, "budget_tokens": 1025}}),
+            ("max_tokens", {"thinking": fixed}, {"max_tokens": 4095}),
+            ("effort", {"output_config": {"effort": "high"}}, {"output_config": {"effort": "low"}}),
+        ):
+            with self.subTest(name=name), closing(self._driver()) as driver:
+                driver.managed_oauth = True
+                identity = {**self._identity("generation-guard"), "native_cold_history": True}
+                body = {**self._body(), "model": "claude-sonnet-4-6", "max_tokens": 4096, **requested}
+                with closing(driver.prepare(identity, encode(body))) as handle:
+                    actor = handle.actor
+                    self.assertIsNotNone(actor.cold_history)
+                    actor.step = SimpleNamespace(native=("turn", 1), native_model=body["model"], claimed=False)
+                    driver.launcher = SimpleNamespace(managed_model_response=Mock())
+                    marker = "<system-reminder>\nprompt.submit hook additional context: " + actor.guard_text
+                    native = {**body, **actual, "messages": [
+                        {"role": "user", "content": [{"type": "text", "text": marker + "\n</system-reminder>"}]},
+                    ]}
+                    with self.assertRaises(ModelResponseError) as caught:
+                        actor.serve_model(Mock(headers={}), native, native_raw=encode(native))
+                    self.assertEqual(caught.exception.status, 422)
+                    self.assertEqual(caught.exception.source, "tui_cli_input_guard")
+                    self.assertEqual(json.loads(caught.exception.private_body)["error"]["code"], "unsupported_parameter")
+                    self.assertFalse(actor.step.claimed)
+                    driver.launcher.managed_model_response.assert_not_called()
+
+    def test_cli_tool_preservation_guards_are_local_before_model_submission(self):
+        """工具选择或历史保真检查失败时标明本地来源。@return 无。"""
+        for name in (
+            "matches_tool_choice",
+            "matches_history_tool_images",
+            "matches_history_empty_tool_results",
+            "matches_history_tool_text_blocks",
+            "matches_recovered_signatures",
+        ):
+            with self.subTest(name=name), closing(self._driver()) as driver:
+                driver.managed_oauth = True
+                identity = {**self._identity("tool-preservation-guard"), "native_cold_history": True}
+                body = {**self._body(), "model": "claude-sonnet-4-6"}
+                with closing(driver.prepare(identity, encode(body))) as handle:
+                    actor = handle.actor
+                    self.assertIsNotNone(actor.cold_history)
+                    actor.step = SimpleNamespace(native=("turn", 1), native_model=body["model"], claimed=False)
+                    driver.launcher = SimpleNamespace(managed_model_response=Mock())
+                    with (
+                        patch.object(actor, "_main_request", return_value=True),
+                        patch.object(type(actor.cold_history), name, return_value=False) as guard,
+                        self.assertRaises(ModelResponseError) as caught,
+                    ):
+                        actor.serve_model(Mock(headers={}), body, native_raw=encode(body))
+                    guard.assert_called_once_with(body)
+                    self.assertEqual((caught.exception.status, caught.exception.source), (422, "tui_cli_input_guard"))
+                    self.assertEqual(json.loads(caught.exception.private_body)["error"]["code"], "unsupported_parameter")
+                    self.assertFalse(actor.step.claimed)
+                    driver.launcher.managed_model_response.assert_not_called()
 
     def test_non_stream_accept_uses_sdk_for_upstream_sse(self):
         """公开非流式请求向模型取流时使用同轮 SDK 的 Accept。@return 无。"""
@@ -206,6 +370,37 @@ class SessionTests(unittest.TestCase):
                     ))
                 with self.assertRaises(ValueError):
                     restarted.prepare(child, raw)
+
+    def test_restore_native_receipt_reconstructs_original_root_policy_and_tool_names(self):
+        """恢复只接受同一根轮配置，保留本轮回执内容及原生工具名。@return 无。"""
+        identity = {**self._identity("external-native"), "native_cold_history": True}
+        tool = {"name": "LookupNote", "input_schema": {"type": "object"}}
+        body = {**self._body(), "system": "原轮指令", "tools": [tool]}
+        group = [{"type": "tool_use", "id": "tool_native", "name": tool["name"], "input": {}}]
+        returned = json.loads(self._returning(body, group, "tool_native"))
+        text_result = [{"type": "text", "text": "合成回执"}]
+        returned["messages"][-1]["content"][0]["content"] = text_result
+        with TemporaryDirectory() as root, closing(self._driver()) as first:
+            first.managed_oauth = True
+            first.checkpoints = ReceiptCheckpoints(root)
+            with closing(first.prepare(identity, encode(body))) as initial:
+                plan = initial.actor.cold_history
+                self.assertIsNotNone(plan)
+                self._offered(initial, *group)
+            first.close()
+            continuation = {**identity, "continuation_only": True, "client_system_prompt_policy": "user_reminder"}
+            with closing(self._driver()) as restarted:
+                restarted.managed_oauth = True
+                restarted.checkpoints = ReceiptCheckpoints(root)
+                with self.assertRaisesRegex(ValueError, "unsupported_parameter"):
+                    restarted.prepare(continuation, encode({**returned, "system": "替换已冻结的指令"}))
+                with closing(restarted.prepare(continuation, encode(returned))) as handle:
+                    self.assertEqual(handle.kind, "recovered")
+                    self.assertEqual(handle.actor.cold_history, plan)
+                    recovered = handle.actor.recovery_history
+                    self.assertEqual(recovered.history[-2]["content"][0]["name"], "mcp__flower__LookupNote")
+                    self.assertEqual(recovered.history[-1]["content"][0]["content"], text_result)
+                    self.assertEqual(recovered.system_argument(), ("--append-system-prompt-file", "原轮指令"))
 
     def test_new_tool_immediately_revokes_old_recovery(self):
         """新指令首帧可能已经到达客户端，拒绝重新生成上一份回执。@return 无。"""
@@ -355,7 +550,8 @@ class SessionTests(unittest.TestCase):
         with actor.changed:
             actor.history = handle.history
             actor.step = SimpleNamespace(
-                final=[b"finished"], stopped=True, reason="tool_use", blocks=list(group)
+                final=[b"finished"], stopped=True, reason="tool_use", blocks=list(group),
+                response_model=stage.response_model, tool_ids=stage.tool_ids,
             )
             actor._finish_step()
             actor.frame_batch = []
@@ -423,6 +619,53 @@ class SessionTests(unittest.TestCase):
                 waiting.result(2)
             self.assertFalse(driver.waiters)
             self.assertEqual(driver.capacity.snapshot().in_use, 1)
+
+    def test_receipt_fork_borrows_only_the_waiting_parents_existing_spare(self):
+        """分叉用既有物理余位，父回执可同时认领，另一个分叉仍须排队。@return 无。"""
+        identity = {**self._identity("fork-while-waiting"), "native_cold_history": True,
+                    "receipt_fork_session_protocol": True}
+        tool = {"name": "LookupNote", "input_schema": {"type": "object"}}
+        body = {**self._body(), "tools": [tool]}
+        invocation = {"type": "tool_use", "id": "call", "name": tool["name"], "input": {}}
+        raw = self._returning(body, [invocation], invocation["id"])
+
+        def add_instruction(text):
+            branch = json.loads(raw)
+            branch["messages"][-1]["content"].append({"type": "text", "text": text})
+            return encode(branch)
+
+        launcher = SimpleNamespace(managed_oauth_enabled=lambda: True)
+        for memory in ("max", str(1024**3)):
+            with (
+                self.subTest(memory=memory),
+                patch("tui_session.Path.read_text", return_value=memory),
+                closing(SessionDriver({"max_reservations": 2}, launcher)) as driver,
+                ThreadPoolExecutor(max_workers=1) as pool,
+            ):
+                parent = self._offered(driver.prepare(identity, encode(body)), invocation)
+                with closing(driver.prepare(identity, add_instruction("甲任务"))) as child:
+                    self.assertIsNot(child.actor, parent)
+                    self.assertTrue(child.actor.fork_borrowed_slot)
+                    self.assertEqual(driver.capacity.snapshot().limit, 2)
+                    self.assertEqual(driver.capacity.snapshot().in_use, 2)
+                    cancelled = Event()
+                    waiting = pool.submit(driver.prepare, identity, add_instruction("乙任务"), cancel_event=cancelled)
+                    try:
+                        deadline = time.monotonic() + 1
+                        while not driver.waiters and not waiting.done() and time.monotonic() < deadline:
+                            time.sleep(0.005)
+                        self.assertEqual(len(driver.waiters), 1)
+                        self.assertFalse(waiting.done())
+                        with closing(driver.prepare({**identity, "continuation_only": True}, raw)) as original:
+                            self.assertIs(original.actor, parent)
+                            self.assertEqual(original.answers["call"]["content"], "合成回执")
+                            self.assertEqual(driver.capacity.snapshot().in_use, 2)
+                    finally:
+                        cancelled.set()
+                    with self.assertRaises(TimeoutError):
+                        waiting.result(2)
+                self.assertFalse(driver.waiters)
+                self.assertEqual(driver.capacity.snapshot().in_use, 1)
 
     def test_agent_resident_budget_respects_cgroup_and_reports_disjoint_parent_chains(
         self,
@@ -862,6 +1105,37 @@ class SessionTests(unittest.TestCase):
         messages[-2]["content"] = [text, signed, first, second]
         with self.assertRaises(ValueError):
             tool_receipts(messages, history, [signed, *expected], input_format="claude_code")
+
+    def test_cli_groups_interleaved_read_and_glob_text_before_its_receipts(self):
+        """原版客户端可按同类原序归并文本与工具，活跃和磁盘比较均保留字段校验。@return 无。"""
+        first_text = {"type": "text", "text": "第一段"}
+        second_text = {"type": "text", "text": "工具之间的第二段"}
+        read = {"type": "tool_use", "id": "read", "name": "Read", "input": {"file_path": "fixture.txt"}}
+        glob = {"type": "tool_use", "id": "glob", "name": "Glob", "input": {"pattern": "fixture-*.txt"}}
+        expected = [first_text, read, second_text, glob]
+        history = self._body()["messages"]
+        results = [{"type": "tool_result", "tool_use_id": identifier, "content": "合成结果"}
+                   for identifier in ("glob", "read")]
+
+        def messages(content):
+            return [*history, {"role": "assistant", "content": content}, {"role": "user", "content": results}]
+
+        for checkpoint in (False, True):
+            with self.subTest(checkpoint=checkpoint):
+                frozen = [{**block, "text": sha256(block["text"].encode()).hexdigest()}
+                          if block["type"] == "text" else block for block in expected]
+                if checkpoint:
+                    frozen = [receipt_snapshot(block) for block in frozen]
+                previous = history_digest(history)
+                grouped = [first_text, second_text, read, glob]
+                self.assertEqual(set(tool_receipts(messages(grouped), previous, frozen,
+                                                  input_format="claude_code", checkpoint=checkpoint)), {"read", "glob"})
+                for changed in ([second_text, first_text, read, glob], [first_text, second_text, glob, read],
+                                [first_text, second_text, read, {**glob, "input": {"pattern": "other.txt"}}]):
+                    with self.assertRaises(ValueError):
+                        tool_receipts(messages(changed), previous, frozen, input_format="claude_code", checkpoint=checkpoint)
+                with self.assertRaises(ValueError):
+                    tool_receipts(messages(grouped), previous, frozen, checkpoint=checkpoint)
 
     def test_open_group_waits_until_tool_order_is_known(self):
         """同提示兄弟仍可能到达；组封闭且唯一时早于父终态认领。@return 无。"""
@@ -1338,6 +1612,23 @@ class SessionTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 tool_receipts(received(wrong), history_digest(history), registered)
 
+    def test_live_receipt_preserves_original_tool_argument_types(self):
+        """工具参数内的布尔值与数字不能替换，键序与同值数字表示可沿用。@return 无。"""
+        history = self._body()["messages"]
+        original = {"type": "tool_use", "id": "tool_typed", "name": "LookupNote",
+                    "input": {"options": {"include_archived": False, "count": 1}}}
+        result = {"type": "tool_result", "tool_use_id": original["id"], "content": "合成回执"}
+
+        def receive(options):
+            return [*history, {"role": "assistant", "content": [{**original, "input": {"options": options}}]},
+                    {"role": "user", "content": [result]}]
+
+        previous = history_digest(history)
+        matching = {"count": 1.0, "include_archived": False}
+        self.assertEqual(tool_receipts(receive(matching), previous, [original]), {original["id"]: result})
+        with self.assertRaisesRegex(ValueError, "原轮助手内容或工具声明发生变化"):
+            tool_receipts(receive({**matching, "include_archived": 0}), previous, [original])
+
     def test_consecutive_tool_turns_deliver_only_the_current_receipts(self):
         """连续两轮工具结果均能开启原进程的下一步，同轮重复回调仍被拒绝。@return 无。"""
         request = {
@@ -1431,8 +1722,9 @@ class SessionTests(unittest.TestCase):
 
     def test_verified_refusal_finishes_before_cli_requests_another_step(self):
         """真实拒答交付完整终帧，普通文本按完整回合收尾，重复回调不增加投递。@return 无。"""
-        for reason in ("refusal", "end_turn"):
-            with self.subTest(reason=reason), closing(self._driver()) as driver, ThreadPoolExecutor(1) as pool:
+        cases = (("refusal", "refusal", True), ("refusal", None, False), ("end_turn", "end_turn", True))
+        for reason, native_reason, has_text in cases:
+            with self.subTest(reason=reason, has_text=has_text), closing(self._driver()) as driver, ThreadPoolExecutor(1) as pool:
                 driver.launcher = Mock()
                 with closing(driver.prepare(self._identity(reason), encode(self._body()))) as handle:
                     actor = handle.actor
@@ -1443,12 +1735,17 @@ class SessionTests(unittest.TestCase):
                                 self.assertTrue(actor.changed.wait_for(lambda: actor.step is not None, 2))
                             turn = {"turn": "test", "step": 0, "model": "chosen"}
                             actor.callback("/begin", turn)
-                            events = [
-                                {"type": "message_start", "message": {}},
+                            with self.assertRaises(ValueError):
+                                actor.callback("/end", {**turn, "reason": native_reason})
+                            content = [
                                 {"type": "content_block_start", "index": 0,
                                  "content_block": {"type": "text", "text": "usage policy [reasoning_extraction]"}},
                                 {"type": "content_block_stop", "index": 0},
-                                {"type": "message_delta", "delta": {"stop_reason": reason}},
+                            ] if has_text else []
+                            events = [
+                                {"type": "message_start", "message": {"usage": {"input_tokens": 10}}},
+                                *content,
+                                {"type": "message_delta", "delta": {"stop_reason": reason}, "usage": {"output_tokens": 8}},
                                 {"type": "message_stop"},
                             ]
                             wire = b"".join(b"data: " + encode(e) + b"\n\n" for e in events)
@@ -1459,7 +1756,9 @@ class SessionTests(unittest.TestCase):
                             marker = f"<system-reminder>\nprompt.submit hook additional context: {actor.guard_text}\n</system-reminder>"
                             native = {**self._body(), "messages": [{"role": "user", "content": [{"type": "text", "text": marker}]}]}
                             actor.serve_model(Mock(), native)
-                            actor.callback("/end", {**turn, "reason": reason})
+                            with self.assertRaises(ValueError):
+                                actor.callback("/end", {**turn, "reason": "max_tokens" if native_reason is None else None})
+                            actor.callback("/end", {**turn, "reason": native_reason})
                             self.assertEqual(actor.finished, reason == "refusal")
                             if reason == "refusal":
                                 self.assertEqual(b"".join(output.result(2)), wire)
@@ -1820,6 +2119,31 @@ class SessionTests(unittest.TestCase):
                 with self.subTest(case=case):
                     self.assertFalse(actor._main_request({**native, "messages": messages}, handle))
 
+    def test_current_text_blocks_must_reach_model_request_in_original_order(self):
+        """原标记出站或 Mod 改写缺块时，保留本轮发送许可。@return 无。"""
+        body = self._body()
+        blocks = [{"type": "text", "text": part} for part in ("第一段", "第一段", "第二段")]
+        body["messages"][-1]["content"] = blocks
+        with closing(self._driver()) as driver:
+            driver.managed_oauth = True
+            identity = {**self._identity("x"), "native_cold_history": True}
+            with closing(driver.prepare(identity, encode(body))) as handle:
+                actor = handle.actor
+                prompt = actor.callback("/prompt", {"marker": actor.marker})
+                self.assertEqual(prompt["blocks"], blocks)
+                self.assertEqual(prompt["prompt"], actor.marker)
+                actor.step = WireStep([])
+                actor.step.native_model = "chosen"
+                guard = {"type": "text", "text": "<system-reminder>\nprompt.submit hook additional context: "
+                                                   + actor.guard_text + "\n</system-reminder>"}
+                user = {"role": "user", "content": [guard, *blocks]}
+                native = {"model": "chosen", "stream": True, "messages": [user]}
+                self.assertTrue(actor._main_request(native, handle))
+                user["content"] = [guard, *reversed(blocks)]
+                self.assertFalse(actor._main_request(native, handle))
+                user["content"] = [guard, blocks[0], {"type": "text", "text": actor.marker}]
+                self.assertFalse(actor._main_request(native, handle))
+
     def test_local_model_string_user_owns_only_its_trailing_system_guard(self):
         """DeepSeek 合并系统梯段时，用户正文、原生模型和独立随机标记行须同时匹配。@return 无。"""
         body = self._body()
@@ -1981,6 +2305,26 @@ class SessionTests(unittest.TestCase):
                 "error": {"type": "rate_limit_error", "message": "稍后再试"},
             },
         )
+
+    def test_standard_http_error_metadata_requires_complete_provider_response(self):
+        """按错误来源与完整性筛选公开字段，保留私有分类字段。@return 无。"""
+        detail = {"error_code": "synthetic_parameter", "internal": "private"}
+        error = {"type": "invalid_request_error", "message": "合成拒绝", "details": detail, "code": "private_code"}
+        payload = {"type": "error", "request_id": "req_01Synthetic", "error": error}
+        for source, status, complete, allowed in (
+            ("managed_oauth_http", 400, True, True), ("local_provider_http", 429, True, True),
+            ("managed_oauth_http", 400, False, False), ("managed_oauth_http", 302, True, False),
+            ("tui_cli_input_guard", 422, True, False),
+        ):
+            with self.subTest(source=source, status=status, complete=complete):
+                response = ModelResponseError(status, encode(payload), source=source, complete=complete)
+                public = {"type": "error", "error": {"type": error["type"], "message": error["message"]}}
+                if allowed:
+                    public["request_id"] = payload["request_id"]
+                    public["error"]["details"] = {"error_code": detail["error_code"]}
+                self.assertEqual(json.loads(response.body), public)
+                self.assertEqual(json.loads(response.private_body),
+                                 {**public, "error": {**public["error"], "code": "private_code"}})
 
 
 if __name__ == "__main__":

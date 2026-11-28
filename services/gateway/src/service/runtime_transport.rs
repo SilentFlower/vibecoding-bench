@@ -37,14 +37,14 @@ use futures_util::StreamExt;
 use futures_util::stream::{empty, once as stream_once, unfold};
 use regex::Regex;
 use reqwest::redirect::Policy;
-use reqwest::{Body as RequestBody, Client, StatusCode};
+use reqwest::{Body as RequestBody, Client, Response as PrivateResponse, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 
 use crate::error::AppError;
-use crate::model::account::{Account, AccountAuthType};
+use crate::model::account::{Account, AccountAuthType, TuiSystemPromptPolicy};
 use crate::model::request_diagnostics::{ExecutionLocation, RequestLogMode};
 use crate::service::account::{AccountService, CredentialActivity};
 use crate::service::agy_contract::{
@@ -66,9 +66,11 @@ use crate::service::rewriter::{CacheControlTtlRewrite, MessageCacheControlRewrit
 use crate::service::runtime_background::{BACKGROUND_HEADER, BackgroundPurpose};
 use crate::service::runtime_bridge::config as runtime_management_config;
 use crate::service::tui_backend::TUI_V2;
+use crate::service::tui_reconnect::BeforeHeaders;
 #[cfg(target_os = "linux")]
 use crate::service::tui_sender::TuiSender;
 use crate::service::tui_sender_response;
+use crate::service::tui_tool_history::{SUGGESTION_SESSION_PREFIX, auxiliary_original_session};
 use crate::tlsfp::{
     TlsProfileId, get_background_request_client_for_profile, get_request_client_for_profile,
 };
@@ -79,10 +81,17 @@ pub(super) const TUI_V2_STATUS_PROTOCOL: u8 = 1;
 // 仅由已绑定 sender 的私有 HTTP 回包转递。公开响应白名单不会交付此头。
 pub(super) const TUI_GATEWAY_ID_HEADER: &str = "x-v3-tui-message-id-mode";
 pub(super) const TUI_CAPTURE: &str = "x-v3-tui-http-capture";
+pub(super) const TUI_BODY_SOURCE: &str = "x-v3-tui-body-source";
+pub(super) const TUI_OPENING_USAGE_PLACEHOLDER: &str = "x-v3-tui-opening-usage-placeholder";
+pub(super) const TUI_SESSION_ORIGIN: &str = "x-v3-tui-session-origin";
+pub(super) const TUI_INSTRUCTION_LOCATION: &str = "x-v3-tui-instruction-location";
 pub(super) const TUI_FINAL_CAPTURE: &str = "x-v3-tui-final-capture";
 pub(super) const TUI_CLI_SUBMISSION: &str = "x-v3-tui-cli-submission";
 pub(super) const TUI_UPSTREAM_SESSION: &str = "x-v3-tui-upstream-session";
+pub(super) const TUI_TITLE_SESSION_MAPPING: &str = "x-v3-tui-title-session-mapping";
+pub(super) const TUI_PROMPT_SUGGESTION: &str = "x-v3-tui-prompt-suggestion";
 pub(super) const TUI_MANAGED_OAUTH: &str = "x-v3-tui-managed-oauth";
+pub(super) const TUI_SYSTEM_PROMPT_POLICY: &str = "x-v3-tui-system-prompt-policy";
 pub(super) const TUI_MODEL_HEADER_POLICY: &str = "x-v3-tui-model-header-policy";
 pub(super) const TUI_MODEL_ACCEPT_OMITTED: &str = "x-v3-tui-model-accept-omitted";
 pub(super) const TUI_OAUTH_FILE: &str = "x-v3-tui-oauth-file";
@@ -91,9 +100,18 @@ const TUI_ACCOUNT_MODEL: &str = "x-v3-tui-account-model";
 pub(super) const TUI_SIGNATURE_REPAIR: &str = "x-v3-tui-signature-repair";
 pub(super) const TUI_REPAIR_ATTEMPT: &str = "x-v3-tui-repair-attempt";
 pub(super) const TUI_ERROR_SOURCE: &str = "x-v3-tui-error-source";
+pub(super) const TUI_CLI_INPUT_GUARD: &str = "tui_cli_input_guard";
+pub(super) const TUI_SENDER_CONFIG: &str = "tui_sender_config";
+pub(super) const TUI_PREPARE_LEDGER: &str = "tui_prepare_ledger";
+pub(super) const TUI_PREPARE_BIND: &str = "tui_prepare_bind";
+pub(super) const TUI_PREPARE_EXCHANGE: &str = "tui_prepare_exchange";
+pub(super) const TUI_SEND_CLAIM: &str = "tui_send_claim";
+pub(super) const TUI_SUBMISSION_LEDGER: &str = "tui_submission_ledger";
+pub(super) const TUI_WORKSPACE_BIND: &str = "tui_workspace_bind";
 pub(super) const TUI_JSON_PROJECTION_V1: &str = "gateway-json-v1";
 pub(super) const TUI_SSE_PROJECTION_HEADER: &str = "x-v3-tui-sse-projection";
 pub(super) const TUI_SSE_PROJECTION_V1: &str = "gateway-sse-v1";
+const TUI_LEDGER_REPLY_WINDOW: Duration = Duration::from_millis(250);
 
 /// 限制私有 V2 帧的 Bearer 令牌格式。@param token 账号凭据。@return 是否可安全编码。
 pub(super) fn valid_tui_account_token(token: &str) -> bool {
@@ -195,9 +213,37 @@ pub(super) fn tui_projection_marker(headers: &HeaderMap, name: &str, expected: &
     values.next().is_some_and(|value| value == expected) && values.next().is_none()
 }
 
+/// 核对账号源在模型认领前发出的 CLI 输入拒绝。@param response 已绑定的私有响应。
+/// @return 是否有受信的单值来源和匹配的 HTTP 状态。
+pub(super) fn tui_cli_input_rejected(response: &PrivateResponse) -> bool {
+    response.status() == StatusCode::UNPROCESSABLE_ENTITY
+        && tui_projection_marker(response.headers(), TUI_ERROR_SOURCE, TUI_CLI_INPUT_GUARD)
+}
+
+/// 读取已绑定 sender 的单值失败阶段。@param headers 私有响应头。
+/// @param permitted 当前私有入口的固定阶段。@return 已核验的阶段。
+pub(super) fn tui_failure_stage(
+    headers: &HeaderMap,
+    permitted: &[&'static str],
+) -> Option<&'static str> {
+    permitted
+        .iter()
+        .copied()
+        .find(|stage| tui_projection_marker(headers, TUI_ERROR_SOURCE, stage))
+}
+
+/// 构造已发出私有提交但尚未确认回复时使用的公开错误。@return 提交状态未知的错误。
+pub(super) fn tui_submission_unknown_error() -> AppError {
+    AppError::BadGateway("V2 请求提交状态未知".into())
+}
+
 /// 内部响应模式，供公开路由采用正文终态记账。
 #[derive(Clone)]
 pub(super) struct TuiGatewayIds;
+
+/// 已鉴权直发响应的首帧用量由投影补齐。
+#[derive(Clone, Copy)]
+pub(super) struct TuiOpeningUsagePlaceholder;
 
 const META_HEADER: &str = "x-v3-request";
 const ERROR_HEADER: &str = "x-v3-transport-error";
@@ -319,14 +365,18 @@ pub struct SenderConfig {
     pub quota_identity: String,
 }
 
+/// 私有 sender 就绪与绑定核验的失败类别。
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
-enum TuiV2Unavailable {
+pub(super) enum TuiV2Unavailable {
     NotConfigured,
     NotRunning,
     BindingUnverified,
     MessagesToolAndUsageEventsUnavailable,
     ReadinessUnverified,
+    ReadinessConfig,
+    ReadinessLedger,
+    ReadinessSource,
 }
 
 impl TuiV2Unavailable {
@@ -338,10 +388,33 @@ impl TuiV2Unavailable {
                 Self::MessagesToolAndUsageEventsUnavailable => {
                     "V2 缺少官方交互终端的完整 Messages 工具和用量事件源"
                 }
-                Self::ReadinessUnverified => "V2 账号发送器就绪状态待核对",
+                Self::ReadinessUnverified
+                | Self::ReadinessConfig
+                | Self::ReadinessLedger
+                | Self::ReadinessSource => "V2 账号发送器就绪状态待核对",
             }
             .into(),
         )
+    }
+
+    fn readiness_stage(self) -> &'static str {
+        match self {
+            Self::BindingUnverified => "tui_v2_binding",
+            Self::ReadinessConfig => "tui_readiness_config",
+            Self::ReadinessLedger => "tui_readiness_ledger",
+            Self::ReadinessSource => "tui_readiness_source",
+            _ => "tui_v2_readiness",
+        }
+    }
+
+    fn admission_branch(self) -> &'static str {
+        match self {
+            Self::NotConfigured => "tui_readiness_not_configured",
+            Self::NotRunning => "tui_readiness_not_running",
+            Self::MessagesToolAndUsageEventsUnavailable => "tui_readiness_events_unavailable",
+            Self::ReadinessUnverified => "tui_readiness_unverified",
+            _ => self.readiness_stage(),
+        }
     }
 }
 
@@ -1014,7 +1087,7 @@ async fn tui_status(
     binding: &TransportBinding,
     fixture: bool,
     probe: Option<&TuiReceiptProbe>,
-) -> Result<(bool, bool), TuiV2Unavailable> {
+) -> Result<(bool, bool, bool, bool), TuiV2Unavailable> {
     let mut request = client
         .get(format!(
             "{}/internal/status",
@@ -1044,6 +1117,8 @@ async fn tui_status(
         .map_err(|_| TuiV2Unavailable::ReadinessUnverified)?;
     let idle = tui_status_snapshot(binding, &status, fixture)?;
     let summary = status["tui_v2"]["agent_summary_protocol"] == 1;
+    let system_prompt_policy = status["tui_v2"]["client_system_prompt_policy_protocol"] == 1;
+    let direct_https = !fixture && status["tui_v2"]["direct_https_protocol"] == 1;
     if probe.is_some() {
         if !fixture && status["evidence_ok"] != true {
             return Err(TuiV2Unavailable::ReadinessUnverified);
@@ -1052,9 +1127,11 @@ async fn tui_status(
         return Ok((
             status["tui_v2"]["receipt_idle"].as_bool().unwrap_or(idle),
             summary,
+            system_prompt_policy,
+            direct_https,
         ));
     }
-    Ok((idle, summary))
+    Ok((idle, summary, system_prompt_policy, direct_https))
 }
 
 fn tui_status_snapshot(
@@ -1162,10 +1239,13 @@ async fn probe_tui_account(
             predecessors,
             ..
         } = tui_transport(account, None, registered, false).await?;
-        let (idle, _) = tui_status(&client, &binding, fixture, probe).await?;
+        let (idle, _, system_prompt_policy, direct_https) =
+            tui_status(&client, &binding, fixture, probe).await?;
         Ok(TuiBindingStatus {
             key: tui_sender_key(&binding, fixture),
             idle,
+            system_prompt_policy,
+            direct_https,
             predecessors,
         })
     })
@@ -1186,6 +1266,8 @@ pub(crate) async fn tui_account_status(account: &Account) -> Result<(String, boo
 pub(super) struct TuiBindingStatus {
     pub(super) key: String,
     pub(super) idle: bool,
+    pub(super) system_prompt_policy: bool,
+    pub(super) direct_https: bool,
     predecessors: Vec<String>,
 }
 
@@ -1307,6 +1389,8 @@ pub(super) async fn tui_switch_status(account: &Account) -> Result<TuiBindingSta
             Ok(TuiBindingStatus {
                 key: sender.key,
                 idle: sender.idle,
+                system_prompt_policy: sender.system_prompt_policy,
+                direct_https: sender.direct_https,
                 predecessors: sender.predecessors,
             })
         }
@@ -1434,6 +1518,8 @@ pub(super) struct TuiReadySender {
     pub(super) key: String,
     pub(super) idle: bool,
     agent_summary: bool,
+    system_prompt_policy: bool,
+    direct_https: bool,
     predecessors: Vec<String>,
     tui_oauth_profile: Option<Map<String, Value>>,
 }
@@ -1455,18 +1541,29 @@ impl TuiReadySender {
 
 /// 解析账号登记并核验 sender 的实际能力。@param account 已授权账号。
 /// @param deadline 请求的单调时钟截止。@param wake 是否允许沿编排合同唤醒。
-/// @param registered 原回执已登记的绑定。@return 原传输及其就绪证明。
+/// @param registered 原回执已登记的绑定。@return 原传输及其就绪证明，新轮只使用当前发行。
 pub(super) async fn ready_tui_sender(
     account: &Account,
     deadline: Instant,
     wake: bool,
     registered: Option<&str>,
 ) -> Result<TuiReadySender, AppError> {
+    let deadline_reached = || {
+        super::diagnostics::tui_admission_rejected("tui_readiness_deadline");
+        AppError::AdmissionLimited { retry_after: 1 }
+    };
     let budget = deadline
         .checked_duration_since(Instant::now())
-        .ok_or(AppError::AdmissionLimited { retry_after: 1 })?;
-    let (transport, (idle, agent_summary)) = timeout(budget, async {
+        .ok_or_else(deadline_reached)?;
+    let (transport, (idle, agent_summary, system_prompt_policy, direct_https)) = timeout(budget, async {
         let transport = tui_transport(account, wake.then_some(budget), registered, true).await?;
+        if registered.is_none()
+            && !transport.fixture
+            && transport.binding.release_id != configured_account_release()
+        {
+            // 滚动更新的旧本机绑定仍可被发现。仅已登记回执可以继续使用该发行的发送器。
+            return Err(TuiV2Unavailable::BindingUnverified);
+        }
         let idle = tui_status(
             &transport.client,
             &transport.binding,
@@ -1477,8 +1574,12 @@ pub(super) async fn ready_tui_sender(
         Ok((transport, idle))
     })
     .await
-    .map_err(|_| AppError::AdmissionLimited { retry_after: 1 })?
-    .map_err(|reason| reject_tui(account.id, reason))?;
+    .map_err(|_| deadline_reached())?
+    .map_err(|reason| {
+        super::diagnostics::tui_admission_rejected(reason.admission_branch());
+        super::diagnostics::error_stage(reason.readiness_stage());
+        reject_tui(account.id, reason)
+    })?;
     let TuiTransport {
         client,
         binding,
@@ -1493,6 +1594,8 @@ pub(super) async fn ready_tui_sender(
         key,
         idle,
         agent_summary,
+        system_prompt_policy,
+        direct_https,
         predecessors,
         tui_oauth_profile,
     })
@@ -1503,6 +1606,7 @@ pub(super) struct TuiReservation {
     client: Client,
     binding: TransportBinding,
     identity_header: String,
+    admission_deadline: Instant,
     pub(super) attempt_id: String,
     pub(super) capture_state: Option<&'static str>,
     pub(super) wire_capture: bool,
@@ -1514,6 +1618,7 @@ pub(super) struct TuiReservation {
     input_policy: bool,
     model_header_policy: bool,
     session_mapping: bool,
+    title_session_mapping: bool,
     upstream_session: Option<String>,
     pub(super) managed_oauth: bool,
     pub(super) oauth_file: bool,
@@ -1552,6 +1657,11 @@ impl TuiReservation {
     /// 查询原来源是否确认出站会话映射协议。@return 是否支持本轮映射。
     pub(super) fn supports_session_mapping(&self) -> bool {
         self.session_mapping
+    }
+
+    /// 查询来源是否可从标题的执行键恢复出站映射的原会话。@return 是否支持标题映射。
+    pub(super) fn supports_title_session_mapping(&self) -> bool {
+        self.session_mapping && self.title_session_mapping
     }
 
     /// 设置只在单次提交时传递的账号池结果。@param session 已解析的上游 UUID。
@@ -1615,23 +1725,24 @@ impl TuiReservation {
         mut self,
         ttfb_timeout: Duration,
     ) -> Result<reqwest::Response, AppError> {
-        self.submit_with_account_credentials(ttfb_timeout, None)
+        self.submit_with_account_credentials(Instant::now() + ttfb_timeout, None, None)
             .await
     }
 
     /// 提交原预留，按原来源协商的凭据协议发放本轮凭据。
-    /// @param ttfb_timeout 回包头期限。@param credentials 敏感私有凭据头。@return 原 sender 响应。
+    /// @param ttfb_deadline 公开回包头截止。@param credentials 敏感私有凭据头。
+    /// @param reconnect 已登记可重连的工具回复。@return 原 sender 响应。
     pub(super) async fn submit_with_account_credentials(
         &mut self,
-        ttfb_timeout: Duration,
+        ttfb_deadline: Instant,
         credentials: Option<HeaderValue>,
+        reconnect: Option<&BeforeHeaders>,
     ) -> Result<reqwest::Response, AppError> {
         if self.managed_oauth != credentials.is_some() {
             return Err(AppError::ServiceUnavailable("V2 账号凭据协议未确认".into()));
         }
         // 发出请求后，断连或超时也可能已有 sender 接管。交由 sender 收尾，避免误取消原轮。
         self.submission_started = true;
-        let unknown = || AppError::BadGateway("V2 请求提交状态未知".into());
         // 即使附带受信采集元数据，提交仍使用不可重放的流。
         let request = self
             .request("send")
@@ -1661,10 +1772,41 @@ impl TuiReservation {
         } else {
             request.body(reqwest::Body::wrap_stream(empty::<Result<Bytes, IoError>>()))
         };
-        let response = timeout(ttfb_timeout, request.send())
-            .await
-            .map_err(|_| unknown())?
-            .map_err(|_| unknown())?;
+        // 等账本锁与网关准入共用截止。仅给明确的发送前拒绝留出私有回包时间。
+        let reply_deadline = if self.continuation && ttfb_deadline == self.admission_deadline {
+            ttfb_deadline + TUI_LEDGER_REPLY_WINDOW
+        } else {
+            ttfb_deadline
+        };
+        let private_deadline = Instant::now() + Duration::from_millis(REQUEST_BUDGET_MS);
+        let sending = request.send();
+        tokio::pin!(sending);
+        let response = match timeout_at(reply_deadline, &mut sending).await {
+            Ok(response) => response,
+            Err(_) => {
+                let reconnect = reconnect.ok_or_else(tui_submission_unknown_error)?;
+                // 公开 502 后继续同一个不可重放的 HTTP future，保留正在生成的回复。
+                reconnect.public_timeout().await;
+                timeout_at(private_deadline, &mut sending)
+                    .await
+                    .map_err(|_| tui_submission_unknown_error())?
+            }
+        }
+        .map_err(|_| tui_submission_unknown_error())?;
+        // 定时器与响应可能同时就绪，须按实际观察时间核对迟到的私有回包。
+        let observed = Instant::now();
+        if observed >= reply_deadline
+            || (observed >= ttfb_deadline
+                && (response.status() != StatusCode::TOO_MANY_REQUESTS
+                    || !tui_projection_marker(
+                        response.headers(),
+                        TUI_ERROR_SOURCE,
+                        TUI_SUBMISSION_LEDGER,
+                    )))
+        {
+            let reconnect = reconnect.ok_or_else(tui_submission_unknown_error)?;
+            reconnect.public_timeout().await;
+        }
         self.repair_pending = self.signature_repair
             && response.status() == StatusCode::BAD_REQUEST
             && tui_projection_marker(response.headers(), TUI_SIGNATURE_REPAIR, "pending");
@@ -1780,6 +1922,8 @@ pub(super) async fn tui_public_response(
     let retry_after = (response.status() == StatusCode::TOO_MANY_REQUESTS
         && (tui_projection_marker(headers, TUI_ERROR_SOURCE, "local_provider_http")
             || tui_projection_marker(headers, TUI_ERROR_SOURCE, "managed_oauth_http")
+            || tui_projection_marker(headers, TUI_ERROR_SOURCE, TUI_SUBMISSION_LEDGER)
+            || tui_projection_marker(headers, TUI_ERROR_SOURCE, TUI_WORKSPACE_BIND)
             || tui_projection_marker(headers, TUI_ERROR_SOURCE, "local_provider_backoff")))
     .then(|| tui_retry_seconds(headers))
     .flatten()
@@ -1811,7 +1955,7 @@ pub(super) async fn tui_public_response(
         let mut public = tui_sender_response::project_observed(
             response.status(),
             content_type,
-            Body::from_stream(response.bytes_stream()),
+            tui_private_body(response),
             policy_account,
         )
         .await?;
@@ -1840,8 +1984,44 @@ pub(super) async fn tui_public_response(
         }
     }
     public
-        .body(Body::from_stream(response.bytes_stream()))
+        .body(tui_private_body(response))
         .map_err(|_| AppError::BadGateway("V2 sender 响应头无效".into()))
+}
+
+/// 在投影前观察私有 HTTP 正文的实际读取结果。@param response 原私有响应。@return 原字节流。
+fn tui_private_body(response: reqwest::Response) -> Body {
+    #[cfg(all(target_os = "linux", feature = "v3-verification"))]
+    if std::env::var("FLOWER_V2_STARTUP_TRACE").as_deref() == Ok("1") {
+        use super::diagnostics::tui_reply_event;
+
+        let result = if response.status().is_success() {
+            "received"
+        } else {
+            "received_error"
+        };
+        let body = unfold(
+            (Box::pin(response.bytes_stream()), false),
+            move |(mut source, failed)| async move {
+                match source.next().await {
+                    Some(frame) => {
+                        if frame.is_err() && !failed {
+                            tui_reply_event("gateway_tui_private_body", "read_failed");
+                        }
+                        let failed = failed || frame.is_err();
+                        Some((frame, (source, failed)))
+                    }
+                    None => {
+                        if !failed {
+                            tui_reply_event("gateway_tui_private_body", result);
+                        }
+                        None
+                    }
+                }
+            },
+        );
+        return Body::from_stream(body);
+    }
+    Body::from_stream(response.bytes_stream())
 }
 
 /// 同一公开请求的原文和解析线索；身份、路由与认证始终由预留绑定独立校验。
@@ -1852,6 +2032,7 @@ pub(super) struct TuiMessagesInput<'a> {
     pub agent_summary: bool,
     pub oauth_file: bool,
     pub body_policy: TuiBodyPolicy,
+    pub system_prompt_policy: TuiSystemPromptPolicy,
     pub signature_repair: Option<bool>,
 }
 
@@ -1941,6 +2122,18 @@ pub(super) fn tui_input_rejection(reason: &str) -> Option<AppError> {
         })
 }
 
+/// 判断正文是否自报原生 billing 格式。@param body 入站正文。@return 是否含原生格式标记。
+pub(super) fn has_tui_billing_marker(body: &Value) -> bool {
+    let system = &body["system"];
+    let marked = |s: &str| s.trim_start().starts_with("x-anthropic-billing-header:");
+    system.as_str().is_some_and(marked)
+        || system.as_array().is_some_and(|blocks| {
+            blocks
+                .iter()
+                .any(|block| block["text"].as_str().is_some_and(marked))
+        })
+}
+
 /// 旧源仅放行已知不会在新合同中删除字段或改变准入的基本 Messages 形状。
 fn legacy_tui_input_compatible(body: &Value) -> bool {
     body.as_object().is_some_and(|obj| {
@@ -1964,20 +2157,16 @@ fn legacy_tui_input_compatible(body: &Value) -> bool {
             row.as_object()
                 .is_some_and(|obj| obj.keys().all(|k| matches!(k.as_str(), "role" | "content")))
         })
-    }) && !body.get("system").is_some_and(|system| {
-        let marked = |s: &str| s.trim_start().starts_with("x-anthropic-billing-header:");
-        system.as_str().is_some_and(marked)
-            || system.as_array().is_some_and(|blocks| {
-                blocks.iter().any(|block| {
-                    block["text"].as_str().is_some_and(marked)
-                        || !block.as_object().is_some_and(|fields| {
-                            fields
-                                .keys()
-                                .all(|key| matches!(key.as_str(), "type" | "text"))
-                        })
+    }) && !has_tui_billing_marker(body)
+        && !body["system"].as_array().is_some_and(|blocks| {
+            blocks.iter().any(|block| {
+                !block.as_object().is_some_and(|fields| {
+                    fields
+                        .keys()
+                        .all(|key| matches!(key.as_str(), "type" | "text"))
                 })
             })
-    })
+        })
 }
 
 /// 无 billing 的原生格式还须匹配固定 CLI 版本和入口，宽泛客户端分类仅用于工具归属。
@@ -2039,8 +2228,17 @@ pub(super) async fn prepare_tui(
             .ok_or_else(limited)
     };
     if input.agent_summary && !sender.agent_summary {
+        super::diagnostics::tui_admission_rejected("tui_prepare_agent_summary_capability");
         return Err(AppError::ServiceUnavailable(
             "原生进度请求需要支持独立摘要的账号发送器".into(),
+        ));
+    }
+    let explicit_system_policy =
+        !input.native_cc && input.system_prompt_policy != TuiSystemPromptPolicy::Append;
+    if explicit_system_policy && !sender.system_prompt_policy {
+        super::diagnostics::tui_admission_rejected("tui_prepare_system_prompt_capability");
+        return Err(AppError::ServiceUnavailable(
+            "原生账号发送器尚未支持客户端系统提示词动作".into(),
         ));
     }
     let TuiReadySender {
@@ -2064,7 +2262,11 @@ pub(super) async fn prepare_tui(
         principal_id,
         session_id,
         reservation_id: Uuid::new_v4().to_string(),
-        deadline_unix_ms: now_ms().saturating_add(remaining()?.as_millis() as u64),
+        deadline_unix_ms: now_ms().saturating_add(
+            remaining()
+                .inspect_err(|_| super::diagnostics::tui_admission_rejected("tui_prepare_deadline"))?
+                .as_millis() as u64,
+        ),
         continuation_only,
         agent_hint,
         agent_summary: input.agent_summary,
@@ -2074,10 +2276,12 @@ pub(super) async fn prepare_tui(
             .map_err(|_| AppError::Internal("V2 预留身份编码失败".into()))?,
     );
     let attempt_id = identity.reservation_id.clone();
+    super::diagnostics::tui_reservation(&attempt_id);
     let mut reservation = TuiReservation {
         client,
         binding,
         identity_header,
+        admission_deadline: deadline,
         attempt_id,
         agent_header_used: agent_hint.is_some(),
         capture_state: None,
@@ -2086,6 +2290,7 @@ pub(super) async fn prepare_tui(
         input_policy: false,
         model_header_policy: false,
         session_mapping: false,
+        title_session_mapping: false,
         upstream_session: None,
         managed_oauth: false,
         oauth_file: false,
@@ -2105,8 +2310,11 @@ pub(super) async fn prepare_tui(
     }
     let observe = super::diagnostics::current_log_mode() == RequestLogMode::Debug;
     if observe {
-        prepare = prepare.header(TUI_CAPTURE, "1").header(TUI_FINAL_CAPTURE, "1")
-            .header(TUI_CLI_SUBMISSION, "1");
+        prepare = prepare.header(TUI_CAPTURE, "1").header(TUI_CLI_SUBMISSION, "1");
+        // 辅助轮沿用账号转发正文。这里只观察入口和组装，保留最终写出未采集的边界。
+        if auxiliary_original_session(session_id).is_none() {
+            prepare = prepare.header(TUI_FINAL_CAPTURE, "1");
+        }
     }
     let apply_policy = input.body_policy != TuiBodyPolicy::default();
     if apply_policy {
@@ -2114,6 +2322,12 @@ pub(super) async fn prepare_tui(
             TUI_BODY_POLICY,
             serde_json::to_string(&input.body_policy)
                 .map_err(|_| AppError::Internal("V2 本轮正文设置无法编码".into()))?,
+        );
+    }
+    if explicit_system_policy {
+        prepare = prepare.header(
+            TUI_SYSTEM_PROMPT_POLICY,
+            input.system_prompt_policy.as_str(),
         );
     }
     if input.native_cc
@@ -2136,12 +2350,32 @@ pub(super) async fn prepare_tui(
         .send()
         .await
         .map_err(|error| {
+            super::diagnostics::error_stage("tui_prepare_http");
             if error.is_timeout() {
                 limited()
             } else {
                 AppError::ServiceUnavailable("V2 sender 准备通道不可用".into())
             }
         })?;
+    if matches!(
+        response.status(),
+        StatusCode::SERVICE_UNAVAILABLE | StatusCode::TOO_MANY_REQUESTS
+    ) {
+        let stage = tui_failure_stage(
+            response.headers(),
+            &[
+                TUI_SENDER_CONFIG,
+                TUI_PREPARE_LEDGER,
+                TUI_PREPARE_BIND,
+                TUI_PREPARE_EXCHANGE,
+            ],
+        );
+        if let Some(stage) = stage.or_else(|| {
+            (response.status() == StatusCode::SERVICE_UNAVAILABLE).then_some("tui_prepare")
+        }) {
+            super::diagnostics::error_stage(stage);
+        }
+    }
     if let Some(error @ AppError::TuiInput { status, .. }) = response
         .headers()
         .get(TUI_PREPARE_REASON)
@@ -2153,6 +2387,12 @@ pub(super) async fn prepare_tui(
     }
     match response.status() {
         StatusCode::NO_CONTENT => {
+            if session_id.starts_with(SUGGESTION_SESSION_PREFIX)
+                && !tui_projection_marker(response.headers(), TUI_PROMPT_SUGGESTION, "1")
+            {
+                super::diagnostics::error_stage(TUI_PREPARE_EXCHANGE);
+                return Err(AppError::ServiceUnavailable("V2 建议请求需要支持独立建议的账号发送器".into()));
+            }
             reservation.managed_oauth =
                 tui_projection_marker(response.headers(), TUI_MANAGED_OAUTH, "1");
             reservation.oauth_file = tui_projection_marker(response.headers(), TUI_OAUTH_FILE, "1");
@@ -2165,6 +2405,8 @@ pub(super) async fn prepare_tui(
                 tui_projection_marker(response.headers(), TUI_MODEL_HEADER_POLICY, "1");
             reservation.session_mapping =
                 tui_projection_marker(response.headers(), TUI_UPSTREAM_SESSION, "1");
+            reservation.title_session_mapping =
+                tui_projection_marker(response.headers(), TUI_TITLE_SESSION_MAPPING, "1");
             reservation.signature_repair = input.signature_repair.is_some()
                 && tui_projection_marker(response.headers(), TUI_SIGNATURE_REPAIR, "1");
             if observe {
@@ -2187,6 +2429,13 @@ pub(super) async fn prepare_tui(
             {
                 return Err(AppError::ServiceUnavailable(
                     "V2 sender 未确认本轮正文设置".into(),
+                ));
+            }
+            if explicit_system_policy
+                && !tui_projection_marker(response.headers(), TUI_SYSTEM_PROMPT_POLICY, "1")
+            {
+                return Err(AppError::ServiceUnavailable(
+                    "V2 sender 未确认客户端系统提示词动作".into(),
                 ));
             }
             match response
@@ -3386,9 +3635,15 @@ async fn status(
                 .status(&config.binding, Some(configuration), receipt_probe.as_ref())
                 .await
             {
-                Some((idle, receipt_idle, agent_summary)) => {
+                Ok((idle, receipt_idle, agent_summary, system_prompt_policy, direct_https)) => {
                     if agent_summary {
                         status["agent_summary_protocol"] = json!(1);
+                    }
+                    if system_prompt_policy {
+                        status["client_system_prompt_policy_protocol"] = json!(1);
+                    }
+                    if direct_https {
+                        status["direct_https_protocol"] = json!(1);
                     }
                     status["ready"] = json!(true);
                     status["idle"] = json!(idle);
@@ -3399,7 +3654,7 @@ async fn status(
                     status.as_object_mut().unwrap().remove("reason");
                     tui_active = state.tui.active().max(u64::from(!idle));
                 }
-                None => status["reason"] = json!(TuiV2Unavailable::ReadinessUnverified),
+                Err(reason) => status["reason"] = json!(reason),
             }
         }
         (status, active + tui_active)
@@ -4391,6 +4646,8 @@ mod tests {
             let mut state = TuiBindingStatus {
                 key: tui_sender_key(&current, false),
                 idle: true,
+                system_prompt_policy: false,
+                direct_https: false,
                 predecessors: tui_predecessor_keys(
                     &current,
                     vec![
@@ -4592,7 +4849,7 @@ mod tests {
     async fn tui_reservation_sends_once_and_only_cancels_before_submission() {
         use axum::body::to_bytes;
         use futures_util::stream::once;
-        use tokio::sync::{Notify, mpsc};
+        use tokio::sync::{Notify, mpsc, oneshot};
         use tokio::time::sleep_until;
 
         let (observations, mut events) = mpsc::unbounded_channel();
@@ -4611,11 +4868,13 @@ mod tests {
         let (sends, mut sent) = mpsc::unbounded_channel();
         let release_body = Arc::new(Notify::new());
         let sender_barrier = release_body.clone();
+        let (late_replies, mut late_reply) = mpsc::unbounded_channel();
         let app = app.route(
             "/internal/tui-v2/send",
             post(move |headers: HeaderMap| {
                 let sends = sends.clone();
                 let sender_barrier = sender_barrier.clone();
+                let late_replies = late_replies.clone();
                 async move {
                     assert!(tui_delegates_json(&headers));
                     let reservation = headers["x-v3-tui-reservation"].to_str().unwrap().to_owned();
@@ -4637,6 +4896,27 @@ mod tests {
                     }
                     if reservation == "unknown" {
                         tokio::time::sleep(Duration::from_secs(1)).await;
+                    }
+                    if reservation.starts_with("late-") {
+                        let (release, ready) = oneshot::channel();
+                        late_replies.send(release).unwrap();
+                        let _ = ready.await;
+                        if reservation == "late-model" {
+                            return StatusCode::OK.into_response();
+                        }
+                        let stage = if reservation == "late-provider" {
+                            "local_provider_http"
+                        } else {
+                            TUI_SUBMISSION_LEDGER
+                        };
+                        let mut response = (
+                            StatusCode::TOO_MANY_REQUESTS,
+                            [(TUI_ERROR_SOURCE, stage), (RETRY_AFTER.as_str(), "1")],
+                        ).into_response();
+                        if reservation == "late-duplicate-ledger" {
+                            response.headers_mut().append(TUI_ERROR_SOURCE, HeaderValue::from_static(stage));
+                        }
+                        return response;
                     }
                     if reservation == "delegated429" {
                         return (
@@ -4688,6 +4968,7 @@ mod tests {
                 release_id: "synthetic".into(),
             },
             identity_header: id.into(),
+            admission_deadline: Instant::now() + Duration::from_secs(5),
             attempt_id: id.into(),
             agent_header_used: false,
             capture_state: None,
@@ -4696,6 +4977,7 @@ mod tests {
             input_policy: false,
             model_header_policy: false,
             session_mapping: false,
+            title_session_mapping: false,
             upstream_session: None,
             managed_oauth: false,
             oauth_file: false,
@@ -4718,7 +5000,7 @@ mod tests {
         let mut legacy_relay = reservation("legacy-relay");
         legacy_relay.signature_repair = true;
         let first = legacy_relay
-            .submit_with_account_credentials(Duration::from_secs(2), None)
+            .submit_with_account_credentials(Instant::now() + Duration::from_secs(2), None, None)
             .await
             .unwrap();
         assert_eq!(first.status(), StatusCode::BAD_REQUEST);
@@ -4799,11 +5081,56 @@ mod tests {
         );
         assert_eq!(body["usage"]["cache_read_input_tokens"], 4210);
         assert_eq!(sent.recv().await.unwrap(), "delegated");
-        let failed = reservation("unknown")
-            .submit(Duration::from_millis(500))
+        for (id, shared, continuation, expected_rejection) in [
+            ("late-ledger", true, true, true),
+            ("late-provider", true, true, false),
+            ("late-model", true, true, false),
+            ("late-duplicate-ledger", true, true, false),
+            ("late-ledger", false, true, false),
+            ("late-ledger", true, false, false),
+        ] {
+            let mut prepared = reservation(id);
+            prepared.continuation = continuation;
+            let deadline = Instant::now() + Duration::from_millis(150);
+            if shared {
+                prepared.admission_deadline = deadline;
+            }
+            let (result, ()) = tokio::join!(
+                prepared.submit_with_account_credentials(deadline, None, None),
+                async {
+                    assert_eq!(sent.recv().await.unwrap(), id);
+                    let release = late_reply.recv().await.unwrap();
+                    sleep_until(deadline + Duration::from_millis(25)).await;
+                    let _ = release.send(());
+                }
+            );
+            if expected_rejection {
+                let response = result.unwrap();
+                assert_eq!(
+                    tui_failure_stage(response.headers(), &[TUI_SUBMISSION_LEDGER]),
+                    Some(TUI_SUBMISSION_LEDGER)
+                );
+                let public = tui_public_response(response, None).await.unwrap();
+                assert_eq!(public.status(), StatusCode::TOO_MANY_REQUESTS);
+                assert_eq!(public.headers()[RETRY_AFTER], "1");
+                assert!(!public.headers().contains_key(TUI_ERROR_SOURCE));
+            } else {
+                assert!(
+                    matches!(result, Err(AppError::BadGateway(_))),
+                    "{id} 共用截止={shared} 原工具回执={continuation}"
+                );
+            }
+        }
+        let mut unknown = reservation("unknown");
+        let deadline = Instant::now() + Duration::from_millis(500);
+        unknown.continuation = true;
+        unknown.admission_deadline = deadline;
+        let failed = unknown
+            .submit_with_account_credentials(deadline, None, None)
             .await;
         assert!(matches!(failed, Err(AppError::BadGateway(_))));
         assert_eq!(sent.recv().await.unwrap(), "unknown");
+        drop(unknown);
         assert!(
             timeout(Duration::from_millis(100), events.recv())
                 .await
@@ -6142,6 +6469,8 @@ mod tests {
                 binding,
                 idle: true,
                 agent_summary: false,
+                system_prompt_policy: false,
+                direct_https: false,
                 predecessors: Vec::new(),
                 tui_oauth_profile: None,
             };
@@ -6152,6 +6481,7 @@ mod tests {
                 signature_repair: None,
                 agent_summary: false,
                 oauth_file: false,
+                system_prompt_policy: TuiSystemPromptPolicy::Append,
                 body_policy,
             };
             let result = prepare_tui(
@@ -6301,6 +6631,7 @@ mod tests {
                 signature_repair: None,
                 agent_summary: false,
                 oauth_file: false,
+                system_prompt_policy: TuiSystemPromptPolicy::Append,
                 body_policy: TuiBodyPolicy::default(),
             })
             .unwrap(),
@@ -6314,6 +6645,7 @@ mod tests {
                 signature_repair: None,
                 agent_summary: false,
                 oauth_file: false,
+                system_prompt_policy: TuiSystemPromptPolicy::Append,
                 body_policy: TuiBodyPolicy::default(),
             })
             .unwrap(),
@@ -6328,6 +6660,7 @@ mod tests {
                 signature_repair: None,
                 agent_summary: false,
                 oauth_file: false,
+                system_prompt_policy: TuiSystemPromptPolicy::Append,
                 body_policy: TuiBodyPolicy::default(),
             })
             .is_err()

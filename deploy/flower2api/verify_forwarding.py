@@ -69,7 +69,8 @@ def build_verification(release, destination):
         arguments = list(arguments)
         if arguments[:2] == ['docker', 'build'] or arguments[:3] == ['docker', 'buildx', 'build']:
             index = arguments.index('--target') + 1
-            arguments[index] = 'verification-' + arguments[index]
+            if arguments[index] in ('control', 'account'):
+                arguments[index] = 'verification-' + arguments[index]
         return original(*arguments, **options)
 
     with patch.object(manage, 'command', command):

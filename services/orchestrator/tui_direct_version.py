@@ -1,0 +1,4 @@
+"""正式受管引擎回调使用的固定官方 CLI。"""
+
+DIRECT_CLI_VERSION = '2.1.321'
+DIRECT_CLI_SHA256 = '426c33815ca6645a772f722fbff10dbf2cbdb124a8aeab733c1365dbf8bbf61f'

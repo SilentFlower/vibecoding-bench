@@ -113,6 +113,7 @@ impl Fixture {
             agy_gif_frames_enabled: false,
             agy_disable_safety_filtering: false,
             agy_system_prompt_as_user_reminder: false,
+            tui_system_prompt_policy: Default::default(),
             id: 0,
             name: name.into(),
             email: format!("{}@example.invalid", Uuid::new_v4()),

@@ -23,6 +23,9 @@ use tokio::time::{Instant, sleep_until, timeout, timeout_at};
 use uuid::Uuid;
 
 use crate::error::AppError;
+use crate::model::account::TuiSystemPromptPolicy;
+use crate::model::request_diagnostics::{TuiBodySource, TuiInstructionLocation, TuiSessionOrigin};
+use crate::service::diagnostics::tui_startup_event;
 use crate::service::gateway::is_passive_usage_header;
 use crate::service::native_capture::tui_wire::CaptureJob;
 use crate::service::native_capture::{TuiCaptureInput, tui_writer};
@@ -39,12 +42,16 @@ use crate::service::runtime_transport::{
     tui_input_rejection, tui_model_headers, tui_projection_marker, valid_tui_account_token,
 };
 use crate::service::runtime_transport::{
-    TUI_CAPTURE, TUI_CLI_SUBMISSION, TUI_ERROR_SOURCE, TUI_FINAL_CAPTURE, TUI_MODEL_ACCEPT_OMITTED,
-    TUI_MODEL_HEADER_POLICY, TUI_REPAIR_ATTEMPT, TUI_SIGNATURE_REPAIR, TuiReceiptProbe,
+    TUI_BODY_SOURCE, TUI_CAPTURE, TUI_CLI_INPUT_GUARD, TUI_CLI_SUBMISSION, TUI_ERROR_SOURCE,
+    TUI_FINAL_CAPTURE, TUI_INSTRUCTION_LOCATION, TUI_MODEL_ACCEPT_OMITTED, TUI_MODEL_HEADER_POLICY,
+    TUI_OPENING_USAGE_PLACEHOLDER, TUI_PREPARE_BIND, TUI_PREPARE_EXCHANGE, TUI_PREPARE_LEDGER,
+    TUI_PROMPT_SUGGESTION, TUI_REPAIR_ATTEMPT, TUI_SEND_CLAIM, TUI_SENDER_CONFIG,
+    TUI_SESSION_ORIGIN, TUI_SIGNATURE_REPAIR, TUI_SUBMISSION_LEDGER, TUI_SYSTEM_PROMPT_POLICY,
+    TUI_TITLE_SESSION_MAPPING, TUI_WORKSPACE_BIND, TuiReceiptProbe, TuiV2Unavailable,
 };
 use crate::service::session_policy_block;
 use crate::service::tui_sender_response;
-use crate::service::tui_tool_history::SERVER_SESSION_PREFIX;
+use crate::service::tui_tool_history::{SERVER_SESSION_PREFIX, SUGGESTION_SESSION_PREFIX, auxiliary_original_session};
 use axum::http::header::RETRY_AFTER;
 #[path = "tui_submission_log.rs"]
 mod submission_log;
@@ -149,7 +156,7 @@ enum Phase {
         managed_oauth: bool,
         oauth_file: bool,
         signature_repair: Option<bool>,
-        cli_submission: bool,
+        cli_submission: Option<&'static str>,
     },
     Submitted,
     RepairPending(oneshot::Sender<RepairPermit>),
@@ -203,7 +210,7 @@ struct SourceOptions {
     managed: bool,
     oauth_file: bool,
     wire: bool,
-    cli_submission: bool,
+    cli_submission: Option<&'static str>,
     captured: bool,
 }
 
@@ -212,6 +219,7 @@ struct Record {
     wire_capture: Option<CaptureJob>,
     identity: Identity,
     agent_probe: bool,
+    fork_borrowed_slot: bool,
     binding_proof: [u8; 32],
     deadline: Instant,
     replay_until: Instant,
@@ -282,6 +290,14 @@ impl Default for TuiSender {
 
 fn unavailable() -> AppError {
     AppError::ServiceUnavailable("V2 本机事件源未通过准备或绑定核验".into())
+}
+
+fn stage_response(error: AppError, stage: &'static str) -> Response {
+    let mut response = error.into_response();
+    response
+        .headers_mut()
+        .insert(TUI_ERROR_SOURCE, HeaderValue::from_static(stage));
+    response
 }
 
 fn invalid_identity() -> AppError {
@@ -427,15 +443,18 @@ struct VerifiedSource {
     model_headers: bool,
     model_header_policy: bool,
     capture_http: bool,
-    cli_submission: bool,
     body_policy: bool,
     input_policy: bool,
     agent_scope: bool,
     agent_summary: bool,
     session_mapping: bool,
+    title_session_mapping: bool,
+    prompt_suggestion: bool,
     managed_oauth: bool,
     oauth_file: bool,
     signature_repair: bool,
+    system_prompt_policy: bool,
+    direct_https: bool,
 }
 
 async fn verify_source(
@@ -454,13 +473,16 @@ async fn verify_source(
     write_json(&mut connection, &control).await?;
     let reply = read_json(&mut connection).await?;
     let idle = verify_reply(&reply, &proof)?;
+    // 旧候选在绑定时声明外部正文交付。当前源只在确认冷导入的预留中声明 CLI 采集。
+    if reply["capture_cli_submission_protocol"].as_u64() == Some(1) {
+        return Err(source_error());
+    }
     Ok(VerifiedSource {
         connection,
         proof,
         idle,
         receipt_idle: reply["receipt_idle"].as_bool(),
         capture_http: reply["capture_http_protocol"].as_u64() == Some(1),
-        cli_submission: reply["capture_cli_submission_protocol"].as_u64() == Some(1),
         model_headers: reply["model_headers_protocol"].as_u64() == Some(1),
         model_header_policy: reply["model_header_policy_protocol"].as_u64() == Some(1),
         body_policy: reply["body_policy_protocol"].as_u64() == Some(1),
@@ -468,9 +490,13 @@ async fn verify_source(
         agent_scope: reply["agent_scope_protocol"].as_u64() == Some(1),
         agent_summary: reply["agent_summary_protocol"].as_u64() == Some(1),
         session_mapping: reply["upstream_session_protocol"].as_u64() == Some(1),
+        title_session_mapping: reply["title_session_mapping_protocol"].as_u64() == Some(1),
+        prompt_suggestion: reply["prompt_suggestion_protocol"].as_u64() == Some(1),
         managed_oauth: reply["managed_oauth_protocol"].as_u64() == Some(1),
         oauth_file: reply["oauth_file_protocol"].as_u64() == Some(1),
         signature_repair: reply["signature_repair_protocol"].as_u64() == Some(1),
+        system_prompt_policy: reply["client_system_prompt_policy_protocol"].as_u64() == Some(1),
+        direct_https: reply["direct_https_protocol"].as_u64() == Some(1),
     })
 }
 
@@ -525,20 +551,35 @@ impl TuiSender {
         binding: &TransportBinding,
         config: Option<&Value>,
         receipt: Option<&TuiReceiptProbe>,
-    ) -> Option<(bool, Option<bool>, bool)> {
-        setting(config).ok()?;
-        let source = timeout(Duration::from_secs(1), async {
-            submission_log::was_consumed(&self.submission_storage, binding, None).await?;
-            verify_source(&self.path, binding, "status", receipt).await
-        })
+    ) -> Result<(bool, Option<bool>, bool, bool, bool), TuiV2Unavailable> {
+        setting(config).map_err(|_| TuiV2Unavailable::ReadinessConfig)?;
+        let deadline = Instant::now() + Duration::from_secs(1);
+        timeout_at(
+            deadline,
+            submission_log::was_consumed(
+                &self.submission_storage,
+                binding,
+                None,
+                deadline.into_std(),
+            ),
+        )
         .await
-        .ok()?
-        .ok()?;
+        .map_err(|_| TuiV2Unavailable::ReadinessLedger)?
+        .map_err(|_| TuiV2Unavailable::ReadinessLedger)?;
+        let source = timeout_at(
+            deadline,
+            verify_source(&self.path, binding, "status", receipt),
+        )
+        .await
+        .map_err(|_| TuiV2Unavailable::ReadinessSource)?
+        .map_err(|_| TuiV2Unavailable::ReadinessSource)?;
         let inactive = self.active() == 0;
-        Some((
+        Ok((
             source.idle && inactive,
             source.receipt_idle.map(|idle| idle && inactive),
             source.agent_summary,
+            source.managed_oauth && source.system_prompt_policy,
+            source.managed_oauth && source.oauth_file && source.direct_https,
         ))
     }
 
@@ -571,22 +612,26 @@ impl TuiSender {
                 && identity.agent_hint.is_some()
                 && !identity.continuation_only
                 && !identity.agent_summary;
-            if !agent_probe && occupied(&book) - usize::from(probe_used) >= maximum {
+            let normal_occupied = occupied(&book) - usize::from(probe_used);
+            if !agent_probe && normal_occupied >= maximum {
                 return Err(limited());
             }
-            // 正在排队的新轮不能占完所有握手位置，最后一位供持有原进程的工具续轮入场。
+            // 新轮排队或分支借用物理余位时，最后一个传输位置留给已核验的工具续轮。
             if !agent_probe
                 && !identity.continuation_only
                 && maximum > 1
-                && book
-                    .values()
-                    .filter(|record| {
-                        !record.agent_probe && matches!(record.phase, Phase::Preparing)
-                    })
-                    .count()
-                    >= maximum - 1
+                && normal_occupied == maximum - 1
             {
-                return Err(limited());
+                let active = || {
+                    book.values().filter(|record| {
+                        !record.agent_probe && !matches!(record.phase, Phase::Closed)
+                    })
+                };
+                if active().any(|record| record.fork_borrowed_slot)
+                    || active().all(|record| matches!(record.phase, Phase::Preparing))
+                {
+                    return Err(limited());
+                }
             }
             book.insert(
                 id.clone(),
@@ -595,6 +640,7 @@ impl TuiSender {
                     wire_capture: None,
                     identity,
                     agent_probe,
+                    fork_borrowed_slot: false,
                     binding_proof: binding_proof(binding),
                     deadline,
                     replay_until,
@@ -642,13 +688,39 @@ impl TuiSender {
                     .map_err(|_| invalid_identity())
             })
             .transpose()?;
+        let mut system_policy_headers = request.headers().get_all(TUI_SYSTEM_PROMPT_POLICY).iter();
+        let system_prompt = system_policy_headers
+            .next()
+            .map(|value| {
+                if system_policy_headers.next().is_some() {
+                    return Err(invalid_identity());
+                }
+                value
+                    .to_str()
+                    .ok()
+                    .and_then(TuiSystemPromptPolicy::parse)
+                    .filter(|policy| *policy != TuiSystemPromptPolicy::Append)
+                    .ok_or_else(invalid_identity)
+            })
+            .transpose()?;
+        let observe = |stage, result| {
+            tui_startup_event(stage, Some(&identity.reservation_id), None, Some(result))
+        };
+        observe("sender_private_prepare", "entered");
         let (deadline, replay_until) = identity.deadlines(binding, now_ms())?;
+        let config = match setting(config) {
+            Ok(config) => config,
+            Err(error) => {
+                observe(TUI_SENDER_CONFIG, "rejected");
+                return Ok(stage_response(error, TUI_SENDER_CONFIG));
+            }
+        };
         let (mut slot, mut cancelled) = self.reserve(
             identity.clone(),
             binding,
             deadline,
             replay_until,
-            setting(config)?.max_reservations,
+            config.max_reservations,
         )?;
         let capture_requested = tui_projection_marker(request.headers(), TUI_CAPTURE, "1");
         let wire_protocol = tui_projection_marker(request.headers(), TUI_FINAL_CAPTURE, "1");
@@ -662,39 +734,49 @@ impl TuiSender {
             } else {
                 None
             };
+        let mut stage = TUI_PREPARE_LEDGER;
         let prepared = async {
+            observe(stage, "started");
             if submission_log::was_consumed(
                 &self.submission_storage,
                 binding,
                 Some(&identity.reservation_id),
+                deadline.into_std(),
             )
             .await
             .map_err(|_| unavailable())?
             {
                 return Err(consumed());
             }
+            observe(stage, "confirmed");
             // 先在将承载正文的同一个 socket 核对账号。遇到错绑时连预留信封也不送出。
+            stage = TUI_PREPARE_BIND;
+            observe(stage, "started");
             let VerifiedSource {
                 mut connection,
                 proof,
                 model_headers,
                 model_header_policy,
                 capture_http,
-                cli_submission,
                 body_policy,
                 input_policy,
                 agent_scope,
                 agent_summary,
                 session_mapping,
+                title_session_mapping,
+                prompt_suggestion,
                 managed_oauth,
                 oauth_file,
                 signature_repair,
+                system_prompt_policy,
+                direct_https,
                 ..
             } = verify_source(&self.path, binding, "bind", None)
                 .await
                 .map_err(|_| unavailable())?;
             // 双方明确支持原生交付表示才采集。旧控制端继续使用其认识的来源。
-            let cli_submission = cli_submission && managed_oauth && capture_requested
+            let offer_cli_capture = managed_oauth
+                && capture_requested
                 && tui_projection_marker(request.headers(), TUI_CLI_SUBMISSION, "1");
             if identity.agent_summary && !agent_summary {
                 return Err(unavailable());
@@ -703,6 +785,17 @@ impl TuiSender {
                 return Err(AppError::TuiInputUnsupported);
             }
             if policy.is_some() && !body_policy {
+                return Err(unavailable());
+            }
+            if system_prompt.is_some() && (!managed_oauth || !system_prompt_policy) {
+                return Err(unavailable());
+            }
+            observe(stage, "confirmed");
+            stage = TUI_PREPARE_EXCHANGE;
+            observe(stage, "started");
+            if identity.session_id.starts_with(SUGGESTION_SESSION_PREFIX)
+                && (!prompt_suggestion || identity.continuation_only || identity.agent_hint.is_some())
+            {
                 return Err(unavailable());
             }
             let model_header_policy = offer_header_policy && model_header_policy && model_headers;
@@ -727,6 +820,9 @@ impl TuiSender {
             let offer_oauth_file = managed_oauth
                 && oauth_file
                 && tui_projection_marker(request.headers(), TUI_OAUTH_FILE, "1");
+            if direct_https && !offer_oauth_file {
+                return Err(unavailable());
+            }
             let body = to_bytes(request.into_body(), REQUEST_BODY_LIMIT)
                 .await
                 .map_err(|_| invalid_identity())?;
@@ -736,15 +832,25 @@ impl TuiSender {
             let mut control = proof.clone();
             control["action"] = json!("prepare");
             control["reservation"] = json!(identity);
+            if managed_oauth {
+                control["native_cold_history_protocol"] = json!(1);
+                control["receipt_fork_session_protocol"] = json!(1);
+            }
+            if let Some(policy) = system_prompt {
+                control["client_system_prompt_policy"] = json!(policy);
+            }
             if offer_oauth_file {
                 control["oauth_file_protocol"] = json!(1);
+            }
+            if direct_https {
+                control["direct_https_protocol"] = json!(1);
             }
             control["body_len"] = json!(body.len());
             control["body_sha256"] = json!(hex::encode(Sha256::digest(&body)));
             if let Some(policy) = policy {
                 control["body_policy"] = json!(policy);
             }
-            if let Some(format) = native_input {
+            if let Some(format) = native_input.as_deref() {
                 control["input_format"] = json!(format);
             }
             if model_header_policy {
@@ -773,6 +879,14 @@ impl TuiSender {
                 .await
                 .map_err(|_| unavailable())?;
             verify_reply(&reply, &proof).map_err(|_| unavailable())?;
+            let cold = reply["native_cold_history_protocol"].as_u64() == Some(1);
+            if cold && !managed_oauth {
+                return Err(unavailable());
+            }
+            let cli_submission =
+                (offer_cli_capture && cold).then_some("request_from_interactive_cli");
+            let capture_http = capture_http && !cold;
+            let signature_repair = signature_repair && !cold;
             let oauth_file = reply["oauth_file_protocol"].as_u64() == Some(1);
             if oauth_file && !offer_oauth_file {
                 return Err(unavailable());
@@ -808,10 +922,37 @@ impl TuiSender {
                 Some("recovered") if identity.continuation_only => "recovered",
                 _ => return Err(invalid_identity()),
             };
+            if let Some(policy) = system_prompt
+                && reply["client_system_prompt_policy"] != policy.as_str()
+            {
+                return Err(unavailable());
+            }
             // 支持绑定的源在准备时仅预留容量，到 send 才获得实际启动目录。
-            let branch = match (identity.agent_hint.as_ref(), reply.get("agent_session")) {
-                (None, None) => None,
-                (Some(_), Some(value)) if agent_scope => Some(
+            let branch = match (
+                identity.agent_hint.as_ref(),
+                reply.get("agent_session"),
+                reply.get("receipt_fork_session"),
+            ) {
+                (None, None, None) => None,
+                (Some(_), Some(value), None) if agent_scope => Some(value),
+                (None, None, Some(value))
+                    if managed_oauth && (cold || native_input.as_deref() == Some("claude_code")) =>
+                {
+                    Some(value)
+                }
+                _ => return Err(invalid_identity()),
+            };
+            let fork_borrowed_slot = match reply.get("receipt_fork_borrowed_slot") {
+                None => false,
+                Some(Value::Bool(true))
+                    if kind == "new" && reply.get("receipt_fork_session").is_some() =>
+                {
+                    true
+                }
+                _ => return Err(invalid_identity()),
+            };
+            let branch = branch
+                .map(|value| {
                     value
                         .as_str()
                         .filter(|text| {
@@ -822,11 +963,10 @@ impl TuiSender {
                                     })
                                 })
                         })
-                        .ok_or_else(invalid_identity)?
-                        .to_owned(),
-                ),
-                _ => return Err(invalid_identity()),
-            };
+                        .map(str::to_owned)
+                        .ok_or_else(invalid_identity)
+                })
+                .transpose()?;
             let workspace = match reply.get("workspace_protocol") {
                 None if branch.is_none() => None,
                 Some(version) if version.as_u64() == Some(1) => {
@@ -851,14 +991,24 @@ impl TuiSender {
                 input_policy,
                 model_header_policy,
                 session_mapping,
+                title_session_mapping,
                 managed_oauth,
                 oauth_file,
+                fork_borrowed_slot,
                 if signature_repair {
                     repair_requested
                 } else {
                     None
                 },
             ))
+        };
+        let result = tokio::select! {
+            biased;
+            _ = cancelled.changed() => {
+                observe("sender_private_prepare", "cancelled");
+                return Err(consumed());
+            },
+            result = timeout_at(deadline, prepared) => result.unwrap_or_else(|_| Err(limited())),
         };
         let (
             connection,
@@ -869,13 +1019,24 @@ impl TuiSender {
             input_policy,
             model_header_policy,
             session_mapping,
+            title_session_mapping,
             managed_oauth,
             oauth_file,
+            fork_borrowed_slot,
             signature_repair,
-        ) = tokio::select! {
-            biased;
-            _ = cancelled.changed() => return Err(consumed()),
-            result = timeout_at(deadline, prepared) => result.map_err(|_| limited())??,
+        ) = match result {
+            Ok(prepared) => {
+                observe(stage, "confirmed");
+                prepared
+            }
+            Err(error @ AppError::ServiceUnavailable(_)) => {
+                observe(stage, "failed");
+                return Ok(stage_response(error, stage));
+            }
+            Err(error) => {
+                observe(stage, "rejected");
+                return Err(error);
+            }
         };
         let mut book = self.book.lock().unwrap();
         let record = book
@@ -887,6 +1048,7 @@ impl TuiSender {
                     && record.deadline > Instant::now()
             })
             .ok_or_else(consumed)?;
+        record.fork_borrowed_slot = fork_borrowed_slot;
         record.phase = Phase::Ready {
             connection,
             workspace,
@@ -897,7 +1059,11 @@ impl TuiSender {
             cli_submission,
         };
         slot.armed = false;
+        observe("sender_private_prepare", "accepted");
         let mut response = (StatusCode::NO_CONTENT, [(HANDOFF_HEADER, kind)]).into_response();
+        if identity.session_id.starts_with(SUGGESTION_SESSION_PREFIX) {
+            response.headers_mut().insert(TUI_PROMPT_SUGGESTION, HeaderValue::from_static("1"));
+        }
         if input_policy {
             response
                 .headers_mut()
@@ -912,6 +1078,11 @@ impl TuiSender {
             response
                 .headers_mut()
                 .insert(TUI_UPSTREAM_SESSION, HeaderValue::from_static("1"));
+        }
+        if session_mapping && title_session_mapping {
+            response
+                .headers_mut()
+                .insert(TUI_TITLE_SESSION_MAPPING, HeaderValue::from_static("1"));
         }
         if managed_oauth {
             response
@@ -928,8 +1099,8 @@ impl TuiSender {
                 .headers_mut()
                 .insert(TUI_SIGNATURE_REPAIR, HeaderValue::from_static("1"));
         }
-        if capture_requested && (capture_http || cli_submission) {
-            if wire_protocol && !cli_submission {
+        if capture_requested && (capture_http || cli_submission.is_some()) {
+            if wire_protocol && cli_submission.is_none() {
                 response
                     .headers_mut()
                     .insert(TUI_FINAL_CAPTURE, HeaderValue::from_static("1"));
@@ -942,6 +1113,11 @@ impl TuiSender {
             response
                 .headers_mut()
                 .insert(TUI_BODY_POLICY, HeaderValue::from_static("1"));
+        }
+        if system_prompt.is_some() {
+            response
+                .headers_mut()
+                .insert(TUI_SYSTEM_PROMPT_POLICY, HeaderValue::from_static("1"));
         }
         Ok(response)
     }
@@ -959,7 +1135,7 @@ impl TuiSender {
             BufReader<UnixStream>,
             Option<workspace::Candidate>,
             Option<bool>,
-            bool,
+            Option<&'static str>,
         ),
         AppError,
     > {
@@ -1021,18 +1197,25 @@ impl TuiSender {
         capture: Option<(PathBuf, TuiCaptureInput)>,
     ) -> Result<Response, AppError> {
         let identity = Identity::decode(headers, binding)?;
+        let reservation_id = identity.reservation_id.clone();
+        let observe = |stage, result| tui_startup_event(stage, Some(&reservation_id), None, Some(result));
+        observe("sender_private_send", "entered");
         let (deadline, _) = identity.deadlines(binding, now_ms())?;
-        setting(config)?;
+        if let Err(error) = setting(config) {
+            return Ok(stage_response(error, TUI_SENDER_CONFIG));
+        }
         let mut session_headers = headers.get_all(TUI_UPSTREAM_SESSION).iter();
         let upstream_session = session_headers
             .next()
             .map(|value| {
                 let value = value.to_str().map_err(|_| invalid_identity())?;
+                let original = auxiliary_original_session(&identity.session_id)
+                    .unwrap_or(&identity.session_id);
                 if session_headers.next().is_some()
                     || value.len() != 36
                     || Uuid::parse_str(value).is_err()
-                    || identity.session_id.len() != 36
-                    || Uuid::parse_str(&identity.session_id).is_err()
+                    || original.len() != 36
+                    || Uuid::parse_str(original).is_err()
                 {
                     return Err(invalid_identity());
                 }
@@ -1051,14 +1234,29 @@ impl TuiSender {
             })
             .transpose()?;
         let oauth_file = oauth_file_payload(headers)?;
-        let (slot, mut connection, workspace, signature_repair, cli_submission) = self.claim(
+        observe("sender_send_claim", "started");
+        let (slot, mut connection, workspace, signature_repair, cli_submission) = match self.claim(
             binding,
             &identity,
             upstream_session.is_some(),
             account_token.is_some(),
             oauth_file.is_some(),
-        )?;
+        ) {
+            Ok(claimed) => {
+                observe("sender_send_claim", "accepted");
+                claimed
+            }
+            Err(error @ AppError::ServiceUnavailable(_)) => {
+                observe("sender_send_claim", "rejected");
+                return Ok(stage_response(error, TUI_SEND_CLAIM));
+            }
+            Err(error) => {
+                observe("sender_send_claim", "rejected");
+                return Err(error);
+            }
+        };
         // 先同步提交事实。进程退出或回包丢失后，重放的 prepare 与 send 仍无法触发第二次提交。
+        observe("sender_submission_ledger", "started");
         let committed = timeout_at(
             deadline,
             submission_log::consume(
@@ -1066,12 +1264,35 @@ impl TuiSender {
                 binding,
                 &identity.reservation_id,
                 identity.deadline_unix_ms,
+                deadline.into_std(),
                 submission_log::Terminal::Submitted,
             ),
         )
         .await
-        .map_err(|_| limited())?
-        .map_err(|_| unavailable())?;
+        .unwrap_or_else(|_| Err(io::ErrorKind::TimedOut.into()));
+        let committed = match committed {
+            Ok(committed) => {
+                observe("sender_submission_ledger", if committed { "committed" } else { "already_consumed" });
+                committed
+            }
+            Err(error) => {
+                observe("sender_submission_ledger", if error.kind() == io::ErrorKind::TimedOut { "deadline" } else { "failed" });
+                let error = match error.kind() {
+                    io::ErrorKind::TimedOut => limited(),
+                    kind => {
+                        tracing::warn!(
+                            account_id = binding.account_id,
+                            reservation_id = %identity.reservation_id,
+                            ?kind,
+                            "V2 发送前写入提交账本失败"
+                        );
+                        unavailable()
+                    }
+                };
+                // 账本失败时尚未向事件源发送 send，网关可以安全归还原工具回执。
+                return Ok(stage_response(error, TUI_SUBMISSION_LEDGER));
+            }
+        };
         if !committed {
             return Err(consumed());
         }
@@ -1099,7 +1320,8 @@ impl TuiSender {
                 .is_some()
                 .then(|| (dir.clone(), input.clone(), *account))
         });
-        let wire_protocol = !cli_submission && tui_projection_marker(headers, TUI_FINAL_CAPTURE, "1");
+        let wire_protocol =
+            cli_submission.is_none() && tui_projection_marker(headers, TUI_FINAL_CAPTURE, "1");
         let wire_captured = if managed_oauth && wire_protocol {
             capture
                 .take()
@@ -1117,7 +1339,11 @@ impl TuiSender {
             command["capture_assembly"] = json!(true);
         }
         if capture.is_some() {
-            command[if cli_submission { "capture_cli_submission" } else { "capture_http" }] = json!(true);
+            if cli_submission.is_some() {
+                command["capture_cli_submission"] = json!(true);
+            } else {
+                command["capture_http"] = json!(true);
+            }
         }
         if let Some(known) = signature_repair {
             command["signature_repair"] = json!(known);
@@ -1131,16 +1357,36 @@ impl TuiSender {
             captured: capture.is_some() || wire_captured,
         };
         if let Some(candidate) = workspace {
+            observe("sender_workspace_bind", "started");
             let root = self.submission_storage.clone();
             let launch = tokio::task::spawn_blocking(move || candidate.bind(&root, &identity));
-            command["workspace"] = timeout_at(deadline, launch)
+            let resolved = timeout_at(deadline, async { launch.await.map_err(|_| unavailable())? })
                 .await
-                .map_err(|_| limited())?
-                .map_err(|_| unavailable())??;
-            if Instant::now() >= deadline {
-                return Err(limited());
-            }
+                .unwrap_or_else(|_| Err(limited()));
+            command["workspace"] = match resolved {
+                Ok(workspace) if Instant::now() < deadline => {
+                    observe("sender_workspace_bind", "bound");
+                    workspace
+                }
+                Ok(_) => {
+                    observe("sender_workspace_bind", "deadline");
+                    return Ok(stage_response(limited(), TUI_WORKSPACE_BIND));
+                }
+                Err(error @ AppError::ServiceUnavailable(_))
+                | Err(error @ AppError::AdmissionLimited { .. }) => {
+                    observe("sender_workspace_bind", if matches!(error, AppError::AdmissionLimited { .. }) { "deadline" } else { "failed" });
+                    // 预留已认领，但事件源还没收到 send。网关可以归还原回执。
+                    return Ok(stage_response(error, TUI_WORKSPACE_BIND));
+                }
+                Err(error) => {
+                    observe("sender_workspace_bind", "rejected");
+                    return Err(error);
+                }
+            };
+        } else {
+            observe("sender_workspace_bind", "skipped");
         }
+        observe("sender_unix_send", "started");
         let reply = timeout(IO_TIMEOUT, async {
             write_json(&mut connection, &command).await?;
             if let Some(file) = &oauth_file {
@@ -1447,6 +1693,40 @@ impl TuiSender {
         response
             .headers_mut()
             .insert(TUI_GATEWAY_ID_HEADER, HeaderValue::from_static(mode));
+        if status.is_success() {
+            if let Some(source) = head["body_source"].as_str().and_then(TuiBodySource::from_wire) {
+                response
+                    .headers_mut()
+                    .insert(TUI_BODY_SOURCE, HeaderValue::from_static(source.as_str()));
+                if options.managed
+                    && source == TuiBodySource::InteractiveCli
+                    && status == StatusCode::OK
+                    && content_type == "text/event-stream"
+                    && head["opening_usage_placeholder"].as_bool() == Some(true)
+                {
+                    response
+                        .headers_mut()
+                        .insert(TUI_OPENING_USAGE_PLACEHOLDER, HeaderValue::from_static("1"));
+                }
+            }
+            if let Some(origin) = head["session_origin"]
+                .as_str()
+                .and_then(TuiSessionOrigin::from_wire)
+            {
+                response
+                    .headers_mut()
+                    .insert(TUI_SESSION_ORIGIN, HeaderValue::from_static(origin.as_str()));
+            }
+            if let Some(location) = head["instruction_location"]
+                .as_str()
+                .and_then(TuiInstructionLocation::from_wire)
+            {
+                response.headers_mut().insert(
+                    TUI_INSTRUCTION_LOCATION,
+                    HeaderValue::from_static(location.as_str()),
+                );
+            }
+        }
         if options.captured {
             response
                 .headers_mut()
@@ -1464,6 +1744,9 @@ impl TuiSender {
                 }
                 Some("local_provider_backoff") if status == StatusCode::TOO_MANY_REQUESTS => {
                     Some("local_provider_backoff")
+                }
+                Some(TUI_CLI_INPUT_GUARD) if status == StatusCode::UNPROCESSABLE_ENTITY => {
+                    Some(TUI_CLI_INPUT_GUARD)
                 }
                 Some("local_provider_event") => Some("local_provider_event"),
                 _ => None,
@@ -1547,6 +1830,7 @@ impl TuiSender {
                         wire_capture: None,
                         identity: identity.clone(),
                         agent_probe: false,
+                        fork_borrowed_slot: false,
                         binding_proof: proof,
                         deadline,
                         replay_until,
@@ -1566,6 +1850,7 @@ impl TuiSender {
                     binding,
                     &identity.reservation_id,
                     identity.deadline_unix_ms,
+                    replay_until.into_std(),
                     submission_log::Terminal::Cancelled,
                 ),
             )
@@ -1590,8 +1875,8 @@ fn save_provider_capture(
     let (directory, input, account, attempt, permit) = capture;
     tokio::task::spawn_blocking(move || {
         let _permit = permit;
-        let format = if options.cli_submission {
-            "request_to_interactive_cli"
+        let format = if let Some(format) = options.cli_submission {
+            format
         } else if options.managed {
             "request_to_account_sender"
         } else {
@@ -1605,7 +1890,7 @@ fn save_provider_capture(
                 pairs,
                 raw,
                 format,
-                !options.wire && !options.cli_submission,
+                !options.wire && options.cli_submission.is_none(),
                 None,
             )
             .is_err()
@@ -2017,7 +2302,7 @@ mod tests {
                 (Err(AppError::TuiInput { code, status, .. }), Some(expected)) => {
                     assert_eq!((code, status), (reason, expected));
                 }
-                (Err(AppError::ServiceUnavailable(_)), None) => {}
+                (Ok(response), None) => assert_stage(response, TUI_PREPARE_EXCHANGE),
                 _ => panic!("准备错误映射不符"),
             }
             assert_eq!(source.sender.active(), 0);
@@ -2067,7 +2352,7 @@ mod tests {
             socket
         });
         assert_eq!(prepared.unwrap().headers()[TUI_MANAGED_OAUTH], "1");
-        assert!(source.send(&identity).await.is_err());
+        assert_stage(source.send(&identity).await.unwrap(), TUI_SEND_CLAIM);
         let mut credential_headers = headers(&identity);
         let token = "synthetic-account-at";
         credential_headers.insert(TUI_MANAGED_OAUTH, HeaderValue::from_static(token));
@@ -2093,6 +2378,9 @@ mod tests {
                 &mut socket,
                 &json!({
                     "status":200, "content_type":"text/event-stream", "message_id_mode":"gateway",
+                    "body_source":"account_sender",
+                    "session_origin":"live_process",
+                    "instruction_location":"system",
                     "quota_headers":{
                         "anthropic-ratelimit-unified-5h-utilization":"0.25",
                         "anthropic-ratelimit-unified-5h-reset":"2030-01-01T12:00:00Z",
@@ -2108,6 +2396,9 @@ mod tests {
             chunk(&mut socket, b"").await;
         });
         let response = response.unwrap();
+        assert_eq!(response.headers()[TUI_BODY_SOURCE], "account_sender");
+        assert_eq!(response.headers()[TUI_SESSION_ORIGIN], "live_process");
+        assert_eq!(response.headers()[TUI_INSTRUCTION_LOCATION], "system");
         assert_eq!(
             response.headers()["anthropic-ratelimit-unified-5h-utilization"],
             "0.25"
@@ -2185,12 +2476,12 @@ mod tests {
                 .send(&source.binding, Some(&source.config), headers, None)
         };
         legacy.insert(TUI_MANAGED_OAUTH, HeaderValue::from_static("legacy-at"));
-        assert!(send(&legacy).await.is_err());
+        assert_stage(send(&legacy).await.unwrap(), TUI_SEND_CLAIM);
         let value = file.header().unwrap();
         assert!(value.is_sensitive());
         let mut both = legacy.clone();
         both.insert(TUI_OAUTH_FILE, value.clone());
-        assert!(send(&both).await.is_err());
+        assert_stage(send(&both).await.unwrap(), TUI_SEND_CLAIM);
         let mut private = headers(&identity);
         private.insert(TUI_OAUTH_FILE, value);
         private.insert(
@@ -2254,6 +2545,9 @@ mod tests {
         let response = response.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(response.headers()[TUI_CAPTURE], "queued");
+        assert!(!response.headers().contains_key(TUI_BODY_SOURCE));
+        assert!(!response.headers().contains_key(TUI_SESSION_ORIGIN));
+        assert!(!response.headers().contains_key(TUI_INSTRUCTION_LOCATION));
         assert_eq!(
             response.headers()["anthropic-ratelimit-unified-7d-utilization"],
             "0.43"
@@ -2469,12 +2763,13 @@ mod tests {
             );
             send_headers.insert(TUI_UPSTREAM_SESSION, mapped.parse().unwrap());
             if !supported {
-                assert!(
+                assert_stage(
                     source
                         .sender
                         .send(&source.binding, Some(&source.config), &send_headers, None)
                         .await
-                        .is_err()
+                        .unwrap(),
+                    TUI_SEND_CLAIM,
                 );
                 send_headers.remove(TUI_UPSTREAM_SESSION);
             }
@@ -2529,7 +2824,7 @@ mod tests {
                 assert!(remaining.is_empty());
             }
         );
-        assert!(matches!(result, Err(AppError::ServiceUnavailable(_))));
+        assert_stage(result.unwrap(), TUI_PREPARE_BIND);
         assert_eq!(source.sender.active(), 0);
     }
 
@@ -2570,6 +2865,36 @@ mod tests {
         assert_eq!(source.sender.active(), 3);
     }
 
+    /// 已借用物理余位的分支运行时，保留最后一个传输位置。@return 无。
+    #[tokio::test]
+    async fn borrowed_receipt_fork_preserves_the_last_sender_slot() {
+        let source = Source::new();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let reserve = |identity| {
+            source
+                .sender
+                .reserve(identity, &source.binding, deadline, deadline, 2)
+        };
+        let (fork, _) = reserve(source.identity()).unwrap();
+        {
+            let mut book = source.sender.book.lock().unwrap();
+            let record = book.get_mut(&fork.id).unwrap();
+            record.fork_borrowed_slot = true;
+            record.phase = Phase::Submitted;
+        }
+        assert!(matches!(
+            reserve(source.identity()),
+            Err(AppError::AdmissionLimited { .. })
+        ));
+        let mut parent = source.identity();
+        parent.continuation_only = true;
+        let (returning, _) = reserve(parent).unwrap();
+        assert_eq!(source.sender.active(), 2);
+        drop(returning);
+        drop(fork);
+        assert!(reserve(source.identity()).is_ok());
+    }
+
     impl Drop for Source {
         fn drop(&mut self) {
             let _ = remove_dir_all(self.sender.path.parent().unwrap());
@@ -2584,6 +2909,33 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert(RESERVATION_HEADER, header(identity));
         headers
+    }
+
+    fn assert_stage(response: Response, stage: &str) {
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(response.headers()[TUI_ERROR_SOURCE], stage);
+    }
+
+    /// 旧候选的源在绑定阶段关闭，外部正文与发送指令都留在发送器内。@return 无。
+    #[tokio::test]
+    async fn retired_cli_body_override_is_rejected_before_prepare() {
+        let source = Source::new();
+        let identity = source.identity();
+        let (response, ()) = tokio::join!(source.prepare(&identity, b"{}"), async {
+            let (socket, _) = source.listener.accept().await.unwrap();
+            let mut socket = BufReader::new(socket);
+            let mut proof = read_json(&mut socket).await.unwrap();
+            assert_eq!(proof["action"], "bind");
+            proof["ready"] = json!(true);
+            proof["idle"] = json!(true);
+            proof["managed_oauth_protocol"] = json!(1);
+            proof["capture_cli_submission_protocol"] = json!(1);
+            write_json(&mut socket, &proof).await.unwrap();
+            assert_eq!(socket.read(&mut [0_u8; 1]).await.unwrap(), 0);
+        });
+        assert_stage(response.unwrap(), TUI_PREPARE_BIND);
+        assert_eq!(source.sender.active(), 0);
+        assert!(source.send(&identity).await.is_err());
     }
 
     async fn chunk(connection: &mut BufReader<UnixStream>, bytes: &[u8]) {
@@ -2653,6 +3005,54 @@ mod tests {
         }
     }
 
+    /// 原工具预留的绑定暂缺时关闭已准备的 Unix 连接，并报告确定的发送前拒绝。@return 无。
+    #[tokio::test]
+    async fn unavailable_workspace_does_not_send_authenticated_tool_receipt() {
+        let source = Source::new();
+        let root = &source.sender.submission_storage;
+        let body = b"{}";
+        let owner = source.identity();
+        let workspace = workspace::Candidate::from_request(body, true, None)
+            .unwrap()
+            .bind(root, &owner)
+            .unwrap();
+        let binding = Path::new(workspace["binding_file"].as_str().unwrap());
+        let original = std::fs::read(binding).unwrap();
+        let base = binding.parent().unwrap();
+        for target in [base, binding] {
+            let held = target.with_extension("fixture-held");
+            std::fs::rename(target, &held).unwrap();
+            let identity = Identity {
+                continuation_only: true,
+                reservation_id: Uuid::new_v4().to_string(),
+                ..owner.clone()
+            };
+            let (prepared, mut socket) = tokio::join!(source.prepare(&identity, body), async {
+                let (mut socket, mut reply) = source.receive("prepare").await;
+                let mut raw = [0; 2];
+                socket.read_exact(&mut raw).await.unwrap();
+                assert_eq!(&raw, body);
+                reply["kind"] = json!("recovered");
+                reply["workspace_protocol"] = json!(1);
+                write_json(&mut socket, &reply).await.unwrap();
+                socket
+            });
+            assert_eq!(prepared.unwrap().status(), StatusCode::NO_CONTENT);
+            let (response, ()) = tokio::join!(source.send(&identity), async {
+                assert_eq!(
+                    socket.read_u8().await.unwrap_err().kind(),
+                    io::ErrorKind::UnexpectedEof
+                );
+            });
+            let response = response.unwrap();
+            assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+            assert_eq!(response.headers()[TUI_ERROR_SOURCE], TUI_WORKSPACE_BIND);
+            assert!(!target.exists());
+            std::fs::rename(&held, target).unwrap();
+            assert_eq!(std::fs::read(binding).unwrap(), original);
+        }
+    }
+
     /// 同一预留在发送前占用名额，响应按源字节逐段返回，发送后仍可安全重放取消。@return 无。
     /// 测试单轮证明可在另一个会话驻留时独立返回。@return 无。
     #[tokio::test]
@@ -2678,7 +3078,7 @@ mod tests {
                 write_json(&mut socket, &reply).await.unwrap();
             }
         );
-        assert_eq!(status, Some((false, Some(true), true)));
+        assert_eq!(status, Ok((false, Some(true), true, false, false)));
     }
 
     #[tokio::test]
@@ -2695,7 +3095,7 @@ mod tests {
                 write_json(&mut socket, &reply).await.unwrap();
             }
         );
-        assert_eq!(idle, Some((true, None, false)));
+        assert_eq!(idle, Ok((true, None, false, false, false)));
         let mut identity = source.identity();
         identity.continuation_only = true;
         let (prepared, mut socket) = tokio::join!(source.prepare(&identity, body), async {
@@ -3116,7 +3516,7 @@ mod tests {
         let source = Source::new();
         assert_eq!(
             source.sender.status(&source.binding, None, None).await,
-            None
+            Err(TuiV2Unavailable::ReadinessConfig)
         );
         let (idle, ()) = tokio::join!(
             source
@@ -3128,7 +3528,7 @@ mod tests {
                 write_json(&mut socket, &reply).await.unwrap();
             }
         );
-        assert_eq!(idle, None);
+        assert_eq!(idle, Err(TuiV2Unavailable::ReadinessSource));
         let identity = source.identity();
         let (prepared, mut socket) = tokio::join!(source.prepare(&identity, b"{}"), async {
             let (mut socket, mut reply) = source.receive("prepare").await;
@@ -3175,7 +3575,7 @@ mod tests {
                     socket.read_to_end(&mut received).await.unwrap();
                     received
                 });
-            assert!(matches!(prepared, Err(AppError::ServiceUnavailable(_))));
+            assert_stage(prepared.unwrap(), TUI_PREPARE_BIND);
             assert!(received.is_empty());
             assert_eq!(source.sender.active(), 0);
         }
@@ -3200,7 +3600,8 @@ mod tests {
                 submission_log::was_consumed(
                     &source.sender.submission_storage,
                     &source.binding,
-                    Some(&identity.reservation_id)
+                    Some(&identity.reservation_id),
+                    (Instant::now() + Duration::from_secs(1)).into_std(),
                 )
                 .await
                 .unwrap()
@@ -3230,6 +3631,112 @@ mod tests {
         assert_eq!(source.sender.active(), 0);
     }
 
+    /// 合法恢复续轮沿原截止等待账本锁，锁内提交后才通知事件源。@return 无。
+    #[tokio::test]
+    async fn recovered_send_waits_for_ledger_within_its_deadline() {
+        let source = Source::new();
+        let mut identity = source.identity();
+        identity.continuation_only = true;
+        let (prepared, mut socket) = tokio::join!(source.prepare(&identity, b"{}"), async {
+            let (mut socket, mut reply) = source.receive("prepare").await;
+            socket.read_exact(&mut [0; 2]).await.unwrap();
+            reply["kind"] = json!("recovered");
+            write_json(&mut socket, &reply).await.unwrap();
+            socket
+        });
+        assert_eq!(prepared.unwrap().status(), StatusCode::NO_CONTENT);
+        let lock = submission_log::lock(&source.sender.submission_storage).unwrap();
+        let (sent, ()) = tokio::join!(source.send(&identity), async {
+            assert!(
+                timeout(Duration::from_millis(1250), read_json(&mut socket))
+                    .await
+                    .is_err()
+            );
+            drop(lock);
+            let command = read_json(&mut socket).await.unwrap();
+            assert_eq!(command["action"], "send");
+            assert_eq!(command["reservation_id"], identity.reservation_id);
+            assert!(
+                submission_log::was_consumed(
+                    &source.sender.submission_storage,
+                    &source.binding,
+                    Some(&identity.reservation_id),
+                    (Instant::now() + Duration::from_secs(1)).into_std(),
+                )
+                .await
+                .unwrap()
+            );
+            write_json(
+                &mut socket,
+                &json!({"status":200,"content_type":"text/event-stream"}),
+            )
+            .await
+            .unwrap();
+            socket.get_mut().write_u32(0).await.unwrap();
+        });
+        assert_eq!(sent.unwrap().status(), StatusCode::OK);
+        assert!(matches!(
+            source.send(&identity).await,
+            Err(AppError::BadRequest(_))
+        ));
+    }
+
+    /// 写账本失败有独立阶段，私有事件源在该失败中收不到发送指令。@return 无。
+    #[tokio::test]
+    async fn ledger_failure_stops_before_source_submission() {
+        let source = Source::new();
+        let identity = source.identity();
+        let (prepared, mut socket) = tokio::join!(source.prepare(&identity, b"{}"), async {
+            let (mut socket, mut reply) = source.receive("prepare").await;
+            socket.read_exact(&mut [0; 2]).await.unwrap();
+            reply["kind"] = json!("new");
+            write_json(&mut socket, &reply).await.unwrap();
+            socket
+        });
+        assert_eq!(prepared.unwrap().status(), StatusCode::NO_CONTENT);
+        let path = source
+            .sender
+            .submission_storage
+            .join("tui-v2-submissions.lock");
+        std::fs::write(&path, b"").unwrap();
+        set_permissions(&path, Permissions::from_mode(0o644)).unwrap();
+        let response = source.send(&identity).await.unwrap();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(response.headers()[TUI_ERROR_SOURCE], TUI_SUBMISSION_LEDGER);
+        assert_eq!(socket.read(&mut [0]).await.unwrap(), 0);
+        assert_eq!(source.sender.active(), 0);
+    }
+
+    /// 等锁耗尽本次预算时，截止后释放锁也不会补写提交事实。@return 无。
+    #[tokio::test]
+    async fn ledger_lock_deadline_leaves_no_submission() {
+        let source = Source::new();
+        let root = &source.sender.submission_storage;
+        let lock = submission_log::lock(root).unwrap();
+        let identity = source.identity();
+        let result = submission_log::consume(
+            root,
+            &source.binding,
+            &identity.reservation_id,
+            identity.deadline_unix_ms,
+            (Instant::now() + Duration::from_millis(30)).into_std(),
+            submission_log::Terminal::Submitted,
+        )
+        .await;
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::TimedOut);
+        drop(lock);
+        assert!(
+            !submission_log::was_consumed(
+                root,
+                &source.binding,
+                Some(&identity.reservation_id),
+                (Instant::now() + Duration::from_secs(1)).into_std(),
+            )
+            .await
+            .unwrap()
+        );
+    }
+
     /// 两种终态共享文件锁。写入新终态时清除两类已过期记录。@return 无。
     #[tokio::test]
     async fn send_and_cancel_share_durable_admission_and_expiry_cleanup() {
@@ -3255,6 +3762,7 @@ mod tests {
                 &source.binding,
                 &identity.reservation_id,
                 identity.deadline_unix_ms,
+                (Instant::now() + Duration::from_secs(5)).into_std(),
                 terminal,
             )
         };

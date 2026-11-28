@@ -9,8 +9,9 @@ use tokio::time::{MissedTickBehavior, interval};
 use tracing::{debug, warn};
 
 use crate::error::AppError;
-use crate::model::account::Account;
+use crate::model::account::{Account, TuiSystemPromptPolicy};
 use crate::service::account::{AccountQueue, AccountService};
+use crate::service::diagnostics::tui_admission_rejected;
 use crate::service::runtime_bridge::{account_config_permit, account_route_config_permit};
 use crate::service::runtime_transport::{
     TuiBindingStatus, TuiReadySender, TuiRollbackReadiness, tui_fixture, tui_input_rejection,
@@ -45,11 +46,13 @@ impl TuiRequestRoute {
             return Ok(false);
         }
         if self.queue.runtime_gate.node_migration_draining() {
+            tui_admission_rejected("tui_wake_node_migration");
             return Err(AppError::AdmissionLimited { retry_after: 1 });
         }
         let _config = self.queue.tui_config.lock().await;
         let state = service.tui_backend(account.id).await?;
         if !state.target.is_empty() {
+            tui_admission_rejected("tui_wake_backend_draining");
             return Err(AppError::AdmissionLimited { retry_after: 1 });
         }
         Ok(!tui_native_drain::occupied_v2(service.tui_database(), account.id).await?)
@@ -57,7 +60,8 @@ impl TuiRequestRoute {
 
     /// 登记已核验 sender 上的本轮。@param service 账号服务。@param account 当前账号。
     /// @param owner 要登记的入口主体与会话。@param body 公开 Messages。@param sender 已核验 sender。
-    /// @param continuation 是否为工具回传。@return 冻结的绑定、轮次和当前排空状态。
+    /// @param continuation 是否带工具回执。@param recovery 原轮恢复证明。@param fork 分叉的原绑定。
+    /// @return 冻结的绑定、轮次和当前排空状态。
     pub(super) async fn begin_v2(
         &self,
         service: &AccountService,
@@ -67,15 +71,18 @@ impl TuiRequestRoute {
         sender: &TuiReadySender,
         continuation: bool,
         recovery: Option<tui_native_drain::ReceiptRow>,
+        fork: Option<&tui_native_drain::ReceiptFork>,
     ) -> Result<(String, Option<NativeTurn>, bool), AppError> {
         let _config = self.queue.tui_config.lock().await;
         let mut state = service.tui_backend(account.id).await?;
         let unavailable = || sender.binding_unavailable();
         if state.active != TUI_V2 || state.binding.is_empty() {
+            tui_admission_rejected("tui_turn_route_changed");
             return Err(unavailable());
         }
         let draining = !state.target.is_empty();
-        if draining && !continuation {
+        if draining && (!continuation || fork.is_some()) {
+            tui_admission_rejected("tui_turn_backend_draining");
             return Err(AppError::AdmissionLimited { retry_after: 1 });
         }
         let same = tui_same_binding(&state.binding, &sender.key);
@@ -84,6 +91,7 @@ impl TuiRequestRoute {
                 || state.binding != self.binding
                 || !sender.can_advance(&state.binding))
         {
+            tui_admission_rejected("tui_turn_sender_binding");
             return Err(unavailable());
         }
         if state.binding != sender.key
@@ -99,13 +107,16 @@ impl TuiRequestRoute {
                 .await?;
         }
         if !tui_same_binding(&state.binding, &sender.key) {
+            tui_admission_rejected("tui_turn_binding_not_advanced");
             return Err(unavailable());
         }
         // 无显式会话时，原轮登记需要消息数组生成历史摘要。结构错误应保留公开输入分类。
         if !body["messages"].is_array() {
             return Err(tui_input_rejection("invalid_messages").expect("固定 Messages 输入分类"));
         }
-        let turn = if let (Some(row), Some(owner)) = (recovery, owner) {
+        let turn = if let (Some(fork), Some(owner)) = (fork, owner) {
+            Some(fork.claim(service.tui_database(), account.id, &state.binding, owner).await?)
+        } else if let (Some(row), Some(owner)) = (recovery, owner) {
             Some(row.pending(
                 service.tui_database(),
                 account.id,
@@ -123,7 +134,12 @@ impl TuiRequestRoute {
                     state.binding.clone(),
                     draining,
                 )
-                .await?,
+                .await
+                .inspect_err(|error| {
+                    if matches!(error, AppError::AdmissionLimited { .. } | AppError::ServiceUnavailable(_)) {
+                        tui_admission_rejected("tui_turn_claim");
+                    }
+                })?,
             )
         } else {
             None
@@ -302,12 +318,22 @@ fn view(
     runtime: Option<&TuiBindingStatus>,
 ) -> Value {
     let mut value = json!(account);
-    attach_status(&mut value, state, runtime);
+    attach_status(&mut value, account, state, runtime);
     value
+}
+
+/// 回报 V1 已验证的固定动作。@param value 账号管理视图。@param backend 当前生效的转发方式。@return 无。
+pub(crate) fn append_v1_system_prompt(value: &mut Value, backend: &str) {
+    if backend == "native293" {
+        value["client_system_prompt_policy"] = json!(TuiSystemPromptPolicy::Replace);
+    } else if let Some(fields) = value.as_object_mut() {
+        fields.remove("client_system_prompt_policy");
+    }
 }
 
 fn attach_status(
     value: &mut Value,
+    account: &Account,
     state: &TuiBackendSnapshot,
     runtime: Option<&TuiBindingStatus>,
 ) {
@@ -319,6 +345,15 @@ fn attach_status(
             || tui_same_binding(&state.binding, &status.key)
             || (status.idle && status.can_advance(&state.binding))
     }));
+    value["tui_direct_available"] = json!(runtime.is_some_and(|status| status.direct_https));
+    if state.active == TUI_V2 {
+        value["client_system_prompt_policy"] = json!(account.tui_system_prompt_policy);
+        value["tui_system_prompt_policy_available"] = json!(runtime.is_some_and(|status| {
+            status.system_prompt_policy && tui_same_binding(&state.binding, &status.key)
+        }));
+    } else {
+        append_v1_system_prompt(value, &state.active);
+    }
     if !state.target.is_empty() {
         value["request_backend_wait_reason"] = json!(if runtime
             .is_some_and(|status| status.can_advance(&state.binding))
@@ -343,6 +378,7 @@ pub(crate) async fn append_view(
     let state = service.tui_backend(account.id).await?;
     attach_status(
         value,
+        account,
         &state,
         tui_transition_status(account).await.as_ref().ok(),
     );
@@ -443,6 +479,7 @@ pub(super) async fn request_route(
 ) -> Result<(Account, Option<TuiRequestRoute>), AppError> {
     if !tui_scope(&account) {
         if account.request_backend == TUI_V2 {
+            tui_admission_rejected("tui_route_scope_unavailable");
             return Err(AppError::ServiceUnavailable("V2 环境不可用".into()));
         }
         return Ok((account, None));

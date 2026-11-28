@@ -161,10 +161,14 @@ COPY orchestrator/runtime_files.py orchestrator/runtime_diagnostics.py orchestra
 COPY orchestrator/runtime_files.py orchestrator/tui_workspace_launch.py orchestrator/tui_process.py orchestrator/tui_capacity.py /opt/flower/tui/
 COPY images/account/tui_*.py /opt/flower/tui/
 COPY images/account/tui-mod /opt/flower/tui/tui-mod
+COPY images/account/tui-direct-mod /opt/flower/tui/tui-direct-mod
+COPY orchestrator/tui_direct_version.py /opt/flower/tui/
 COPY --from=tui-guard-build /tui-guard /opt/flower/tui/tui-guard
 COPY --from=tui-guard-build /tui-connect.so /opt/flower/tui/tui-connect.so
+RUN install -d -m 0755 /etc/claude-code /opt/flower/managed-plugins /run/flower/tui-direct
 COPY images/account/cli-version.sh /usr/local/bin/v3-cli-version
 COPY images/account/passthrough.py /usr/local/bin/v3-passthrough
+COPY images/account/passthrough.py /opt/flower/tui/passthrough.py
 COPY images/account/network-guard.py /usr/local/bin/v3-network-guard
 COPY images/account/cli-control.py /usr/local/bin/v3-cli-control
 COPY images/account/node-input.py /usr/local/bin/v3-node-input
@@ -206,6 +210,8 @@ LABEL vibebench.product="v3" vibebench.role="account" vibebench.release=$V3_RELE
     vibebench.tui-sender-protocol="1" \
     vibebench.tui-session-host="1" \
     vibebench.tui-managed-oauth="1" \
+    vibebench.tui-managed-policy="1" \
+    vibebench.tui-direct-protocol="1" \
     vibebench.system-update-protocol="1" vibebench.account-runtime-protocol="1" \
     vibebench.fast-system-update="1" \
     vibebench.credential-ownership-protocol="1" \

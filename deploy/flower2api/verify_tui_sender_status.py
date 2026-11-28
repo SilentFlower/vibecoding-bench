@@ -85,23 +85,27 @@ def probe(folder: Path, gateway: Path) -> None:
                 self.send_error(401)
                 return
             registry_queries.append(self.path)
-            route = '/internal/v3/transport/1'
-            path = urlsplit(self.path)
-            params = parse_qs(path.query)
-            if path.path != route:
+            target = urlsplit(self.path)
+            query = parse_qs(target.query, keep_blank_values=True)
+            rollback = query.get('tui_rollback_generation')
+            if (target.path != '/internal/v3/transport/1'
+                    or query.keys() - {'wake', 'tui_oauth_profile', 'tui_previous_release', 'tui_rollback_generation'}
+                    or query.get('wake') not in (None, ['false'], ['true'])
+                    or query.get('tui_oauth_profile') not in (None, ['false'])
+                    or ('tui_previous_release' in query and (
+                        query['tui_previous_release'] != ['true'] or query.get('wake') != ['false']))
+                    or (rollback is not None and (len(rollback) != 1 or not rollback[0].isdigit()
+                        or query.keys() != {'wake', 'tui_rollback_generation'} or query.get('wake') != ['false']))):
                 self.send_error(404)
                 return
-            if params.get('wake') == ['false'] and 'tui_rollback_generation' in params:
+            if rollback is not None:
                 scope = {key: value for key, value in registered.items() if key != 'secret'} if registered else None
                 payload = {'scope': scope, 'predecessors': rollback_predecessors, 'stopped': sleeping} if scope else None
-            elif params.get('wake') == ['false']:
+            elif query.get('wake') == ['false']:
                 payload = None if sleeping else registered
-            elif params.get('wake', ['true']) == ['true']:
+            else:
                 sleeping = False
                 payload = registered
-            else:
-                self.send_error(404)
-                return
             self._reply_json(payload)
 
         def do_POST(self):
@@ -238,7 +242,8 @@ def probe(folder: Path, gateway: Path) -> None:
             nonlocal registered, stop_gateway
             set_runtime(174, False)
             scope = {key: value for key, value in binding.items() if key != 'secret'}
-            encode = lambda value: json.dumps(value, separators=(',', ':')).encode()
+            def encode(value):
+                return json.dumps(value, separators=(',', ':')).encode()
             location = (scope['account_id'], environment, 'local-old', scope['endpoint'])
             location_digest = sha256(encode(location)).hexdigest()
             digest = sha256(encode((*location[:2], 168, *location[2:]))).hexdigest()
@@ -342,9 +347,9 @@ def probe(folder: Path, gateway: Path) -> None:
             diagnostic = log_path.read_bytes()[previous:].decode()
             assert '发送前拒绝 V2 请求' in diagnostic and expected in diagnostic, (label, diagnostic)
             public[label] = {'status': code, 'diagnostic': expected}
-        observed = [urlsplit(path) for path in registry_queries[before_invalid:]]
-        assert len(observed) == len(public) and all(path.path == '/internal/v3/transport/1'
-            and parse_qs(path.query).get('wake') == ['false'] for path in observed)
+        assert registry_queries[before_invalid:] == [
+            '/internal/v3/transport/1?wake=false&tui_oauth_profile=false'
+        ] * len(public)
         assert control()[1]['active'] == 0 and not upstream_connections
         result = {'status': 'passed', 'sender': sender, 'private_missing_config': 503,
                   'private_invalid_bearer': 401, 'sender_actions': actions,

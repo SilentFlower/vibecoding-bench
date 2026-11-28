@@ -23,6 +23,7 @@ from resource_budget import account_limits, isolated_account_limits, memory_byte
 from runtime_files import atomic_json, directory_fd
 from system_profile import (COMPUTER_PROFILE_LABEL, COMPUTER_PROFILE_VERSION, SYSTEM_PROFILE_DIRECTORY,
     SYSTEM_PROFILE_LABEL, SYSTEM_PROFILE_VERSION)
+from tui_managed_policy import DIRECT_ACCOUNT_PATH, DIRECT_DIRECTORY, MANAGED_MARKETPLACE_PATH, MANAGED_SETTINGS_PATH, POLICY_DIRECTORY
 
 
 ISOLATION_VERSION = 2
@@ -195,6 +196,7 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
         migrate_records(root, int(account.get('cc2api_account_id') or 0), reconciled=account.get('native_migration') is True)
     execution = agy or native
     tui_budget = account.get('tui_host_memory')
+    tui_policy = account.get('tui_managed_policy')
     execution_budget = (('unlimited' if execution['memory_mib'] == 0 else str(execution['memory_mib']) + 'm')
                         if execution else None)
     limits = isolated_account_limits(fingerprint['mem'], fingerprint.get('swap', '0'), tui_budget or execution_budget)
@@ -264,6 +266,8 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
         **({'tui_v2': account['tui_transport']} if tui_socket and account.get('tui_transport') else {}),
         **({'tui_host_memory': tui_budget} if tui_budget else {}),
         **({'tui_managed_oauth': True} if account.get('tui_managed_oauth') else {}),
+        **({'tui_managed_policy': tui_policy} if tui_policy else {}),
+        **({'tui_direct': True} if account.get('tui_direct') else {}),
         'native': native, 'agy': agy, 'native_capture_dir': ('/flows/api/agy-prepared' if agy else '/flows/api/cc-prepared') if (execution or tui_budget) and capture_enabled(fingerprint) else None,
         'native_tls_observer_protocol': observer_protocol,
         'native_criu_enabled': restore['eligible'], 'native_criu_reason': restore['reason'],
@@ -384,6 +388,14 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
             sender_env['V3_TUI_SESSION_HOST'] = '1'
             if account.get('tui_managed_oauth'):
                 sender_env['V3_TUI_MANAGED_OAUTH'] = '1'
+                if tui_policy:
+                    policy_root = runtime.host_data / POLICY_DIRECTORY / row['environment_id']
+                    sender_mounts[str(policy_root / 'managed-settings.json')] = {'bind': MANAGED_SETTINGS_PATH, 'mode': 'ro'}
+                    sender_mounts[str(policy_root / 'marketplace')] = {'bind': MANAGED_MARKETPLACE_PATH, 'mode': 'ro'}
+                    sender_env['V3_TUI_MANAGED_POLICY'] = '1'
+                    if account.get('tui_direct'):
+                        sender_env['V3_TUI_DIRECT'] = '1'
+                        sender_mounts[str(runtime.host_data / DIRECT_DIRECTORY)] = {'bind': DIRECT_ACCOUNT_PATH, 'mode': 'ro'}
             else:
                 sender_env['V3_TUI_LOCAL_PROVIDER_CONFIG'] = '/run/v3/tui-local-provider.json'
         sender_env['CCRB_CRIU_REASON'] = restore['reason'] or ''

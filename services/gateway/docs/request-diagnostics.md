@@ -57,6 +57,12 @@ session 和消息使用带账号、标识类型域的 SHA256 摘要（取前 128
 
 根结果代表整个请求；中间 401/400 不覆盖后续尝试结果。根状态是下游状态，尝试状态是实际收到的上游状态。`partial=true` 表示用量或响应观察不完整，不能据此认定上游没有生成完整结果。`ttft_ms` 实际测量响应头到达时间，不代表首个模型文本 token。
 
+V2 私有提交响应头丢失，或已提交的私有入口只交回没有模型响应证据和正式投影的 502 时，根请求记录为 `transport_error/tui_send_http`。用公开请求 ID 查询详情，`context.tui_reservation_id` 保留原发送器预留。`attempt_count` 是已记录尝试数，零次观测时模型仍可能已收件。先核对原轮状态再决定是否重投。确认发送前拒绝的请求仍记录为 `local_rejected`，并沿用其拒绝阶段和采集规则。
+
+已提交的 V2 工具回执在网关等待首响应头到期时公开返回 502。原私有请求沿工具响应接回窗口继续读取。同一回执可接回仍在交付的原流，或读取已完成的缓存回复。晚到的模型响应及尝试按原预留补记，原公开 502 继续保留。接回请求自身的上游尝试计数为零。
+
+隔离构建启用 `v3-verification` 和 `FLOWER_V2_STARTUP_TRACE=1` 时，验收可以按原公开请求和预留核对两个网关终态。`gateway_tui_private_body/received` 表示网关从私有 HTTP 成功响应读到正文结束。`received_error` 表示完整读到私有 HTTP 错误响应。`read_failed` 表示正文读取失败，`no_response` 表示私有提交在取得响应前结束。`gateway_tui_reply_cache/ready` 表示已核验的完整回复确实保存在接回缓存。`no_reply` 表示写者在发布完整回复前释放，`incomplete` 表示已发布的回复收尾失败。隔离模型生成终帧和本地写出结果由模型夹具另行记录。用量收口用于核对计费。
+
 重试原因包括 `oauth_recovery`、`credentials_rejected`、`signature_repair`、`transient_rate_limit` 和 `account_rate_limit`。错误阶段区分准入、请求、凭据、认证恢复、账号选择、Hello 探针、传输、上游响应头/响应体和下游响应体；不保存任意错误文本。采样错误类型为 `sampling_limit`、`decode_error` 或 `invalid_payload`；上游错误类型只保留白名单，未知类型归为 `unknown_upstream_error`。
 
 ## 留存、隐私与故障信号
@@ -78,3 +84,5 @@ SQLite/PostgreSQL 使用独立请求与尝试表，启动幂等建表；后台�
 `attempts[].capture_status` 为 `disabled`、`saved`、`dropped`、`failed` 或 `timeout`；旧记录为空。`timeout` 表示保存结果待核对，后台写入仍受并发上限约束。单份超限时保留前缀并标记截断。轮转后读取显示文件缺失。采集从开启后生效，历史记录保持原有摘要。
 
 `GET /admin/request-diagnostics/:request_id/captures/:attempt_id` 只读取属于该请求的尝试，响应使用 `Cache-Control: no-store`。正文以转义文本显示。
+
+V2 请求采集使用独立的后台保存名额。名额耗尽时，尝试保留 `capture_status=dropped`，详情接口返回 `state=missing` 和未进入保存队列的原因。该状态只描述采集。当尝试已排队而文件尚未保存时，仍按该尝试读取实际快照。

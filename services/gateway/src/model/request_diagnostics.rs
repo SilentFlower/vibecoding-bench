@@ -324,6 +324,93 @@ pub struct DiagnosticQuery {
     pub until: Option<String>,
 }
 
+/// 已取得同轮模型响应的 V2 正文来源。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TuiBodySource {
+    InteractiveCli,
+    AccountSender,
+}
+
+impl TuiBodySource {
+    /// 识别私有协议的已知正文来源。@param value 发送器回执值。@return 匹配的来源。
+    pub(crate) fn from_wire(value: &str) -> Option<Self> {
+        match value {
+            "interactive_cli" => Some(Self::InteractiveCli),
+            "account_sender" => Some(Self::AccountSender),
+            _ => None,
+        }
+    }
+
+    /// 返回私有响应头所用的值。@return 对应的协议字符串。
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::InteractiveCli => "interactive_cli",
+            Self::AccountSender => "account_sender",
+        }
+    }
+}
+
+/// 已取得同轮模型响应的 V2 会话启动或复用来源。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TuiSessionOrigin {
+    NewSession,
+    LiveProcess,
+    DiskResume,
+    ExternalImport,
+}
+
+impl TuiSessionOrigin {
+    /// 识别私有协议的已知会话来源。@param value 发送器回执值。@return 匹配的来源。
+    pub(crate) fn from_wire(value: &str) -> Option<Self> {
+        match value {
+            "new_session" => Some(Self::NewSession),
+            "live_process" => Some(Self::LiveProcess),
+            "disk_resume" => Some(Self::DiskResume),
+            "external_import" => Some(Self::ExternalImport),
+            _ => None,
+        }
+    }
+
+    /// 返回私有响应头所用的值。@return 对应的协议字符串。
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::NewSession => "new_session",
+            Self::LiveProcess => "live_process",
+            Self::DiskResume => "disk_resume",
+            Self::ExternalImport => "external_import",
+        }
+    }
+}
+
+/// 普通 Messages 显式顶层业务指令在实际模型请求中的落点。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TuiInstructionLocation {
+    System,
+    UserReminder,
+}
+
+impl TuiInstructionLocation {
+    /// 识别已知业务指令落点。@param value 发送器回执值。@return 匹配的落点。
+    pub(crate) fn from_wire(value: &str) -> Option<Self> {
+        match value {
+            "system" => Some(Self::System),
+            "user_reminder" => Some(Self::UserReminder),
+            _ => None,
+        }
+    }
+
+    /// 返回私有响应头所用的值。@return 对应的协议字符串。
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::System => "system",
+            Self::UserReminder => "user_reminder",
+        }
+    }
+}
+
 /// 跨平台入口、执行身份及源事实；不保存正文、凭据或任意原生事件。
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
@@ -344,6 +431,21 @@ pub struct DiagnosticContext {
     pub conversation_id: Option<String>,
     pub trajectory_id: Option<String>,
     pub native_model_calls: Option<u64>,
+    /// V2 私有预留的关联 ID，准备失败时也可以存在。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tui_reservation_id: Option<String>,
+    /// 仅在同一 V2 尝试收到模型响应时记录的正文来源。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tui_body_source: Option<TuiBodySource>,
+    /// 同一次 V2 尝试实际使用的已确认会话来源。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tui_session_origin: Option<TuiSessionOrigin>,
+    /// 实际模型正文中已核对的普通顶层业务指令落点。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tui_instruction_location: Option<TuiInstructionLocation>,
+    /// 该 V2 请求经私有发送器确认的模型响应数，可低于实际投递数。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tui_confirmed_model_responses: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input_rejection_reason: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -465,6 +567,14 @@ pub struct DiagnosticPage {
     pub counts: DiagnosticCounts,
 }
 
+/// 核对 Claude API 的标准请求 ID。@param value 响应标识。@return 是否符合已有公开格式。
+pub(crate) fn is_anthropic_request_id(value: &str) -> bool {
+    value.len() <= 128
+        && value
+            .strip_prefix("req_")
+            .is_some_and(|rest| !rest.is_empty() && rest.bytes().all(|b| b.is_ascii_alphanumeric()))
+}
+
 /// 规范化响应关联 ID，非标准头值只保存散列。
 /// @param value 外部响应标识或管理员筛选条件。
 /// @return 可持久化、可反查的受控标识。
@@ -472,11 +582,7 @@ pub(crate) fn normalize_correlation_id(value: &str) -> String {
     if let Ok(uuid) = Uuid::parse_str(value) {
         return uuid.to_string();
     }
-    if value.len() <= 128
-        && value
-            .strip_prefix("req_")
-            .is_some_and(|rest| !rest.is_empty() && rest.bytes().all(|b| b.is_ascii_alphanumeric()))
-    {
+    if is_anthropic_request_id(value) {
         return value.to_owned();
     }
     if value

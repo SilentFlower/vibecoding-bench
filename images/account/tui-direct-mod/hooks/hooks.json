@@ -1,0 +1,3 @@
+{
+  "modules": ["./engine.js"]
+}

@@ -1,0 +1,5 @@
+{
+  "name": "flower2api-v2-direct",
+  "version": "1.0.0",
+  "description": "为 Flower2API 的受管 Claude Code 账号接入一次模型发送许可。"
+}

@@ -136,6 +136,15 @@
       "predecessor": 14,
       "rollback_mode": "compatible",
       "version": 15
+    },
+    {
+      "checksum": "bd7586742f794ef28e46f2ac3cada8f4ec9b8a9d94a7f4fb87e7b608e780b975",
+      "engine": "sqlite",
+      "id": "gateway.tui-system-prompt.16",
+      "kind": "schema",
+      "predecessor": 15,
+      "rollback_mode": "compatible",
+      "version": 16
     }
   ]
 }

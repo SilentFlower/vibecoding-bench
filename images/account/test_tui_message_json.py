@@ -12,8 +12,10 @@ class MessageJSONTests(TestCase):
     """覆盖交错的块、累计用量、原始工具标识和正常化上限。"""
 
     @staticmethod
-    def opened(limit=10 * 1024**2):
-        """提供已开始的合成消息。@param limit 最终 JSON 预算。@return 本轮聚合器。"""
+    def opened(limit=10 * 1024**2, **message_fields):
+        """提供已开始的合成消息。@param limit 最终 JSON 预算。
+        @param message_fields 可选的模型开场字段。@return 本轮聚合器。
+        """
         result = MessageJSON(limit)
         result.add(
             {
@@ -31,6 +33,7 @@ class MessageJSONTests(TestCase):
                         "cache_read_input_tokens": 8,
                         "cache_creation": {"ephemeral_1h_input_tokens": 3},
                     },
+                    **message_fields,
                 },
             }
         )
@@ -102,6 +105,31 @@ class MessageJSONTests(TestCase):
                 {"type": "text", "text": '尾🌸\n"'},
             ],
         )
+
+    def test_message_delta_keeps_context_management_in_final_json(self):
+        """上下文报告累计到消息顶层，显式 null 与省略保持各自含义。@return 无。"""
+        report = {"applied_edits": [{"type": "clear_tool_uses_20250919",
+                                    "cleared_tool_uses": 1, "cleared_input_tokens": 17}]}
+        for start, update, expected in (
+            ({}, {}, {}),
+            ({}, {"context_management": None}, {"context_management": None}),
+            ({"context_management": {"applied_edits": []}}, {}, {"context_management": {"applied_edits": []}}),
+            ({"context_management": {"applied_edits": []}}, {"context_management": report}, {"context_management": report}),
+        ):
+            with self.subTest(start=start, update=update):
+                result = self.opened(**start)
+                result.add({"type": "message_delta", "delta": {"stop_reason": "end_turn"}, **update})
+                result.add({"type": "message_stop"})
+                message = json.loads(result.finish())
+                self.assertEqual({key: message[key] for key in ("context_management",) if key in message}, expected)
+
+    def test_context_management_report_uses_json_budget(self):
+        """上下文编辑报告计入同一消息字节预算。@return 无。"""
+        result = self.opened(limit=512)
+        edit = {"type": "clear_tool_uses_20250919", "cleared_tool_uses": 1, "cleared_input_tokens": 17}
+        with self.assertRaises(ModelError):
+            result.add({"type": "message_delta", "delta": {"stop_reason": "end_turn"},
+                        "context_management": {"applied_edits": [edit] * 10}})
 
     def test_large_fragmented_unicode_is_exact_and_limits_are_errors(self):
         """多兆字节的 JSON 输出按最终预算交付，超预算明确报错且不截断。@return 无。"""

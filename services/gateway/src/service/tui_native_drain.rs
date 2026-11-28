@@ -13,7 +13,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
 use tokio::runtime::Handle;
 use tracing::warn;
-use uuid::Uuid;
+use uuid::{Builder, Uuid};
 
 use crate::error::AppError;
 use crate::service::request_session::valid_id;
@@ -95,10 +95,12 @@ pub(super) struct NativeTurn {
     pool: AnyPool,
     id: String,
     previous_tools: Option<String>,
+    fork: bool,
     background_agents: Vec<String>,
     stateless_history: Option<String>,
     session_id: String,
     submitted: AtomicBool,
+    released: bool,
     recovery: Option<ReceiptRow>,
     delivery: Option<Arc<Delivery>>,
 }
@@ -496,6 +498,124 @@ pub(super) async fn summary_account(
     })
 }
 
+/// 同主体原工具组可授权一份独立的分叉输入。
+pub(super) struct ReceiptFork {
+    pub(super) account: i64,
+    binding: String,
+    principal: i64,
+    session: String,
+    intent: String,
+}
+
+/// 只读定位显式会话中的原 V2 工具组。@param pool 归属库。@param principal 入口主体。
+/// @param session 原会话。@param body 分叉输入。@param key 包含新指令的请求摘要。@return 唯一原绑定。
+pub(super) async fn receipt_fork(
+    pool: &AnyPool,
+    principal: i64,
+    session: &str,
+    body: &Value,
+    key: &[u8; 32],
+) -> Result<Option<ReceiptFork>, AppError> {
+    let Some(ids) = result_ids(body) else {
+        return Ok(None);
+    };
+    if continuation_proof(body, &ids).is_none() {
+        return Ok(None);
+    }
+    let tools = serde_json::to_string(&ids).expect("纯字符串集合可编码");
+    let scopes: Vec<(i64, String)> = sqlx::query_as(
+        "SELECT DISTINCT t.account_id,t.binding FROM tui_native_turns t
+         JOIN accounts a ON a.id=t.account_id
+         WHERE t.principal_id=$1 AND t.session_id=$2 AND a.request_backend=$3
+         AND NOT EXISTS (SELECT 1 FROM tui_stateless_turn_proofs p WHERE p.turn_id=t.id)
+         AND ((t.version=$4 AND t.tools IN ($5,$6)) OR (t.version IN ($4,$7)
+             AND t.tools LIKE '#%' AND substr(t.tools,22,1)='E'
+             AND substr(t.tools,2,20)>$8 AND substr(t.tools,23)=$9)) LIMIT 2",
+    )
+    .bind(principal)
+    .bind(session)
+    .bind(super::tui_backend::TUI_V2)
+    .bind(TUI_V2_RECEIPT_VERSION)
+    .bind(&tools)
+    .bind(format!("!{tools}"))
+    .bind(UNDELIVERED)
+    .bind(format!("{:020}", now_ms()))
+    .bind(tool_digest(&tools))
+    .fetch_all(pool)
+    .await?;
+    match scopes.as_slice() {
+        [] => Ok(None),
+        [(account, binding)] => Ok(Some(ReceiptFork {
+            account: *account,
+            binding: binding.clone(),
+            principal,
+            session: session.to_owned(),
+            intent: format!("fork:{}", hex::encode(key)),
+        })),
+        _ => Err(AppError::ServiceUnavailable("工具组归属有歧义".into())),
+    }
+}
+
+impl ReceiptFork {
+    /// 登记独立生成，保留父回执当前状态。@param pool 归属库。@param account 已授权账号。
+    /// @param binding 当前绑定。@param owner 入口主体及会话。@return 分支生成的生命周期凭证。
+    pub(super) async fn claim(
+        &self,
+        pool: AnyPool,
+        account: i64,
+        binding: &str,
+        owner: (i64, Option<&str>),
+    ) -> Result<NativeTurn, AppError> {
+        let (principal, Some(session)) = owner else {
+            return Err(AppError::BadRequest(RECEIPT_MISMATCH.into()));
+        };
+        if self.account != account
+            || self.binding != binding
+            || self.principal != principal
+            || self.session != session
+        {
+            return Err(AppError::BadRequest(RECEIPT_MISMATCH.into()));
+        }
+        if let Some(message) = terminal_receipt(&pool, &self.intent, Some(owner)).await? {
+            return Err(AppError::BadRequest(message.into()));
+        }
+        // 同意图在网关重启或多实例竞争时也共用一个持久领用键。
+        let hash = Sha256::digest(self.intent.as_bytes());
+        let id = Builder::from_random_bytes(hash[..16].try_into().expect("摘要含 16 字节"))
+            .into_uuid()
+            .to_string();
+        let inserted = sqlx::query(
+            "INSERT INTO tui_native_turns (id,account_id,principal_id,session_id,binding,version,tools)
+             VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO NOTHING",
+        )
+        .bind(&id)
+        .bind(account)
+        .bind(principal)
+        .bind(session)
+        .bind(binding)
+        .bind(TUI_V2_RECEIPT_VERSION)
+        .bind(format!("!{}", self.intent))
+        .execute(&pool)
+        .await?;
+        if inserted.rows_affected() != 1 {
+            return Err(AppError::BadRequest(RECEIPT_COMPLETE.into()));
+        }
+        Ok(NativeTurn {
+            pool,
+            id,
+            previous_tools: Some(self.intent.clone()),
+            fork: true,
+            background_agents: Vec::new(),
+            stateless_history: None,
+            session_id: session.to_owned(),
+            submitted: AtomicBool::new(false),
+            released: false,
+            recovery: None,
+            delivery: None,
+        })
+    }
+}
+
 /// 从登记定位原账号，供调度过滤。@param pool 数据库。@param owner 已认证主体与可选会话。
 /// @param body 公开 Messages。@return 原账号；发送前仍需核对权限、版本、代次并认领。
 pub(super) async fn continuation_account(
@@ -645,6 +765,7 @@ impl ReceiptRow {
             pool,
             id: Uuid::new_v4().to_string(),
             previous_tools: Some(serde_json::to_string(&ids).unwrap()),
+            fork: false,
             background_agents: if self.stateless == 0 {
                 background_agent_hashes(body)
             } else {
@@ -657,6 +778,7 @@ impl ReceiptRow {
             },
             session_id: self.session_id.clone(),
             submitted: AtomicBool::new(false),
+            released: false,
             recovery: Some(self),
             delivery: None,
         })
@@ -753,6 +875,7 @@ pub(super) async fn claim(
                 pool,
                 id,
                 previous_tools: Some(tools),
+                fork: false,
                 background_agents: if explicit.is_some() {
                     background_agent_hashes(body)
                 } else {
@@ -761,6 +884,7 @@ pub(super) async fn claim(
                 stateless_history: next_history,
                 session_id,
                 submitted: AtomicBool::new(false),
+                released: false,
                 recovery: None,
                 delivery: None,
             });
@@ -794,10 +918,12 @@ pub(super) async fn claim(
         pool,
         id,
         previous_tools: None,
+        fork: false,
         background_agents: Vec::new(),
         stateless_history: next_history,
         session_id,
         submitted: AtomicBool::new(false),
+        released: false,
         recovery: None,
         delivery: None,
     })
@@ -805,7 +931,7 @@ pub(super) async fn claim(
 
 impl Drop for NativeTurn {
     fn drop(&mut self) {
-        if self.recovery.is_some() || self.submitted.load(Ordering::Acquire) {
+        if self.released || self.recovery.is_some() || self.submitted.load(Ordering::Acquire) {
             return;
         }
         if let Ok(runtime) = Handle::try_current() {
@@ -814,8 +940,9 @@ impl Drop for NativeTurn {
                 self.id.clone(),
                 self.previous_tools.take(),
             );
+            let fork = self.fork;
             runtime.spawn(async move {
-                if let Err(error) = release_open_turn(&pool, &id, previous.as_deref()).await {
+                if let Err(error) = release_open_turn(&pool, &id, previous.as_deref(), fork).await {
                     warn!(%error,"未提交的候选工具轮待对账");
                 }
             });
@@ -827,8 +954,9 @@ async fn release_open_turn(
     pool: &AnyPool,
     id: &str,
     previous: Option<&str>,
+    fork: bool,
 ) -> Result<(), AppError> {
-    if let Some(tools) = previous {
+    if let (Some(tools), false) = (previous, fork) {
         sqlx::query("UPDATE tui_native_turns SET tools=$1 WHERE id=$2 AND tools=$3")
             .bind(tools)
             .bind(id)
@@ -836,8 +964,9 @@ async fn release_open_turn(
             .execute(pool)
             .await?;
     } else {
-        sqlx::query("DELETE FROM tui_native_turns WHERE id=$1 AND tools=''")
+        sqlx::query("DELETE FROM tui_native_turns WHERE id=$1 AND tools=$2")
             .bind(id)
+            .bind(previous.map_or_else(String::new, |intent| format!("!{intent}")))
             .execute(pool)
             .await?;
     }
@@ -909,14 +1038,24 @@ impl NativeTurn {
         Ok(())
     }
 
+    /// 准备失败时，在返回公开错误前归还仍未提交的工具轮。@return 持久归还结果。
+    pub(super) async fn release_rejected_prepare(mut self) -> Result<(), AppError> {
+        if self.recovery.is_none() {
+            self.release_tui_before_model().await?;
+            // 后续合法认领可能重用同一行和工具组，归还后析构不能再修改它。
+            self.released = true;
+        }
+        Ok(())
+    }
+
     /// 在 Sender 确认工具尚未交付时归还原回执。@return 已条件恢复原可领状态。
     pub(super) async fn release_tui_before_model(&self) -> Result<(), AppError> {
-        release_open_turn(&self.pool, &self.id, self.previous_tools.as_deref()).await
+        release_open_turn(&self.pool, &self.id, self.previous_tools.as_deref(), self.fork).await
     }
 
     /// 标记本次是否认领了旧工具组。@return 是否必须保留原账号。
     pub(super) fn owns_continuation(&self) -> bool {
-        self.previous_tools.is_some()
+        !self.fork && self.previous_tools.is_some()
     }
 
     /// 返回无客户端会话时冻结的服务端会话。@return 已登记的 UUID 或空值。
@@ -1119,6 +1258,69 @@ mod tests {
 
     fn sse(value: Value) -> Bytes {
         Bytes::from(format!("data: {value}\n\n"))
+    }
+
+    /// 并发或完成后的分叉只核销自己的输入，父原组仍可领用。
+    #[tokio::test]
+    async fn receipt_fork_keeps_the_parent_claim_and_deduplicates_its_own_intent() {
+        install_default_drivers();
+        let pool = AnyPoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        migrate(&pool, "sqlite").await.unwrap();
+        sqlx::query("INSERT INTO accounts(id,name,email,token,device_id,request_backend)
+                     VALUES(1,'one','one@test.invalid','fixture','one','tui_v2')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let group = r#"["tool_a"]"#;
+        let parent = json!({"messages":[{"role":"user","content":"原问题"},
+            {"role":"assistant","content":[{"type":"tool_use","id":"tool_a","name":"Read","input":{}}]},
+            {"role":"user","content":[{"type":"tool_result","tool_use_id":"tool_a","content":"完成"}]}]});
+        let mut child = parent.clone();
+        child["messages"][2]["content"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"type":"text","text":"子问题"}));
+        sqlx::query("INSERT INTO tui_native_turns VALUES('original',1,7,'scope','binding',$1,$2)")
+            .bind(TUI_V2_RECEIPT_VERSION)
+            .bind(group)
+            .execute(&pool)
+            .await
+            .unwrap();
+        for (principal, session) in [(8, "scope"), (7, "sibling")] {
+            assert!(super::receipt_fork(&pool, principal, session, &child, &[1; 32])
+                .await.unwrap().is_none());
+        }
+        let owner = (7, Some("scope"));
+        let fork = super::receipt_fork(&pool, 7, "scope", &child, &[1; 32])
+            .await.unwrap().unwrap();
+        for (account, binding, owner) in [
+            (2, "binding", owner), (1, "changed", owner), (1, "binding", (8, Some("scope"))),
+        ] {
+            assert!(fork.claim(pool.clone(), account, binding, owner).await.is_err());
+        }
+        let first = fork.claim(pool.clone(), 1, "binding", owner).await.unwrap();
+        assert!(!first.owns_continuation());
+        assert!(fork.claim(pool.clone(), 1, "binding", owner).await.is_err());
+        first.release_rejected_prepare().await.unwrap();
+        let mut first = fork.claim(pool.clone(), 1, "binding", owner).await.unwrap();
+        let delivery = first.track_delivery();
+        first.mark_submitted();
+        first.finish(Some((Vec::new(), None))).await.unwrap();
+        delivery.acknowledge().await.unwrap();
+        assert!(fork.claim(pool.clone(), 1, "binding", owner).await.is_err());
+        let original = claim(pool.clone(), 1, owner, &parent, "binding".into(), false)
+            .await.unwrap();
+        assert!(original.owns_continuation());
+        original.mark_submitted();
+        original.finish(Some((Vec::new(), None))).await.unwrap();
+        let next = super::receipt_fork(&pool, 7, "scope", &child, &[2; 32])
+            .await.unwrap().unwrap();
+        assert!(next.claim(pool.clone(), 1, "binding", owner).await.is_ok());
+        assert!(continuation_account(pool, owner, &parent).await.is_err());
     }
 
     /// 原进程已退出时仅原发送器能替代认领，迟到观察器和并发竞争者均保留原修订。

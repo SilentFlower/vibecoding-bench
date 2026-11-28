@@ -72,12 +72,14 @@ export interface OverallWorkStatus {
 }
 
 export type RequestBackend = 'legacy' | 'native293' | 'tui_v2'
+export type ClientSystemPromptPolicy = 'append' | 'replace' | 'independent' | 'user_reminder'
 
 export interface Account {
   id: number
   platform?: string
   agy_system_prompt_homoglyph_enabled?: boolean
   agy_system_prompt_as_user_reminder?: boolean
+  client_system_prompt_policy?: ClientSystemPromptPolicy
   agy_gif_frames_enabled?: boolean
   agy_disable_safety_filtering?: boolean
   credential_state?: { generation: number; phase: string; operation_id?: string | null; first_failure?: string; recovery_status?: string }
@@ -122,6 +124,7 @@ export interface Account {
   request_backend_revision?: number
   request_backend_wait_reason?: 'draining' | 'runtime_unconfirmed'
   tui_v2_available?: boolean
+  tui_system_prompt_policy_available?: boolean
   account_uuid?: string | null
   organization_uuid?: string | null
   subscription_type?: string | null
@@ -621,6 +624,11 @@ export interface DiagnosticContext {
   conversation_id?: string | null
   trajectory_id?: string | null
   native_model_calls?: number | null
+  tui_reservation_id?: string | null
+  tui_body_source?: 'interactive_cli' | 'account_sender' | null
+  tui_session_origin?: 'new_session' | 'live_process' | 'disk_resume' | 'external_import' | null
+  tui_instruction_location?: 'system' | 'user_reminder' | null
+  tui_confirmed_model_responses?: number | null
   control_state?: string | null
   control_observed_at?: string | null
   control_error_code?: string | null

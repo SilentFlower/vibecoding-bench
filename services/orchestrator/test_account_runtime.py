@@ -29,6 +29,8 @@ from physical_features import FEATURE_LABELS, physical_features_summary
 from native_sender import NativePreparationBlocked
 from native_kernel_upgrade import validate_records
 from project_library import digest_json
+from tui_managed_policy import (DIRECT_ACCOUNT_PATH, DIRECT_DIRECTORY, MANAGED_MARKETPLACE_PATH, MANAGED_SETTINGS_PATH,
+                                POLICY_DIRECTORY, direct_account_selected, managed_policy)
 import main
 
 
@@ -2813,6 +2815,125 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertEqual(destinations['/cli'], 'ro')
         self.assertNotIn('/home/node', destinations)
         self.assertEqual(install.call_args.args[1], '2.1.293')
+
+    def test_admin_managed_policy_changes_only_stopped_bound_account(self) -> None:
+        """保留账号代理和原后端。托管策略只由已排空的原账号装入或撤销。@return 无。"""
+        containers = self._isolated_docker()
+        self.client.images.get.return_value.attrs['Config']['Labels'].update({
+            'vibebench.tui-sender-protocol': '1', 'vibebench.tui-session-host': '1',
+            'vibebench.tui-managed-oauth': '1', 'vibebench.tui-managed-policy': '1', 'vibebench.native-runtime': '293-raw-1',
+            'vibebench.tui-direct-protocol': '1',
+        })
+        proxy = 'socks5://192.0.2.2:1080'
+        self.gateway._request.return_value = {'auth_type': 'oauth', 'status': 'active', 'proxy_url': proxy,
+                                              'request_backend': 'native293', 'concurrency': 1}
+        account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': 7, 'upstream_proxy_scheme': 'socks5',
+                   'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080,
+                   'upstream_socks5_user': '', 'upstream_socks5_pass': ''}
+
+        def stop_roles(row):
+            for column in ROLE_COLUMNS.values():
+                containers[row[column]].status = 'exited'
+
+        with (patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sender_active', return_value=0),
+              patch.object(self.runtime, '_running_sender_active', return_value=False),
+              patch.object(self.runtime, '_ensure_version') as install, patch.dict(os.environ, {'V3_NATIVE_SENDER_MEMORY': '128m'})):
+            before, _ = self.runtime.ensure(account)
+            environment = before['environment_id']
+            bundle = self.root / POLICY_DIRECTORY / environment
+            market = bundle / 'marketplace'
+            (market / '.claude-plugin').mkdir(parents=True)
+            (market / 'guard/.claude-plugin').mkdir(parents=True)
+            policy = {'account_id': 8, 'environment_id': environment, 'plugin': 'guard@approved'}
+            atomic_json(bundle / 'binding.json', policy)
+            atomic_json(bundle / 'managed-settings.json', {'enabledPlugins': {'guard@approved': True},
+                'extraKnownMarketplaces': {'approved': {'source': {'source': 'directory', 'path': MANAGED_MARKETPLACE_PATH}}}}, 0o444)
+            atomic_json(market / '.claude-plugin/marketplace.json', {'name': 'approved',
+                'plugins': [{'name': 'guard', 'source': './guard'}]}, 0o444)
+            atomic_json(market / 'guard/.claude-plugin/plugin.json', {'name': 'guard'}, 0o444)
+            self.assertIsNone(managed_policy(self.root, account_id=8, environment_id='b' * 32))
+            with self.assertRaisesRegex(ValueError, '账号环境的绑定不符'):
+                self.runtime.ensure(account)
+            atomic_json(bundle / 'binding.json', {**policy, 'account_id': 7})
+            untrusted = market / 'guard' / 'unexpected'
+            untrusted.symlink_to(bundle / 'binding.json')
+            with self.assertRaisesRegex(ValueError, '管理员拥有'):
+                self.runtime.ensure(account)
+            untrusted.unlink()
+            with self.assertRaisesRegex(RuntimeBusy, '排空并停止当前账号环境'):
+                self.runtime.ensure(account)
+            self.assertEqual(self.client.containers.run.call_count, 3)
+
+            stop_roles(before)
+            enabled, _ = self.runtime.ensure(account)
+            self.assertEqual(enabled['generation'], before['generation'] + 1)
+            config = json.loads(self.runtime._sender_config(enabled).read_bytes())
+            self.assertEqual(config['tui_managed_policy']['plugin'], 'guard@approved')
+            self.assertEqual(config['binding']['account_id'], 7)
+            self.assertEqual(config['proxy_source'], proxy)
+            self.assertIsNotNone(config['native'])
+            self.assertEqual(self.gateway._request.return_value['request_backend'], 'native293')
+            for role, column in ROLE_COLUMNS.items():
+                destinations = {volume['Destination']: volume for volume in containers[enabled[column]].attrs['Mounts']}
+                for path, source in ((MANAGED_SETTINGS_PATH, 'managed-settings.json'), (MANAGED_MARKETPLACE_PATH, 'marketplace')):
+                    if role == 'sender':
+                        self.assertEqual(destinations[path], {'Type': 'bind', 'Source': str(bundle / source),
+                                                             'Destination': path, 'RW': False})
+                    else:
+                        self.assertNotIn(path, destinations)
+            sender = self.client.containers.run.call_args.kwargs
+            self.assertEqual(sender['environment']['V3_TUI_MANAGED_POLICY'], '1')
+            self.assertNotIn('V3_TUI_LOCAL_PROVIDER_CONFIG', sender['environment'])
+
+            selector = self.root / DIRECT_DIRECTORY / 'account.json'
+            selector.parent.mkdir(mode=0o755)
+            atomic_json(selector, {'account_id': 7, 'environment_id': environment}, 0o444)
+            self.assertTrue(direct_account_selected(self.root, account_id=7, environment_id=environment))
+            self.assertFalse(direct_account_selected(self.root, account_id=8, environment_id='b' * 32))
+            with self.assertRaisesRegex(ValueError, '环境已变化'):
+                direct_account_selected(self.root, account_id=7, environment_id='b' * 32)
+            hooks = market / 'guard/hooks'
+            hooks.mkdir()
+            atomic_json(hooks / 'hooks.json', {'modules': ['./engine.js']}, 0o444)
+            (hooks / 'engine.js').write_text('export function register() {}\n')
+            with self.assertRaisesRegex(ValueError, '内建 guard'):
+                self.runtime.ensure(account)
+            settings = json.loads((bundle / 'managed-settings.json').read_bytes())
+            settings['appendPlugins'] = ['guard@approved']
+            settings['prependPlugins'] = []
+            atomic_json(bundle / 'managed-settings.json', settings, 0o444)
+            with self.assertRaisesRegex(ValueError, '内建 guard'):
+                self.runtime.ensure(account)
+            settings.pop('prependPlugins')
+            atomic_json(bundle / 'managed-settings.json', settings, 0o444)
+            self.assertTrue(managed_policy(self.root, account_id=7, environment_id=environment)['managed_order'])
+            settings['prependPlugins'] = ['sec-default@builtin']
+            atomic_json(bundle / 'managed-settings.json', settings, 0o444)
+            with self.assertRaisesRegex(RuntimeBusy, '排空并停止当前账号环境'):
+                self.runtime.ensure(account)
+            stop_roles(enabled)
+            direct, _ = self.runtime.ensure(account)
+            self.assertEqual(direct['generation'], enabled['generation'] + 1)
+            sender = self.client.containers.run.call_args.kwargs
+            self.assertEqual(sender['environment']['V3_TUI_DIRECT'], '1')
+            self.assertEqual(sender['volumes'][str(selector.parent)], {'bind': DIRECT_ACCOUNT_PATH, 'mode': 'ro'})
+            self.assertEqual(install.call_args.args[1], '2.1.321')
+
+            selector.unlink()
+            bundle.rename(self.root / 'released-policy')
+            with self.assertRaisesRegex(RuntimeBusy, '排空并停止当前账号环境'):
+                self.runtime.ensure(account)
+            stop_roles(direct)
+            disabled, _ = self.runtime.ensure(account)
+        self.assertEqual(disabled['generation'], direct['generation'] + 1)
+        config = json.loads(self.runtime._sender_config(disabled).read_bytes())
+        self.assertNotIn('tui_managed_policy', config)
+        self.assertEqual(config['proxy_source'], proxy)
+        sender = self.client.containers.run.call_args.kwargs
+        self.assertNotIn('V3_TUI_MANAGED_POLICY', sender['environment'])
+        self.assertNotIn('V3_TUI_DIRECT', sender['environment'])
+        self.assertFalse({MANAGED_SETTINGS_PATH, MANAGED_MARKETPLACE_PATH}.intersection(
+            volume['bind'] for volume in sender['volumes'].values()))
 
     def test_tui_single_model_slot_borrows_only_from_available_ram(self) -> None:
         """保留各角色预算及已冻结 sender 上限，只有确定的余量计入额外驻留位。@return 无。"""

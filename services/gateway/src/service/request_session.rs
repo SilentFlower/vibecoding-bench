@@ -245,22 +245,30 @@ pub(super) fn hash_json(hash: &mut Sha256, value: &Value, ignore_cache_control: 
             }
             hash.update(b"]");
         }
-        Value::Object(fields) => {
-            hash.update(b"{");
-            // 入站 JSON 保留键顺序，这里只排序引用以避免复制多模态数据。
-            let mut ordered: Vec<_> = fields.iter().collect();
-            ordered.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
-            for (key, value) in ordered {
-                if ignore_cache_control && key == "cache_control" {
-                    continue;
-                }
-                hash.update(b"k");
-                hash_string(hash, key);
-                hash_json(hash, value, false);
-            }
-            hash.update(b"}");
-        }
+        Value::Object(fields) => hash_json_object(hash, fields, ignore_cache_control),
     }
+}
+
+/// 写入有序 JSON 对象摘要。@param hash 当前摘要。@param fields 字段引用。
+/// @param ignore_cache_control 是否忽略对象的顶层缓存断点。@return 无。
+pub(super) fn hash_json_object<'a>(
+    hash: &mut Sha256,
+    fields: impl IntoIterator<Item = (&'a String, &'a Value)>,
+    ignore_cache_control: bool,
+) {
+    hash.update(b"{");
+    // 入站 JSON 保留键顺序，这里只排序引用以避免复制多模态数据。
+    let mut ordered: Vec<_> = fields.into_iter().collect();
+    ordered.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
+    for (key, value) in ordered {
+        if ignore_cache_control && key == "cache_control" {
+            continue;
+        }
+        hash.update(b"k");
+        hash_string(hash, key);
+        hash_json(hash, value, false);
+    }
+    hash.update(b"}");
 }
 
 #[cfg(test)]

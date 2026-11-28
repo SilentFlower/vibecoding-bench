@@ -1,5 +1,5 @@
 // 绑定文件由发送器在本次会话专属目录生成，服务端地址和授权均不取自 Messages。
-import { endpoint, bearer } from './binding.js'
+import { endpoint, bearer, direct } from './binding.js'
 
 async function post($, action, value = {}) {
   const response = await $.http.fetch(endpoint + '/' + action, {
@@ -13,6 +13,8 @@ async function post($, action, value = {}) {
 
 /** 安装该进程的回合观察和外部工具回执钩子。@param on 官方事件注册器。@return 无。 */
 export function register(on) {
+  let pendingBlocks = null
+  let directStep = null
   on('session.start', async ($, e, next) => {
     const result = await next(e)
     await post($, 'ready')
@@ -20,13 +22,40 @@ export function register(on) {
   })
   on('prompt.submit', async ($, e, next) => {
     // 终端只输入发送器产生的固定标记。客户文本到达这里时已经越过终端命令解析。
-    const { prompt, guard } = await post($, 'prompt', { marker: e.text })
+    const { prompt, guard, blocks, media } = await post($, 'prompt', { marker: e.text })
+    if (blocks) pendingBlocks = { marker: prompt, blocks, media }
     return next({ ...e, text: prompt, context: [...(e.context ?? []), guard] })
   }).catch(() => ({ drop: '交互请求归属已失效' }))
+
+  on('session.append', { door: 'prompt' }, ($, e, next) => {
+    if (!pendingBlocks || e.agentId) return next(e)
+    const { content } = e.message
+    const { marker, blocks, media } = pendingBlocks
+    const index = content.findIndex(block => block.type === 'text' && block.text === marker)
+    if (index < 0) return next(e)
+    // 图像取自 CLI 实际粘贴的块。仅按公开输入顺序放回对应位置，仍由 CLI 保存和组装。
+    pendingBlocks = null
+    const images = media ? content.filter(block => block.type === 'image') : []
+    let imageIndex = 0
+    const submitted = blocks.map(block => media && block.type === 'image' ? images[imageIndex++] : block)
+    if (imageIndex !== images.length || submitted.includes(undefined)) throw new Error('本轮图像未完整粘贴')
+    const replaced = content.flatMap((block, slot) =>
+      slot === index ? submitted : media && block.type === 'image' ? [] : [block])
+    return next({ ...e, message: { ...e.message, content: replaced } })
+  })
+
+  on('session.append', { door: 'response' }, async ($, e, next) => {
+    if (direct && directStep && !e.agentId && e.message.role === 'assistant') {
+      const blocks = e.message.content.filter(b => ['thinking', 'redacted_thinking'].includes(b.type))
+      if (blocks.length) await post($, 'direct-signed', { ...directStep, blocks })
+    }
+    return next(e)
+  })
 
   on('turn.step', async function* ($, e, next) {
     if (e.agentId) throw new Error('当前会话不接受子代理回合')
     await post($, 'begin', { turn: e.turnId, step: e.index, model: e.model })
+    if (direct) directStep = { turn: e.turnId, step: e.index }
     const stream = next(e)
     // 内层一见完整工具块就会等待客户端回执。先公开原生增量并读到同一步的真实用量，
     // 再把这一工具之后的原始分片按原序交给内层，避免两个终端互等结束事件。
@@ -36,12 +65,17 @@ export function register(on) {
       const item = await stream.next()
       if (item.done) {
         const response = item.value
+        if (direct) directStep = null
         await post($, 'end', { turn: e.turnId, step: e.index, reason: response.stopReason,
+          ...(direct ? { answer: response.answer } : {}),
           usage: response.usage, serverTools: response.serverToolUses?.length ?? 0 })
         if (pending) for (const part of pending) yield part
         return item.value
       }
       const chunk = item.value
+      if (direct && ['text', 'tool', 'input', 'thinking', 'stop'].includes(chunk.kind)) {
+        await post($, 'direct-chunk', { ...directStep, chunk })
+      }
       if (chunk.kind === 'tool' && !pending) pending = []
       if (pending) {
         // 预留正文的相同上限也约束完整工具等待，无法作为后续正文回传的调用不驻留。

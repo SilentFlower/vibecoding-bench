@@ -181,12 +181,72 @@ Bash 在第 43 秒结束时跨过两次分段等待，第三次查询立即获�
 
 `reconnect_preserves_completed_reply_for_slow_reader` 和 `rejected_reconnect_preserves_idle_deadline` 分别核对慢读与无效订阅。用隔离公开路由验证首包前 JSON、SSE、网关重启、并发恢复、旧发送器提示和撤权。对照原消息 ID、旧工具的实际执行次数、下一轮工具结果和两次生成各自的用量记录。
 
+`verify_tui_cold_history.py --reconnect-tool-stream` 在公开工具续轮交付半段参数后断开。等 6 秒后接回，逐字节核对前六个 SSE `data` 行，再放行余下参数。第二个读者收到第七个 `data` 行并断开后才放行终帧。第三个读者从缓存收到共十帧并逐字节保留已有七帧。以公开请求 ID 核对三个读者的尝试数为 1、0、0，模型累计收件保持为 2。下一合法工具回执再投递一次，过期回执返回 400。
+
+`verify_tui_cold_history.py --interrupted-tool-stream` 验证原回复已丢失时的替代生成。公开读者收到三个正文数据事件后，隔离模型截断原 HTTPS 响应，公开 SSE 返回错误并提前结束。确认原 CLI 退出并重启发送器，约 6 秒后原样重交工具回执。首个读者触发一次原生磁盘恢复，第二个读者在替代流结束前接回，两者得到逐字节相同的十帧、新消息 ID 和同一个下一工具 ID。原工具和下一工具的合成回调各执行一次。四次模型收件分别为首轮、中断的续轮、一次替代生成和下一合法回执。中断续轮记 17 输入／2 输出的部分用量，替代生成另记 19／11 的完整用量，并发读者零尝试。按公开请求、预留、CLI 与模型实收摘要关联，原档与绑定保持，过期回执为 400。此用例的中断点位于下一工具的首帧之前。
+
+`verify_tui_cold_history.py --interrupted-tool-stream after-tool-start` 在公开读者已经收到下一工具 ID 和半段参数后截断原流。原 CLI 退出且发送器重启后，两次原样重交上一工具的回执都在源端准备阶段返回 `409 outstanding_tool`。两条拒绝各零尝试、零新增模型收件。上一工具的合成回调保持一次，下一工具参数未形成完整执行输入。保留原档和原绑定，只有首轮和中断续轮的两笔用量。
+
+`verify_tui_cold_history.py --slow-tool-stream` 复用同一公开工具续轮路径和十帧合成回复。在第六帧读到半段工具参数后，保持原 HTTP 响应打开，放行模型尾帧并在模型写完后暂停读取 11 秒。继续读取同一响应，按顺序核对十个模型数据事件、首帧分配的公开消息 ID、原工具 ID、完整参数和终帧。以公开请求 ID、预留及实收摘要核对一次原生模型尝试。慢读续轮只产生一条 17 输入、11 输出的完整用量记录，前后两条请求分别记 10 输入、8 输出。下一合法回执成功并新增一次投递，过期回执返回 400、零新增。
+
+## V2 工具回执附带新指令的分叉
+
+### 1. 适用范围
+
+受管 V2 账号上的显式会话支持普通 Messages 和完整 CC 2.1.293。分叉复用原助手工具组及结果作为已完成历史，并为新指令独立生成一次回复。
+
+### 2. 接口
+
+公开入口为 `POST /v1/messages`。最后一个 user 数组包含原工具组的全部 `tool_result`，随后是一块非空的 `{"type":"text","text":"…"}`。紧邻的 assistant 行保留原调用 ID、名称和参数。
+
+完整 CC 保留原生 billing 块及固定 2.1.293 来源。由原生会话头或 `metadata.user_id` 校验原登记，两者同时提供时一并匹配。带 `x-claude-code-agent-id` 的输入沿既有子代理归属判定。
+
+受管发送器在私有准备中以 `receipt_fork_session_protocol=1` 声明分支工作区能力。账号源可在普通原生历史或完整 CC 的准备响应中发布 `receipt_fork_session`，值为 `gateway-tools-` 加标准 v4 UUID。发送器按相同账号、环境、主体和该私有会话绑定分支工作区。旧发送器仍能领用父原回执。
+
+账号源在 `kind="new"` 且确实借用了现有物理余位时，在同一受信准备响应中附 `receipt_fork_borrowed_slot=true`。该字段与有效的 `receipt_fork_session` 一起生效。省略时按普通传输名额处理。
+
+### 3. 归属与交付
+
+- 网关依据同主体、显式会话、工具组、账号与环境绑定定位原记录。接受仍等待、正在认领或已完整生成且仍保留的原工具组。账号源据同代次回执快照再次核对原历史、完整调用组和根轮选项。已有原回执请求摘要时，比较去掉新指令后的正文及生效选项。
+- 完整 CC 根轮的生成字段、受信模型请求头和生效正文策略按回执修订记录摘要。摘要位于账号 `receipts.db` 的 `cc_receipt_fork_scopes`，历史和流式表示各沿原合同。先前记录的父回执可用完整的已提交请求摘要核对。账号发出冻结的完整正文及原工具结果，附加文字属于分支。
+- 网关以包含新指令的请求摘要登记分支。准备失败释放分支登记。同一个在途分支复用原响应，成功交付后的同意图按原已处理规则结束。账本及请求诊断归属实际生成。
+- 分支准备和收口保持父工具组原状态。普通 Messages 经已闭合历史导入，完整 CC 按原冻结正文投递。分支按账号普通并发额度运行。若分支输出新工具，后续结果凭分支已登记的历史定位它自己的工作区。
+- 普通进程额度满时，已完成边界校验的分支只有在其父进程仍等待同一回执修订时才可使用账号已有的物理余位。`TuiCapacity` 的进程数、内存预算及网关发送并发均沿原上限。真实回执复用原进程。借位分支持有发送器预留期间，最后一个现有传输位置供已核验的原回执使用。
+
+### 4. 验证与错误矩阵
+
+| 请求 | 处理 |
+| --- | --- |
+| 原工具组、同主体会话、不同新指令 | 各自准备分支并取得独立答复 |
+| 完全相同的在途输入 | 共享一次实际投递及同一回复 ID |
+| 已确认交付的原样重交 | 400，零新增投递 |
+| 错主体、会话或原绑定，改历史、工具参数或已记录结果 | 400 或 422，零新增投递 |
+| 完整 CC 根轮选项、受信模型头改变，或缺少可核对的原请求摘要 | 422，零新增投递，父回执仍可领用 |
+| 手工加未登记的 `agent-id` | 沿原子代理归属拒绝，400、零新增投递 |
+| 父已收口，历史归属仍在保留期 | 可按原边界提交不同新指令 |
+| 父仍等同一修订，普通进程位满且有物理余位 | 独立分支借余位，父原回执可沿原进程继续 |
+| 物理位已满 | 分支按原期限等待物理释放，父原回执复用原进程 |
+| 借位分支运行且发送器只余最后一个传输位置 | 新分支 429、零投递，父原回执可认领；新分支可重交 |
+
+### 5. 场景
+
+父轮发出工具调用，客户端执行一次。先提交相同工具结果加「校对标题」，随后交回纯工具结果，最后以原工具结果加「校对日期」创建另一分支。三次分别收到自己的回答，已执行的工具结果直接用作两条分支的输入。把文字放到原工具结果之前时沿既有回执输入合同处理。
+
+### 6. 回归
+
+- `receipt_fork_keeps_the_parent_claim_and_deduplicates_its_own_intent` 验证分支的领用、准备失败归还、完成重复及主体、会话、账号和绑定校验。
+- `test_cc_fork_scope_is_bound_to_the_current_receipt_revision` 验证同账号同修订的摘要、续轮选项变化及旧记录的回执领用。
+- 隔离公开回放须核对父前与父后分支、父子并发、相同输入重读、错归属、改回执以及分支新工具的实际收件和客户端执行次数。原工具仅执行一次，先前历史工具执行次数为零。
+- 固定 2.1.293 的完整父轮和回执与普通 Messages 各自复跑。完整 CC 对照逐字段比较实际父、子模型正文，覆盖未登记子代理 ID 的单独拒绝和正常父回执。
+- `test_receipt_fork_borrows_only_the_waiting_parents_existing_spare` 与 `borrowed_receipt_fork_preserves_the_last_sender_slot` 核对物理上限、发送器余位及原回执认领。隔离回放在单普通槽上延迟父原回执，核对分支先交付、原父进程复用、物理满额和第二条分支争用。
+
 ## V2 直接工具调用的客户端回执
 
 - `tool_receipts(messages, previous, expected)` 在原会话的历史和完整工具组匹配后，按工具 ID 交付结果。
 - 上轮登记的 `tool_use.caller` 恰为 `{"type":"direct"}` 时，允许客户端在回传该块时省略顶层 `caller`。兼容只作用于比较快照。发给提供方的请求保留客户端的字段写法及既有缓存策略。
+- 原版 Claude Code 会将交错的文本和工具归为先文本后工具。`input_format=claude_code` 的 `tool_receipts` 在登记块全为 `text` 或 `tool_use` 时允许这一归并，文本次序、工具次序及各块内容逐项相同。活跃与持久回执都使用此比较，签名块及普通 Messages 沿各自原顺序比较。模型正文仍由实际发送进程构造。
 - 显式 `null`、非直接调用来源、工具 ID、名称、执行参数或签名发生变化时，沿原错误路径拒绝。省略工具输入中的同名业务字段仍属于参数变化。
-- `test_tool_receipts_allow_missing_direct_caller_only` 核对正反例。公开接口验收分别使用显式和缺省会话 ID，回填并行工具组并继续下一轮，核对每次成功回填的单次模型提交、工具 ID 及缓存断点。
+- `test_tool_receipts_allow_missing_direct_caller_only` 核对正反例。公开接口验收分别使用显式和缺省会话 ID，回填并行工具组并继续下一轮，核对每次成功回填的单次模型提交、工具 ID 及缓存断点。`test_cli_groups_interleaved_read_and_glob_text_before_its_receipts` 核对文本与工具归并的活跃及持久快照，`verify_tui_installed_direct_stock.py --case mixed-interleaved` 验收真实客户端回传。
 
 ## Scenario: US 宿主管理工具继承既有口令例外
 
@@ -2543,3 +2603,186 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `test_cluster_migration_files/test_cluster_migration_runner`：真实部分文件、上传完成回包未知、协调器重建、CAS／取消后拒绝、已核验包和链接保护。 节点激活替身核对实际已准备尝试，覆盖新尝试的最终激活及 `test_renewed_transfer_activation_resumes_after_committed_response_loss` 的提交后重启续接。
 - `test_cluster_project_capture/test_cluster_projects_terminal`：双空间实际文件、真实迁移归档、旧节点离线、原账本保持、零运行时准备、scope 和路径拒绝。
 - `test_cluster_agent.NodeAgentTests.test_history_capture_through_real_ssh_light_client_and_actor`：真实隔离 SSH→轻量客户端→UDS Actor→原文件；Docker exec 使用明确命令替身，保持零真实账号请求。
+
+## Scenario: V2 受管账号从普通 Messages 冷导入已闭合工具历史
+
+### 1. Scope / Trigger
+
+- 修改受管账号的外部历史导入、工具续轮、私有 sender 协议或 CLI 出站诊断时适用。
+
+### 2. Signatures
+
+- 公开入口仍为 `POST /v1/messages`。受管 sender 在原绑定 Unix socket 的 `prepare` 提出整数 `native_cold_history_protocol: 1`。事件源选用该路径时在同一预留回执确认该字段。
+- 冷导入回执启用 `capture_cli_submission_protocol: 1`。本次调试证据的 `tui_provider_request.representation` 为 `request_from_interactive_cli`。
+- `capture_cli_submission_protocol: 1` 只在已确认原生路径的 `prepare` 回执声明。握手时声明该字段的旧候选源在认证绑定阶段拒绝，外部正文和发送指令均停留在发送器。旧候选历史采集的 `request_to_interactive_cli` 仍可查阅。
+
+### 3. Contracts
+
+- 普通 Messages 的已闭合文本与工具历史、当前文本问题和支持的客户端工具声明共用当前账号作用域。工作区归属核验后，事件源原子发布固定 2.1.293 格式的私有会话记录。CLI 恢复该历史并提交当前问题。顶层追加指令保持输入顺序。
+- 冷导入使用发送器已登记的 `native_session_id`。新导入记录的 `message` 只包含 `role` 和 `content`，原工具调用 ID 和结果仍保留在内容块中。首条 JSONL 记录的外层 `flower2apiImportBoundary` 保存规范化历史和本轮生效设置的摘要。同一工作区的完整主链、消息及摘要匹配时，保留文件和 UUID。旧格式沿原模型及主链匹配条件读回，保留原文件字节。
+- 已有合法主链超出本轮确认边界，或历史、已记录的生效设置发生分歧时，按登记会话、确认历史及生效设置查找同一私有工作区的匹配分支。发布使用目录锁与原子不覆盖操作。恢复与导入回调返回的 UUID 均经 `_resume_path` 核对目标文件身份、权限、cwd 和原生 UUID。回调为纯新轮选中的 UUID 须尚无历史。
+- 同一公开会话带完整确认历史开始独立新轮时，无主链的候选文件可按同一确认边界跳过并在私有工作区另选分支。原档和原绑定保留。相同确认边界可复用尚未推进的导入分支。JSONL 损坏或主链的 UUID、cwd 不符时仍拒绝该次导入。直接恢复及无确认历史的入口沿用各自的缺主链校验。
+- 分叉已结束且本轮问题与档案里的原问题一致时，客户可重发同一确认历史触发新投递。启动器核对原分叉及同 UUID 的私有临时 JSONL。临时文件只载入已确认前缀，由本次 CLI 追加并在进程回收后清除。原分叉档案保留原字节。输入问题改变或已有分叉仍未完成时沿后续修订查找。
+- 普通 Messages 在原公开会话中提交分叉的确认历史。启动器的显式恢复与自动恢复均可根据同一导入计划定位该分叉。单独按已登记 UUID 恢复时，选择原绑定的历史。普通历史分叉共享原会话的绑定文件与私有配置目录。
+- 普通单文本首轮和已闭合的纯文本历史也使用该原生入口。无外部历史时由 CLI 自行创建会话记录。公开会话已有主链但本轮提交空前缀时，启动新的独立原生会话。普通顶层 `system` 省略、空串和空数组均保留原生默认工作正文。多个文本块按原顺序作为本轮追加指令。
+- 当前用户消息的多个纯文本块在 `session.append` 阶段按原顺序替换本会话的提交标记，CLI 按原生方式保存并组装。派发前核对本轮标记和实际文本块。原工具回执冻结文本块边界。原进程丢失后，已提交的块随核对过的历史载入，继续提示单独提交。
+- 普通 Messages 的已确认历史文本可保留 `ephemeral` 缓存标记、本来缺省的 TTL 与 `1h`、`5m`。原生路径可将当前轮纯文本或边界内的内嵌图文与至多四个按先长后短排序的历史断点组合。该会话关闭 CLI 自动断点，派发前逐条对照角色、消息和块位置及标记内容。当前图像的附件来源块也保持无标记。标记不符返回 422，零投递。根轮历史标记随工具组冻结，从续轮或丢进程恢复改写标记均拒绝。
+- 平台强制 `5m` 或 `1h` 且缓存布局关闭时，带历史断点的原生计划先按账号政策生成导入历史。直接断点应用平台 TTL。已闭合工具结果内的标记保留客户端表示，单独存在或与直接断点混合时均按有效出站 TTL 检查前缀先长后短。工具回执冻结根轮的有效 TTL 和客户端原值。平台 TTL 更新对新轮生效；在线续轮使用原计划，丢进程后从同一持久边界核对根轮有效 TTL。客户端改写直接或嵌套历史断点仍返回 422。无显式断点及启用 `sub2api` 布局的强制形状沿各自已有合同。[缓存 TTL 顺序](https://platform.claude.com/docs/en/build-with-claude/prompt-caching#mixing-different-ttls)
+- 已确认的用户历史与本轮用户消息可保留内嵌 Base64 PNG、JPEG、GIF 和 WebP。历史恢复按原角色和内容块顺序交给 CLI，用户提醒可附在同一条消息。URL 图像沿既有输入合同。
+- 本轮图片暂存于当前私有 HOME 的 `tmp` 子目录。隔离启动器仅保留属于该 HOME 的 `O_PATH` 目录描述符。CLI 逐张使用原生 PTY 粘贴，Mod 依据公开图文顺序使用实际粘贴的图片块。主请求核对原图字节、图文边界和生成的进程内来源别名。该别名只标识进程内文件描述符和服务端生成的附件名。单张图片的原生粘贴边界包含长边 2000 像素及 Base64 解码后 512000 字节的上限值。固定 CLI 会重采样或重编码超界图像，公开入口在启动前按下表判断超界输入。
+- 本轮图文的业务合同覆盖同一 `user` 行内的块顺序、重复块、文字内容与图片 MIME/Base64。固定 2.1.293 的 PTY 首轮和同进程续轮在原始数组前带有 CLI 上下文，尾部每张图片各有一条按粘贴顺序排列的来源文本。末个实际提交块为文字时，CLI 在来源文本前向该文字块追加一个 LF。末块为图片时，业务块本身逐块相等。两种 PTY 形状的完整 `content` 都含额外块。CLI 自动缓存标记可出现在首轮最后一条来源文本。
+- 丢进程恢复用原始业务块重建该图文历史行。公开回归的恢复模型请求中，这一行的原始 `content` 与客户端业务数组逐块相等。续轮的工具结果及继续提示各有自己的消息边界。
+- 固定版的 `--print --input-format stream-json` 对照也保留四种格式及重复块，并生成来源文本和相同的末文字换行。普通交互 PTY 拒绝该参数组合。X11 剪贴板 `Ctrl+V` 对照中，四种格式单张实收的 MIME/Base64 均相等，CLI 每张也生成一条来源文本。直接经当前 `session.append` 提交新图块的隔离探针未达到图片提交边界。当前入口继续使用实际粘贴。[CLI 输入参数](https://code.claude.com/docs/en/cli-reference) · [交互剪贴板入口](https://code.claude.com/docs/en/interactive-mode)
+- 已闭合的旧工具结果可保留非空有序 `text` 块数组和原工具 ID。其余扩展字段沿现有输入合同，先前完成的工具保持已完成。
+- 已闭合的空工具结果允许省略 `content`，或显式提交 `[]`、`""`。原生导入和磁盘恢复保留原字段形状、用户角色、工具 ID 及结果的 `is_error`。提交模型前核对对应结果块。工具回执改写已确认历史里的空值形状返回 422、零新增投递。[Messages 空工具结果](https://platform.claude.com/docs/en/agents-and-tools/tool-use/handle-tool-calls#example-of-empty-tool-result)
+- 普通原生工具轮收到当前空结果（省略 `content`、`[]` 或 `""`）时，校验原历史、完整工具组和持久回执修订，再通过同一修订的磁盘恢复投递。原 CLI 若仍活跃则在校验后回收。发送前逐块核对原用户角色、调用 ID、`content` 字段形状及 `is_error` 字段，合法回执只投递一次。混合工具组中的其他原结果仍随该组恢复。
+- 固定 2.1.293 的直接热续轮会在三种空形状中加入非空内容。旧账号发送器三种均保持原值。交互 CLI 磁盘恢复保留整个空结果块，并在模型的 `user` 输入中另外提交一次 `Continue from where you left off.`。该提示与工具结果分开统计。
+- 普通原生轮的非空纯 `text` 数组回执按整组核对后使用磁盘恢复。逐块保留重复文本、顺序、换行、调用 ID、`user` 角色及 `is_error` 缺省、`false`、`true` 三种字段形状。固定 CLI 的直接热续轮在此形状实测为末块多一个换行、追加原生 token 提醒块，并省略显式 `false`。沿原修订恢复保留工具结果原块，续轮另有一次标准继续提示。
+- 当前工具结果的非空 `text` 数组可在内层文本块带 `ephemeral` 标记，保留显式 `5m`、`1h` 或省略 TTL 的原样。单工具与混合工具组均经原修订恢复。CLI 载入该断点后关闭自动断点，避免接在客户端 `5m` 之后的自动 `1h`。派发前按原工具 ID 核对标记所在块、TTL 和完整结果字段。
+- `tool_result.cache_control` 的外层 `ephemeral` 标记支持 `5m`、`1h` 与省略 TTL。可恢复的当前结果在原修订上通过磁盘交回，关闭自动断点，按原调用 ID、结果位置、完整字段和有效 TTL 核对出站。同一工具结果的外层及第一段文本内层均显式为 `5m` 时，原进程活跃与已退出两种对照均沿磁盘恢复，两个标记各自保留在原位置。平台启用强制 TTL 时，外层使用根轮冻结的有效值，保留原始回执及内层标记。已经闭合的同形工具结果沿历史导入和归属校验处理。
+- 带外层断点的工具结果在出站前按原位置和有效 TTL 核对完整 JSON 块。CLI 将已确认的 `is_error: false` 或 `is_error: true` 分别改成数字 `0` 或 `1` 时，公开返回 HTTP 422，诊断阶段为 `tui_cli_input_guard`，模型零新增收件。错误标志缺省与显式布尔值分别核验。
+- 纯文本数组和外层断点的切换要求整组可按原修订恢复。签名响应缺少 `message_start.message.model` 时，隔离对照的非空文本数组带内层 `5m` 由活跃进程继续接收，公开返回 200，诊断为 `interactive_cli` 和 `live_process`。续轮模型实收缺少原内层 `5m` 和原签名块，该组合按原生保真缺口记录，线上频率待核。丢失原进程时返回 422、零新增投递。当前空回执使用下文缺响应模型的恢复边界。未标记的普通非空字符串仍沿原热续轮。
+- 已归属旧账号发送器的工具组继续按原路径提交。旧路径退役验收以实际诊断 `tui_body_source`、`tui_session_origin` 和模型实收为证。`account_sender` 计入旧发送路径，`interactive_cli` 以实收字段核对原生保真。
+- 已闭合的成功工具结果可在同一个 `tool_result.content` 数组内混合有序文本和内嵌 Base64 PNG、JPEG、GIF、WebP。原生会话恢复保留重复图块、多行文字、原调用 ID 及 `is_error` 缺省或显式 `false` 的字段形状。账号组件在发送前按 JSON 类型核对 CLI 生成的结果块及原角色。将已冻结的显式 `false` 改为数字 `0` 或省略字段时返回 422，模型零收件。改写该段历史的回执继续按原归属拒绝。
+- 对 `is_error:true` 的图文结果，固定 2.1.293 读取历史时去掉图像并合并文本。该形状沿原账号路径兼容。已有原生计划在实际出站核对失败时返回 422，模型零收件。
+- 固定 2.1.293 的原版 CLI 在交互 stdio MCP、`--print` stdio MCP 和 `--print --resume` 的结构化输入对照中均保留错误标志及调用 ID，均移除错误结果内的全部图像。混合内容的两段文字被合并。纯图片错误的 MCP 结果生成 `Unknown error` 文本，从磁盘载入的同形错误产生空数组。三种入口各自的成功对照均实收五幅图，涵盖内嵌 PNG、JPEG、GIF、WebP 及重复 PNG。错误结果的完整保真仍是旧路径退役条件。CLI 文档为 `PostToolUseFailure` 提供的模型上下文字段是字符串 `additionalContext`，插入位置在错误结果旁边。[CLI 参数](https://code.claude.com/docs/en/cli-reference) · [MCP 接入](https://code.claude.com/docs/en/mcp) · [失败钩子](https://code.claude.com/docs/en/hooks#posttoolusefailure)
+- 无 schema 的交互 HTTP MCP 对照由固定 2.1.293 完成三轮工具往返。成功组原图片 PNG、JPEG、重复 PNG 的 MIME、Base64 与业务顺序保持，CLI 追加附件来源文本、换行及 token 提醒。错误组以相同工具声明和图像分别交付混合图文或纯图片，两组保留原工具 ID 和 `is_error:true`，结果转换为字符串且模型没有收到图像。混合错误合并两段原文，纯图错误以 `Unknown error` 起头，两组均追加 token 提醒。MCP 回调、原工具调用和模型实收均按同一工具 ID 核对。复跑 `verify_tui_http_tool_error.py <固定 CLI>`。[Claude Code HTTP MCP](https://code.claude.com/docs/en/mcp) · [MCP 工具结果](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)
+- 普通原生工具轮的当前成功图文回执单独走已核验的磁盘恢复入口。固定 2.1.293 的活跃工具续轮会丢弃图像。原进程仍活跃时，先核对完整工具组、原历史、原生计划与持久回执修订，再回收原进程并从同一修订恢复。已丢进程时沿相同恢复入口。两个入口均核对实际 CLI 出站的原调用 ID、块顺序、内容和结果标志，消费一次恢复许可，只提交一次续轮。原进程回收期间仍可能补写自身尚未落盘的记录。
+- 图文工具结果块保留原内容。使用磁盘恢复的续轮还会在模型的 `user` 输入中收到一个单独的 `Continue from where you left off.` 文本块，因此整个用户输入会增加该块。父版热续轮的同一对照为零次。隔离对照中的连续两次图文回执共三次模型请求，分别收到 0／1／1 次，继续提示在实收正文中逐次核对。
+- 原生在途 `is_error:true` 的混合图文及纯图片回执在准备阶段返回 422、零尝试和零模型投递。原回执修订仍可接收保真的结果，原进程若仍活跃则继续等待。已归属旧账号发送器的工具轮沿现有路径，将原错误标志和全部内容发给模型。
+- 这项限制按工具轮已登记的路径生效。追加、替换和用户提醒下已认领的原生轮均拒绝完整错误图文。追加策略中已归属旧发送器的工具轮仍投递原错误块。新轮带已闭合错误图文历史时，追加策略由旧发送器保留全部块，替换和用户提醒返回 422、零投递。按现行输入合同退役需要受支持的原生入口同时保留错误标志、原图、位置和调用 ID。若产品接受输入收窄，须明确将旧发送器已支持的在途回执及已闭合历史改为拒绝，并保留原轮排空语义。
+- 客户端收到错误图文的 422 后，可用同一工具 ID 另行提交纯文本错误结果。两组公开实测均返回 200，模型实收 `is_error:true`。热续轮的 `tool_result.content` 以客户端原文开头，固定 CLI 在同一字段末尾追加含 `<total_tokens>` 的原生 `<system-reminder>`。丢进程后磁盘恢复的 `content` 与客户端原文完全相等。两组覆盖调用方主动选择的纯文本回传。原始错误图文的原生保真仍是退役缺口。
+- 已闭合工具结果内的文本块也可带历史 `ephemeral` 标记。它与历史直接文本共用四个断点预算和 TTL 顺序。发送前按原调用 ID、角色及工具结果内的块位置核对已载入前缀。通过回执校验后载入的当前组也纳入该前缀。
+- 旧工具调用和回执可以拆在相邻同角色历史里。原生导入按角色合并相邻行，保持块内容和先后顺序，整组调用必须在下一助理轮前闭合。原公开历史仍作为回执归属的比较依据。
+- V2 管理端可选择 `append`、`replace`、`user_reminder`。已核验发送器通过私有预留传递非默认动作。替换以启动文件承载系统正文，省略保留默认正文，显式空串或空数组仅保留身份和计费块。提醒保留默认系统正文，附到首条不含工具回执的用户消息。纯新轮的提醒随原问题提交。完整 CC 原生请求沿原输入合同。已登记等待工具的进程沿用其启动动作。
+- 普通原生输入的 `output_config.effort` 支持 `low`、`medium`、`high`、`max`，由 2.1.293 的 `--effort` 组装。模型出站前核对实际字段。等待和冷恢复沿用根轮冻结的强度。
+- 普通 Messages 的 `output_config.format.type=json_schema` 仍是退役兼容缺口。固定 2.1.293 的 `--json-schema` 交互 PTY 探针在禁用和启用默认工具时均未生成 `output_config.format`。`--print` 正对照经 `StructuredOutput` 工具发送 schema，模型正文仍无该字段。CLI 文档把该参数限定在 print 模式。Agent SDK 以工作流结束时的 `structured_output` 交付验证结果，允许因验证失败多次推理。[Claude Code CLI 参数](https://code.claude.com/docs/en/cli-reference) · [Agent SDK 结构化结果](https://code.claude.com/docs/en/agent-sdk/structured-outputs) · [Messages JSON 输出](https://platform.claude.com/docs/en/build-with-claude/structured-outputs)
+- 带 schema 的普通工具首轮在追加策略由 `account_sender` 承接。合法工具结果含 `is_error:true`、文本和内嵌 PNG 时，热续轮和丢进程后的恢复都沿原已登记路径保留 `output_config.format`、`effort`、原调用 ID 及图文顺序。原生等待轮收到新加 schema 的回执返回 `422/unsupported_parameter`、零尝试和零新增投递；原样回执仍经交互 CLI 完成。用 `verify_tui_cold_history.py --structured-output-tool-round live|restart` 核对模型实收、公开 JSON 工具调用、SSE 的结构化答复和重复回执。同用 `--installed-runtime` 时运行镜像内置发送器和事件源，以管理诊断的尝试及预留核对正文来源和恢复方式。CLI 回调原始摘要、回调是否携带 format、已认领正文字节是否匹配 CLI 回调由源码观察器提供。两项输入原生保真仍是退役条件。
+- 固定 2.1.293 对 `claude-sonnet-4-6` 和 `claude-opus-5-5` 原生支持显式 `adaptive/updates` 和 `adaptive/summarized`。后者在原生计划确定后以 CLI `--settings` 启用 `showThinkingSummaries`，恢复沿同一根轮配置。投递前核对 CLI 真实生成的 `thinking` 对象。回执改动 `display`、省略显式值、或改成平台会自动重写的 `disabled` 时返回 `422/unsupported_parameter`。新请求的缺省 `display`、显式 `omitted` 和平台自动重写沿既有合同。用 `--adaptive-thinking-model` 指定模型，搭配 `--adaptive-thinking-display summarized` 验证摘要，省略显示选项验证 `updates` 及其功能头。两种模式均可搭配 `--recover-pending-tool`。
+- 工具声明由会话私有 HTTP MCP 返回。有工具的轮次等待 `tools/list` 应答写出后才提交 PTY 提示。公开调用块恢复原名，ID 与参数增量仍对应原模型事件。工具结果通过原进程的回执账本交付，接收方、历史、原调用和本轮生效设置均需匹配。
+- 普通自定义工具的顶层 `type` 省略与显式 `custom` 双向等价。两种声明通过同一受管 MCP 入口提供名称、说明和输入 schema。热续根轮比较、冷恢复摘要及断线重读索引归一该字段。实际出站沿用发送路径选择，固定 CLI 的实收声明省略可选的 `type`。类型、名称、说明、工具组或 schema 的实际变化仍按原合同拒绝，主体、会话和回执消费归属继续分别核验。[Anthropic SDK ToolParam](https://github.com/anthropics/anthropic-sdk-python/blob/main/src/anthropic/types/tool_param.py)
+- 旧记录保持原摘要与条件认领。恢复可核对入站原样、整表全省略、整表全显式及逐项反转后的旧摘要。其它旧混写摘要仍可用原声明形状匹配。新摘要归一各普通工具的等价表示。
+- 声明客户端工具时接受显式 `tool_choice.type=auto`，`disable_parallel_tool_use` 可省略或显式为 false。固定 CLI 2.1.293 的这两种输入保留工具声明，实际模型正文均省略 `tool_choice`。自动选择允许模型直接返回文本，公开 SSE 的 `stop_reason` 为 `end_turn`。在线、磁盘恢复及断线重连均接受同一工具回执在两种形状间切换。已冻结的根轮计划和旧账本摘要继续沿用。整项省略 `tool_choice`、改为 `none`、禁止并行或指定工具仍返回 422 且模型零新增收件。已消费且原回复不可接回的回执沿现有规则处理。
+- 普通首轮的 `tool_choice={"type":"auto","disable_parallel_tool_use":true}` 允许模型直接回答，工具响应最多含一个调用。固定 2.1.293 的 `--append-system-prompt` 可把串行指令交给模型，实际正文仍省略 `tool_choice`，并保留两项 MCP 工具。追加策略沿下表保留原请求的禁并行字段，合法工具续轮按原归属继续。V2 管理 API 在绑定就绪时回报 `tui_v2_available` 和 `tui_system_prompt_policy_available`，账号列表、详情及策略更新均显示所选动作。两个字段分别描述 V2 可用性和系统提示词动作能力。禁并行的实际支持范围由公开 Messages 合同确认。[Messages 禁并行](https://platform.claude.com/docs/en/agents-and-tools/tool-use/parallel-tool-use#disable-parallel-tool-use) · [CLI 参数](https://code.claude.com/docs/en/cli-reference)
+- 普通 Messages 的 `tool_choice={"type":"none"}` 在 `tools` 省略或为空数组时使用交互 CLI。派发前要求 CLI 正文的 `tools` 为空或省略，`tool_choice` 保持显式 `none` 或省略并应用无工具默认值。存在工具声明时仍按既有策略处理并保留完整列表。[Messages 工具选择](https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools)
+- `tool_choice.type=any` 要求模型调用已声明的任一工具，`type=tool` 要求指定名称。固定 2.1.293 交互对照用 `--tools ""` 关闭内置工具并声明两个 MCP 工具，`--allowedTools` 只预许可指定工具时仍保留两个声明，`--disallowedTools` 排除另一工具后仅发送一个声明。三种对照的 CLI 正文均省略 `tool_choice`，均可直接以文本收口。现有受支持的权限及声明入口缺少 Messages 的强制字段，原生支持仍为退役缺口。[CLI 工具选项](https://code.claude.com/docs/en/cli-reference) · [Messages 工具选择](https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools)
+- 普通追加策略的在途强制工具轮由已登记的账号发送器收口，合法回执显式切为 `auto` 时仍沿原归属。完成该轮并交付完整答复后，同一公开会话可带完整已确认历史提交独立的 `auto` 新问题。新轮按原生输入合同判断。原进程存活及原轮中途重启时，`any` 与命名共四个独立新轮均由交互 CLI 各投递一次，并保留两组已完成工具的调用、原 ID 与结果归属。
+- 普通工具名中的连字符与下划线分别保留。固定 CLI 2.1.293 仅增加会话 MCP 前缀，嵌套 Schema 与参数沿原描述交付。重启后工具回执仍核对原名、ID 和完整参数。
+- 热续轮与磁盘恢复均以嵌套 JSON 布尔类型核对原工具参数及冻结的工具声明。同值对象的键顺序可变。将原 `false` 替换为 `0` 或将 `true` 替换为 `1` 按实质参数变化处理，公开返回 422、零尝试及零新增。原回执仍可认领一次。该检查沿用已支持的默认 `auto` 等价写法。
+- 原生等待进程丢失时，私有回执按同一修订核对根轮策略及正文摘要。新原生会话导入客户端已核对的工具结果，保留原 JSONL。由受管 PTY 使用 CLI 的继续提示启动模型步骤，原问题和已完成工具保持在历史中。旧工具回执仍以原表布局读取。
+- 旧账号发送路径可能先登记工具回执，原 CLI 在写入原生主轮之前退出。已核对的旧回执使用自动恢复时，若原绑定档案可解析、归属有效且只有非主轮记录，启动器以新的 CLI 会话 UUID 继续同一已核验工作区，原绑定与档案字节保留。发送器继续使用账本核对过的请求历史。原生导入、显式恢复及普通新轮仍要求原有主链校验。历史内容损坏、文件权限异常及主链归属不符仍拒绝。
+- 活跃工具组的签名属于发送器实收的助手块。回传时核对原签名和工具参数。受支持的原生根轮按工具 ID 登记实际 `message_start.message.model`，与当前回执修订一起保存，覆盖缺省 `thinking`、显式 `adaptive/updates` 和 `adaptive/summarized`。冷恢复仅将该事实写入对应的已验签助手行，普通外部历史仍使用 `role/content`。固定 CLI 2.1.293 依此保留原签名，模型提交前核对签名块和工具 ID 的原序。带签名回执的来源数据缺失或旧存量未登记助手模型时，冷恢复在准备阶段返回 `422/unsupported_parameter`，原会话文件保留，回执零尝试和零新增投递。无签名旧回执沿原布局恢复。
+- 上游已发签名块且 `message_start.message.model` 缺省时，当前空工具回执沿同一缺来源边界处理。原 CLI 仍活跃时，合法归属的空回执也在准备阶段返回 `422/unsupported_parameter`，零尝试和零新增投递。原进程、绑定和档案均保留。签名来源只取实际响应的模型名。隔离对照的同形非空字符串热续返回 200，续轮模型实收缺原签名块。该组合的线上发生率未知。
+- 带已闭合签名工具组发起新轮时，准备阶段可从当前账号、环境、主体和公开会话已绑定的原生主档及分叉读取来源。文件和主链沿工作区归属校验。分叉按当前绑定的原生 UUID、首条导入边界和已有发布顺序核对，使用同一工作目录的相邻会话各持独立来源。签名与原工具名称、ID、输入必须匹配同一档案内同一实际响应 ID 的助手块，跨档案汇总后的响应模型必须唯一。历史行的模型仅取自这份证据。原档保持，新工具等待期间把这份来源纳入冻结的回执边界，热续轮及磁盘恢复均可继续核对。跨主体、跨会话、缺档、缺实际响应 ID 或模型来源不唯一时沿既有输入能力边界。`verify_tui_cold_history.py --bound-signed-history live|restart|fork` 分别验证主档热续轮、主档冷恢复和真实分叉产生签名工具后的新轮与冷恢复。分叉用例从公开入口建立一个共享工作目录的相邻会话，核对隔离拒绝、主档和分叉实收签名及三份档案保持。
+- 归档内的工具名类型错误使整份档案退出签名来源核对，包括读到错误前取得的候选模型。其它满足归属与格式校验的档案各自提供来源。
+- 已绑定签名工具组的公开工具名按客户端声明逐字核对。原生档案与出站模型正文只移除 CLI 添加的一层 `mcp__flower__` 进行比较。导入对应签名助手行时添加一层内部前缀，保留客户端工具名中已有的同名命名空间。改写公开工具名仍按签名来源拒绝，签名、调用 ID、参数和绑定归属参与原有核对。
+- 一般外部签名历史的标准助手输入只有 `role/content`。响应模型属于原模型响应，当前请求的 `model` 属于新轮。调用方将原响应的 `model` 或 `id/model/usage` 附在历史助手行时，三种账号策略均返回 `422/unsupported_parameter`、零尝试。对无当前绑定来源的 `thinking/signature` 或 `redacted_thinking`，追加策略沿 `account_sender` 保留签名块和已闭合工具历史；替换及用户提醒均返回 `422/unsupported_parameter`、零尝试。`verify_tui_cold_history.py --external-signed-history-source` 将独立回环来源模型的真实 HTTP 响应投影为普通助手历史，并用不同的新轮模型核对两种块及三种策略。本用例使用合成签名，覆盖字段转发与归属，供应商验签仍由供应商完成。一般外部签名历史的原生兼容仍是退役缺口。[Messages 请求与响应](https://platform.claude.com/docs/en/api/messages) · [思考块签名](https://platform.claude.com/docs/en/build-with-claude/thinking)
+- CLI 回环模型请求沿原账号 sender 授权路径送到固定供应商。该次请求交付 CLI 实际生成的 JSON 实体。调试快照的正文摘要取自这一实体，`wire_final.status` 为 `unavailable`。
+- 原工具组等待期间，受信管理入口 `POST /admin/accounts/{id}/oauth-credentials/resolve` 可用 `force_refresh: true` 验证原账号刷新通道。合法回执保留原工具归属和原轮输入，实际模型续轮按同一账号已落库的新 AT 重新解析。原进程内续轮和原进程丢失后的磁盘恢复均适用完整 OAuth 文件协议。模型请求调试快照保留正文摘要与会话归属，凭据值须脱敏。
+- 受管模型的 HTTP 429 在公开 Messages 保留状态、错误正文和有效 `Retry-After`。诊断以同一预留记录一次确认的模型响应及 `upstream_rejected / upstream_headers`。受管模型的 200 和真实 429 都可从完整响应额度头被动更新原账号对应窗口，比例换算为百分比，缺省窗口保留已记录值。账本和工作区的本地拒绝各沿原阶段记录。
+- 现行账号发送路径的首帧前 HTTP 模型错误保留既有状态、类型和消息。完整的上游 Messages 错误信封可保留顶层 `request_id` 和 `error.details.error_code`。请求 ID 沿现有关联格式 `req_` 加 ASCII 字母数字，总长至多 128。结构化错误码接受非空 ASCII 字母、数字或下划线；其它详情字段继续过滤。返回的 JSON 请求 ID 属于上游，`X-CC2API-Request-Id` 仍属于公开网关。格式错误、截断及本地拒绝继续使用已有错误信封。用 `verify_tui_http_error_contract.py --path account --error-metadata valid|invalid` 在公开 JSON 和 SSE 首帧前验证模型一次投递、绑定预留及错误字段。[Claude API 错误合同](https://platform.claude.com/docs/en/api/errors#request-id)
+- 账户、会话、模型、替代的调用方参数或连接归属变更均沿原预留和回执门槛处理。冷导入只协商当前支持的普通输入形状。其他形状继续沿该发行既有入口合同。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 主体或公开会话与等待工具组不匹配 | 400，零新增模型提交 |
+| 原工具参数被改写 | 422。准备阶段先归还回执，合法新请求可立即认领 |
+| 同组合法回执已交付后再次提交 | 原回执规则拒绝重放 |
+| 同绑定并发导入相同历史 | 使用同一原生 UUID，已有文件保持原字节 |
+| 导入回调选中已有历史的 UUID 用于纯新轮 | 启动器拒绝使用该 UUID 创建会话 |
+| 同一分叉边界 A→B→B，B 尚未推进 | 两次 B 使用同一分支 UUID。A 和首次 B 的文件保持原字节 |
+| 分叉公开回复已成功交付，重启后再次提交相同历史及问题 | 新尝试使用同一分叉 UUID。模型只收到客户端确认的历史和一次当前问题，档案数量和已有字节保持 |
+| 文件归属错误或包含其他工作区的主链 | 拒绝恢复，保留原文件 |
+| 当前轮合法内嵌图像达到长边 2000 像素或解码后 512000 字节，且其余输入满足原生合同 | 三种账号动作均经交互 CLI 投递一次 |
+| 当前轮内嵌图像长边超过 2000 像素或解码后超过 512000 字节，顶层 `system` 可省略或为已支持的文本 | `append` 沿旧账号发送路径保留原 `messages`，投递一次。`replace` 和 `user_reminder` 返回 `422/unsupported_parameter`，模型零收件 |
+| 已闭合的历史 `tool_result` 含图文且 `is_error:true` | `append` 经旧账号发送器保留原图文及错误标志，投递一次。`replace` 和 `user_reminder` 返回 `422/unsupported_parameter`，零尝试、零投递 |
+| 原生当前成功回执含内嵌图文 | 使用原修订从磁盘恢复，后续模型投递一次，尝试归属 `interactive_cli / disk_resume` |
+| 原生当前错误回执含图文 | `422/unsupported_parameter`，零尝试、零新增模型投递。原许可未消费 |
+| 普通 API 携带 `output_config.format.type=json_schema`，单独使用或同带 `effort=medium` | `append` 经旧账号发送器透传，实收一次。`replace` 和 `user_reminder` 返回 `422/unsupported_parameter`，零尝试、零投递 |
+| 普通首轮声明客户端工具，显式 `tool_choice.type=auto` 及 `disable_parallel_tool_use:true` | `append` 经 `account_sender` 保留 `true` 和工具声明，投递一次。`replace` 和 `user_reminder` 返回 `422/unsupported_parameter`，模型零收件 |
+| Sonnet 4.6 普通 API 声明两个客户端工具、关闭思考并要求 `tool_choice.type=any` 或指定 `type=tool` | `append` 经旧账号发送器保留工具表与精确选择。`replace` 和 `user_reminder` 返回 `422/unsupported_parameter`，零尝试、零投递 |
+| 普通 API 声明工具且指定 `tool_choice.type=none` | `append` 经旧账号发送器保留选择和声明。`replace` 和 `user_reminder` 返回 `422/unsupported_parameter`，零尝试、零投递 |
+| 仅开启该路径的调试采集 | 保存 CLI 实际实体证据，最终 TLS 写出未采集 |
+
+### 5. Scenarios and Examples
+
+- 首次带两组旧问答和已完成的工具对发起请求。HTTPS 模型收到原历史及一次当前问题，随后收到新工具的单次合法结果。
+- 将 CLI 回环摘要标作最终 TLS 写出会混淆采集点。使用 `request_from_interactive_cli` 记录 CLI 实际交付，并单独对照 HTTPS 接收端正文摘要。
+
+### 6. Tests Required
+
+- `test_tui_cold_history.py` 核对闭合边界、私有 JSONL 父链、最小历史消息、旧格式字节保留、同绑定并发与 MCP 声明范围。`test_tui_workspace_launch.py` 核对首次导入、重复导入和后续预留的正式恢复入口使用同一文件。回调返回的分支须通过目录、会话和权限校验。
+- `verify_tui_cold_history.py` 使用公开入口、生产事件源、真实 2.1.293 CLI 和账号代理，对照 HTTPS 实收、公开流式调用、JSON 续轮及拒绝路径。
+- `verify_tui_cold_history.py --restart-history` 在原工具续轮收口后核对已导入消息的 `role` 和 `content`。以账号权限预先落盘改写后的历史，再重启发送器并从公开入口提交分叉确认历史，未推进时须复用同一 UUID。完整答复写入后再次重启并重发相同输入，检查独立响应、一次额外模型投递、确认历史、旧档案字节及工具归属。已推进的内容可由后续分支承接，报告记录实际 UUID 和持久档案数量。
+- `verify_tui_cold_history.py --text-input` 从公开入口核对纯新轮、同公开会话另起新轮、纯文本历史以及缺省、空串、空数组和多段系统指令实收。
+- `9aed7a1f` 的 `--cache-markers` 记录退役前基线。当前同名用例覆盖三种账号动作、嵌套历史断点和强制 `5m`、`1h` 的原生出站，以及本轮文本和工具声明的旧路径对照。请求根、顶层系统块上的标记，以及使用替换或用户提醒时的已测本轮文本标记返回 `422 / unsupported_parameter`，模型零收件。夹具按预留比对已认领正文及隔离 HTTPS 实收摘要，最终 TLS 写出保持未采集。`--history-cache-markers` 核对一次工具往返的两次模型请求，兼容 `--recover-pending-tool` 验证冷恢复和改写历史断点拒绝。同用 `--history-cache-ttl 5m`，等待中切换到 `off`，核对原回执继续使用 `5m`，同一公开会话的新轮应用 `off`。
+- `--cache-marker-capabilities baseline` 核对当前轮双文本块与双工具声明。追加动作下，首位及末位的显式标记都沿旧账号代发保留原位置及缺省 TTL、`5m`、`1h` 三种表示。同一请求在末工具声明显式 `1h`、首用户文本显式 `5m` 时，模型实收两处原值。替换和用户提醒在分别标记和联合标记时均返回 `422 / unsupported_parameter`、零尝试、模型零收件。无标记对照沿 CLI 原生路径。管理更新、详情及列表核对三种策略的现有可用标志。该标志描述账号能选择策略，各输入形状的支持范围由公开请求单独验收。
+- `--history-cache-markers --history-cache-ttl 5m|1h --history-cache-scope nested|mixed` 对照强制 TTL 下仅有嵌套标记及混合标记。普通续轮和 `--recover-pending-tool` 核对原工具 ID、第二个重复文本块的标记、直接断点的有效值及回执冻结。改写原值返回 422。同会话下一新轮核对平台关闭覆盖后的客户端原值。
+- `--cache-marker-capabilities native-default` 和 `native-no-auto` 仅用于隔离能力实验。当前块通过 `prompt.submit` 与 `session.append` 交给固定 2.1.293。MCP `tools/list` 在声明及 `_meta` 中提供相同标记。单独及联合标记按同预留和模型实收摘要核对。默认配置只在当前用户末块生成自动 `1h`，工具声明无标记。关闭自动缓存后，两类位置均无标记。实收保留用户角色、两块的相邻顺序及工具名称映射、描述和 schema。此能力缺口影响调用方显式断点的前缀和时长，保留旧账号路径直至原生合同通过。最终 TLS 写出保持未采集。
+- `--message-system-roles` 对照 V2、`bdaca089` 旧 V2 与固定 V1 制品。白名单模型的普通 API 可保留原位 `system` 文本及缓存块、`clear_at`、携带 effort 的空系统消息和根系统块。两版 V2 都经账号代发，V1 经 `native293`。只有根 `system` 的 V2 对照使用交互 CLI。白名单外模型返回 `400/system_role_model_not_allowed`，给 user 或 assistant 加专属字段返回 `422/unsupported_parameter`，无效 `clear_at` 返回 `400/invalid_parameter`。显式测试的三个功能头均到达模型。历史基线 `30516cb4` 中客户端省略它们时，固定 V1 实收带 `mid-conversation-system-clear-at-2026-08-21`，该版和旧版 V2 实收缺少该项。
+- `--ordinary-message-system-contract` 固定普通 API 上述状态、错误码、模型投递和尝试次数。省略缓存、`clear_at` 与 effort 的纯文本对照覆盖原位置和文档支持的 `user → system → assistant` 位置。模型实收核对成功请求的原系统角色、位置及内容。原样提供的合成根指令在 V2 追加、替换和 V1 的模型顶层 `system` 中恰好出现一次，在 V2 用户提醒的 `user` 消息中恰好出现一次，其余消息位置出现零次。省略顶层 `system` 时合成根指令在各位置出现零次。仅有顶层 `system` 的 V2 正对照须使用交互 CLI，允许 CLI 自行生成 effort 和环境上下文的 `system` 行。含消息级 `system` 的成功用例以实收合同为准，并记录实际处理路径。传入 `--v1-runtime` 时核对同一公开入口的固定 V1 制品。
+- `--turn-scoped-system-contract` 对照 V2 追加动作的普通 Messages。明确给出消息级 `clear_at: next_user_message` 或 `clear_at: never` 时，兼容账号发送器补齐 `mid-conversation-system-clear-at-2026-08-21`，保留已提供的协议标记及顺序。原角色、位置、过期历史行、根指令和真实工具回执原样投递。缺省该字段时不因消息级 system 额外添加此 beta。固定原生客户端按原协议，替换和用户提醒保持现有 422 边界。回环模型拒绝缺少必需 beta 的 `clear_at` 请求，公开父版对照为一次确认的上游 400。该夹具核对 header、模型实收和回执归属。
+- `--message-system-effort-contract` 以 Opus 5.5 核对普通 Messages 中的空内容 `system` 行及显式 `output_config.effort`。追加兼容发送器补齐 `mid-conversation-output-config-2026-07-01`，根 effort 和消息级原值各留在原位置，客户端已有 beta 及其顺序保持。同一请求可用不同系统行同时携带 `clear_at` 和 effort，两个必需标记各出现一次。仅有根 effort 时沿用原声明。夹具使用要求对应 beta 的回环接收端，核对已有历史、已声明 beta、合法热续回执及拒绝。固定 CLI 2.1.293 的实测会话内 `/effort low` 同时改变根 effort，并生成含运行上下文的系统行。原生会话能力和普通 Messages 消息级输入分别验收。
+- `--structured-output-contract` 从普通公开入口对照三种账号动作的无 schema、仅 schema、schema 与 `effort=medium`，覆盖 SSE 和非流式 JSON。无 schema 的六例走交互 CLI。成功用例核对模型实收的 `output_config`、问题一次、工作指令落点和公开响应终态。比较 schema 时保留 JSON 值类型和数组顺序，允许对象键重排。公开 SSE 按索引核对文本块开始、增量、结束和消息终态，允许同一文本块的多个增量。隔离模型仅在收到完整 schema 时返回约定的 JSON 文本。用预留、尝试和实收摘要确认发送路径，拒绝用例核对零尝试和零投递。最终 TLS 写出未采集。
+- `--forced-tool-choice-contract live|restart` 从公开 Messages 对照 `any` 和指定第二个工具。隔离模型按实收字段决定调用，`any` 两次分别选择两个工具，指定工具两次使用同一名称及各自 ID。续轮提交原调用结果并保留强制选择，最后一个合法回执可在旧账号发送路径显式选用 `auto`，接收合成文本。其后在同一公开会话带已确认历史提交独立 `auto` 请求，核对 CLI 认领摘要等于模型实收、只投递一次、原两组工具调用和结果完整。`restart` 在第一个回执前结束原 CLI 并重启账号发送器。报告按预留对照 CLI 正文及实际模型请求的摘要、字段、工具名、参数与回执。`verify_tui_tool_choice_input.py <固定 CLI>` 在仅回环网络独立验证工具权限选项与模型请求。最终 TLS 写出未采集。
+- 强制选择公开夹具与固定 CLI 权限探针比较工具声明时保留嵌套 JSON 类型及数组顺序，允许对象键重排。公开夹具用同一语义核对工具选择、公开调用参数及模型实收的历史工具块，保留角色、调用 ID 和块顺序。投递次数按原预留核对。
+- `--forced-tool-choice-contract restart-metadata-only` 在首轮工具回执登记后结束原 CLI，原档只保留实际 CLI 写出的非主轮记录。通过相同公开请求验证父版 `cli_launch` 失败与本版独立 CLI UUID 成功，核对原档和绑定字节、回执归属及实收投递。观测记录原进程退出、旧发送器退出和新发送器就绪、入站正文摘要、预留以及 CLI 实际启动模式。
+- `--forced-tool-choice-contract restart-closed-metadata-only` 在指定工具轮已收到 `end_turn` 后保留原档的实际 CLI 元数据。随后在同一公开会话提交完整确认历史及独立 `auto` 问题。核对公开 200、`external_import` 原生分支、新问题一次投递、完整答复与两组工具调用及结果、原档与绑定的字节。
+- `--no-tool-choice-contract` 从公开入口对照三种策略的缺省、显式 `none` 且 `tools` 省略、显式 `none` 且为空数组，以及 `none` 同带工具声明。按预留核对原生分支、模型实收工具及选择、工作指令角色和公开文本终态。最终 TLS 写出未采集。
+- `--thinking-display-contract <claude-sonnet-4-6|claude-opus-5-5>` 通过普通 Messages 对照省略整个 `thinking`、仅省略 `display`、显式 `omitted` 和 `summarized`。完全省略时三种账号动作均使用交互 CLI 生成 `adaptive/updates`，显式 `summarized` 也走交互 CLI。仅省略 `display` 或显式 `omitted` 时，追加策略经账号代发保留原对象，替换及用户提醒均返回 `422/unsupported_parameter`、零投递。隔离模型按文档模拟 Sonnet 4.6 缺省摘要及 Opus 5.5 缺省省略，SSE 检查摘要增量和签名顺序，JSON 检查等价内容块。显式 `omitted` 的合成回复保留空思考块和签名。核对原生分支、正文 SHA-256 及预留和尝试的关联。最终 TLS 写出未采集。
+- 将 `--thinking-cli-summaries on|off` 与 `--thinking-display-contract` 同用，探针只在启动固定 CLI 的 `--settings` 设置 `showThinkingSummaries`。公开请求省略整个 `thinking`。两个模型在 `on` 下原生生成 `adaptive/summarized`，在 `off` 下原生生成 `adaptive/updates`。SSE 按实际公开顺序核对思考签名和文本增量均在各自块启闭之间，两个块关闭后才到消息终态。JSON 继续核对等价内容块。`off` 产生的 `updates` 和显式 `omitted` 是不同的模型请求模式。
+- 普通 Messages 的 Sonnet 4.6 和 Opus 4.6 支持固定预算的 `thinking.type=enabled` 与显式 `display=updates` 或 `display=summarized`。已知保真范围是整数 `1024 ≤ budget_tokens < max_tokens ≤ 128000`。账号启动器在该原生计划中传入受支持的固定预算和关闭自适应选项，使用 `--settings` 根级 `showThinkingSummaries` 表达摘要模式，模型出站前核对整个 `thinking` 及 `max_tokens`。固定预算下省略 `display`、显式 `omitted` 或超界输入沿现有兼容合同处理。已认领的旧轮保留原来源。
+- 普通 Messages 的 Sonnet 4.6 和 Opus 5.5，在显式 `thinking:{type:"adaptive",display:"updates"}` 下接纳单条 `clear_thinking_20251015` 且 `keep:"all"` 的原生历史管理。账号在同次 CLI 回调核对完整 `context_management` 和 `context-management-2025-06-27`，以实际生成的请求投递。热续及冷恢复沿原根轮摘要冻结字段，回执改值或删除返回 422。省略 `keep`、保留指定轮数及其他形状沿现有兼容合同处理。用 `verify_tui_context_management.py --case live|restart` 核对三种账号动作、模型实收、原工具 ID、回执和实际正文来源。
+- 模型在最终 `message_delta` 顶层返回 `context_management` 时，公开 SSE 在原事件位置交付，公开非流式 JSON 聚合到消息顶层。模型显式返回空报告或 `null` 时保留该值。省略字段时沿用原开场状态。报告计入同一响应字节预算。用 `verify_tui_context_management.py --case response` 核对兼容路径的工具清理、原生路径的 `keep:"all"`、显式空值和字段省略，两种公开表示逐笔核对尝试和模型实收。[Claude 上下文编辑响应](https://platform.claude.com/docs/en/build-with-claude/context-editing#context-editing-response)
+- 混合发行中，旧版已开始的显式 `keep:"all"` 工具轮沿原账号、主体、会话和发送器绑定收口。新控制端接管后，旧轮等待工具时以及排空后新绑定就绪前，同会话新轮均返回 503。新代次就绪后原样重交新轮，由固定 CLI 生成上下文管理字段。用 `verify_tui_cold_history.py --mixed-release … --mixed-context-keep-all <模型>` 或四镜像夹具的同名参数核对旧轮两次、新轮一次模型收件、原工具一次及三笔公开请求各自的预留。
+- `verify_tui_cold_history.py --fixed-thinking-model <claude-sonnet-4-6|claude-opus-4-6>` 核对模型实收的预算、显示模式、输出上限及工具归属。显式 `updates` 核对对应 beta。加入 `--fixed-thinking-display summarized` 核对公开摘要和签名，按隔离模型实收的显式 display 生成合成响应。与 `--tool-policy` 合用覆盖其它账号动作，与 `--recover-pending-tool --trace-recovery-resend` 合用覆盖原 CLI 丢失。改预算、显示或输出上限的回执返回 422，尝试和收件均不增加。
+- 同一手段与 `--mixed-release` 合用，以仍由兼容发送器承接固定 `summarized` 的前代核对已认领工具轮。原回执沿旧代发出，新代在原轮排空后由交互 CLI 投递。三次实收的思考字段及输出上限均与公开输入相同。
+- `verify_tui_system_session_input.py <固定 CLI>` 在仅回环容器内以真实交互 2.1.293 和 Opus 5.5 核对 `hookSpecificOutput.additionalContext`。`UserPromptSubmit` 的正文由 CLI 加上来源前缀，放在该轮 user 之后、该轮 assistant 之前的 `system` 行。档案保存 `hook_additional_context` 附件，热续轮和从原档案 `--resume` 都保留该位置和一次内容。恢复时新执行的 `SessionStart` 钩子生成带来源前缀的当前轮 `system`，排在重开后新 user 之后。重开进程退出后回读同一 JSONL，核对原前缀字节和新增后缀中的同会话主链问答、`SessionStart` 附件各一次。`last-prompt` 辅助记录单独计数。外部 Messages 原始文本块及指定历史位置仍需独立满足公开输入合同。当前公开追加策略对中途 `system` 的成功形状依赖旧账号代发，保留退役阻塞。
+- 当前 V2 的普通 API 在替换和用户提醒下对已测消息级 `system` 返回 422。相同普通正文声明 CLI UA 时，入口按 UA 选用 Claude Code 路由，发送器仍按普通正文处理，模型单次实收保留消息级角色和内容，调用方的身份 metadata 缺失。带合法 billing 和结构化 metadata 的合成对照可保留其原生正文。无 billing 时，规范 `claude-cli` UA 与官方身份块、合法 metadata 的组合可保留客户端 metadata。无 billing 的 `claude-code` 别名对照可完成公开请求，发送器出站省略该 metadata。此对照记录入口策略和账号正文归因的实际边界，消息级 `system` 的新 V2 原生合同保持开放。最终 TLS 写出未采集。
+- `verify_tui_cold_history.py --system-policy` 从管理 API 保存并读回动作，按公开 Messages 的模型实收核对三种落点。`--tool-policy` 对照替换和用户提醒的工具往返。`--toggle-pending-policy` 在原工具等待时更改动作，核对回执隔离及原轮指令。
+- `verify_tui_cold_history.py --recover-pending-tool` 结束唯一等待中的真实 CLI 并重启其账号发送器。修改账号动作和客户端指令后，原回执仅继续其冻结策略，恢复模型步骤的正文来自真实 CLI。
+- 公开首轮和原工具回执的意外状态或断连先写出 HTTP 状态、请求 ID、夹具阶段与隔离模型收件，再在网关退出前读取对应请求的诊断阶段及所属尝试。无响应头时固定原失败时刻，以请求开始所在毫秒为含端点的 `since`，以失败所在毫秒的下一毫秒为排他的 `until`。同一合成会话的窗内记录均为候选，包括失败所在毫秒。上界及其后的记录排除，原 HTTP 状态与原请求 ID 仍为空，候选可为空。失败证据输出到 stderr，原失败仍使验收退出。`test_verify_tui_failure_diagnostics.py` 核对同会话后发请求、同窗多候选、排他边界及空候选。
+- `--trace-initial-startup` 复用 `tui_startup` 的单调时钟事件。Linux `v3-verification` 网关和账号发送器均由 `FLOWER_V2_STARTUP_TRACE=1` 打开。通过 `gateway_reservation` 的请求 ID 和预留 ID 关联 `sender_private_send`、`sender_send_claim`、`sender_submission_ledger_lock`、`sender_submission_ledger`、`sender_workspace_bind` 和 `sender_unix_send`。账号侧只写预留、阶段、固定结果及单调时间。提交截止时，外层账本结果可能先于阻塞线程的加锁结果写出。两处均按同一预留区分。搭配 `--recover-pending-tool --recovery-ledger-deadline` 的账本未提交对照或 `--recovery-workspace-rejection` 的提交后绑定拒绝，核对失败阶段、零新增模型投递和原回执可继续使用。
+- 公开冷导入夹具在模型连接的工作线程办理 TLS 握手。用 `--initial-idle-model-connection` 在首请求前打开一条未握手的 TCP 连接并保持到公开回包，核对首请求返回 200、模型收件一次及后续工具正常续轮。
+- `--trace-initial-startup` 开启当前 V2 源码夹具的启动观测，`--initial-idle-model-connection` 自动开启同一观测。网关用 Linux `v3-verification` 构建。日志记录同一单调时钟下的网关预留、事件源准备完成或拒绝、发送、CLI 起进程和回调、代理接入及模型 TCP、HTTP、完整正文边界。空闲连接和模型连接以回环端口区分。与 `--recover-pending-tool` 同用时，首轮和重启后的合法回执分别记录实际 sender 就绪、公开响应头与请求 ID、模型收件次数及正文摘要。原始失败首先输出，然后保留线程栈及请求诊断，最后独立读取一次 sender 状态。响应头缺失时的诊断记录标为会话候选，客户端取消只说明终结结果。
+- `--cancel-before-response-headers [sse|json]` 暂停首轮的真实 CLI 启动调用。公开客户端等首响应头超时后，解除暂停，按原预留核对实际子进程退出、进程名额归还及 sender 恢复为 `active=0`、`idle=true`。记录超时后的启动事件和模型实际收件。同账号、同会话的新问题以另一预留返回 200，隔离模型只收到一次新问题。原公开记录保持 `cancelled/downstream_headers`、HTTP 状态空及零已登记尝试。此用例与已开始交付响应后的消费者取消分开。
+- 预留前的 V2 准入拒绝在同一时间线中以公开请求 ID 记录固定分支，预留字段缺省。预留后的准备事件以同一预留分别记录账本读取、本机绑定和准备交换的开始、确认或拒绝，并沿用提交认领、账本写入和工作区绑定事件。夹具故障行记录公开会话、请求正文摘要、响应状态和截至失败时的模型收件摘要。将 `--recovery-readiness-rejection` 与 `--recover-pending-tool` 同用，核对账本权限造成的预留前 503、`tui_readiness_ledger`、零次尝试和恢复权限后一次续轮。此对照与自然 503、首响应头超时分别记录。
+- 发送器在向本机事件源发出 `send` 之前同步写入提交账本。账本终态写入沿原预留的单调截止等待文件锁。发送前账本拒绝的私有回包标为 `tui_submission_ledger`，网关记录同名诊断阶段并归还原工具回执。将 `--recovery-ledger-contention` 与 `--recover-pending-tool` 同用，核对持锁两秒后合法回执完成、模型总收件两次、原归档保留。
+- 原工具回执的私有发送首包等待与准入共用截止时，网关在原截止后最多再观察 250 毫秒，只接纳同一已鉴权请求中带单值 `tui_submission_ledger` 标记的 429。提交截止和原预留保持不变。缺少明确拒绝时仍按提交状态未知处理。将 `--recovery-ledger-deadline` 与 `--recover-pending-tool` 同用，核对 3 秒预算持锁到回包的 429、账本阶段、零次模型尝试以及释锁后原回执单次续轮。
+- 网关在根诊断的 `context.tui_reservation_id` 关联 sender 预留。已鉴权私有响应的固定阶段区分准备阶段的账本读取、源绑定及准备交换，以及提交阶段的预留认领、账本终态和工作区绑定。阶段标记限于单值白名单。工作区绑定在 Unix `send` 之前明确拒绝时归还原回执。将 `--recovery-workspace-rejection` 与 `--recover-pending-tool` 同用，核对 `tui_workspace_bind`、零 attempt、原回执可重新认领以及恢复绑定后仅向模型投递一次续轮。
+- V2 私有 HTTP 提交结果未知时，公开 502 的完整响应记为 `transport_error / tui_send_http`，沿原请求保留预留 UUID 和实际观测的尝试数。该边界不生成发送前拒绝采集。将 `--recovery-slow-model` 与 `--recover-pending-tool` 同用，核对模型早于公开 502 收件、请求和预留关联、零已记录尝试、合计两轮模型和一次新工具。已有证据的发送前拒绝仍为 `local_rejected`。
+- 私有 JSON 委托证明账号侧交付了有效回包。合成 502 缺少受信模型来源时，根仍保留公开 502，根与已观察的 JSON 尝试均记为 `transport_error / tui_send_http`。尝试的上游 HTTP 状态和模型确认数保持缺省。真实模型 HTTP 502 沿已绑定私有源标记归属上游，保留上游状态和一次确认。用 `verify_tui_http_error_contract.py --path cli --error-type api_error` 与 `--path account --error-type api_error --upstream-status 502` 核对同一公开状态和正文下的两种归属。受管隔离试接的代理、模型及钩子记录是独立验收证据。
+- 首次创建工作区绑定仍在锁内原子发布。续轮只读已发布的绑定及工作目录，读取时核对原主体、会话键、UUID 和私有权限。测试在持有提交账本锁时读回既有绑定，同时核对跨主体拒绝及原文件字节。
+- 已完成原工具组准备校验的续接预留遇到绑定目录或原绑定文件暂缺时，sender 只读查找并在 Unix `send` 前返回 `503 / tui_workspace_bind`。网关同步归还该认领，保留原账号、主体、会话及源回执修订。还原原绑定后，原回执取得新预留并投递一次。用 `--recovery-workspace-rejection missing-directory|missing-binding --recover-pending-tool --trace-recovery-resend` 核对原字节与修订、首次拒绝零尝试和零投递，以及还原后仍拒绝异主体、异会话和改参。
+- 就绪和准备的无锁账本读取若碰到原子替换后已脱离目录的旧文件描述符，沿原调用截止重新打开当前路径。属主、0600、唯一链接及账号环境仍须匹配。写入终态继续在锁内重读。就绪探测按 `tui_readiness_config`、`tui_readiness_ledger`、`tui_readiness_source` 区分配置、账本和本机源失败，准备账本失败仍标记 `tui_prepare_ledger`。
+- `verify_tui_cold_history.py --output-effort` 核对四档强度、显式禁用思考及不同 `max_tokens` 的公开入口实收。`--recover-pending-tool` 核对原轮强度与拒绝改写。
+- `verify_tui_cold_history.py --history-png` 核对追加、用户提醒两种动作下的原角色、历史图像字节和单次当前问题。
+- `verify_tui_cold_history.py --history-images` 在同一旧用户消息中核对 PNG、JPEG、GIF、WebP 的顺序和原始数据。
+- `verify_tui_cold_history.py --current-images` 核对本轮九块交错图文、四种内嵌格式、重复 PNG、重复多行文字与边界内纯图片请求的实际模型正文。增加 `--current-image-ending image` 对照图片末块。两种末块均覆盖同进程和 `--recover-pending-tool`，独立比较原始业务块、额外上下文和每条来源文本，并报告原始数组等价性及摘要。九块样本含五张图，首轮及热续轮实收九个业务块、五个 CLI 上下文块和五个附件来源块。末块为文字时多一个 LF。丢进程恢复的该历史行与客户端原始九块逐块相等。交换图片顺序的回执返回 422。夹具还覆盖隔离程序当前 HOME 的目录描述符读取及外部 HOME 拒绝。
+- 独立图像补测使用可完整解码的透明 PNG、带 EXIF 的渐进 JPEG、双帧 GIF、双帧 WebP 及重复图块。核对原 MIME、Base64、顺序和上述原始数组差异。像素和字节边界的 18 例包含三种动作的 2000 像素、512000 字节正例，以及 2001 像素、512001 字节在有无顶层 `system` 时的路由和投递。正例各投递一次。超界 `append` 四例各投递一次，保留原 `messages`。另外八例均为 `422/unsupported_parameter`、零投递。
+- `verify_tui_cold_history.py --history-tool-blocks` 核对已闭合的两个文本结果块、顺序及原 ID，并完成一次新工具回执。`--history-cache-markers` 还核对重复的工具结果文本上单个嵌套断点的准确位置，以及在线续轮、丢进程恢复和篡改拒绝。
+- `verify_tui_cold_history.py --history-empty-tool-result` 用 `omitted`、`array`、`string` 及对应的 `-error` 形状核对模型实收。三种账号动作及丢进程恢复保留已闭合记录。改写历史空值形状后合法回执仍可完成。
+- `verify_tui_cold_history.py --empty-tool-receipt` 核对本轮新交回的空结果，包含缺省、显式成功和失败标志。首轮及续轮的标准继续提示计数为 0／1，当前结果逐块与公开输入相等，最终为 `end_turn`。三种账号动作覆盖原进程活跃时的恢复，`--recover-pending-tool --trace-recovery-resend` 覆盖原进程丢失。与 `--parallel-new-tools` 同用时核对空结果与另一条非空错误结果仍各属原调用。异主体、异会话、改参数和重复回执维持 400／400／422／400。
+- `verify_tui_cold_history.py --tool-receipt-text-blocks` 分别核对 `implicit-success`、`explicit-success`、`error` 的实际回执，原始数组含重复块及换行。断言模型实收逐块相等、标准继续提示 0／1、合法回执投递一次、重复回执 400。可与 `--history-tool-blocks`、`--parallel-new-tools` 或 `--recover-pending-tool --trace-recovery-resend` 组合，分别核对已闭合历史、同组另一结果和原进程丢失。
+- 在该用例同用 `--tool-receipt-nested-cache 5m|1h|default` 核对当前结果第一个文本块的断点，覆盖单工具、另一工具含无标记数组以及丢进程。合法续轮只发一次，内层标记、TTL 及原结果逐块相等。只有当前结果带标记时，核对模型请求的其他位置无自动断点。
+- 同用 `--tool-receipt-outer-cache 5m|1h|default` 核对当前结果整块及外层断点位置。三种账号动作和冷恢复均检查实际 CLI 正文与模型实收。与 `--history-cache-markers --history-cache-ttl 1h` 同用时核对平台关闭改写后，原回执仍应用根轮的 `1h`。同用 `--tool-receipt-text-blocks explicit-success --tool-receipt-nested-cache 5m --tool-receipt-outer-cache 5m` 核对同一回执两个断点。分别让原 CLI 活跃及同用 `--recover-pending-tool`，两组模型实收均按同一工具 ID 保留原位置和 `5m`。可与并行工具及实际签名组合。
+- `verify_tui_cold_history.py --history-tool-images` 核对嵌套图文的四种内嵌格式、重复 PNG、多行文字及原工具 ID。包括三种账号动作、显式成功及 `implicit-success`、在线续轮及丢进程恢复。交换原历史图像顺序的工具回执返回 422，合法回执仍由交互 CLI 投递。可与已确认的直接、嵌套缓存标记组合。
+- `verify_tui_cold_history.py --explicit-custom-tool-type` 和 `--receipt-explicit-custom-tool-type` 分别核对显式到省略、省略到显式。热续、双工具、丢进程恢复及断线重读均核对原工具 ID、实收声明和单次投递。实际改类型、改名、改说明、改 schema 或移除声明返回 422、零新增，错主体、错会话及已消费回执按原合同拒绝。
+- 重启用例可同用 `--prior-custom-source <旧源码目录>`。先由该目录的旧账号事件源写入待恢复回执，再由当前账号代码读取并消费同一修订。
+- `verify_tui_cold_history.py --tool-receipt-images` 核对本轮实际回执的四种内嵌格式、文字、重复项及原工具 ID。三种账号动作覆盖原 CLI 活跃时的恢复路径，`implicit-success` 与 `--recover-pending-tool` 对照显式成功和原进程丢失。混合图文错误与纯图片错误各返回 422、零尝试和零新增投递。同一修订随后接受合法回执，重复及异主体／异会话结果均被拒绝。可用 `--parallel-new-tools` 核对两项工具的逆序回执。
+- 图文回执摘要的 `standard_continue_count_by_model_post` 按模型实收顺序统计 `user` 角色中完整相等的标准继续文本块。首轮及一次图文恢复的公开夹具断言 0／1，同时独立核对原工具结果块。
+- `--current-images --history-cache-markers` 核对同轮图文与直接、嵌套历史断点。首轮和合法回执各由交互 CLI 投递一次，保留图文业务块及断点位置，附件来源没有 CLI 自动断点。改写历史标记或交换图片顺序返回 422。与 `--recover-pending-tool` 同用时核对原图文行和断点同时恢复。
+- `verify_tui_cold_history.py --stock-client` 让未修改的固定 Claude Code 2.1.293 从公开 V2 入口执行 `Read`。三种账号提示词策略各用独立客户端 HOME，隔离模型实收正文与客户端逻辑正文逐字节一致。按相同调用 ID 核对工具参数、原回执、客户端读到的便签与最终答复。当前六次投递在管理记录均归属旧账号发送器，并分别关联新进程与热续轮。此结果是完整 CC 的退役前基线。最终 TLS 写出未采集。
+- `verify_tui_cold_history.py --cancel-and-change-question` 在公开首轮交付工具 ID 和部分参数时断开读者，隔离模型继续保留尾段。确认原请求终态为取消后，沿同一公开会话从客户端确认的历史改问。新轮走交互 CLI，已取消问题和工具不会进入模型正文，原绑定和会话档案按原字节保留。迟交被取消的工具回执返回 400、零尝试。两轮各一次模型实收。
+- `verify_tui_cold_history.py --parallel-new-tools` 从公开入口核对同一模型响应的两个不同 Schema 的工具。客户端执行返回的调用并按原 ID 逆序回传。模型实收恢复调用顺序，成功文本逐字保留，失败保留 `is_error` 和原文本及原生 token 提醒。缺少结果、用重复 ID 代替缺项、齐全后追加重复项均返回 400，模型零新增收件。随后合法组完成一次。
+- `verify_tui_cold_history.py --oauth-rotation live|restart` 将固定 OAuth 和 Messages 目标映射到同一隔离 HTTPS 接收端。公开首轮收到工具后经真实管理入口强制刷新，旧 RT 使用一次，刷新回包的两项凭据与账号返回的已落库值相符。模型回环收件只报告凭据代次，首轮与原样回执分别使用旧 AT、新 AT。核对两个请求及尝试、CLI 正文及模型实收摘要、原调用 ID、回执隔离和两次模型投递。重启用例保留原档。两份调试快照检查刷新前后的 AT、RT 均已脱敏。
+- `verify_tui_cold_history.py --provider-quota sse|json` 从公开入口分别发一次成功请求和一次真实模型 429 请求。核对公开响应、有效 `Retry-After`、预留与单次尝试、CLI 正文及隔离模型实收摘要。管理详情读回 5 小时、7 天及 Fable 周额度，429 省略的 Fable 周额度保留原值。隔离上游主动额度查询计数为零。
+- `verify_tui_cold_history.py --auto-tool-choice [bare|explicit-false]` 核对根轮字段形状、等价回执、完整工具声明与实际模型正文省略 `tool_choice`。省略选项值时沿用 `explicit-false`。分别与 `--parallel-new-tools`、`--recover-pending-tool` 组合，核对双工具正常续轮与单组丢进程恢复各投递两次。四种非等价改写均拒绝，随后切换等价形状的回执成功。与 `--reconnect-tool-stream` 组合时，两个重读以另一形状接回同一回复并验证模型零新增投递。`--auto-tool-direct-text` 以 bare auto 带两项工具声明验证一次模型投递、零工具执行及公开文本 `end_turn`。
+- `verify_tui_cold_history.py --disable-parallel-tool-use-contract` 使用相同的两项客户端工具，在三种账号动作下分别提交 `auto` 加显式 `true` 或 `false`。核对策略更新、详情和列表的现有可用性字段，按公开 ID 和预留核对入站 SHA-256、CLI 认领、模型实收、工具 schema 及实际策略落点。三种 `false` 均由交互 CLI 投递一次，实际模型正文省略 `tool_choice`。追加的 `true` 直接答复以 `end_turn` 结束，单工具往返保留原字段、调用 ID 和两项工具声明，重复回执为 400 且模型零新增。替换、用户提醒的 `true` 均为 422 且零尝试、零投递。独立 `verify_tui_tool_choice_input.py` 以受支持的 `--append-system-prompt` 核对串行指令只出现在提示词中。
+- `verify_tui_cold_history.py --split-history-tools` 核对分行的两对旧工具及结果、原顺序和单次新工具执行。
+- `verify_tui_cold_history.py --current-text-blocks` 核对本轮两个独立文本块的模型实收，合并边界的回执返回 422。与 `--recover-pending-tool` 组合时，另核对重启后原始文本块、记录和工具结果仍被保留。
+- `verify_tui_cold_history.py --signed-tool-history` 从公开 SSE 重组签名块，核对同进程和 `--recover-pending-tool` 的合法回执、原档及模型实收。用 `--adaptive-thinking-model <模型>` 和 `--adaptive-thinking-display default|updates|summarized` 区分省略 `thinking` 与两种显式模式。`--signed-tool-response signature-only` 模拟带签名的空思考块，`--signed-tool-response missing-model` 保留签名而省略模型响应里的助手模型，验证冷恢复 422 和零尝试。源检查点只登记实收模型，恢复档只在对应的已验签助手行携带该事实。 改写签名的用例由公开响应观察器保留异常 HTTP 状态、请求 ID 和拒绝正文，再按该请求读取预留与失败阶段。预期 422 的诊断在原样回执的公开响应完成后读取。缺响应模型的原样回执另外记录其拒绝原因。
+- `--signed-tool-history --signed-tool-response missing-model --empty-tool-receipt omitted|array|string` 核对活跃 CLI 的空回执拒绝。合法归属的各形状返回 422，原进程与档案保留，账本无响应模型，诊断无尝试。加 `--recover-pending-tool` 可核对原进程丢失时的同一限制。用非空字符串热续对照观察模型实收的签名块数。
+- 同一夹具用 `--signed-tool-history --signed-tool-response redacted --recover-pending-tool --adaptive-thinking-model <模型> --adaptive-thinking-display summarized` 验证在途不透明思考块。`<模型>` 分别取 `claude-sonnet-4-6` 和 `claude-opus-5-5`。首轮从公开 SSE 取回完整 `redacted_thinking.data` 和客户端工具调用。结束旧 CLI 并重启发送器后，改写 `data` 返回 422，零尝试、零新增投递。原样回执成功，原工具只执行一次，模型实收与恢复档中的不透明块均保持原值，原档字节保持。

@@ -614,8 +614,15 @@ fn snapshot_parts(
             .as_str()
             .unwrap_or("http_request_to_local_provider");
         let wire_note = match format {
-            "request_to_interactive_cli" => "已记录交给交互 CLI 的正文与协议选项。CLI 最终 TLS 写出的有序请求头与字节尚未采集。",
-            "request_to_account_sender" => "已记录交给账号发送器的请求。当前发送器未采集最终 TLS 写出。",
+            "request_from_interactive_cli" => {
+                "已取得交互 CLI 实际提交给回环的模型正文。最终 TLS 写出未采集。"
+            }
+            "request_to_interactive_cli" => {
+                "已记录交给交互 CLI 的正文与协议选项。CLI 最终 TLS 写出的有序请求头与字节尚未采集。"
+            }
+            "request_to_account_sender" => {
+                "已记录交给账号发送器的请求。当前发送器未采集最终 TLS 写出。"
+            }
             _ => "已记录回环 HTTP 请求。独立提供方的对外 TLS 写出尚未观测。",
         };
         value["stages"] = json!([

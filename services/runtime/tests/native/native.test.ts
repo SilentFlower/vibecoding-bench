@@ -499,15 +499,21 @@ native('官方 ' + sourceVersion + ' 的无外网回环链路', () => {
     }
   });
 
-  test.each([{ system: '你是业务助手，请保留业务系统提示词。' }, { system: '' }, { system: [] }])('显式 system 完整替换 CLI 默认正文 %#', async ({ system }) => {
+  test.each([
+    { system: '你是业务助手，请保留业务系统提示词。', expected: ['你是业务助手，请保留业务系统提示词。'] },
+    { system: '', expected: [] },
+    { system: [], expected: [] },
+    { system: [{ type: 'text', text: '客户身份提到 Claude Code。' }, { type: 'text', text: '只返回订单状态。' }],
+      expected: ['客户身份提到 Claude Code。\n\n只返回订单状态。'] },
+  ])('显式 system 完整替换 CLI 默认正文 %#', async ({ system, expected }) => {
     mode = 'normal'; const count = requests.length;
     const result = await send({ model: 'claude-sonnet-4-6', messages: [{ role: 'user', content: '请检查这条离线样本的出站参数。' }], system, stream: true });
     expect(result.response.status).toBe(200); expect(requests.length - count).toBe(1);
     const request = requests.at(-1)!;
     const texts = (request.body.system as { text: string }[]).map(block => block.text);
     expect(texts).toContain("You are Claude Code, Anthropic's official CLI for Claude.");
-    if (typeof system === 'string' && system) expect(texts.slice(2)).toEqual([system]);
-    else expect(texts).toHaveLength(2);
+    expect(texts.slice(2)).toEqual(expected);
+    expect(JSON.stringify(request.body.messages)).toContain('请检查这条离线样本的出站参数。');
     expect(request.body.tools).toEqual([]);
     assertCch(request.raw);
   });
