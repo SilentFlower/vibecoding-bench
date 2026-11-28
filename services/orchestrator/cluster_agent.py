@@ -22,6 +22,7 @@ from pydantic import Field, StrictStr
 from starlette.concurrency import run_in_threadpool
 from uvicorn import Config, Server
 
+from cluster_stopped_observation import OPERATION as STOPPED_OBSERVE, StoppedNodeRead, node_observation
 from cluster_execution import NodeExecution, NodeLocation, execute_operation
 from agy_node import AgyNode
 from agy_node_contract import AGY_NODE_OPERATIONS, AGY_NODE_SHORT
@@ -130,6 +131,9 @@ def create_node_app(executor: NodeExecution, host: NodeRuntimeHost, token: str, 
                     raise ValueError('节点健康检查输入无效')
                 value = {'protocol': 1, 'node_key': executor.node_key, 'deployment': executor.deployment,
                     'release': release, 'state': 'ready'}
+            elif operation == STOPPED_OBSERVE:
+                request = StoppedNodeRead.model_validate(strict_json(raw,16384))
+                value = node_observation(executor,host,grants,draft_grants,request)
             elif operation in AGY_NODE_OPERATIONS:
                 value = agy.call(operation, strict_json(raw, 2 * 1024 * 1024))
             elif operation in ('stage-preparation-files', 'prepare-files'):
@@ -317,7 +321,7 @@ def create_node_app(executor: NodeExecution, host: NodeRuntimeHost, token: str, 
         supplied = request.headers.get('x-v3-node-token', '')
         if not re.fullmatch('[a-f0-9]{64}', supplied) or not compare_digest(token, supplied):
             return JSONResponse({'ok': False, 'reason': 'node_authentication_failed'}, status_code=401)
-        control = operation in AGY_NODE_SHORT or operation in DRAFT_LOGIN_SHORT_OPERATIONS or operation in ('health', 'grant-renew', 'grant-close', 'grant-get', 'terminal-get', 'terminal-input',
+        control = operation == STOPPED_OBSERVE or operation in AGY_NODE_SHORT or operation in DRAFT_LOGIN_SHORT_OPERATIONS or operation in ('health', 'grant-renew', 'grant-close', 'grant-get', 'terminal-get', 'terminal-input',
             'terminal-quota-state', 'terminal-verification-get', 'run-get', 'run-poll', 'run-quota-state', 'run-refresh-get',
             'continue-get', 'continue-input', 'continue-quota-state', 'credential-refresh-get', 'credential-status',
             'credential-material','credential-identity','credential-usage-get','credential-owner-get',

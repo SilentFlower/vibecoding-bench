@@ -55,10 +55,11 @@ def node_agent_request(data: Path, token: str, operation: str, raw: bytes) -> di
     allowed.update(OWNER_OPERATIONS)
     allowed.update(ENVIRONMENT_OPERATIONS)
     allowed.update(AGY_NODE_OPERATIONS)
+    allowed.add('stopped-environment-observe')
     if operation not in allowed or not re.fullmatch('[a-f0-9]{64}', token) or len(raw) > 2 * 1024 * 1024:
         raise ValueError('节点私有操作或认证格式无效')
     timeout = 15 if operation in DRAFT_LOGIN_SHORT_OPERATIONS else 600 if operation in ('export', 'verify-import', 'terminal-assets', 'terminal-snapshot', 'terminal-snapshot-get', 'run-snapshot', 'run-snapshot-get') else 15 if operation in (
-        'inspect', 'review-admission', 'stage-import', 'health', 'grant-create', 'grant-renew', 'grant-get', 'grant-close', 'credential-refresh-get', 'credential-status', 'credential-material', 'credential-identity', 'credential-usage-get', 'account-login-get', 'account-login-observe', 'account-login-code-receipt', 'account-login-snapshot', 'account-login-input', 'account-bound-identity', 'account-bound-login-get', 'account-bound-login-observe', 'account-bound-login-code-receipt', 'account-bound-login-snapshot', 'account-bound-login-input',
+        'stopped-environment-observe', 'inspect', 'review-admission', 'stage-import', 'health', 'grant-create', 'grant-renew', 'grant-get', 'grant-close', 'credential-refresh-get', 'credential-status', 'credential-material', 'credential-identity', 'credential-usage-get', 'account-login-get', 'account-login-observe', 'account-login-code-receipt', 'account-login-snapshot', 'account-login-input', 'account-bound-identity', 'account-bound-login-get', 'account-bound-login-observe', 'account-bound-login-code-receipt', 'account-bound-login-snapshot', 'account-bound-login-input',
         'terminal-get', 'terminal-observe', 'terminal-send', 'terminal-input', 'terminal-conversation',
         'terminal-usage', 'terminal-passive', 'terminal-passive-ack', 'terminal-quota-state', 'terminal-quota-read', 'api-quota-read', 'project-history-capture',
         'terminal-capture', 'terminal-reconcile', 'terminal-verification-get', 'run-verification-get', 'run-project-facts', 'run-project-native', 'run-get', 'run-poll', 'run-quota-state', 'run-quota-read', 'run-artifact', 'run-files', 'run-file', 'run-stats', 'run-capture', 'run-session', 'run-refresh', 'run-refresh-get', 'run-owner-refresh-defer', 'continue-get', 'continue-input', 'continue-quota-state', 'continue-quota-read', 'continue-quota-control', 'continue-credentials') else 115
