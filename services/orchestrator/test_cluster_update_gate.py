@@ -159,6 +159,16 @@ class NodeGateTests(unittest.TestCase):
         self.record['config_json']='{}'
         self.assertTrue(self.coordinate('release'))
 
+    def test_release_rechecks_an_intended_node_after_backup_restore(self):
+        """宿主仍封住中央时，节点恢复到先前快照，同一释放再核原节点。@return 无。"""
+        self.assertTrue(self.coordinate('freeze'))
+        saved = self.state()
+        self.assertTrue(self.coordinate('release'))
+        atomic_json(self.directory / 'admission.json', saved)
+        self.assertTrue(self.coordinate('release'))
+        self.assertEqual(self.state()['phase'], 'idle')
+        self.assertEqual(self.state()['epoch'], self.operation['epoch'])
+
     def test_node_release_overtakes_delayed_freeze(self):
         """节点在实际冻结执行前收到释放，也消费原修订。@return 无。"""
         request={**{k:self.operation[k] for k in ('operation_id','epoch','deployment','created_at','target_release')},
