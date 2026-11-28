@@ -24,6 +24,28 @@ async def run(output=None,gateway=None):
             await workspace.get_by_role('tab',name=tab,exact=True).click()
         fixture.rows[1]['native_kernel']=copy.deepcopy(fixture.rows[0]['native_kernel']);fixture.rows[1]['native_kernel']['revision']='second-revision';await refresh();await cards.nth(1).get_by_role('button',name='请求内核',exact=True).click();await expect(workspace).to_contain_text('演示环境 2');await expect(workspace).to_contain_text('随 flower2api 版本统一交付');await expect(workspace.get_by_role('button',name='激活候选',exact=True)).to_have_count(0);await workspace.get_by_role('button',name='关闭环境详情').click();assert not fixture.writes;checks.append('多账号平台内核上下文隔离与只读零写入')
         await open_tab('请求内核');await expect(workspace).not_to_contain_text('Claude Code 2.1.280');await expect(workspace).to_contain_text('Claude Code 2.1.293');await expect(workspace.get_by_role('button',name='检查更新',exact=True)).to_have_count(0);await expect(workspace.get_by_role('button',name='选择版本',exact=True)).to_have_count(0);assert fixture.release_reads==0 and not fixture.writes;checks.append('平台内核版本只读与退休接口零调用')
+        fixture.rows[0].update(request_backend='tui_v2', runtime_release='ci-123-1')
+        await refresh()
+        for panel in ('请求内核', '运行概览'):
+            await open_tab(panel)
+            basic = workspace.get_by_role('tabpanel', name=panel, exact=True).get_by_role('region', name='基本信息')
+            for value in (ENVIRONMENT, '2.1.293', 'ci-123-1'):
+                await expect(basic).to_contain_text(value)
+        await open_tab('请求内核')
+        basic = workspace.get_by_role('tabpanel', name='请求内核', exact=True).get_by_role('region', name='基本信息')
+        fixture.rows[0].pop('cli_versions')
+        fixture.rows[0]['runtime_release'] = None
+        await refresh()
+        await expect(basic).to_contain_text('未观测')
+        await expect(basic).not_to_contain_text('未安装')
+        fixture.rows[0]['cli_versions'] = []
+        await refresh()
+        await expect(basic).to_contain_text('未安装')
+        await expect(basic).not_to_contain_text('2.1.293')
+        assert not fixture.writes
+        fixture.rows[0] = copy.deepcopy(original[0])
+        await refresh()
+        checks.append('V2 保留同一环境的基本信息，安装表缺失与空表分别展示')
         for state,reason,label,checking in [('unknown','snapshot_pending','正在检查',True),('unknown','snapshot_missing','等待快照',False),('unknown','check_expired','检查已过期',False),('maintenance','system_maintenance','维护中',False)]:
             fixture.rows[0]['native_preparation']={'state':state,'reason':reason,'checking':checking};await refresh();await expect(cards.first.locator('.environment-readiness strong')).to_have_text(label)
         await workspace.get_by_role('tab',name='运行概览').click();await workspace.get_by_text('运行组件与准备详情',exact=True).click();await expect(workspace).to_contain_text('平台更新中');fixture.rows[0]['native_preparation']['reason']='maintenance';await refresh();await expect(workspace).to_contain_text('账号正在维护');checks.append('首轮快照、过期、平台与账号维护分别展示')

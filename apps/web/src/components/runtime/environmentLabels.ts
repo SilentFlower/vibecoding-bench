@@ -60,3 +60,9 @@ export function tuiRuntimeLabel(value: RuntimeEnvironment['tui_runtime']): strin
   if (value.idle == null) return 'V2 发送器就绪';
   return value.idle ? 'V2 会话空闲' : 'V2 会话使用中';
 }
+
+/** 显示环境实际安装表中的版本。@param versions 服务端安装观测。@return 安装版本或空状态。 */
+export function installedCliLabel(versions: RuntimeEnvironment['cli_versions'] | null): string {
+  if (!Array.isArray(versions)) return '未观测';
+  return versions.length ? versions.join(' / ') : '未安装';
+}

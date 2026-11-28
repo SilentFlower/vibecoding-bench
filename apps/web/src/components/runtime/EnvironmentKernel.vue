@@ -4,6 +4,7 @@ import { Button } from '../ui/button';
 import { ChoiceSelect, type ChoiceOption } from '../ui/controls';
 import { agyToolContinuationLabels, runtimeRequest, type AgyKernelCatalog, type AgyToolContinuationPolicy, type RuntimeEnvironment } from './runtimeApi';
 import { tuiRuntimeLabel } from './environmentLabels';
+import EnvironmentBasics from './EnvironmentBasics.vue';
 
 /** 读取内核的实际运行状态，并按同一环境代次切换已登记的反重力候选。 */
 const props = defineProps<{ environment: RuntimeEnvironment }>();
@@ -160,6 +161,7 @@ const observation = computed(() => props.environment.native_preparation?.version
       <div class="workspace-properties">
         <div class="kv"><span>模型投递</span><strong>{{ environment.tui_runtime?.direct == null ? '未观测' : environment.tui_runtime.direct ? '受管 CLI 直发' : '兼容发送' }}</strong></div>
       </div>
+      <EnvironmentBasics :environment="environment" />
     </template>
     <template v-else>
     <div class="kernel-version"><span>管理方式</span><strong>随 flower2api 版本统一交付</strong></div>

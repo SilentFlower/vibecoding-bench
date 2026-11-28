@@ -58,6 +58,7 @@ export interface RuntimeEnvironment {
   generation: number; state: string; busy: boolean; isolation_version?: number; identity_status?: string;
   fingerprint?: { tz?: string; mem?: string; hostname?: string; lang?: string; profile_version?: number };
   role_status?: Partial<Record<'cli' | 'sender' | 'network', string>>; cli_versions?: string[];
+  runtime_release?: string | null; runtime_release_error?: string | null;
   can_reprofile?: boolean; reprofile_message?: string; run_window?: RunWindow | null;
   reconcile_allowed?: boolean;
   request_backend?: string; content_capture?: EnvironmentFeature | null; criu?: EnvironmentFeature | null;
