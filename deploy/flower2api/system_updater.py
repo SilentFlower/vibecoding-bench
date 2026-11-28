@@ -576,11 +576,15 @@ class SystemUpdater:
             timeout = FAST_CUTOVER_SETTLE_SECONDS if quick_drain else operation['request']['drain_timeout_seconds']
             deadline = time.monotonic() + timeout
             while True:
-                evidence = self.backend.drained(operation)
                 if self._cancelled(operation):
                     self.backend.abandon(operation)
                     self._finish(operation, 'cancelled', admission_reopened_at=utc_now())
                     return
+                if (operation['before'].get('stopped_gate_nodes')
+                        and not self.backend.freeze_stopped_nodes(operation, lambda: self._record(operation))):
+                    evidence = {'ready': False, 'blockers': ['等待网关及原节点正在执行的工作收口']}
+                else:
+                    evidence = self.backend.drained(operation)
                 if evidence['ready']:
                     break
                 self._phase(operation, 'draining', blockers=evidence['blockers'])
@@ -588,7 +592,10 @@ class SystemUpdater:
                     raise TimeoutError('切换收尾超过时限' if quick_drain else '在途工作排空超时')
                 time.sleep(0.5)
             # 以在途自然结束后的身份和环境为切换基线，接纳原工作合法完成的变化。
-            operation['before'] = self.backend.capture(*capture_args, **capture_options)
+            settled = self.backend.capture(*capture_args, **capture_options)
+            if settled.get('stopped_gate_nodes', []) != operation['before'].get('stopped_gate_nodes', []):
+                raise ValueError('切换前历史环境的参与节点已变化')
+            operation['before'] = settled
             prepare_nodes = getattr(self.backend, 'prepare_nodes', None)
             nodes = operation['before'].get('nodes', [])
             if fast and nodes:
@@ -664,7 +671,8 @@ class SystemUpdater:
                     self._phase(operation, 'reconcile', error='排空失败，维护门禁及原版状态需要对账')
             elif phase == 'cleaning':
                 self._finish(operation, 'succeeded_cleanup_pending', error='新版本已生效，旧制品回收需要重试')
-            elif phase == 'committing' and operation.get('rolling_accounts') and operation.get('release_started'):
+            elif (phase == 'committing' and operation.get('release_started')
+                    and (operation.get('rolling_accounts') or operation.get('stopped_gate_intents'))):
                 self._phase(operation, 'reconcile', error='新版本开放准入结果待核对')
             else:
                 try:
@@ -742,13 +750,14 @@ class SystemUpdater:
                 operation['release_started'] = True
                 self._record(operation)
             committing = operation['phase'] == 'committing'
-            released_rolling = operation['phase'] == 'reconcile' and operation.get('rolling_accounts') and operation.get('release_started')
-            if (committing or released_rolling) and self.state['current']['release']['release'] == operation['target_release']:
+            releasing = (operation['phase'] == 'reconcile' and operation.get('release_started')
+                and (operation.get('rolling_accounts') or operation.get('stopped_gate_intents')))
+            if (committing or releasing) and self.state['current']['release']['release'] == operation['target_release']:
                 if self.backend.committed(operation):
                     self._phase(operation, 'cleaning', admission_reopened_at=operation.get('admission_reopened_at') or utc_now())
                     self._clean(operation)
                     return
-                if operation.get('rolling_accounts'):
+                if operation.get('rolling_accounts') or operation.get('stopped_gate_intents'):
                     raise ValueError('新版本已提交，实际控制组件或门禁需要对账')
             self.backend.block(operation)
             if (folder / 'before.env').exists():

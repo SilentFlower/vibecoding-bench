@@ -478,6 +478,46 @@ class SystemUpdaterTests(unittest.TestCase):
         restored = SystemUpdater(self.policy, self.backend)
         self.assertEqual(restored.status()['current_release'], old['release'])
 
+    def test_committed_install_recovers_partial_remote_gate_release(self) -> None:
+        """已提交版本释放部分节点后断连，重启只续办本次开放。@return 无。"""
+        body = self.request()
+        peer = {'id': 2, 'node_key': 'e' * 32, 'config_sha256': 'f' * 64}
+        snapshot = {**self.backend.capture(), 'stopped_gate_nodes': [peer]}
+
+        def freeze(operation, save):
+            operation['stopped_gate_intents'] = [peer]
+            save()
+            return True
+
+        with patch.object(self.backend, 'capture', return_value=snapshot), \
+                patch.object(self.backend, 'freeze_stopped_nodes', freeze, create=True), \
+                patch.object(self.backend, 'release', side_effect=TimeoutError('节点开放回执丢失')):
+            self.engine.submit('install', body)
+            state = self.join()
+        self.assertEqual(state['operation']['phase'], 'reconcile')
+        self.assertEqual(state['current_release'], self.target['release'])
+        self.assertEqual(self.engine._operation(body['operation_id'])['stopped_gate_intents'], [peer])
+        self.engine = SystemUpdater(self.policy, self.backend)
+        self.engine.control(body['operation_id'], 'recover', {'expected_revision': state['revision']})
+        self.assertEqual(self.join()['operation']['phase'], 'succeeded')
+        self.assertEqual(self.backend.calls.count('switch'), 1)
+        self.assertIn('committed', self.backend.calls)
+        self.assertNotIn('restore', self.backend.calls)
+
+    def test_changed_node_between_drain_and_final_capture_keeps_original(self) -> None:
+        """最后冻结时发现节点改配，禁止切换并向原节点收口。@return 无。"""
+        peers = [{'id': 2, 'node_key': 'a' * 32, 'config_sha256': 'b' * 64}]
+        first = {**self.backend.capture(), 'stopped_gate_nodes': peers}
+        changed = {**first, 'stopped_gate_nodes': [{**peers[0], 'config_sha256': 'c' * 64}]}
+        with patch.object(self.backend, 'capture', side_effect=[first, changed]), \
+                patch.object(self.backend, 'freeze_stopped_nodes', return_value=True, create=True):
+            self.engine.submit('install', self.request())
+            state = self.join()
+        self.assertEqual(state['operation']['phase'], 'failed')
+        self.assertEqual(state['current_release'], self.old['release'])
+        self.assertIn('abandon', self.backend.calls)
+        self.assertNotIn('switch', self.backend.calls)
+
     def test_failed_health_restores_original(self) -> None:
         """候选验收失败后完成原版恢复。
 

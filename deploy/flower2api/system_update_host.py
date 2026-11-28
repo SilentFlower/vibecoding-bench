@@ -653,7 +653,8 @@ class HostDeployment:
             **({'management_address': item['NetworkSettings']['Networks'].get(network, {}).get('IPAddress')} if network else {})}
             for role, item in controls.items()},
             'env_sha256': hashlib.sha256(safe_read(self.env, private=True)).hexdigest(),
-            'metadata': self.metadata(), 'environments': evidence['environments'], 'nodes': evidence.get('nodes', [])}
+            'metadata': self.metadata(), 'environments': evidence['environments'], 'nodes': evidence.get('nodes', []),
+            **({'stopped_gate_nodes': evidence['stopped_gate_nodes']} if evidence.get('stopped_gate_nodes') else {})}
 
     def block(self, operation: dict) -> None:
         """原子发布本次维护门禁。
@@ -667,6 +668,42 @@ class HostDeployment:
         atomic_json(self.gate / 'admission.json', {'schema_version': 1, 'deployment': self.policy['deployment'],
             'operation_id': operation['operation_id'], 'epoch': operation['epoch'], 'phase': 'blocked',
             'target_release': operation['target']['release'], 'revision': operation['revision'], 'created_at': operation['created_at']})
+
+    def _stopped_node_gate(self, operation: dict, peer: dict, action: str) -> bool:
+        """转发本次操作并核对节点回执。@param operation 原操作。@param peer 原节点。@param action 冻结或释放。@return 是否完成。"""
+        scope = {key: operation[key] for key in ('operation_id', 'epoch')}
+        reply = self.request('orchestrator', '/internal/v3/system-updates/stopped-node-gate',
+            {**scope, 'peer': peer, 'action': action})
+        if (any(reply.get(key) != value for key, value in scope.items())
+                or reply.get('node_key') != peer['node_key'] or type(reply.get('done')) is not bool):
+            raise ValueError('历史环境节点门禁回执与原维护操作不符')
+        return reply['done']
+
+    def freeze_stopped_nodes(self, operation: dict, save) -> bool:
+        """在自然排空期间接管实际参与停机核验的节点。
+
+        :param operation: 已持有中央门禁的安装或回退操作。
+        :param save: 将节点意图写入原操作日志。
+        :return: 需要的远端门禁均已接管时为真。
+        """
+        gateway = self._cutover_status(operation)
+        self._require_v2_tools_complete(gateway)
+        central = self._runtime_snapshot(True, control_only=True)
+        if (central.get('phase') != 'blocked' or central.get('epoch') != operation['epoch']
+                or central.get('operation_id') != operation['operation_id']):
+            raise ValueError('原编排尚未接管本次节点维护门禁')
+        # 已经领到的中央作业可能还要访问 SSH，待其正常结束再冻结原节点。
+        if gateway.get('active') != 0 or central.get('active') != 0:
+            return False
+        issued = operation.setdefault('stopped_gate_intents', [])
+        for peer in operation['before']['stopped_gate_nodes']:
+            if peer not in issued:
+                # 远端可能已经落盘而回复丢失。先写本地意图，恢复时才能找到应当释放的原节点。
+                issued.append(peer)
+                save()
+            if not self._stopped_node_gate(operation, peer, 'freeze'):
+                return False
+        return True
 
     def drained(self, operation: dict) -> dict:
         """取得同一 epoch 的双端接管和真实排空证明。
@@ -683,6 +720,8 @@ class HostDeployment:
             self._require_v2_tools_complete(gateway)
         if any(value.get('phase') != 'blocked' or value.get('epoch') != operation['epoch'] for value in (gateway, runtime)):
             raise ValueError('部署维护接管代次不一致')
+        if runtime.get('stopped_gate_nodes', []) != operation.get('before', {}).get('stopped_gate_nodes', []):
+            raise ValueError('排空期间历史环境的参与节点已变化')
         node_removals = [] if rolling else runtime.get('node_removals', [])
         removal_retries = [item['name'] for item in node_removals if item['state'] == 'needs_check']
         if removal_retries:
@@ -1568,6 +1607,10 @@ class HostDeployment:
         current = read_gate(self.gate, self.policy['deployment'])
         if current['phase'] != 'blocked' or current['operation_id'] != operation['operation_id'] or current['epoch'] != operation['epoch']:
             raise ValueError('维护门禁归属已经变化')
+        # 先释放已发出意图的节点；部分应答丢失时中央仍封住准入，原操作可以幂等续办。
+        for peer in reversed(operation.get('stopped_gate_intents', [])):
+            if not self._stopped_node_gate(operation, peer, 'release'):
+                raise ValueError('原节点维护门禁尚未释放')
         atomic_json(self.gate / 'admission.json', {**current, 'phase': 'idle', 'operation_id': None, 'target_release': None})
 
     def abandon(self, operation: dict) -> None:
@@ -1604,7 +1647,9 @@ class HostDeployment:
                 for item in self.controls().values()):
             return False
         if current['phase'] == 'blocked':
-            self.health(operation, operation['selected'])
+            # 有节点的释放可能只完成一部分；提交前健康检查已成功，已开放的节点不能再充当冻结证据。
+            if not (operation.get('stopped_gate_intents') and operation.get('release_started')):
+                self.health(operation, operation['selected'])
             self.release(operation)
         return True
 
