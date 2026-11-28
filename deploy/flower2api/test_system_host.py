@@ -14,12 +14,14 @@ import io
 import os
 import platform
 import tarfile
+from http.client import RemoteDisconnected
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from socketserver import UnixStreamServer
 from threading import Event, Thread
 from contextlib import closing
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
+from urllib.request import Request, urlopen
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -388,6 +390,71 @@ class HostNetworkNamesTests(unittest.TestCase):
             self.assertEqual(result['orchestrator']['state'], 'ready')
             self.assertEqual(result['orchestrator']['attempts'], 2)
             self.assertEqual(request.call_args.args[2], {'central_only': True})
+
+    def test_lost_node_freeze_reply_leaves_recoverable_intent(self) -> None:
+        """节点已受理冻结后断开 HTTP；换宿主实例能按磁盘意图释放同一节点。@return 无。"""
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            policy = {'state_root': str(root), 'data_root': str(root / 'data'),
+                'env_file': str(root / 'env'), 'deployment': 'test'}
+            host = HostDeployment(policy)
+            host.gate.mkdir()
+            peer = {'id': 2, 'node_key': 'b' * 32, 'config_sha256': 'c' * 64}
+            op = {'operation_id': str(uuid.uuid4()), 'epoch': str(uuid.uuid4()), 'revision': str(uuid.uuid4()),
+                'created_at': '2026-11-28T00:00:00Z', 'target': {'release': 'system-ci-2-1'},
+                'before': {'stopped_gate_nodes': [peer]}}
+            atomic_json(host.gate / 'admission.json', {'schema_version': 1, 'deployment': 'test',
+                'phase': 'idle', 'operation_id': None, 'target_release': None, 'epoch': str(uuid.uuid4()),
+                'revision': str(uuid.uuid4()), 'created_at': op['created_at']})
+            host.block(op)
+            gate = {**read_gate(host.gate, 'test'), 'active': 0}
+            journal = root / 'operation.json'
+            observed = []
+
+            class PeerHandler(BaseHTTPRequestHandler):
+                """模拟已执行远端动作、尚未返回确认时连接断开。"""
+
+                def do_POST(self):
+                    """按真实 HTTP 接收原操作并只在释放时回复。@return 无。"""
+                    body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+                    observed.append((body, json.loads(journal.read_text())['stopped_gate_intents']))
+                    if body['action'] == 'freeze':
+                        self.close_connection = True
+                        return
+                    payload = json.dumps({'operation_id': body['operation_id'], 'epoch': body['epoch'],
+                        'node_key': body['peer']['node_key'], 'done': True}).encode()
+                    self.send_response(200)
+                    self.end_headers()
+                    self.wfile.write(payload)
+
+                def log_message(self, *args):
+                    """省略本地夹具访问日志。@param args 请求摘要。@return 无。"""
+
+            server = ThreadingHTTPServer(('127.0.0.1', 0), PeerHandler)
+            server.timeout = 5
+
+            def request(service, path, body):
+                self.assertEqual((service, path), ('orchestrator', '/internal/v3/system-updates/stopped-node-gate'))
+                worker = Thread(target=server.handle_request)
+                worker.start()
+                try:
+                    with urlopen(Request(f'http://127.0.0.1:{server.server_port}{path}',
+                            data=json.dumps(body).encode()), timeout=5) as response:
+                        return json.load(response)
+                finally:
+                    worker.join(5)
+
+            with server, patch.object(host, '_cutover_status', return_value={**gate, 'tui_tool_pending': False}), \
+                    patch.object(host, '_runtime_snapshot', return_value=gate), patch.object(host, 'request', request):
+                with self.assertRaises(RemoteDisconnected):
+                    host.freeze_stopped_nodes(op, lambda: atomic_json(journal, op))
+                self.assertEqual(read_gate(host.gate, 'test')['phase'], 'blocked')
+                restarted = HostDeployment(policy)
+                with patch.object(restarted, 'request', request):
+                    restarted.release(json.loads(journal.read_text()))
+            self.assertEqual([(body['action'], body['epoch'], peers) for body, peers in observed],
+                [('freeze', op['epoch'], [peer]), ('release', op['epoch'], [peer])])
+            self.assertEqual(read_gate(host.gate, 'test')['phase'], 'idle')
 
     def test_fast_abandon_reopens_gate_without_rolling_back_independent_node(self) -> None:
         """节点预取中，快速取消恢复中央门禁，旧版仍按原账本回退。@return 无。"""
