@@ -1,6 +1,7 @@
 """节点有限执行证明，只镜像中央许可，执行停止由原进程监督合同核对。"""
 from __future__ import annotations
 
+import os
 import re
 import threading
 import time
@@ -9,7 +10,7 @@ from typing import Callable, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr, model_validator
 
-from runtime_files import atomic_json, private_directory
+from runtime_files import directory_fd, atomic_json, private_directory
 from system_update_contract import safe_read, strict_json
 from cluster_owner_state import pending_owner_transition
 
@@ -159,6 +160,38 @@ class ExecutionGrants:
             private_directory(self.directory)
             private_directory(parent)
         return parent / (scope.operation_id + '.json')
+
+    def open_for_stopped_observation(self, environment_id: str) -> set[str]:
+        """只读核对冻结环境的持久证明。@param environment_id 不可变原环境。@return 尚未关闭的操作身份。"""
+        if not re.fullmatch('[a-f0-9]{32}', environment_id):
+            raise ValueError('执行许可的环境无效')
+        with self.lock:
+            parent = self.directory / environment_id
+            try:
+                fd = directory_fd(parent)
+            except FileNotFoundError:
+                return set()
+            try:
+                names = os.listdir(fd)
+                active = set()
+                for name in names:
+                    if not re.fullmatch(r'[a-f0-9]{32}\.json', name):
+                        raise ValueError('节点许可目录存在未核对的文件')
+                    record = self._record_model.model_validate(
+                        strict_json(safe_read(parent / name, 16384, private=True), 16384)
+                    )
+                    if (
+                        record.grant.environment_id != environment_id
+                        or record.grant.node_key != self.node_key
+                        or name != record.grant.operation_id + '.json'
+                    ):
+                        raise ValueError('持久许可归属有变化')
+                    # 过期的许可也可能持有已接受的工作，只将正式关闭记录视为收口。
+                    if record.phase != 'closed':
+                        active.add(record.grant.operation_id)
+                return active
+            finally:
+                os.close(fd)
 
     def _load(self, scope: ExecutionScope) -> _GrantRecord:
         value = self._record_model.model_validate(strict_json(safe_read(self._path(scope), 16384, private=True), 16384))
