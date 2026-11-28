@@ -18,7 +18,7 @@ from unittest.mock import Mock, patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/orchestrator"))
 from tui_capacity import TuiCapacity
 from tui_reconnect import ReceiptCheckpoints, digest
-from tui_session import SessionDriver, _install_mod, _receipt_request
+from tui_session import SessionDriver, _cc_fork_scope, _install_mod, _receipt_request
 from tui_messages import (
     ModelResponseError,
     SubagentAmbiguousError,
@@ -37,6 +37,34 @@ from tui_messages import (
 
 class SessionTests(unittest.TestCase):
     """固定版结构化事件和账号内原生进程预留的回归。"""
+
+    def test_cc_fork_scope_is_bound_to_the_current_receipt_revision(self):
+        """完整 CC 分叉按根选项核验，保留旧原回执的读取与提交。@return 无。"""
+        key = ("account", "generation", "principal", "session")
+        identity = {**self._identity("cc-fork"), "input_format": "claude_code",
+                    "model_headers": {"anthropic-beta": "original"}}
+        body = self._body()
+        scope = _cc_fork_scope(body, identity)
+        self.assertEqual(_cc_fork_scope({**body, "messages": [], "stream": False}, identity), scope)
+        self.assertNotEqual(_cc_fork_scope({**body, "max_tokens": 999}, identity), scope)
+        self.assertNotEqual(_cc_fork_scope(
+            body, {**identity, "model_headers": {"anthropic-beta": "changed"}},
+        ), scope)
+        with TemporaryDirectory() as directory:
+            with closing(ReceiptCheckpoints(directory)) as checkpoints:
+                old = checkpoints.offer(key, "session", "history", [], 60)
+                self.assertIsNone(checkpoints.cc_fork_scope(key, old))
+                self.assertTrue(checkpoints.submit(key, old, "回执摘要", recovered=False))
+                revision = checkpoints.offer(key, "session", "history", [], 60, cc_fork_scope=scope)
+            with closing(ReceiptCheckpoints(directory)) as checkpoints:
+                self.assertEqual(checkpoints.cc_fork_scope(key, revision), scope)
+                self.assertIsNone(checkpoints.cc_fork_scope(key, old))
+                self.assertIsNone(checkpoints.cc_fork_scope((*key, "other"), revision))
+                self.assertIsNone(checkpoints.find(key)[5])
+                next_revision = checkpoints.offer(key, "session", "history", [], 60)
+                self.assertIsNone(checkpoints.cc_fork_scope(key, next_revision))
+                self.assertIsNone(checkpoints.cc_fork_scope(key, revision))
+                self.assertTrue(checkpoints.submit(key, next_revision, "下一回执摘要", recovered=True))
 
     def test_receipt_digest_uses_the_frozen_ttl_and_preserves_old_default(self):
         """原生重交只沿根轮归一 TTL，兼容旧存储的摘要。@return 无。"""
@@ -591,6 +619,53 @@ class SessionTests(unittest.TestCase):
                 waiting.result(2)
             self.assertFalse(driver.waiters)
             self.assertEqual(driver.capacity.snapshot().in_use, 1)
+
+    def test_receipt_fork_borrows_only_the_waiting_parents_existing_spare(self):
+        """分叉用既有物理余位，父回执可同时认领，另一个分叉仍须排队。@return 无。"""
+        identity = {**self._identity("fork-while-waiting"), "native_cold_history": True,
+                    "receipt_fork_session_protocol": True}
+        tool = {"name": "LookupNote", "input_schema": {"type": "object"}}
+        body = {**self._body(), "tools": [tool]}
+        invocation = {"type": "tool_use", "id": "call", "name": tool["name"], "input": {}}
+        raw = self._returning(body, [invocation], invocation["id"])
+
+        def add_instruction(text):
+            branch = json.loads(raw)
+            branch["messages"][-1]["content"].append({"type": "text", "text": text})
+            return encode(branch)
+
+        launcher = SimpleNamespace(managed_oauth_enabled=lambda: True)
+        for memory in ("max", str(1024**3)):
+            with (
+                self.subTest(memory=memory),
+                patch("tui_session.Path.read_text", return_value=memory),
+                closing(SessionDriver({"max_reservations": 2}, launcher)) as driver,
+                ThreadPoolExecutor(max_workers=1) as pool,
+            ):
+                parent = self._offered(driver.prepare(identity, encode(body)), invocation)
+                with closing(driver.prepare(identity, add_instruction("甲任务"))) as child:
+                    self.assertIsNot(child.actor, parent)
+                    self.assertTrue(child.actor.fork_borrowed_slot)
+                    self.assertEqual(driver.capacity.snapshot().limit, 2)
+                    self.assertEqual(driver.capacity.snapshot().in_use, 2)
+                    cancelled = Event()
+                    waiting = pool.submit(driver.prepare, identity, add_instruction("乙任务"), cancel_event=cancelled)
+                    try:
+                        deadline = time.monotonic() + 1
+                        while not driver.waiters and not waiting.done() and time.monotonic() < deadline:
+                            time.sleep(0.005)
+                        self.assertEqual(len(driver.waiters), 1)
+                        self.assertFalse(waiting.done())
+                        with closing(driver.prepare({**identity, "continuation_only": True}, raw)) as original:
+                            self.assertIs(original.actor, parent)
+                            self.assertEqual(original.answers["call"]["content"], "合成回执")
+                            self.assertEqual(driver.capacity.snapshot().in_use, 2)
+                    finally:
+                        cancelled.set()
+                    with self.assertRaises(TimeoutError):
+                        waiting.result(2)
+                self.assertFalse(driver.waiters)
+                self.assertEqual(driver.capacity.snapshot().in_use, 1)
 
     def test_agent_resident_budget_respects_cgroup_and_reports_disjoint_parent_chains(
         self,

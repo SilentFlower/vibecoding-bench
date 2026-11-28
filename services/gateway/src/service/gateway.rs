@@ -82,7 +82,8 @@ use crate::service::telemetry::{
 };
 use crate::service::tui_backend::{self, LEGACY_BINDING, TUI_V2, TuiRequestRoute};
 use crate::service::tui_native_drain::{
-    NativeTurn, active_agent_account, continuation_account, recovery_row, summary_account,
+    NativeTurn, active_agent_account, continuation_account, receipt_fork, recovery_row,
+    summary_account,
 };
 use crate::service::tui_reconnect::{self, BeforeHeaders, Reconnects, Reservation};
 use crate::service::tui_sender_response::RefusalProjectionFailure;
@@ -2462,10 +2463,39 @@ impl GatewayService {
         let mut replay_owner = reconnect_key
             .as_ref()
             .and_then(|key| self.tui_reconnects.account(key));
+        let has_billing = runtime_transport::has_tui_billing_marker(&body_map);
+        let cc_fork = client_type == ClientType::ClaudeCode
+            && has_billing
+            && runtime_transport::tui_cli_format(&native_header_map) == Some("claude_code")
+            && !native_header_map.contains_key("x-claude-code-agent-id");
+        let ordinary_fork = client_type != ClientType::ClaudeCode && !has_billing;
+        let fork = if (ordinary_fork || cc_fork)
+            && let (Some(key), Some(token), Some(session)) =
+                (reconnect_key.as_ref(), api_token, original_session)
+            && !session.starts_with(SERVER_SESSION_PREFIX)
+            && tui_tool_history::has_fork_instruction(&body_map)
+        {
+            if cc_fork
+                && native_session_candidate(
+                    native_header_map.get_all("x-claude-code-session-id").iter(),
+                    |value| value.to_str().ok(),
+                    &body_map,
+                )
+                .as_deref()
+                    != Some(session)
+            {
+                return Err(AppError::BadRequest("V2 分叉的原生会话不符".into()));
+            }
+            receipt_fork(&self.account_svc.tui_database(), token.id, session, &body_map, key).await?
+        } else {
+            None
+        };
         let tool_owner = if let Some((owner, ..)) = &summary {
             Some(*owner)
         } else if let Some(owner) = replay_owner {
             Some(owner)
+        } else if let Some(fork) = &fork {
+            Some(fork.account)
         } else if method == "POST"
             && path == "/v1/messages"
             && runtime_transport::tui_runtime_configured()
@@ -2855,7 +2885,7 @@ impl GatewayService {
                 )
                 .await?;
                 // 选号与就绪检查期间原进程可能已退出。持原账号路由读锁时按最新回执阶段准备。
-                let recovery = if reconnect.is_some() {
+                let recovery = if reconnect.is_some() && fork.is_none() {
                     recovery_row(
                         &self.account_svc.tui_database(),
                         principal.id,
@@ -2877,6 +2907,7 @@ impl GatewayService {
                         &sender,
                         returning_tool,
                         recovery,
+                        fork.as_ref(),
                     )
                     .await
                     .inspect_err(|error| {

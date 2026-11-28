@@ -219,6 +219,7 @@ struct Record {
     wire_capture: Option<CaptureJob>,
     identity: Identity,
     agent_probe: bool,
+    fork_borrowed_slot: bool,
     binding_proof: [u8; 32],
     deadline: Instant,
     replay_until: Instant,
@@ -608,22 +609,26 @@ impl TuiSender {
                 && identity.agent_hint.is_some()
                 && !identity.continuation_only
                 && !identity.agent_summary;
-            if !agent_probe && occupied(&book) - usize::from(probe_used) >= maximum {
+            let normal_occupied = occupied(&book) - usize::from(probe_used);
+            if !agent_probe && normal_occupied >= maximum {
                 return Err(limited());
             }
-            // 正在排队的新轮不能占完所有握手位置，最后一位供持有原进程的工具续轮入场。
+            // 新轮排队或分支借用物理余位时，最后一个传输位置留给已核验的工具续轮。
             if !agent_probe
                 && !identity.continuation_only
                 && maximum > 1
-                && book
-                    .values()
-                    .filter(|record| {
-                        !record.agent_probe && matches!(record.phase, Phase::Preparing)
-                    })
-                    .count()
-                    >= maximum - 1
+                && normal_occupied == maximum - 1
             {
-                return Err(limited());
+                let active = || {
+                    book.values().filter(|record| {
+                        !record.agent_probe && !matches!(record.phase, Phase::Closed)
+                    })
+                };
+                if active().any(|record| record.fork_borrowed_slot)
+                    || active().all(|record| matches!(record.phase, Phase::Preparing))
+                {
+                    return Err(limited());
+                }
             }
             book.insert(
                 id.clone(),
@@ -632,6 +637,7 @@ impl TuiSender {
                     wire_capture: None,
                     identity,
                     agent_probe,
+                    fork_borrowed_slot: false,
                     binding_proof: binding_proof(binding),
                     deadline,
                     replay_until,
@@ -821,6 +827,7 @@ impl TuiSender {
             control["reservation"] = json!(identity);
             if managed_oauth {
                 control["native_cold_history_protocol"] = json!(1);
+                control["receipt_fork_session_protocol"] = json!(1);
             }
             if let Some(policy) = system_prompt {
                 control["client_system_prompt_policy"] = json!(policy);
@@ -833,7 +840,7 @@ impl TuiSender {
             if let Some(policy) = policy {
                 control["body_policy"] = json!(policy);
             }
-            if let Some(format) = native_input {
+            if let Some(format) = native_input.as_deref() {
                 control["input_format"] = json!(format);
             }
             if model_header_policy {
@@ -911,9 +918,31 @@ impl TuiSender {
                 return Err(unavailable());
             }
             // 支持绑定的源在准备时仅预留容量，到 send 才获得实际启动目录。
-            let branch = match (identity.agent_hint.as_ref(), reply.get("agent_session")) {
-                (None, None) => None,
-                (Some(_), Some(value)) if agent_scope => Some(
+            let branch = match (
+                identity.agent_hint.as_ref(),
+                reply.get("agent_session"),
+                reply.get("receipt_fork_session"),
+            ) {
+                (None, None, None) => None,
+                (Some(_), Some(value), None) if agent_scope => Some(value),
+                (None, None, Some(value))
+                    if managed_oauth && (cold || native_input.as_deref() == Some("claude_code")) =>
+                {
+                    Some(value)
+                }
+                _ => return Err(invalid_identity()),
+            };
+            let fork_borrowed_slot = match reply.get("receipt_fork_borrowed_slot") {
+                None => false,
+                Some(Value::Bool(true))
+                    if kind == "new" && reply.get("receipt_fork_session").is_some() =>
+                {
+                    true
+                }
+                _ => return Err(invalid_identity()),
+            };
+            let branch = branch
+                .map(|value| {
                     value
                         .as_str()
                         .filter(|text| {
@@ -924,11 +953,10 @@ impl TuiSender {
                                     })
                                 })
                         })
-                        .ok_or_else(invalid_identity)?
-                        .to_owned(),
-                ),
-                _ => return Err(invalid_identity()),
-            };
+                        .map(str::to_owned)
+                        .ok_or_else(invalid_identity)
+                })
+                .transpose()?;
             let workspace = match reply.get("workspace_protocol") {
                 None if branch.is_none() => None,
                 Some(version) if version.as_u64() == Some(1) => {
@@ -956,6 +984,7 @@ impl TuiSender {
                 title_session_mapping,
                 managed_oauth,
                 oauth_file,
+                fork_borrowed_slot,
                 if signature_repair {
                     repair_requested
                 } else {
@@ -983,6 +1012,7 @@ impl TuiSender {
             title_session_mapping,
             managed_oauth,
             oauth_file,
+            fork_borrowed_slot,
             signature_repair,
         ) = match result {
             Ok(prepared) => {
@@ -1008,6 +1038,7 @@ impl TuiSender {
                     && record.deadline > Instant::now()
             })
             .ok_or_else(consumed)?;
+        record.fork_borrowed_slot = fork_borrowed_slot;
         record.phase = Phase::Ready {
             connection,
             workspace,
@@ -1789,6 +1820,7 @@ impl TuiSender {
                         wire_capture: None,
                         identity: identity.clone(),
                         agent_probe: false,
+                        fork_borrowed_slot: false,
                         binding_proof: proof,
                         deadline,
                         replay_until,
@@ -2821,6 +2853,36 @@ mod tests {
         retry.agent_hint = Some("verified-at-source".into());
         let _next_probe = reserve(retry).unwrap();
         assert_eq!(source.sender.active(), 3);
+    }
+
+    /// 已借用物理余位的分支运行时，保留最后一个传输位置。@return 无。
+    #[tokio::test]
+    async fn borrowed_receipt_fork_preserves_the_last_sender_slot() {
+        let source = Source::new();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let reserve = |identity| {
+            source
+                .sender
+                .reserve(identity, &source.binding, deadline, deadline, 2)
+        };
+        let (fork, _) = reserve(source.identity()).unwrap();
+        {
+            let mut book = source.sender.book.lock().unwrap();
+            let record = book.get_mut(&fork.id).unwrap();
+            record.fork_borrowed_slot = true;
+            record.phase = Phase::Submitted;
+        }
+        assert!(matches!(
+            reserve(source.identity()),
+            Err(AppError::AdmissionLimited { .. })
+        ));
+        let mut parent = source.identity();
+        parent.continuation_only = true;
+        let (returning, _) = reserve(parent).unwrap();
+        assert_eq!(source.sender.active(), 2);
+        drop(returning);
+        drop(fork);
+        assert!(reserve(source.identity()).is_ok());
     }
 
     impl Drop for Source {

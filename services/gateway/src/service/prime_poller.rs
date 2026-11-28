@@ -959,6 +959,7 @@ impl PrimePollerService {
                     &sender,
                     false,
                     None,
+                    None,
                 )
                 .await?;
             let session = format!("{SERVER_SESSION_PREFIX}prime-{}", Uuid::new_v4());

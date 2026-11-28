@@ -562,10 +562,11 @@ class ColdHistory:
                         return original
         return None
 
-    def resume_receipts(self, messages, *, signed_tool_models=None):
+    def resume_receipts(self, messages, *, signed_tool_models=None, prompt=RESUME_PROMPT):
         """将已认领的原生工具组纳入恢复历史。
         @param messages 已核对原历史、调用和回执的完整公开消息。
-        @param signed_tool_models 账号亲自观测并按工具 ID 保存的模型名。@return 本次原生恢复计划。
+        @param signed_tool_models 账号亲自观测并按工具 ID 保存的模型名。
+        @param prompt 完成原组后交给本次 CLI 的指令。@return 本次原生恢复计划。
         """
         history = []
         receipt_calls = []
@@ -616,8 +617,14 @@ class ColdHistory:
                     for block in row["content"]
                 ]
         # 交互 CLI 从闭合的工具结果开始读取。新模型步骤仍由受管 PTY 标记认领。
-        return replace(self, history=history, prompt=RESUME_PROMPT, current_blocks=(),
+        return replace(self, history=history, prompt=prompt, current_blocks=(),
                        recovered_models=tuple(models.items()))
+
+    def matches_imported_receipts(self, native, receipts):
+        """核对闭合工具结果的真实投递。@param native CLI 正文。
+        @param receipts 已核对的完整回执组。@return 原顺序和原结果是否保留。
+        """
+        return _matches_history_results(native, [("user", block) for block in receipts])
 
     def matches_recovered_signatures(self, native):
         """核对原生出站是否保留已认证的签名及工具组。@param native CLI 正文。@return 核对结果。"""

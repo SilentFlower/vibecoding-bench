@@ -96,7 +96,8 @@ impl TuiRequestRoute {
 
     /// 登记已核验 sender 上的本轮。@param service 账号服务。@param account 当前账号。
     /// @param owner 要登记的入口主体与会话。@param body 公开 Messages。@param sender 已核验 sender。
-    /// @param continuation 是否为工具回传。@return 冻结的绑定、轮次和当前排空状态。
+    /// @param continuation 是否带工具回执。@param recovery 原轮恢复证明。@param fork 分叉的原绑定。
+    /// @return 冻结的绑定、轮次和当前排空状态。
     pub(super) async fn begin_v2(
         &self,
         service: &AccountService,
@@ -106,6 +107,7 @@ impl TuiRequestRoute {
         sender: &TuiReadySender,
         continuation: bool,
         recovery: Option<tui_native_drain::ReceiptRow>,
+        fork: Option<&tui_native_drain::ReceiptFork>,
     ) -> Result<(String, Option<NativeTurn>, bool), AppError> {
         let _config = self.queue.tui_config.lock().await;
         let mut state = service.tui_backend(account.id).await?;
@@ -115,7 +117,7 @@ impl TuiRequestRoute {
             return Err(unavailable());
         }
         let draining = !state.target.is_empty();
-        if draining && !continuation {
+        if draining && (!continuation || fork.is_some()) {
             tui_admission_rejected("tui_turn_backend_draining");
             return Err(AppError::AdmissionLimited { retry_after: 1 });
         }
@@ -148,7 +150,9 @@ impl TuiRequestRoute {
         if !body["messages"].is_array() {
             return Err(tui_input_rejection("invalid_messages").expect("固定 Messages 输入分类"));
         }
-        let turn = if let (Some(row), Some(owner)) = (recovery, owner) {
+        let turn = if let (Some(fork), Some(owner)) = (fork, owner) {
+            Some(fork.claim(service.tui_database(), account.id, &state.binding, owner).await?)
+        } else if let (Some(row), Some(owner)) = (recovery, owner) {
             Some(row.pending(
                 service.tui_database(),
                 account.id,

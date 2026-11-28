@@ -111,6 +111,8 @@ class _Waiting:
     offer: _AgentOffer | None = None
     agent_summary: bool = False
     recovering: bool = False
+    fork: bool = False
+    fork_origin: tuple[tuple, str] | None = None
     exact_receipt_only: bool = False
     groups: frozenset | None = None
 
@@ -351,6 +353,9 @@ class _Actor:
         self.worker = None
         self.cold_history = None
         self.recovery_history = None
+        self.fork_session = None
+        self.fork_borrowed_slot = False
+        self.fork_results = {}
         self.signed_tool_models = {}
 
     def model_authorization(self):
@@ -760,7 +765,7 @@ class _Actor:
             self.receipt_revision = self.driver.checkpoints.offer(
                 self.identity, self.reservation["session_id"], self.history,
                 [receipt_snapshot(b) for b in self.expected], _RECEIPT_SECONDS,
-                native=native,
+                native=native, cc_fork_scope=getattr(self.claim, "cc_fork_scope", None),
             )
             self.wait_until = time.monotonic() + _RECEIPT_SECONDS
             for offer in self.agent_offers.values():
@@ -826,7 +831,7 @@ class _Actor:
             )
         if self.recovery_history is not None:
             # 恢复会话可能在已闭合的结果后生成额外助理边界。核对完整历史中的原调用 ID 后再查本轮标记。
-            expected_ids = set(handle.answers)
+            expected_ids = set(handle.answers) | self.fork_results.keys()
             ids = [block.get("tool_use_id") for row in rows if isinstance(row.get("content"), list)
                    for block in row["content"] if block.get("type") == "tool_result"
                    and block.get("tool_use_id") in expected_ids]
@@ -994,6 +999,12 @@ class _Actor:
                             "code": "unsupported_parameter", "message": "CLI 未保留请求的工具选择"}}),
                             source="tui_cli_input_guard")
                     output_history = self.recovery_history or self.cold_history
+                    if self.fork_results and not output_history.matches_imported_receipts(
+                        native, self.fork_results.values()
+                    ):
+                        raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
+                            "code": "unsupported_parameter", "message": "CLI 未保留分叉的原工具回执"}}),
+                            source="tui_cli_input_guard")
                     if not output_history.matches_history_cache_markers(native):
                         raise ModelResponseError(422, _json({"error": {"type": "invalid_request_error",
                             "code": "unsupported_parameter", "message": "CLI 未保留历史缓存标记"}}),
@@ -1240,6 +1251,29 @@ class _Actor:
                 return
 
 
+def _fork_instruction(message):
+    content = message["content"]
+    if message["role"] != "user" or not isinstance(content, list) or len(content) < 2:
+        return None
+    instruction = content[-1]
+    if (instruction.keys() == {"type", "text"} and instruction["type"] == "text"
+            and isinstance(instruction["text"], str) and instruction["text"].strip()
+            and all(block["type"] == "tool_result" for block in content[:-1])):
+        return instruction["text"]
+    return None
+
+
+def _fork_key(identity, messages):
+    return (*identity, "receipt-fork", history_digest(messages))
+
+
+def _cc_fork_scope(body, reservation):
+    # 历史另按已交付工具组比较，响应表示可以随原版客户端选择变化。
+    options = {key: value for key, value in body.items() if key not in ("messages", "stream")}
+    return digest([options, reservation.get("model_headers") or {}, reservation.get("body_policy"),
+                   reservation.get("input_format")])
+
+
 def _receipt_request(body, reservation, *, cache_ttl=None, previous=None):
     # 只绑定实际支持的生成参数和返回表示，连接 ID 与预留期限可随重试变化。
     policy = reservation.get("body_policy")
@@ -1291,6 +1325,12 @@ class _Reserved:
         self.model_headers = dict(reservation.get("model_headers") or {})
         self.model_header_policy = reservation.get("model_header_policy") == 1
         is_native = native_input(body, reservation.get("input_format"))
+        self.cc_fork_scope = (
+            _cc_fork_scope(body, reservation)
+            if is_native and reservation.get("input_format") == "claude_code"
+            and reservation.get("receipt_fork_session_protocol") is True and reservation.get("agent_hint") is None
+            else None
+        )
         system_rows = [row for row in body["messages"] if row["role"] == "system"]
         self.preserve_model_beta = self.model_header_policy and bool(is_native or system_rows)
         self.system_control_betas = ()
@@ -1414,12 +1454,12 @@ class SessionDriver:
         self.oauth_file_available = getattr(launcher, "file_oauth_enabled", lambda: False)()
         # 编排每个 HTTP 并发配置两个预留。等待新 TUI 的队列必须留下至少一个传输名额还工具。
         limit = max(1, config["max_reservations"] // 2)
-        self.summary_only_headroom = False
+        self.unlimited_memory = False
         if capacity is None:
             memory = Path("/sys/fs/cgroup/memory.max").read_text().strip()
             # 1GiB 账号实测同时持有三个 TUI。预留 256MiB 基础开销及每进程 256MiB。
             reserve = 256 * 1024**2
-            self.summary_only_headroom = memory == "max"
+            self.unlimited_memory = memory == "max"
             budget = (
                 (limit + 2) * reserve
                 if memory == "max"
@@ -1428,7 +1468,7 @@ class SessionDriver:
                 else 0
             )
             # 暂停等 Agent 的父进程继续记入 RAM；只多规划一个经验证的子进程。
-            # 无硬预算时把最后一位仅用于等工具的子代理查询进度；其它入口沿用之前的上限。
+            # 无硬预算时最后一位留给等工具的子代理进度和已核对原回执的分叉。
             capacity = TuiCapacity(
                 limit + 1,
                 budget_bytes=budget,
@@ -1642,9 +1682,20 @@ class SessionDriver:
                 owner is not None and owner.expected is not None and not owner.dead.is_set()
                 and not any(w.offer and any(w.offer.waiting_ancestors()) for w in self.waiters)
             )
+        if not ordinary_room and ticket.fork_origin is not None:
+            parent_key, revision = ticket.fork_origin
+            if (parent := self.sessions.get(parent_key)) is not None:
+                with parent.changed:
+                    # 父进程保留原回执。只有仍等待这一修订的父轮才为分叉借用已有余位。
+                    if (parent.receipt_revision == revision and parent.expected is not None
+                            and parent.wait_until is not None and time.monotonic() < parent.wait_until
+                            and not parent.dead.is_set()):
+                        return True
+        if not ordinary_room and self.unlimited_memory:
+            return False
         if ticket.recovering:
-            return ordinary_room or len(key) > 5
-        return (len(key) == 5 or offer is not None) and (
+            return ordinary_room or (len(key) > 5 and not ticket.fork)
+        return (len(key) == 5 or ticket.fork or offer is not None) and (
             ordinary_room or offer is not None and any(offer.waiting_ancestors())
         )
 
@@ -1701,6 +1752,18 @@ class SessionDriver:
         native_body_policy = not policy or not (policy["sub2api"] or policy["adaptive"])
         native_cache_ttl = policy["ttl"] if policy else "off"
         deadline = reservation["deadline_unix_ms"] / 1000
+        input_format = reservation.get("input_format")
+        is_native = native_input(body, input_format)
+        native_history_allowed = (self.managed_oauth and reservation.get("native_cold_history") is True
+                                  and native_body_policy and agent_hint is None and not is_native)
+        cc_fork = is_native and input_format == "claude_code" and agent_hint is None
+        fork_allowed = native_history_allowed or (self.managed_oauth and cc_fork)
+        instruction = (
+            _fork_instruction(messages[-1])
+            if not summary and not reservation["continuation_only"] and offered == len(messages) - 2
+            and offered >= 0 and agent_hint is None and (not is_native or cc_fork)
+            else None
+        )
 
         def remaining():
             result = deadline - time.time()
@@ -1711,7 +1774,62 @@ class SessionDriver:
         checkpoint = None
         native_checkpoint = None
         retire_for_recovery = None
-        if not summary and (returned or reservation["continuation_only"]):
+        cold = recovery_history = None
+        fork_results = {}
+        fork_origin = None
+        signed_tool_models = {}
+        if returned and fork_allowed:
+            # 有后续工具调用的分支沿当前回执所证明的历史定位自己的账号工作区。
+            previous = history_digest(messages[:offered])
+            for index in range(offered - 1, 0, -1):
+                if messages[index - 1]["role"] != "assistant" or not _fork_instruction(messages[index]):
+                    continue
+                candidate = _fork_key(identity, messages[:index + 1])
+                proof = self.checkpoints.find(candidate, for_fork=True)
+                if proof is not None and proof[1] == previous:
+                    if reservation.get("receipt_fork_session_protocol") is not True:
+                        raise InputRejection("unsupported_parameter")
+                    actor_key = candidate
+                    break
+        if instruction is not None:
+            proof = self.checkpoints.find(actor_key, for_fork=True)
+            if proof is None:
+                raise InputRejection("unrecoverable_tool")
+            _, previous, expected, parent_request, revision, boundary = proof
+            if not fork_allowed or reservation.get("receipt_fork_session_protocol") is not True:
+                raise InputRejection("unsupported_parameter")
+            parent_messages = [*messages[:-1], {**messages[-1], "content": messages[-1]["content"][:-1]}]
+            parent_body = {**body, "messages": parent_messages}
+            fork_results = tool_receipts(parent_messages, previous, expected,
+                                         input_format=input_format, checkpoint=True)
+            if cc_fork:
+                # 完整 CC 继续发送已冻结正文。旧回执有实际提交摘要时仍可验证原输入。
+                scope = self.checkpoints.cc_fork_scope(actor_key, revision)
+                if (scope is None and parent_request is None) or (
+                    scope is not None and scope != _cc_fork_scope(parent_body, reservation)
+                ):
+                    raise InputRejection("unsupported_parameter")
+                fork_results = {}
+            else:
+                if boundary is None:
+                    raise InputRejection("unsupported_parameter")
+                signed_tool_models = boundary.pop("signed_tool_models", {})
+                cold = ColdHistory.from_receipt_boundary(parent_body, boundary)
+                if cold is None:
+                    raise InputRejection("unsupported_parameter")
+                recovery_history = cold.resume_receipts(
+                    parent_messages, signed_tool_models=signed_tool_models, prompt=instruction,
+                )
+                if recovery_history is None:
+                    raise InputRejection("unsupported_parameter")
+            if parent_request is not None and parent_request != _receipt_request(
+                parent_body, reservation, cache_ttl=cold.cache_ttl if cold is not None else None,
+                previous=parent_request,
+            ):
+                raise InputRejection("unsupported_parameter")
+            fork_origin = (actor_key, revision)
+            actor_key = _fork_key(identity, messages)
+        elif not summary and (returned or reservation["continuation_only"]):
             if not returned:
                 raise ValueError("缺少原轮工具结果")
             tool_results_only = all(
@@ -1797,12 +1915,7 @@ class SessionDriver:
                     if prior_request != request:
                         raise ValueError("已提交的工具结果或模型参数与重试不符")
 
-        cold = recovery_history = None
-        signed_tool_models = {}
         system_policy = reservation.get("client_system_prompt_policy", "append")
-        is_native = native_input(body, reservation.get("input_format"))
-        native_history_allowed = (self.managed_oauth and reservation.get("native_cold_history") is True
-                                  and native_body_policy and agent_hint is None and not is_native)
         if native_checkpoint is not None:
             if not native_history_allowed or not tool_results_only:
                 raise InputRejection("unsupported_parameter")
@@ -1817,7 +1930,7 @@ class SessionDriver:
             recovery_history = cold.resume_receipts(messages, signed_tool_models=signed_tool_models)
             if recovery_history is None:
                 raise InputRejection("unsupported_parameter")
-        elif native_history_allowed and checkpoint is None:
+        elif cold is None and native_history_allowed and checkpoint is None:
             storage = getattr(self.launcher, "STORAGE", None)
             reader = partial(read_bound_history, reservation, storage) if storage is not None else None
             cold = ColdHistory.from_request(body, system_policy, cache_ttl=native_cache_ttl, read_history=reader)
@@ -1837,6 +1950,7 @@ class SessionDriver:
                     raise ValueError("原工具回执已被认领")
         launch_plan = recovery_history or cold
         prompt = launch_plan.submitted_prompt() if launch_plan is not None else prompt_text(messages)
+        fork_actor = agent_hint is None and actor_key != identity
         with self.lock:
             if agent_hint is not None and not summary and (
                 actor_key in self.sessions
@@ -1849,12 +1963,15 @@ class SessionDriver:
                 if child_text.endswith("\n"):
                     prompts.append(sha256(child_text[:-1].encode()).digest())
             offer = None
-            ticket = _Waiting(actor_key, agent_summary=summary, recovering=checkpoint is not None)
+            ticket = _Waiting(actor_key, agent_summary=summary, recovering=checkpoint is not None,
+                              fork=fork_actor, fork_origin=fork_origin)
             handoff_limit = time.monotonic() + _AGENT_HANDOFF_SECONDS
             try:
                 while True:
                     if self.closed:
                         raise RuntimeError("当前账号事件源已关闭")
+                    if fork_actor and actor_key in self.sessions:
+                        raise ValueError("分叉的原会话仍在使用")
                     try:
                         timeout = remaining()
                     except TimeoutError:
@@ -1862,8 +1979,7 @@ class SessionDriver:
                             raise SubagentAmbiguousError("本次预留结束前未收到对应启动回执") from None
                         raise
                     capacity = self.capacity.snapshot()
-                    physical_limit = self.ordinary_limit if self.summary_only_headroom and not summary else capacity.limit
-                    if (summary and capacity.in_use >= physical_limit and self.sessions
+                    if (summary and capacity.in_use >= capacity.limit and self.sessions
                             and all(actor.expected and actor.claim is None for actor in self.sessions.values())):
                         # 全部物理位都在等外部工具。让进度请求退避，把下一次准入留给真回执。
                         raise TimeoutError("原工具等待已占满账号物理进程额度")
@@ -1879,6 +1995,7 @@ class SessionDriver:
                     if offer is not None:
                         if not self._valid_agent(offer, agent_hint, extras):
                             raise SubagentBindingError("子代理所属原轮已结束或取消")
+                        physical_limit = self.ordinary_limit if self.unlimited_memory else capacity.limit
                         if (
                             capacity.in_use >= physical_limit
                             and not offer.asynchronous
@@ -1904,7 +2021,7 @@ class SessionDriver:
                         None,
                     )
                     if (
-                        capacity.in_use < physical_limit
+                        capacity.in_use < capacity.limit
                         and self._eligible(ticket, ordinary_room)
                         and first in (None, ticket)
                     ):
@@ -1917,6 +2034,9 @@ class SessionDriver:
                             actor_reservation = {**reservation, "session_id": AGENT_SESSION_PREFIX + str(branch_id)}
                         elif checkpoint is not None:
                             actor_reservation = {**reservation, "session_id": branch}
+                        elif fork_actor:
+                            branch_id = UUID(bytes=sha256(_json(actor_key).encode()).digest()[:16], version=4)
+                            actor_reservation = {**reservation, "session_id": AGENT_SESSION_PREFIX + str(branch_id)}
                         elif offer is not None:
                             actor_reservation = {**reservation, "session_id": AGENT_SESSION_PREFIX + str(uuid4())}
                         actor = _Actor(
@@ -1934,6 +2054,10 @@ class SessionDriver:
                         )
                         actor.cold_history = cold
                         actor.recovery_history = recovery_history
+                        if fork_actor:
+                            actor.fork_session = actor_reservation["session_id"]
+                            actor.fork_borrowed_slot = fork_origin is not None and not ordinary_room
+                            actor.fork_results = fork_results
                         actor.signed_tool_models = signed_tool_models
                         if checkpoint is not None:
                             actor.receipt_revision = revision
@@ -1957,7 +2081,7 @@ class SessionDriver:
                     if ticket not in self.waiters:
                         # 源端与 sender 都给一个可信子依赖留下有界位置。
                         # 已占满普通队列时，合法子轮仍可等下一次物理释放。
-                        reserved = any(len(item.actor_key) > 5 and not item.agent_summary for item in self.waiters)
+                        reserved = any(len(item.actor_key) == 6 and not item.agent_summary for item in self.waiters)
                         if len(self.waiters) - int(reserved) >= self.max_waiters and (
                             reserved or agent_hint is None or summary
                         ):

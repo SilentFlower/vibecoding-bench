@@ -263,6 +263,11 @@ class AccountSource:
                     or prepared["native_cold_history_protocol"] != 1 or not managed_oauth):
                 return
             reservation = {**reservation, "native_cold_history": True}
+        if "receipt_fork_session_protocol" in prepared:
+            version = prepared["receipt_fork_session_protocol"]
+            if reservation.get("native_cold_history") is not True or type(version) is not int or version != 1:
+                return
+            reservation = {**reservation, "receipt_fork_session_protocol": True}
         if "client_system_prompt_policy" in prepared:
             policy = prepared["client_system_prompt_policy"]
             if reservation.get("native_cold_history") is not True or policy not in ("replace", "user_reminder"):
@@ -351,6 +356,11 @@ class AccountSource:
                 reply.pop("oauth_file_protocol", None)
             if reservation.get("agent_hint") is not None:
                 reply["agent_session"] = handle.actor.reservation["session_id"]
+            elif (reservation.get("receipt_fork_session_protocol") is True
+                  and getattr(handle.actor, "fork_session", None) is not None):
+                reply["receipt_fork_session"] = handle.actor.fork_session
+                if handle.kind == "new" and getattr(handle.actor, "fork_borrowed_slot", False):
+                    reply["receipt_fork_borrowed_slot"] = True
             if handle.kind not in ("new", "continuation", "recovered") or (
                 reservation["continuation_only"] and handle.kind == "new"
             ):

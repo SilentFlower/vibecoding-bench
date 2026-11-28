@@ -69,6 +69,24 @@ pub(super) fn has_result(body: &Value) -> bool {
     })
 }
 
+/// 识别紧随工具组的独立文字指令。@param body 公开 Messages。@return 是否为支持的分叉形状。
+pub(super) fn has_fork_instruction(body: &Value) -> bool {
+    let Some((before, [reply])) = split_last_turn(body) else {
+        return false;
+    };
+    let Some((instruction, results)) = reply["content"].as_array().and_then(|v| v.split_last())
+    else {
+        return false;
+    };
+    before.last().is_some_and(|row| row["role"] == "assistant")
+        && reply["role"] == "user"
+        && !results.is_empty()
+        && results.iter().all(|block| block["type"] == "tool_result")
+        && instruction.as_object().is_some_and(|block| block.len() == 2)
+        && instruction["type"] == "text"
+        && instruction["text"].as_str().is_some_and(|text| !text.trim().is_empty())
+}
+
 fn nonempty(value: &Value) -> Option<&str> {
     value.as_str().filter(|text| !text.is_empty())
 }
