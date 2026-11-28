@@ -5,7 +5,7 @@ import json
 from urllib.parse import urlsplit
 from playwright.async_api import async_playwright, expect
 from verify_native_diagnostics_cpu import DiagnosticsCpuFixture
-from verify_environment_ui import BASE, ROOT
+from verify_environment_ui import BASE, ENVIRONMENT, ROOT
 
 
 class VersionFixture(DiagnosticsCpuFixture):
@@ -86,14 +86,30 @@ async def run(gateway=None, output=None):
         await expect(legacy).not_to_contain_text('v0.1.0-beta.7')
         await expect(legacy).not_to_contain_text('builtin-2.1.280')
         await expect(legacy.locator('[data-kernel-action], [data-kernel-check]')).to_have_count(0)
-        for backend in ('tui_v2', 'legacy', 'native293', None):
-            fixture.rows[0]['request_backend'] = backend
+        row = fixture.rows[0]
+        row.update(gateway_account_id=12, runtime_release='synthetic-account', cli_versions=['2.1.293', '2.1.321'],
+            role_status={'cli': 'running', 'sender': 'exited', 'network': '缺失'},
+            tui_runtime={'ready': True, 'idle': True, 'direct': False})
+        for backend, label in (('tui_v2', '交互运行时 V2'), ('legacy', '原有转发'),
+                               ('native293', '原生运行时 V1'), (None, '未观测')):
+            row['request_backend'] = backend
             await page.goto(BASE + '/environments')
-            await page.locator('.environment-rich').first.get_by_role('button', name='请求内核', exact=True).click()
-            await expect(workspace.get_by_role('region', name='Claude Code 2.1.293 内核')).to_be_visible()
-            await expect(workspace.get_by_text('此环境当前使用交互运行时 V2。', exact=True)).to_have_count(int(backend == 'tui_v2'))
-            await expect(workspace.get_by_text('此环境当前使用基础转发方式。', exact=True)).to_have_count(int(backend == 'legacy'))
+            card = page.locator('.environment-rich').first
+            await expect(card.locator('.environment-version-line button')).to_contain_text(label)
+            await card.get_by_role('button', name='请求内核', exact=True).click()
+            await expect(workspace.locator('.workspace-panel-context')).to_contain_text('网关账号 #12 · 第 10 代')
+            kernel = workspace.get_by_role('tabpanel', name='请求内核', exact=True)
+            await expect(kernel.locator('.kernel-version').first.locator('strong')).to_have_text(label)
+            await expect(kernel.get_by_role('region', name='Claude Code 2.1.293 内核')).to_have_count(int(backend == 'native293'))
+            await expect(kernel.get_by_text('兼容发送', exact=True)).to_have_count(int(backend == 'tui_v2'))
+            for section in ('请求内核', '运行概览'):
+                await workspace.get_by_role('tab', name=section, exact=True).click()
+                pane = workspace.get_by_role('tabpanel', name=section, exact=True)
+                basic = pane.get_by_role('region', name='基本信息')
+                for value in (ENVIRONMENT, '2.1.293 / 2.1.321', 'synthetic-account', '运行中', '已退出', '缺失'):
+                    await expect(basic).to_contain_text(value)
         assert not fixture.kernel_requests, fixture.kernel_requests
+        assert not fixture.writes, fixture.writes
         assert not errors, errors
         await browser.close()
     return {'passed': True, 'checks': ['平台内置版本与制品摘要', '独立操作退役零请求', '旧双版回执只展示 293', '独立兼容入口只读', '已生效的后端与未知状态文案', '明暗390/1280px'], 'errors': errors}

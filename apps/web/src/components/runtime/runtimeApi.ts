@@ -61,7 +61,7 @@ export interface RuntimeEnvironment {
   runtime_release?: string | null; runtime_release_error?: string | null;
   can_reprofile?: boolean; reprofile_message?: string; run_window?: RunWindow | null;
   reconcile_allowed?: boolean;
-  request_backend?: string; content_capture?: EnvironmentFeature | null; criu?: EnvironmentFeature | null;
+  request_backend?: string | null; content_capture?: EnvironmentFeature | null; criu?: EnvironmentFeature | null;
   tui_runtime?: { ready: boolean; idle: boolean | null; direct: boolean | null } | null;
   native_kernel?: EnvironmentKernel | null;
   native_kernels?: Partial<Record<'2.1.293', EnvironmentKernel | null>>;

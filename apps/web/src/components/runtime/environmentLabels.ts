@@ -1,5 +1,30 @@
 import type { RuntimeEnvironment } from './runtimeApi';
 
+/** 环境卡片和详情共用的实际容器角色。 */
+export const environmentRoles = [
+  { id: 'cli', label: 'CLI', statusLabel: 'CLI 状态' },
+  { id: 'sender', label: '发送器', statusLabel: '发送器状态' },
+  { id: 'network', label: '网络', statusLabel: '网络状态' },
+] as const;
+
+const roleStatusLabels = new Map([
+  ['running', '运行中'], ['exited', '已退出'], ['stopped', '已停止'], ['created', '已创建'], ['restarting', '重启中'], ['missing', '未创建'],
+  ['未创建', '未创建'], ['缺失', '缺失'], ['归属或批次不匹配', '归属或批次不匹配'], ['状态未知', '状态未知'],
+]);
+
+/** 显示实际容器角色状态。@param status 服务端状态。@return 状态文案。 */
+export function environmentRoleStatus(status?: string): string {
+  return roleStatusLabels.get(status ?? '') ?? '未知';
+}
+
+/** 显示网关回报的生效请求内核。@param backend 当前后端。@return 内核名称或未观测。 */
+export function requestBackendLabel(backend: RuntimeEnvironment['request_backend']): string {
+  if (backend === 'tui_v2') return '交互运行时 V2';
+  if (backend === 'native293') return '原生运行时 V1';
+  if (backend === 'legacy') return '原有转发';
+  return '未观测';
+}
+
 /** 既有运行时状态的中文含义。 */
 export const criuStates:Record<string,string> = {disabled: '已关闭', not_installed: '镜像待升级', requires_rebuild: '待应用',
   preparing: '模板准备中', waiting: '等待准备模板', ready: '模板已就绪', unavailable: '当前使用普通启动', unknown: '状态待核对'};

@@ -22,7 +22,7 @@ ENVIRONMENT = '1' * 32
 def sample_rows() -> list[dict]:
     """生成按现有公开字段组织的环境样例。@return 四种环境及单账号内核试点。"""
     row = {'environment_id': ENVIRONMENT, 'name': '演示环境 A', 'account_id': 1, 'generation': 10,
-        'state': 'ready', 'busy': False, 'fingerprint': {'tz': 'America/Los_Angeles', 'mem': 'unlimited',
+        'state': 'ready', 'busy': False, 'request_backend': 'native293', 'fingerprint': {'tz': 'America/Los_Angeles', 'mem': 'unlimited',
             'hostname': 'demo-machine', 'lang': 'en_US.UTF-8', 'profile_version': 1},
         'identity_status': '已确认 CLI 本地设备身份', 'cli_versions': ['2.1.293'],
         'role_status': {'cli': 'running', 'network': 'running', 'sender': 'running'},

@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { Button } from '../ui/button';
 import { ChoiceSelect, type ChoiceOption } from '../ui/controls';
 import { agyToolContinuationLabels, runtimeRequest, type AgyKernelCatalog, type AgyToolContinuationPolicy, type RuntimeEnvironment } from './runtimeApi';
-import { tuiRuntimeLabel } from './environmentLabels';
+import { requestBackendLabel, tuiRuntimeLabel } from './environmentLabels';
 import EnvironmentBasics from './EnvironmentBasics.vue';
 
 /** 读取内核的实际运行状态，并按同一环境代次切换已登记的反重力候选。 */
@@ -156,32 +156,32 @@ const observation = computed(() => props.environment.native_preparation?.version
       <p v-else-if="toolPolicy">保存后对新派发的请求生效。</p>
       <details class="runtime-technical"><summary>固定原版身份</summary><code>{{ environment.agy_runtime?.source_sha256 || '未提供' }}</code></details>
     </template>
-    <template v-else-if="environment.request_backend === 'tui_v2'">
-      <div class="kernel-version"><strong>交互运行时 V2</strong><span>{{ tuiRuntimeLabel(environment.tui_runtime) }}</span></div>
-      <div class="workspace-properties">
+    <template v-else>
+      <div class="kernel-version">
+        <strong>{{ requestBackendLabel(environment.request_backend) }}</strong>
+        <span v-if="environment.request_backend === 'tui_v2'">{{ tuiRuntimeLabel(environment.tui_runtime) }}</span>
+      </div>
+      <div v-if="environment.request_backend === 'tui_v2'" class="workspace-properties">
         <div class="kv"><span>模型投递</span><strong>{{ environment.tui_runtime?.direct == null ? '未观测' : environment.tui_runtime.direct ? '受管 CLI 直发' : '兼容发送' }}</strong></div>
       </div>
       <EnvironmentBasics :environment="environment" />
-    </template>
-    <template v-else>
-    <div class="kernel-version"><span>管理方式</span><strong>随 flower2api 版本统一交付</strong></div>
-    <p>升级或回退平台时，账号自动采用目标镜像配套的请求内核。</p>
-    <section aria-label="Claude Code 2.1.293 内核">
-      <div class="kernel-version"><strong>Claude Code 2.1.293</strong><span class="environment-state-label">{{ kernel ? states[observation?.state ?? 'unknown'] || '运行状态待核对' : '安装信息未提供' }}</span></div>
-      <template v-if="kernel">
-        <div class="workspace-properties">
-          <div class="kv"><span>内置内核版本</span><strong>2.1.293</strong></div>
-          <div class="kv"><span>制品摘要</span><strong><code>{{ kernel.builtin?.launcher_sha256?.slice(0, 12) || '未提供' }}</code></strong></div>
-          <div class="kv"><span>所属平台批次</span><strong>{{ kernel.platform_release || '未提供' }}</strong></div>
-          <div class="kv"><span>空闲 / 存活进程</span><strong>{{ observation?.idle_workers ?? '—' }} / {{ observation?.live_workers ?? '—' }}</strong></div>
-          <div class="kv"><span>实际空闲 PID</span><strong>{{ observation?.pid ?? '未观测' }}</strong></div>
-        </div>
-        <p v-if="kernel.state === 'migration_required'">历史独立选择等待空闲环境重建，平台升级将在维护阶段完成迁移。</p>
-        <p v-if="kernel.state === 'reconcile' || kernel.error" role="alert" class="runtime-error">{{ kernel.error || '历史内核维护待核对，请在环境维护中执行对账。' }}</p>
-        <details class="runtime-technical"><summary>完整制品摘要</summary><dl><dt>镜像内置分发 SHA256</dt><dd><code>{{ kernel.builtin?.launcher_sha256 || '未提供' }}</code></dd></dl></details>
-      </template>
-    </section>
-    <p v-if="environment.request_backend === 'legacy'">此环境当前使用基础转发方式。</p>
+      <section v-if="environment.request_backend === 'native293'" aria-label="Claude Code 2.1.293 内核">
+        <div class="kernel-version"><span>管理方式</span><strong>随 flower2api 版本统一交付</strong></div>
+        <p>升级或回退平台时，账号自动采用目标镜像配套的请求内核。</p>
+        <div class="kernel-version"><strong>Claude Code 2.1.293</strong><span class="environment-state-label">{{ kernel ? states[observation?.state ?? 'unknown'] || '运行状态待核对' : '安装信息未提供' }}</span></div>
+        <template v-if="kernel">
+          <div class="workspace-properties">
+            <div class="kv"><span>内置内核版本</span><strong>2.1.293</strong></div>
+            <div class="kv"><span>制品摘要</span><strong><code>{{ kernel.builtin?.launcher_sha256?.slice(0, 12) || '未提供' }}</code></strong></div>
+            <div class="kv"><span>所属平台批次</span><strong>{{ kernel.platform_release || '未提供' }}</strong></div>
+            <div class="kv"><span>空闲 / 存活进程</span><strong>{{ observation?.idle_workers ?? '—' }} / {{ observation?.live_workers ?? '—' }}</strong></div>
+            <div class="kv"><span>实际空闲 PID</span><strong>{{ observation?.pid ?? '未观测' }}</strong></div>
+          </div>
+          <p v-if="kernel.state === 'migration_required'">历史独立选择等待空闲环境重建，平台升级将在维护阶段完成迁移。</p>
+          <p v-if="kernel.state === 'reconcile' || kernel.error" role="alert" class="runtime-error">{{ kernel.error || '历史内核维护待核对，请在环境维护中执行对账。' }}</p>
+          <details class="runtime-technical"><summary>完整制品摘要</summary><dl><dt>镜像内置分发 SHA256</dt><dd><code>{{ kernel.builtin?.launcher_sha256 || '未提供' }}</code></dd></dl></details>
+        </template>
+      </section>
     </template>
   </section>
 </template>
