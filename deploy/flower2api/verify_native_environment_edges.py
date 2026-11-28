@@ -42,10 +42,16 @@ async def run(output=None,gateway=None):
         await refresh()
         await expect(basic).to_contain_text('未安装')
         await expect(basic).not_to_contain_text('2.1.293')
+        fixture.rows[0].update(node_observed=False, runtime_release_error='所属节点的实际镜像来源待核对')
+        await refresh()
+        await expect(basic).to_contain_text('未观测')
+        await expect(basic).to_contain_text('待核对')
+        await expect(basic).not_to_contain_text('未安装')
+        await expect(cards.first.locator('.environment-version-line')).to_contain_text('未观测')
         assert not fixture.writes
         fixture.rows[0] = copy.deepcopy(original[0])
         await refresh()
-        checks.append('V2 保留同一环境的基本信息，安装表缺失与空表分别展示')
+        checks.append('V2 保留同一环境的基本信息，缺失、实收和节点失联的安装表分别展示')
         for state,reason,label,checking in [('unknown','snapshot_pending','正在检查',True),('unknown','snapshot_missing','等待快照',False),('unknown','check_expired','检查已过期',False),('maintenance','system_maintenance','维护中',False)]:
             fixture.rows[0]['native_preparation']={'state':state,'reason':reason,'checking':checking};await refresh();await expect(cards.first.locator('.environment-readiness strong')).to_have_text(label)
         await workspace.get_by_role('tab',name='运行概览').click();await workspace.get_by_text('运行组件与准备详情',exact=True).click();await expect(workspace).to_contain_text('平台更新中');fixture.rows[0]['native_preparation']['reason']='maintenance';await refresh();await expect(workspace).to_contain_text('账号正在维护');checks.append('首轮快照、过期、平台与账号维护分别展示')

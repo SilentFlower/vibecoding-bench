@@ -61,8 +61,9 @@ export function tuiRuntimeLabel(value: RuntimeEnvironment['tui_runtime']): strin
   return value.idle ? 'V2 会话空闲' : 'V2 会话使用中';
 }
 
-/** 显示环境实际安装表中的版本。@param versions 服务端安装观测。@return 安装版本或空状态。 */
-export function installedCliLabel(versions: RuntimeEnvironment['cli_versions'] | null): string {
-  if (!Array.isArray(versions)) return '未观测';
-  return versions.length ? versions.join(' / ') : '未安装';
+/** 显示环境实际安装表中的版本。@param environment 环境安装表和观测来源。@return 安装版本或空状态。 */
+export function installedCliLabel({ cli_versions, node_observed, login_draft }: Pick<RuntimeEnvironment, 'cli_versions' | 'node_observed' | 'login_draft'>): string {
+  // 节点失联和登录草稿的接口空表只是占位，无法确认安装状态。
+  if (node_observed === false || login_draft || !Array.isArray(cli_versions)) return '未观测';
+  return cli_versions.length ? cli_versions.join(' / ') : '未安装';
 }

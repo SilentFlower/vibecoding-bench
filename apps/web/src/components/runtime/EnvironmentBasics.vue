@@ -9,7 +9,7 @@ defineProps<{ environment: RuntimeEnvironment }>();
   <section class="workspace-properties" aria-label="基本信息">
     <h4>基本信息</h4>
     <div class="kv"><span>环境 ID</span><strong><code>{{ environment.environment_id }}</code></strong></div>
-    <div class="kv"><span>已安装 CLI 版本</span><strong>{{ installedCliLabel(environment.cli_versions) }}</strong></div>
+    <div class="kv"><span>已安装 CLI 版本</span><strong>{{ installedCliLabel(environment) }}</strong></div>
     <div class="kv"><span>账号镜像批次</span><strong>{{ environment.runtime_release || (environment.runtime_release_error ? '待核对' : '未观测') }}</strong></div>
   </section>
 </template>
