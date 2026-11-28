@@ -14,7 +14,7 @@ from urllib.parse import unquote, urlsplit
 from uuid import uuid4
 
 from passthrough import ProxyConfig, RelayError, open_upstream, relay_streams
-from tui_messages import ModelResponseError, encode
+from tui_messages import ModelResponseError, encode, same_json_value
 
 
 MODEL_HOST = 'api.anthropic.com'
@@ -115,6 +115,12 @@ class DirectModel:
             step, handle = self._current(sending=True)
             if step.claimed or not actor._main_request(body, handle):
                 raise DirectRejected('模型输入不匹配或本步骤已取得许可')
+            for key, expected in handle.direct_options.items():
+                value = body.get(key)
+                if key == 'output_config' and isinstance(value, dict):
+                    value = {option: value[option] for option in expected if option in value}
+                if not same_json_value(value, expected):
+                    raise DirectRejected('原版模型请求缺少本轮核准的提供方参数')
             if (handle.kind == 'new' and actor.agent_offer is not None
                     and not actor.driver._valid_agent(actor.agent_offer, actor.identity[-1], actor.agent_messages)):
                 raise DirectRejected('子代理的原工具已失效')
@@ -255,8 +261,13 @@ class _Projection:
             if native in self.tools:
                 raise ValueError('原生工具索引重复')
             name = chunk['name']
-            if self.actor.cold_history is not None:
-                name = self.actor.cold_history.tools[name]['name']
+            plan = self.actor.cold_history
+            if plan is not None:
+                if plan.native_cc:
+                    if not any(tool['name'] == name for tool in self.handle.tools):
+                        raise ValueError('原版模型返回了未声明的客户端工具')
+                else:
+                    name = plan.tools[name]['name']
             index = self._start({'type': 'tool_use', 'id': chunk['id'], 'name': name, 'input': {}})
             self.tools[native] = index
             self.indices.append(index)

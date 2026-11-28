@@ -3,7 +3,7 @@
 import json
 import unittest
 
-from tui_input_policy import InputRejection, validate_direct
+from tui_input_policy import InputRejection, direct_model_options
 from tui_messages import MessageInputObservation, input_message
 
 
@@ -66,21 +66,28 @@ class InputPolicyTests(unittest.TestCase):
                     session_id=self.session,
                 )
 
-    def test_direct_refuses_only_known_input_changes_before_claim(self):
-        """固定交互 CLI 无法保真的字段给出专用码，常规命名声明和默认参数保持可用。@return 无。"""
+    def test_direct_options_are_typed_and_must_match_declarations(self):
+        """只交付已校验的逐步参数。选择名称必须属于当前调用方声明。@return 无。"""
+        body = {**self.body, "tools": [{"name": "Echo", "input_schema": {}}]}
         for parameters, reason in (
-            ({'output_config': {'format': {'type': 'json_schema'}}}, 'direct_output_format_unsupported'),
-            ({'tool_choice': {'type': 'tool', 'name': 'Echo'}}, 'direct_tool_choice_unsupported'),
-            ({'tool_choice': {'type': 'any'}}, 'direct_required_tool_unsupported'),
-            ({'tool_choice': {'type': 'auto', 'disable_parallel_tool_use': True}}, 'direct_serial_tools_unsupported'),
-            ({'temperature': 0.2}, 'direct_temperature_unsupported'),
+            ({"output_config": {"format": {"type": "json_schema"}}}, "invalid_parameter"),
+            ({"tool_choice": {"type": "tool", "name": "Unknown"}}, "invalid_parameter"),
+            ({"tool_choice": {"type": "any"}, "tools": []}, "invalid_parameter"),
+            ({"tool_choice": {"type": "auto", "disable_parallel_tool_use": 1}}, "invalid_parameter"),
+            ({"temperature": 1.2}, "invalid_temperature"),
         ):
             with self.subTest(parameters=parameters), self.assertRaisesRegex(InputRejection, reason):
-                validate_direct({**self.body, **parameters})
-        for choice in ({'type': 'auto'}, {'type': 'auto', 'disable_parallel_tool_use': False}, {'type': 'none'}):
+                direct_model_options({**body, **parameters})
+        for choice in ({"type": "tool", "name": "Echo"}, {"type": "auto", "disable_parallel_tool_use": True},
+                       {"type": "any"}, {"type": "none"}):
             with self.subTest(choice=choice):
-                validate_direct({**self.body, 'output_config': {'effort': 'medium'}, 'tool_choice': choice,
-                                 'temperature': 1})
+                self.assertEqual(direct_model_options({**body, "tool_choice": choice}), {"tool_choice": choice})
+        schema = {"type": "json_schema", "schema": {"type": "object", "additionalProperties": False}}
+        self.assertEqual(direct_model_options({**body, "output_config": {"effort": "medium", "format": schema},
+                                               "temperature": 0.4}),
+                         {"output_config": {"format": schema}, "temperature": 0.4})
+        for choice in ({"type": "auto"}, {"type": "auto", "disable_parallel_tool_use": False}):
+            self.assertEqual(direct_model_options({**body, "tool_choice": choice}), {})
 
     def test_native_and_api_have_different_allowlists(self):
         """API 根字段与 V1 逐项一致，原生保留扩展和空 MCP，非空服务器声明拒绝。@return 无。"""

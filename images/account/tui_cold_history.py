@@ -12,7 +12,7 @@ from uuid import uuid4
 
 from runtime_files import atomic_text
 from tui_cache_policy import model_body
-from tui_input_policy import custom_tool_type, legacy_custom_tool_lists, ordinary_custom_tool
+from tui_input_policy import custom_tool_type, legacy_custom_tool_lists, native_system_text, ordinary_custom_tool
 from tui_messages import encode, same_json_value
 from tui_reconnect import digest
 from tui_workspace_launch import IMPORT_BOUNDARY, WorkspaceLaunchObservation, publish_workspace_history
@@ -317,18 +317,23 @@ class ColdHistory:
     cache_ttl: str = "off"
     recovered_models: tuple[tuple[int, str], ...] = ()
     context_management: dict | None = None
+    native_cc: bool = False
 
     @classmethod
-    def from_request(cls, body, system_policy="append", *, cache_ttl="off", read_history=None, signed_models=None):
+    def from_request(cls, body, system_policy="append", *, cache_ttl="off", read_history=None, signed_models=None,
+                     direct_options=None, native_cc=False):
         """识别普通文本、内嵌图像及受支持的闭合历史。
         @param body 已校验的请求。@param system_policy 本轮冻结的账号系统指令动作。
         @param cache_ttl 经账号预留核对的平台 TTL。强制模式仅承接已有历史断点。
         @param read_history 可选，同一绑定发布的原生档案只读回调。
         @param signed_models 可选，原工具回执已冻结的签名来源。
+        @param direct_options 已校验且由实际 CLI 在每个步骤单独使用的提供方参数。
+        @param native_cc 是否为外层官方客户端导入。
         @return 原生输入计划或空。
         """
-        if body.keys() - {"model", "max_tokens", "thinking", "system", "messages", "tools", "stream", "output_config",
-                          "tool_choice", "context_management"}:
+        fields = {"model", "max_tokens", "thinking", "system", "messages", "tools", "stream", "output_config",
+                  "tool_choice", "context_management"}
+        if body.keys() - fields - ({"temperature"} if direct_options is not None else set()):
             return None
         if type(body.get("max_tokens")) is not int or body["max_tokens"] <= 0:
             return None
@@ -355,8 +360,11 @@ class ColdHistory:
                 or body["model"] not in _ADAPTIVE_THINKING_MODELS):
             return None
         output = body.get("output_config", {})
-        if not isinstance(output, dict) or output and (
-                output.keys() != {"effort"} or output["effort"] not in ("low", "medium", "high", "max")):
+        if not isinstance(output, dict):
+            return None
+        if direct_options and "output_config" in direct_options:
+            output = {key: value for key, value in output.items() if key != "format"}
+        if output and (output.keys() != {"effort"} or output["effort"] not in ("low", "medium", "high", "max")):
             return None
         *history, current = body["messages"]
         if (current["role"] != "user" or (history and history[0]["role"] != "user")
@@ -379,7 +387,8 @@ class ColdHistory:
         if not _closed_history(history, signed_rows=signed_rows):
             return None
         content = _blocks(current)
-        if not content or not all(_plain_text(block) or _inline_image(block, for_paste=True) for block in content):
+        text_block = _history_text if native_cc else _plain_text
+        if not content or not all(text_block(block) or _inline_image(block, for_paste=True) for block in content):
             return None
         effective_history = _history_with_ttl(history, cache_ttl)
         cache_blocks = [block for row in effective_history for _, _, _, block in _marked_blocks(_blocks(row))]
@@ -394,7 +403,9 @@ class ColdHistory:
                 return None
         declared = body.get("tools", [])
         choice = body.get("tool_choice")
-        if "tool_choice" in body and not (_automatic_tools(choice) if declared else choice == {"type": "none"}):
+        if direct_options and "tool_choice" in direct_options:
+            choice = None
+        elif "tool_choice" in body and not (_automatic_tools(choice) if declared else choice == {"type": "none"}):
             return None
         if not all(ordinary_custom_tool(tool) for tool in declared):
             return None
@@ -405,7 +416,7 @@ class ColdHistory:
             system = "\n".join(block["text"] for block in system)
         if system_policy != "replace":
             system = system or ""
-        tools = {MCP_PREFIX + tool["name"]: tool for tool in declared}
+        tools = {(tool["name"] if native_cc else MCP_PREFIX + tool["name"]): tool for tool in declared}
         if requested and signed_models is None and read_history is not None:
             signed_models = _bound_signature_models(read_history, requested)
         signed_models = signed_models or {}
@@ -413,8 +424,37 @@ class ColdHistory:
             return None
         return cls(history, body["model"], content[0].get("text", ""), system, tools, body["max_tokens"],
                    thinking, system_policy, output.get("effort"),
-                   tuple(content) if len(content) > 1 or content[0]["type"] == "image" else (), choice, cache_ttl,
-                   tuple(sorted(signed_models.items())), context_management=context_management)
+                   tuple(content) if len(content) > 1 or not _plain_text(content[0]) else (), choice, cache_ttl,
+                   tuple(sorted(signed_models.items())), context_management=context_management, native_cc=native_cc)
+
+    @classmethod
+    def from_cc(cls, body, *, restoring_receipt=False, cache_ttl="off", read_history=None, direct_options):
+        """把官方客户端已授权的输入交给内层交互引擎。
+        @param body 已识别的完整 CC 业务正文。@param restoring_receipt 是否按原检查点恢复回执。
+        @param cache_ttl 账号本轮的缓存选项。@param read_history 可选的同绑定历史读取。
+        @param direct_options 已校验的逐步提供方参数。
+        @return 可通过原生历史和 MCP 表示的输入计划。
+        """
+        fields = {"model", "messages", "tools", "max_tokens", "thinking", "output_config", "tool_choice",
+                  "context_management", "stream", "temperature"}
+        # 会话身份在官方进程中生成。其它扩展字段需要各自的原生接入和实收验证。
+        if body.keys() - fields - {"system", "metadata", "mcp_servers"} or body["messages"][-1]["role"] != "user":
+            return None
+        history, current = body["messages"][:-1], _blocks(body["messages"][-1])
+        if restoring_receipt:
+            history = body["messages"]
+            current = [{"type": "text", "text": RESUME_PROMPT}]
+        else:
+            split = next((i for i, b in enumerate(current) if b["type"] != "tool_result"), len(current))
+            if split:
+                # 分支必须从已闭合的原工具调用继续。只把新增内容送入当前交互提示。
+                history = [*history, {"role": "user", "content": current[:split]}]
+                current = current[split:]
+        request = {key: value for key, value in body.items() if key in fields}
+        request.update(messages=[*history, {"role": "user", "content": current}],
+                       system=native_system_text(body["system"]) or None)
+        return cls.from_request(request, "replace", cache_ttl=cache_ttl, read_history=read_history,
+                                direct_options=direct_options, native_cc=True)
 
     def system_argument(self):
         """选择原生 CLI 提示词文件选项。@return 参数和文件正文，或缺省值。"""
@@ -489,6 +529,8 @@ class ColdHistory:
             scope = (*scope, self.recovered_models)
         if self.context_management is not None:
             scope = (*scope, {"context_management": self.context_management})
+        if self.native_cc:
+            scope = (*scope, {"native_cc": True})
         return scope if self.cache_ttl == "off" else (*scope, self.cache_ttl)
 
     def matches_tool_choice(self, native):
@@ -533,13 +575,15 @@ class ColdHistory:
         return boundary
 
     @classmethod
-    def from_receipt_boundary(cls, body, boundary):
-        """从持久摘要恢复已冻结的根轮。@param body 回执原始输入。@param boundary 原生根轮边界。@return 已匹配计划或空。"""
+    def from_receipt_boundary(cls, body, boundary, *, direct_options=None):
+        """从持久摘要恢复已冻结的根轮。@param body 回执原始输入。@param boundary 原生根轮边界。
+        @param direct_options 已校验的逐步提供方参数。@return 已匹配计划或空。"""
         root = {**body, "messages": body["messages"][:boundary["prompt_index"]]}
         signed_models = dict(boundary.get("bound_signature_models", ()))
         # TTL 已参与旧摘要。按私有协议的三个取值核对原始输入，持久格式继续兼容已有回执。
         for ttl in ("off", "5m", "1h"):
-            plan = cls.from_request(root, boundary["system_policy"], cache_ttl=ttl, signed_models=signed_models)
+            plan = cls.from_request(root, boundary["system_policy"], cache_ttl=ttl, signed_models=signed_models,
+                                    direct_options=direct_options)
             if plan is None:
                 continue
             alternatives = [plan]
@@ -673,7 +717,7 @@ class ColdHistory:
             role, content = history[index]
             history[index] = role, [
                 {**block, "name": MCP_PREFIX + block["name"]}
-                if block["type"] == "tool_use" else block
+                if block["type"] == "tool_use" and not self.native_cc else block
                 for block in content
             ]
         return history

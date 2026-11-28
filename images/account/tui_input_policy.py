@@ -40,23 +40,37 @@ class InputRejection(ValueError):
         self.code = code
 
 
-def validate_direct(body):
-    """核对固定交互 CLI 已实测无法保真的入站字段。@param body 已解码请求。@return 无。"""
-    output = body.get('output_config')
-    if isinstance(output, dict) and output.get('format') is not None:
-        raise InputRejection('direct_output_format_unsupported')
-    choice = body.get('tool_choice')
-    if isinstance(choice, dict):
-        kind = choice.get('type')
-        # 固定 CLI 实收只支持默认工具调度，这三种约束会在出站时丢失。
-        if kind == 'tool':
-            raise InputRejection('direct_tool_choice_unsupported')
-        if kind == 'any':
-            raise InputRejection('direct_required_tool_unsupported')
-        if kind == 'auto' and choice.get('disable_parallel_tool_use') is True:
-            raise InputRejection('direct_serial_tools_unsupported')
-    if 'temperature' in body and body['temperature'] != 1:
-        raise InputRejection('direct_temperature_unsupported')
+def direct_model_options(body):
+    """取得当前交互步骤的提供方参数。@param body 已通过 Messages 结构校验的请求。@return 参数对象。"""
+    options = {}
+    output = body.get("output_config", {})
+    if "format" in output:
+        schema = output["format"]
+        if (not isinstance(schema, dict) or schema.keys() != {"type", "schema"}
+                or schema["type"] != "json_schema" or not isinstance(schema["schema"], dict)):
+            raise InputRejection("invalid_parameter")
+        options["output_config"] = {"format": schema}
+    choice = body.get("tool_choice")
+    if choice is not None:
+        kind = choice.get("type")
+        names = [tool["name"] for tool in body.get("tools", [])]
+        allowed = {"type", "disable_parallel_tool_use"}
+        if (kind not in ("auto", "none", "any", "tool")
+                or choice.keys() - (allowed | {"name"} if kind == "tool" else allowed)
+                or ("disable_parallel_tool_use" in choice and (
+                    kind == "none" or type(choice["disable_parallel_tool_use"]) is not bool))
+                or (kind == "any" and not names)
+                or (kind == "tool" and choice.get("name") not in names)):
+            raise InputRejection("invalid_parameter")
+        # 默认 auto 沿用引擎设置。显式限制和原来无法保真的选择由本轮单独传入。
+        if kind in ("tool", "any") or kind == "none" and names or choice.get("disable_parallel_tool_use"):
+            options["tool_choice"] = choice
+    if "temperature" in body:
+        temperature = body["temperature"]
+        if type(temperature) not in (int, float) or not 0 <= temperature <= 1:
+            raise InputRejection("invalid_temperature")
+        options["temperature"] = temperature
+    return options
 
 
 def _uuid(value):
@@ -182,6 +196,15 @@ def native_input(body, cli):
     ):
         raise InputRejection("invalid_native_request")
     return True
+
+
+def native_system_text(blocks):
+    """提取经原生输入校验的系统指令。@param blocks 外层 CLI 的系统块。@return 内层会话的指令。"""
+    # 账单与原版身份前缀来自实际出站进程。外层指令正文交给会话组装。
+    start = int(bool(blocks) and blocks[0]["text"].lstrip().startswith(_BILLING))
+    if start < len(blocks) and blocks[start]["text"] in _IDENTITIES:
+        start += 1
+    return "\n".join(block["text"] for block in blocks[start:])
 
 
 def _keys(obj, allowed):

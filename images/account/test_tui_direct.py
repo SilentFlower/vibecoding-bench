@@ -19,6 +19,7 @@ class DirectModelTests(TestCase):
         future = time_ns() // 1_000_000 + 90_000
         self.events = []
         self.claim = SimpleNamespace(account_token='test-only', expires_at=future, kind='new',
+                                     direct_options={},
                                      reservation={'account_id': 12, 'environment_id': 'a' * 32, 'generation': 2,
                                                   'reservation_id': 'fixture-reservation',
                                                   'deadline_unix_ms': future})
@@ -72,6 +73,25 @@ class DirectModelTests(TestCase):
         self.direct.response({'ticket': ticket, 'status': 200, 'streaming': True})
         with self.assertRaises(DirectRejected):
             self.direct.response({'ticket': ticket, 'status': 200})
+
+    def test_only_effective_options_can_receive_egress_permit(self):
+        """真实引擎应保留本轮参数。错误参数不消耗步骤或打开代理。@return 无。"""
+        schema = {"type": "json_schema", "schema": {"additionalProperties": False, "type": "object"}}
+        self.claim.direct_options = {"output_config": {"format": schema}, "temperature": 0.4}
+        self.direct.started.set()
+        for options in (
+            {"output_config": {"effort": "low"}, "temperature": 0.4},
+            {"output_config": {"format": schema}, "temperature": 0.5},
+            {"output_config": {"format": {**schema, "schema": {"additionalProperties": 0, "type": "object"}}},
+             "temperature": 0.4},
+        ):
+            with self.subTest(options=options), self.assertRaises(DirectRejected):
+                self.direct.permit({**self.offer, "body": json.dumps({"stream": True, **options})})
+        self.assertFalse(self.step.claimed)
+        self.actor.driver.launcher.direct_proxy.assert_not_called()
+        body = json.dumps({"stream": True, "output_config": {"effort": "low", "format": schema}, "temperature": 0.4})
+        self.direct.permit({**self.offer, "body": body})
+        self.assertTrue(self.step.claimed)
 
     def test_same_account_proxy_receives_direct_tunnel_once(self):
         """连接只使用认领时的原代理。连接重试不再次打开隧道。@return 无。"""

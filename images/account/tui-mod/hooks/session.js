@@ -54,35 +54,47 @@ export function register(on) {
 
   on('turn.step', async function* ($, e, next) {
     if (e.agentId) throw new Error('当前会话不接受子代理回合')
-    await post($, 'begin', { turn: e.turnId, step: e.index, model: e.model })
+    const { modelOptions } = await post($, 'begin', { turn: e.turnId, step: e.index, model: e.model })
     if (direct) directStep = { turn: e.turnId, step: e.index }
-    const stream = next(e)
-    // 内层一见完整工具块就会等待客户端回执。先公开原生增量并读到同一步的真实用量，
-    // 再把这一工具之后的原始分片按原序交给内层，避免两个终端互等结束事件。
-    let pending = null
-    let pendingUnits = 0
-    for (;;) {
-      const item = await stream.next()
-      if (item.done) {
-        const response = item.value
-        if (direct) directStep = null
-        await post($, 'end', { turn: e.turnId, step: e.index, reason: response.stopReason,
-          ...(direct ? { answer: response.answer } : {}),
-          usage: response.usage, serverTools: response.serverToolUses?.length ?? 0 })
-        if (pending) for (const part of pending) yield part
-        return item.value
+    // 提供方参数由引擎在组装时读取。下一步须用本轮原回执的参数，不能继承上一步的选择。
+    let originalOptions
+    if (modelOptions) {
+      originalOptions = await $.env.get('CLAUDE_CODE_EXTRA_BODY')
+      const adminOptions = originalOptions === undefined ? {} : JSON.parse(originalOptions)
+      const change = await $.env.set('CLAUDE_CODE_EXTRA_BODY', JSON.stringify({ ...modelOptions, ...adminOptions }))
+      if (change?.deny) throw new Error('本轮模型参数与管理员设置冲突')
+    }
+    try {
+      const stream = next(e)
+      // 内层一见完整工具块就会等待客户端回执。先公开原生增量并读到同一步的真实用量，
+      // 再把这一工具之后的原始分片按原序交给内层，避免两个终端互等结束事件。
+      let pending = null
+      let pendingUnits = 0
+      for (;;) {
+        const item = await stream.next()
+        if (item.done) {
+          const response = item.value
+          if (direct) directStep = null
+          await post($, 'end', { turn: e.turnId, step: e.index, reason: response.stopReason,
+            ...(direct ? { answer: response.answer } : {}),
+            usage: response.usage, serverTools: response.serverToolUses?.length ?? 0 })
+          if (pending) for (const part of pending) yield part
+          return item.value
+        }
+        const chunk = item.value
+        if (direct && ['text', 'tool', 'input', 'thinking', 'stop'].includes(chunk.kind)) {
+          await post($, 'direct-chunk', { ...directStep, chunk })
+        }
+        if (chunk.kind === 'tool' && !pending) pending = []
+        if (pending) {
+          // 预留正文的相同上限也约束完整工具等待，无法作为后续正文回传的调用不驻留。
+          pendingUnits += JSON.stringify(chunk).length
+          if (pendingUnits > 10 * 1024 * 1024) throw new Error('待交接的原生工具轮过大')
+          pending.push(chunk)
+        } else yield chunk
       }
-      const chunk = item.value
-      if (direct && ['text', 'tool', 'input', 'thinking', 'stop'].includes(chunk.kind)) {
-        await post($, 'direct-chunk', { ...directStep, chunk })
-      }
-      if (chunk.kind === 'tool' && !pending) pending = []
-      if (pending) {
-        // 预留正文的相同上限也约束完整工具等待，无法作为后续正文回传的调用不驻留。
-        pendingUnits += JSON.stringify(chunk).length
-        if (pendingUnits > 10 * 1024 * 1024) throw new Error('待交接的原生工具轮过大')
-        pending.push(chunk)
-      } else yield chunk
+    } finally {
+      if (modelOptions) await $.env.set('CLAUDE_CODE_EXTRA_BODY', originalOptions)
     }
   }).catch(async function* ($, e) {
     // 失败前如已提交，这里绝不再调用 next() 触发第二个模型请求。

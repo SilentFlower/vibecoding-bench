@@ -29,14 +29,14 @@ from uuid import UUID, uuid4
 from runtime_files import atomic_text
 from tui_capacity import TuiCapacity, TuiCapacityError
 from tui_cold_history import (
-    ColdHistory, MCP_SERVER, SIGNED_THINKING_TYPES, equivalent_auto_tool_choices, tool_result_has_cache_marker,
+    ColdHistory, MCP_PREFIX, MCP_SERVER, SIGNED_THINKING_TYPES, equivalent_auto_tool_choices, tool_result_has_cache_marker,
     tool_result_has_images, tool_result_has_text_blocks, tool_result_is_empty,
 )
 from tui_direct import DirectModel, DirectRejected
 from tui_reconnect import ReceiptCheckpoints, digest
 from tui_input_policy import (
     CONTEXT_BETA, SYSTEM_CLEAR_AT_BETA, SYSTEM_EFFORT_BETA, InputRejection,
-    custom_tool_type, legacy_custom_tool_lists, native_input, validate_direct,
+    custom_tool_type, direct_model_options, legacy_custom_tool_lists, native_input, ordinary_custom_tool,
 )
 from tui_messages import (
     BODY_LIMIT,
@@ -486,7 +486,7 @@ class _Actor:
                             opts.extend([flag, str(instructions)])
                         if plan.effort:
                             opts.extend(["--effort", plan.effort])
-                        if plan.tools:
+                        if plan.tools and not plan.native_cc:
                             wait_for_mcp = True
                             mcp = plugin / "mcp.json"
                             atomic_text(mcp, _json({"mcpServers": {MCP_SERVER: {
@@ -678,6 +678,8 @@ class _Actor:
                 self.step.native_model = data.get("model")
                 self.expected = None
                 self.wait_until = None
+                if self.claim.direct_options:
+                    return {"modelOptions": self.claim.direct_options}
             elif path == "/end":
                 if (
                     self.step is None
@@ -787,7 +789,8 @@ class _Actor:
     def _finish_step(self):
         self.expected = self.step.blocks if self.step.reason == "tool_use" else None
         if self.expected:
-            native = self.cold_history.receipt_boundary() if self.cold_history is not None else None
+            plan = self.cold_history
+            native = plan.receipt_boundary() if plan is not None and not plan.native_cc else None
             if native is not None:
                 if self.step.response_model and any(b["type"] in SIGNED_THINKING_TYPES for b in self.expected):
                     self.signed_tool_models.update(dict.fromkeys(self.step.tool_ids, self.step.response_model))
@@ -860,7 +863,8 @@ class _Actor:
                 and set(ids) == self.delivered == set(handle.answers)
                 and len(ids) == len(self.delivered)
             )
-        if self.recovery_history is not None:
+        if self.recovery_history is not None or self.fork_results or (self.cold_history is not None
+                and self.cold_history.native_cc and handle.kind == "recovered"):
             # 恢复会话可能在已闭合的结果后生成额外助理边界。核对完整历史中的原调用 ID 后再查本轮标记。
             expected_ids = set(handle.answers) | self.fork_results.keys()
             ids = [block.get("tool_use_id") for row in rows if isinstance(row.get("content"), list)
@@ -1344,7 +1348,7 @@ class _Reserved:
 
     def __init__(
         self, actor, kind, history, answers, body, stream, raw, reservation, request_digest=None,
-        *, input_observation,
+        *, input_observation, direct_options=None,
     ):
         self.actor = actor
         self.kind = kind
@@ -1356,6 +1360,12 @@ class _Reserved:
         self.model_headers = dict(reservation.get("model_headers") or {})
         self.model_header_policy = reservation.get("model_header_policy") == 1
         is_native = native_input(body, reservation.get("input_format"))
+        self.direct_options = dict(direct_options or {})
+        if actor.direct is not None and actor.cold_history is not None and actor.cold_history.native_cc:
+            # 外层 CC 客户端按模型给出的原名执行工具。让内层引擎用相同声明签发请求。
+            self.direct_options["tools"] = self.tools
+        elif not is_native and (choice := self.direct_options.get("tool_choice")) and choice["type"] == "tool":
+            self.direct_options["tool_choice"] = {**choice, "name": MCP_PREFIX + choice["name"]}
         self.cc_fork_scope = (
             _cc_fork_scope(body, reservation)
             if is_native and reservation.get("input_format") == "claude_code"
@@ -1754,8 +1764,7 @@ class SessionDriver:
             body_policy=reservation.get("body_policy"),
             observation=input_observation,
         )
-        if self.direct_mode:
-            validate_direct(body)
+        direct_options = direct_model_options(body) if self.direct_mode else None
         # 在认领工具回执之前检查退避期，等待结束后客户端仍能将回执交还原进程。
         check_wait = getattr(self.launcher, "check_provider_backoff", None)
         if check_wait is not None:
@@ -1844,12 +1853,13 @@ class SessionDriver:
                     scope is not None and scope != _cc_fork_scope(parent_body, reservation)
                 ):
                     raise InputRejection("unsupported_parameter")
-                fork_results = {}
+                if not self.direct_mode:
+                    fork_results = {}
             else:
                 if boundary is None:
                     raise InputRejection("unsupported_parameter")
                 signed_tool_models = boundary.pop("signed_tool_models", {})
-                cold = ColdHistory.from_receipt_boundary(parent_body, boundary)
+                cold = ColdHistory.from_receipt_boundary(parent_body, boundary, direct_options=direct_options)
                 if cold is None:
                     raise InputRejection("unsupported_parameter")
                 recovery_history = cold.resume_receipts(
@@ -1914,13 +1924,18 @@ class SessionDriver:
                         raise ValueError("原会话未准备接收该工具结果")
                     answers = tool_receipts(messages, actor.history, actor.expected,
                                             input_format=reservation.get("input_format"))
-                    if actor.cold_history is not None:
+                    if actor.cold_history is not None and actor.cold_history.native_cc and (
+                        not is_native or not all(ordinary_custom_tool(tool) for tool in body.get("tools", []))
+                    ):
+                        raise InputRejection("unsupported_parameter")
+                    if actor.cold_history is not None and not actor.cold_history.native_cc:
                         prompt_index = len(actor.cold_history.history) + 1
                         # 继续使用原进程的生效设置，校验通过后才把回执交给等待工具。
                         plan = ColdHistory.from_request(
                             {**body, "messages": messages[:prompt_index]}, actor.cold_history.system_policy,
                             cache_ttl=actor.cold_history.cache_ttl,
                             signed_models=dict(actor.cold_history.recovered_models),
+                            direct_options=direct_options,
                         )
                         if not native_body_policy or not actor.cold_history.matches_receipt_plan(plan) or not tool_results_only:
                             raise InputRejection("unsupported_parameter")
@@ -1937,8 +1952,11 @@ class SessionDriver:
                                 raise InputRejection("unrecoverable_tool")
                             retire_for_recovery = actor
                     if retire_for_recovery is None:
+                        if direct_options and actor.cold_history is None:
+                            raise InputRejection("unsupported_parameter")
                         handle = _Reserved(actor, "continuation", history, answers, body, stream, frozen, reservation,
-                                           active_request, input_observation=input_observation)
+                                           active_request, input_observation=input_observation,
+                                           direct_options=direct_options)
                         actor.claim = handle
                         return handle
             if checkpoint is not None:
@@ -1956,7 +1974,7 @@ class SessionDriver:
                 raise InputRejection("unsupported_parameter")
             boundary = dict(native_checkpoint)
             signed_tool_models = boundary.pop("signed_tool_models", {})
-            cold = ColdHistory.from_receipt_boundary(body, boundary)
+            cold = ColdHistory.from_receipt_boundary(body, boundary, direct_options=direct_options)
             if cold is None:
                 raise InputRejection("unsupported_parameter")
             request = _receipt_request(body, reservation, cache_ttl=cold.cache_ttl, previous=prior_request)
@@ -1965,11 +1983,18 @@ class SessionDriver:
             recovery_history = cold.resume_receipts(messages, signed_tool_models=signed_tool_models)
             if recovery_history is None:
                 raise InputRejection("unsupported_parameter")
-        elif cold is None and native_history_allowed and checkpoint is None:
+        elif cold is None and (native_history_allowed and checkpoint is None or self.direct_mode and is_native):
             storage = getattr(self.launcher, "STORAGE", None)
             reader = partial(read_bound_history, reservation, storage) if storage is not None else None
-            cold = ColdHistory.from_request(body, system_policy, cache_ttl=native_cache_ttl, read_history=reader)
-        if cold is None and system_policy != "append" and not is_native and checkpoint is None:
+            if is_native:
+                cold = ColdHistory.from_cc(body, restoring_receipt=checkpoint is not None,
+                                           cache_ttl=native_cache_ttl, read_history=reader, direct_options=direct_options)
+                if cold is None:
+                    fork_results = {}
+            else:
+                cold = ColdHistory.from_request(body, system_policy, cache_ttl=native_cache_ttl, read_history=reader,
+                                                direct_options=direct_options)
+        if cold is None and (direct_options or system_policy != "append" and not is_native and checkpoint is None):
             raise InputRejection("unsupported_parameter")
         if retire_for_recovery is not None:
             # 热续轮会改写空结果和纯文本数组，或移除图片。校验完整回执后沿同一修订恢复。
@@ -2110,6 +2135,7 @@ class SessionDriver:
                             reservation,
                             request if checkpoint is not None else None,
                             input_observation=input_observation,
+                            direct_options=direct_options,
                         )
                         actor.claim = handle
                         return handle
