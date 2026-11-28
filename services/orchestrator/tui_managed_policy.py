@@ -12,7 +12,6 @@ from tempfile import TemporaryDirectory
 
 from runtime_files import atomic_text, directory_fd
 from system_update_contract import safe_read, strict_json
-from tui_direct_selection import DIRECT_ACCOUNT_PATH, DIRECT_DIRECTORY, selector_matches
 
 
 POLICY_DIRECTORY = 'tui-managed-policies'
@@ -44,20 +43,6 @@ def _verify_marketplace(marketplace: Path) -> None:
         for item in directories.pop().iterdir():
             if S_ISDIR(_trusted(item, sender_readable=True).st_mode):
                 directories.append(item)
-
-
-def direct_account_selected(data: Path, *, account_id: int | None, environment_id: str,
-                            supports_multiple: bool = True) -> bool:
-    """读所属节点的账号直发选择。@param data 节点私有数据根。
-    @param account_id 网关登记的账号。@param environment_id 原环境。
-    @param supports_multiple 账号镜像支持多账号目录。@return 是否匹配该账号环境。
-    """
-    try:
-        _trusted(data, directory=True)
-    except FileNotFoundError:
-        return False
-    return selector_matches(data / DIRECT_DIRECTORY, account_id=account_id, environment_id=environment_id,
-                            supports_multiple=supports_multiple)
 
 
 def shipped_direct_policy(data: Path, *, account_id: int, environment_id: str) -> dict:

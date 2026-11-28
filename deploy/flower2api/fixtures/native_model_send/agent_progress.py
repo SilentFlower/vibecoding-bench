@@ -105,25 +105,22 @@ def verify_agent_progress(manage, token, foreign, received, database, samples, c
     snapshots = wait_for(archive_snapshot)
 
     modes = []
-    for local in (True, False):
-        manage("PUT", "settings", {"tui_local_agent_summary": str(local).lower()})
+    for retired_setting in (True, False):
+        manage("PUT", "settings", {"tui_local_agent_summary": str(retired_setting).lower()})
         for stream in (True, False):
             before = len(received)
-            _, raw, request_id = send("progress", f"progress_local_{local}_stream_{stream}", stream=stream)
+            _, raw, request_id = send("progress", f"progress_setting_{retired_setting}_stream_{stream}", stream=stream)
             message_id, text, usage, _ = _public_text_reply(raw, stream)
-            expected = ("Reading file fixture-note.txt", (0, 0)) if local else MODEL_TEXT_REPLIES["progress"]
-            assert (text, usage) == expected
-            assert len(received) - before == int(not local)
+            assert (text, usage) == MODEL_TEXT_REPLIES["progress"]
+            assert len(received) - before == 1
             assert pending_tools() == pending
             assert all(file.read_bytes() == data for file, data in snapshots.items())
             detail = manage("GET", "request-diagnostics/" + request_id)
             attempts = detail["attempts"]
-            assert len(attempts) == int(not local)
-            if not local:
-                assert attempts[0]["request_id"] == request_id
-            modes.append({"local": local, "stream": stream, "request_id": request_id, "message_id": message_id,
+            assert len(attempts) == 1 and attempts[0]["request_id"] == request_id
+            modes.append({"retired_setting": retired_setting, "stream": stream, "request_id": request_id, "message_id": message_id,
                           "usage": usage, "model_posts": len(received) - before, "attempts": attempts,
-                          "model_body_sha256": received[-1][0] if not local else None})
+                          "model_body_sha256": received[-1][0]})
     assert len({mode["message_id"] for mode in modes}) == len(modes)
     send("progress", "progress_foreign_principal", secret=foreign, status=400)
     unrelated = str(uuid4())
@@ -154,15 +151,15 @@ def verify_agent_progress(manage, token, foreign, received, database, samples, c
                            "stream": stream, "message_id": message_id, "text": text, "usage": usage,
                            "stop_reason": stop_reason, "attempt_id": reservation, "model_body_sha256": received[-1][0]}
     assert len({receipt["message_id"] for receipt in receipts.values()}) == len(receipts)
-    assert len(received) == 6
+    assert len(received) == 8
 
     def usage_rows():
         with closing(connect(database)) as db:
             result = db.execute("SELECT input_tokens,output_tokens,partial FROM usage_records WHERE account_id=1").fetchall()
-        return result if len(result) >= 6 else None
+        return result if len(result) >= 8 else None
 
     ledger = wait_for(usage_rows)
-    assert sorted(ledger) == [(10, 8, 0)] * 2 + [(17, 3, 0), (23, 5, 0)] + [(29, 6, 0)] * 2
+    assert sorted(ledger) == [(10, 8, 0)] * 2 + [(17, 3, 0), (23, 5, 0)] + [(29, 6, 0)] * 4
     assert not any(file.is_file() for file in Path("/flows/api").rglob("*"))
     return {"parent_request_id": parent_id, "child_request_id": child_id, "cases": modes, "usage_records": ledger,
             "original_archive_and_bindings": len(snapshots), "receipts": receipts, "foreign_principal_status": 400,

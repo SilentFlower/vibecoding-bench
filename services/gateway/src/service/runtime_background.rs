@@ -8,6 +8,7 @@ use crate::error::AppError;
 use crate::model::account::Account;
 use crate::service::oauth::OAUTH_TOKEN_URL;
 use crate::service::runtime_transport::{self, PreparedRequest};
+use crate::service::tui_backend::TUI_V2;
 use crate::service::version_profile::EVENT_LOGGING_V2_PATH;
 use crate::tlsfp::TlsProfileId;
 
@@ -93,8 +94,8 @@ pub(crate) async fn execute(
     purpose: BackgroundPurpose,
     tls_profile: TlsProfileId,
 ) -> Result<Response, AppError> {
-    if purpose == BackgroundPurpose::TokenTest && runtime_transport::us_claude_direct_required() {
-        return Err(AppError::BadRequest("US Claude 账号请用 OAuth 用量接口检查凭据".into()));
+    if purpose == BackgroundPurpose::TokenTest && account.request_backend == TUI_V2 {
+        return Err(AppError::BadRequest("V2 账号请用 OAuth 用量接口检查凭据".into()));
     }
     let v3 = !std::env::var("V3_RUNTIME_URL")
         .unwrap_or_default()

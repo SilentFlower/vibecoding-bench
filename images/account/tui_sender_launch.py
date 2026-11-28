@@ -21,7 +21,6 @@ from urllib.parse import urlsplit
 from uuid import UUID
 
 from runtime_files import atomic_json, atomic_text, directory_fd, private_directory
-from tui_direct_selection import DIRECT_ACCOUNT_PATH, selector_matches
 from tui_direct_version import DIRECT_CLI_SHA256, DIRECT_CLI_VERSION
 from tui_messages import (
     BODY_LIMIT, MODEL_PROTOCOL_HEADERS, OAUTH_FILE_LIMIT,
@@ -39,7 +38,6 @@ STORAGE = Path("/native")
 GUARD = Path("/opt/flower/tui/tui-guard")
 CONNECT_SHIM = GUARD.with_name("tui-connect.so")
 LOCAL_PROVIDER = Path("/run/v3/tui-local-provider.json")
-DIRECT_SELECTION = Path(DIRECT_ACCOUNT_PATH)
 _OAUTH_FILE_NAME = ".credentials.json"
 ACCOUNT_ORIGIN = "https://api.anthropic.com"
 _program_lock = Lock()
@@ -191,7 +189,7 @@ def _managed_policy_enabled() -> bool:
 
 
 def direct_model_enabled() -> bool:
-    """报告本角色的独立直发选择。@return 控制端是否绑定了直发。"""
+    """报告编排为本角色核定的直发能力。@return 当前绑定是否具备直发能力。"""
     return os.environ.get("V3_TUI_DIRECT") == "1"
 
 
@@ -210,9 +208,6 @@ def _check_direct_policy(config):
             or any(policy.get(key) != binding[key] for key in ('account_id', 'environment_id'))
             or not policy.get("managed_order") or policy.get("direct_hook_sha256") not in allowed_hooks):
         raise ValueError("账号直发缺少同发行的管理员 Mod")
-    if config.get('tui_direct_from_release') is not True and not selector_matches(
-            DIRECT_SELECTION, account_id=binding['account_id'], environment_id=binding['environment_id']):
-        raise ValueError('原账号的直发开关已关闭或改变')
 
 
 def _bound_sender(reservation: dict) -> tuple[dict, dict]:
@@ -228,7 +223,7 @@ def direct_proxy(reservation: dict) -> str:
     """取本轮已校验账号的冻结代理配置。@param reservation 同轮预留。@return 账号代理 URL。"""
     config, _ = _bound_sender(reservation)
     if not direct_model_enabled():
-        raise ValueError("账号未选定直发")
+        raise ValueError("当前账号环境缺少直发能力")
     _check_direct_policy(config)
     return config["proxy_url"]
 

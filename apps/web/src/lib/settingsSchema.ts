@@ -629,18 +629,6 @@ export const settingsGroups:SettingsGroup[] = [
         ]
       },
       {
-        "title": "V2 子代理进度",
-        "description": "适用于 Claude Code 的后台进度查询。",
-        "fields": [
-          {
-            "key": "tui_local_agent_summary",
-            "label": "本地生成子代理进度",
-            "kind": "boolean",
-            "help": "默认由模型生成进度，按实际用量计费。开启后由网关根据最近的工具动作生成，模型用量为零。"
-          }
-        ]
-      },
-      {
         "title": "后台状态分类",
         "description": "按完整模型 ID 匹配 Claude Code 后台分类请求。",
         "fields": [

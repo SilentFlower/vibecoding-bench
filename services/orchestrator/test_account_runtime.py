@@ -30,10 +30,10 @@ from native_sender import NativePreparationBlocked
 from native_kernel_upgrade import validate_records
 from project_library import digest_json
 from tui_direct_admin import update_binding
-from tui_direct_selection import MULTI_SELECTION_LABEL, MULTI_SELECTION_VERSION
+from tui_direct_selection import DIRECT_ACCOUNT_PATH, DIRECT_DIRECTORY
 from tui_managed_policy import (DEFAULT_DIRECT_LABEL, DEFAULT_POLICY_DIRECTORY,
-                                DIRECT_ACCOUNT_PATH, DIRECT_DIRECTORY, MANAGED_MARKETPLACE_PATH, MANAGED_SETTINGS_PATH,
-                                POLICY_DIRECTORY, direct_account_selected, managed_policy)
+                                MANAGED_MARKETPLACE_PATH, MANAGED_SETTINGS_PATH,
+                                POLICY_DIRECTORY, managed_policy)
 import main
 
 
@@ -2893,22 +2893,19 @@ class AccountRuntimeTests(unittest.TestCase):
             selector = self.root / DIRECT_DIRECTORY / 'account.json'
             selector.parent.mkdir(mode=0o755)
             atomic_json(selector, {'account_id': 7, 'environment_id': environment}, 0o444)
-            self.assertTrue(direct_account_selected(self.root, account_id=7, environment_id=environment))
-            self.assertFalse(direct_account_selected(self.root, account_id=8, environment_id='b' * 32))
-            with self.assertRaisesRegex(ValueError, '环境已变化'):
-                direct_account_selected(self.root, account_id=7, environment_id='b' * 32)
             hooks = market / 'guard/hooks'
             hooks.mkdir()
             atomic_json(hooks / 'hooks.json', {'modules': ['./engine.js']}, 0o444)
             (hooks / 'engine.js').write_text('export function register() {}\n')
-            with self.assertRaisesRegex(ValueError, '内建 guard'):
+            with self.assertRaisesRegex(RuntimeBusy, '排空并停止当前账号环境'):
                 self.runtime.ensure(account)
             settings = json.loads((bundle / 'managed-settings.json').read_bytes())
             settings['appendPlugins'] = ['guard@approved']
             settings['prependPlugins'] = []
             atomic_json(bundle / 'managed-settings.json', settings, 0o444)
-            with self.assertRaisesRegex(ValueError, '内建 guard'):
+            with self.assertRaisesRegex(RuntimeBusy, '排空并停止当前账号环境'):
                 self.runtime.ensure(account)
+            self.assertFalse(managed_policy(self.root, account_id=7, environment_id=environment)['managed_order'])
             settings.pop('prependPlugins')
             atomic_json(bundle / 'managed-settings.json', settings, 0o444)
             self.assertTrue(managed_policy(self.root, account_id=7, environment_id=environment)['managed_order'])
@@ -2917,14 +2914,17 @@ class AccountRuntimeTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeBusy, '排空并停止当前账号环境'):
                 self.runtime.ensure(account)
             stop_roles(enabled)
-            direct, _ = self.runtime.ensure(account)
+            labels = self.client.images.get.return_value.attrs['Config']['Labels']
+            labels[DEFAULT_DIRECT_LABEL] = '1'
+            direct, _ = self.runtime.ensure(account, prepare_tui=True)
             self.assertEqual(direct['generation'], enabled['generation'] + 1)
             sender = self.client.containers.run.call_args.kwargs
             self.assertEqual(sender['environment']['V3_TUI_DIRECT'], '1')
-            self.assertEqual(sender['volumes'][str(selector.parent)], {'bind': DIRECT_ACCOUNT_PATH, 'mode': 'ro'})
+            self.assertNotIn(str(selector.parent), sender['volumes'])
             self.assertEqual(install.call_args.args[1], '2.1.321')
 
             selector.unlink()
+            labels.pop(DEFAULT_DIRECT_LABEL)
             bundle.rename(self.root / 'released-policy')
             with self.assertRaisesRegex(RuntimeBusy, '排空并停止当前账号环境'):
                 self.runtime.ensure(account)
@@ -2941,14 +2941,14 @@ class AccountRuntimeTests(unittest.TestCase):
             volume['bind'] for volume in sender['volumes'].values()))
 
     @unittest.skipUnless(os.geteuid() == 0, '管理员选择器测试需要 root')
-    def test_direct_selection_rebuilds_only_the_drained_account(self) -> None:
-        """同节点两个账号独占策略及代理，撤销只影响选中的账号。@return 无。"""
+    def test_direct_policy_rebuilds_only_the_drained_account(self) -> None:
+        """同节点两个账号独立受管，旧选择器的变化与当前环境准备无关。@return 无。"""
         containers = self._isolated_docker(unique_roles=True)
         labels = self.client.images.get.return_value.attrs['Config']['Labels']
         labels.update({
             'vibebench.tui-sender-protocol': '1', 'vibebench.tui-session-host': '1',
             'vibebench.tui-managed-oauth': '1', 'vibebench.tui-managed-policy': '1',
-            'vibebench.tui-direct-protocol': '1', 'vibebench.native-runtime': '293-raw-1',
+            'vibebench.tui-direct-protocol': '1', 'vibebench.native-runtime': '293-raw-1', DEFAULT_DIRECT_LABEL: '1',
         })
 
         with self.database() as connection:
@@ -2992,9 +2992,6 @@ class AccountRuntimeTests(unittest.TestCase):
         with (patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sender_active', return_value=0),
               patch.object(self.runtime, '_running_sender_active', return_value=False),
               patch.object(self.runtime, '_ensure_version'), patch.dict(os.environ, {'V3_NATIVE_SENDER_MEMORY': '128m'})):
-            with self.assertRaisesRegex(ValueError, '多账号直发需要支持'):
-                self.runtime.ensure(first)
-            labels[MULTI_SELECTION_LABEL] = MULTI_SELECTION_VERSION
             with self.assertRaisesRegex(ValueError, '认证类型或状态不可用'):
                 self.runtime.ensure(disabled)
             login, _ = self.runtime.ensure(disabled, allow_inactive_login=True)
@@ -3008,10 +3005,14 @@ class AccountRuntimeTests(unittest.TestCase):
                 self.assertEqual(config['binding']['environment_id'], environments[gateway_id])
                 self.assertEqual(config['tui_managed_policy']['account_id'], gateway_id)
                 self.assertEqual(config['proxy_source'], f'socks5://192.0.2.{gateway_id}:1080')
-                self.assertIn({'Type': 'bind', 'Source': str(self.root / DIRECT_DIRECTORY),
-                               'Destination': DIRECT_ACCOUNT_PATH, 'RW': False},
-                              containers[row['sender_container_id']].attrs['Mounts'])
+                self.assertFalse(any(mount['Destination'] == DIRECT_ACCOUNT_PATH
+                                     for mount in containers[row['sender_container_id']].attrs['Mounts']))
             update_binding(self.root, account_id=7, environment_id=environments[7], publish=False)
+            self.assertEqual(self.runtime.ensure(first)[0]['generation'], a['generation'])
+            settings_path = self.root / POLICY_DIRECTORY / environments[7] / 'managed-settings.json'
+            settings = json.loads(settings_path.read_bytes())
+            settings['appendPlugins'] = []
+            atomic_json(settings_path, settings, 0o444)
             with self.assertRaisesRegex(RuntimeBusy, '排空并停止当前账号环境'):
                 self.runtime.ensure(first)
             for column in ROLE_COLUMNS.values():

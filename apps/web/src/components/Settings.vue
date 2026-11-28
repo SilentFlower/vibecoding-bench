@@ -93,7 +93,6 @@ const rewriteDisabledThinkingEnabled = ref(false);
 const rewriteDisabledThinkingModels = ref('claude-fable-5');
 
 /** assistant prefill 本地拦截配置 */
-const tuiLocalAgentSummary = ref(false);
 const interceptAssistantPrefillEnabled = ref(false);
 const interceptAssistantPrefillModels = ref('claude-fable-5,claude-opus-5,claude-opus-4-8,claude-opus-4-7');
 
@@ -538,7 +537,6 @@ async function loadSettings() {
     sessionHelloProbeFailureCooldownSecs.value = data.session_hello_probe_failure_cooldown_secs ?? '300';
     rewriteDisabledThinkingEnabled.value = (data.rewrite_disabled_thinking_enabled ?? 'false') === 'true';
     rewriteDisabledThinkingModels.value = data.rewrite_disabled_thinking_models ?? 'claude-fable-5';
-    tuiLocalAgentSummary.value = data.tui_local_agent_summary === 'true';
     interceptAssistantPrefillEnabled.value = (data.intercept_assistant_prefill_enabled ?? 'false') === 'true';
     interceptAssistantPrefillModels.value = data.intercept_assistant_prefill_models ?? 'claude-fable-5,claude-opus-5,claude-opus-4-8,claude-opus-4-7';
     log429RequestEnabled.value = (data.log_429_request_enabled ?? 'false') === 'true';
@@ -733,7 +731,6 @@ const fieldBindings: Record<string, {get: () => string;set: (value: string) => v
   session_hello_probe_failure_cooldown_secs: { get: () => formString(trimFormString(sessionHelloProbeFailureCooldownSecs.value)), set: value => { sessionHelloProbeFailureCooldownSecs.value = value as typeof sessionHelloProbeFailureCooldownSecs.value; } },
   rewrite_disabled_thinking_enabled: { get: () => formString(rewriteDisabledThinkingEnabled.value ? 'true' : 'false'), set: value => { rewriteDisabledThinkingEnabled.value = value === 'true'; } },
   rewrite_disabled_thinking_models: { get: () => formString(trimFormString(rewriteDisabledThinkingModels.value)), set: value => { rewriteDisabledThinkingModels.value = value as typeof rewriteDisabledThinkingModels.value; } },
-  tui_local_agent_summary: { get: () => formString(tuiLocalAgentSummary.value ? 'true' : 'false'), set: value => { tuiLocalAgentSummary.value = value === 'true'; } },
   intercept_assistant_prefill_enabled: { get: () => formString(interceptAssistantPrefillEnabled.value ? 'true' : 'false'), set: value => { interceptAssistantPrefillEnabled.value = value === 'true'; } },
   intercept_assistant_prefill_models: { get: () => formString(trimFormString(interceptAssistantPrefillModels.value)), set: value => { interceptAssistantPrefillModels.value = value as typeof interceptAssistantPrefillModels.value; } },
   log_429_request_enabled: { get: () => formString(log429RequestEnabled.value ? 'true' : 'false'), set: value => { log429RequestEnabled.value = value === 'true'; } },

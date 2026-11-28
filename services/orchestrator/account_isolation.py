@@ -24,8 +24,7 @@ from runtime_files import atomic_json, directory_fd
 from system_profile import (COMPUTER_PROFILE_LABEL, COMPUTER_PROFILE_VERSION, SYSTEM_PROFILE_DIRECTORY,
     SYSTEM_PROFILE_LABEL, SYSTEM_PROFILE_VERSION)
 from tui_managed_policy import (
-    DEFAULT_POLICY_DIRECTORY, DIRECT_ACCOUNT_PATH, DIRECT_DIRECTORY, MANAGED_MARKETPLACE_PATH,
-    MANAGED_SETTINGS_PATH, POLICY_DIRECTORY,
+    DEFAULT_POLICY_DIRECTORY, MANAGED_MARKETPLACE_PATH, MANAGED_SETTINGS_PATH, POLICY_DIRECTORY,
 )
 
 
@@ -402,8 +401,6 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
                     sender_env['V3_TUI_MANAGED_POLICY'] = '1'
                     if account.get('tui_direct'):
                         sender_env['V3_TUI_DIRECT'] = '1'
-                        if not account.get('tui_direct_from_release'):
-                            sender_mounts[str(runtime.host_data / DIRECT_DIRECTORY)] = {'bind': DIRECT_ACCOUNT_PATH, 'mode': 'ro'}
             else:
                 sender_env['V3_TUI_LOCAL_PROVIDER_CONFIG'] = '/run/v3/tui-local-provider.json'
         sender_env['CCRB_CRIU_REASON'] = restore['reason'] or ''

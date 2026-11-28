@@ -78,10 +78,30 @@ export const tlsReasons:Record<string,string> = {OBSERVER_NOT_CONFIGURED: '采�
     OBSERVER_STATUS_UNAVAILABLE: '等待实际检查', IMAGE_NOT_ADMITTED: '当前内核尚未准入',
     PROBE_ATTACH_FAILED: '探针附着失败', BPF_LOAD_FAILED: '探针加载失败',
     OBSERVER_FAILED: '采集器已退出', CAPTURE_PREPARING: '后台准备中'};
+const tuiV2UnavailableLabels = new Map([
+  ['account_inactive', '当前账号未启用'],
+  ['oauth_required', '交互运行时 V2 需要 OAuth 授权'],
+  ['proxy_required', '交互运行时 V2 需要账号代理'],
+  ['not_configured', '账号环境尚未配置 V2 发送器'],
+  ['not_running', '账号发送器尚未运行，保存 V2 时会尝试准备'],
+  ['binding_unverified', 'V2 账号与运行环境绑定待核对'],
+  ['messages_tool_and_usage_events_unavailable', '当前发送器缺少新版 V2 交互事件能力'],
+  ['readiness_config', 'V2 发送器配置待核对'],
+  ['readiness_ledger', 'V2 发送器账本待核对'],
+  ['readiness_source', 'V2 交互 CLI 或受管策略未就绪'],
+  ['direct_unavailable', '当前发送器缺少 CLI 直发能力'],
+]);
+
+/** 显示 V2 准备阶段返回的原因。@param reason 受控原因。@return 用户可见说明。 */
+export function tuiV2UnavailableLabel(reason?: string | null): string {
+  return tuiV2UnavailableLabels.get(reason ?? '') ?? 'V2 发送器就绪状态待核对';
+}
+
 /** 按当前环境的发送器回执显示 V2。@param value 实际回执。@return 就绪与会话状态。 */
 export function tuiRuntimeLabel(value: RuntimeEnvironment['tui_runtime']): string {
   if (!value) return 'V2 运行状态未观测';
-  if (!value.ready) return 'V2 发送器未就绪';
+  if (!value.ready) return value.reason ? tuiV2UnavailableLabel(value.reason) : 'V2 发送器未就绪';
+  if (value.direct === false) return tuiV2UnavailableLabel('direct_unavailable');
   if (value.idle == null) return 'V2 发送器就绪';
   return value.idle ? 'V2 会话空闲' : 'V2 会话使用中';
 }

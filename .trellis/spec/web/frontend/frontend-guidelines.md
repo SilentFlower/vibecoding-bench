@@ -107,6 +107,8 @@ const isValidLimit = computed(() => {
 
 ## 账号与凭据展示
 
+- Claude 账号配置沿生效值、待切目标和修订展示转发卡片。V1 与重写的 V2 可在同一页面选择。V2 卡片显示账号代理直发和准备条件，失败说明读取 `tui_v2_unavailable_reason`。运行环境只显示当前代次的发送器观测。已观测缺直发显示未就绪，缺回执显示未观测。
+
 - `access_token`、`refresh_token`、setup token、proxy password 默认不完整展示。
 - 邮箱、账号 UUID、organization UUID 可以展示，但不要和 token 一起导出到日志。
 - usage、RPM、并发和队列状态应标明窗口来源，避免把 5h/7d/RPM 混在一起。

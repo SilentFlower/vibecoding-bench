@@ -9,14 +9,14 @@ use tokio::time::{Instant, MissedTickBehavior, interval};
 use tracing::{debug, warn};
 
 use crate::error::AppError;
-use crate::model::account::{Account, AccountAuthType, AccountStatus, TuiSystemPromptPolicy};
+use crate::model::account::{Account, AccountStatus, TuiSystemPromptPolicy};
 use crate::service::account::{AccountQueue, AccountService};
 use crate::service::diagnostics::tui_admission_rejected;
 use crate::service::runtime_bridge::{account_config_permit, account_route_config_permit};
 use crate::service::runtime_transport::{
-    TuiBindingStatus, TuiReadySender, TuiRollbackReadiness, ready_tui_sender, tui_fixture,
-    tui_input_rejection, tui_rollback_readiness, tui_same_binding, tui_scope, tui_switch_status,
-    tui_transition_status, us_claude_direct_required,
+    TuiBindingStatus, TuiReadySender, TuiRollbackReadiness, TuiV2Unavailable, ready_tui_sender,
+    tui_direct_prerequisite, tui_fixture, tui_input_rejection, tui_rollback_readiness,
+    tui_same_binding, tui_scope, tui_switch_status, tui_transition_status,
 };
 use crate::service::system_update::background_admission;
 use crate::service::tui_native_drain::{self, NativeTurn};
@@ -186,12 +186,6 @@ async fn reconcile_locked(
     {
         return Ok(state);
     }
-    if us_claude_direct_required() && state.target != TUI_V2 {
-        // 撤销上一版遗留的兼容切换意向，原轮的生效值和环境绑定继续保留。
-        return service
-            .update_tui_backend(account.id, &state, &state.active, "", &state.binding)
-            .await;
-    }
     // 响应头前由路由读锁保护。HTTP 在途由账号活动门禁保护。V2 等工具的会话由 sender 核对。
     let Ok(_route) = queue.tui_route.try_write() else {
         return Ok(state);
@@ -199,8 +193,8 @@ async fn reconcile_locked(
     let fixture = tui_fixture(account);
     let active_v2 = state.active == TUI_V2;
     let unbound_v2 = active_v2 && state.target != TUI_V2 && state.binding.is_empty();
-    let returning_to_v1 = active_v2 && state.target == "native293";
-    let _update_activity = if returning_to_v1 {
+    let leaving_v2 = active_v2 && state.target != TUI_V2;
+    let _update_activity = if leaving_v2 {
         let Some(activity) = background_admission()? else {
             return Ok(state);
         };
@@ -234,7 +228,7 @@ async fn reconcile_locked(
     }
     let (confirmed, stopped) = if fixture || unbound_v2 {
         (state.binding.clone(), false)
-    } else if returning_to_v1 {
+    } else if leaving_v2 {
         let Ok(Some(readiness)) = tui_rollback_readiness(account, &state.binding).await else {
             return Ok(state);
         };
@@ -277,11 +271,6 @@ pub(crate) async fn change_locked(
     target: &str,
     expected: Option<i64>,
 ) -> Result<Value, AppError> {
-    if us_claude_direct_required() && target != TUI_V2 {
-        return Err(AppError::BadRequest(
-            "US Claude 账号只支持交互 V2 直发".into(),
-        ));
-    }
     if !tui_scope(account) {
         return Err(AppError::BadRequest("账号没有已配置的 V2 运行环境".into()));
     }
@@ -301,22 +290,16 @@ pub(crate) async fn change_locked(
     // 相同意向的重试不推进配置，也不会重新执行 quiesce。
     if pending == before.target {
         let ready = tui_transition_status(account).await;
-        return Ok(view(account, &before, ready.as_ref().ok()));
+        return Ok(view(account, &before, ready.as_ref().map_err(|reason| *reason)));
     }
     if expected.is_some_and(|version| version != before.revision) {
         return Err(AppError::SchedulingConflict);
     }
-    let crosses_v2 = !pending.is_empty()
-        && (target == TUI_V2 || before.active == TUI_V2 && !before.binding.is_empty());
-    let returning_to_v1 = before.active == TUI_V2 && target == "native293" && !tui_fixture(account);
-    let ready = if crosses_v2 && !returning_to_v1 {
-        tui_switch_status(account).await
+    let ready = if pending == TUI_V2 {
+        Ok(tui_switch_status(account).await?)
     } else {
         tui_transition_status(account).await
     };
-    if target == TUI_V2 && target != before.active && ready.is_err() {
-        return Err(ready.unwrap_err());
-    }
     let binding = if pending.is_empty() && before.active != TUI_V2 {
         ""
     } else if before.active == TUI_V2 || !before.binding.is_empty() {
@@ -331,13 +314,13 @@ pub(crate) async fn change_locked(
         .update_tui_backend(account.id, &before, &before.active, pending, binding)
         .await?;
     let state = reconcile_locked(service, account, queue, saved).await?;
-    Ok(view(account, &state, ready.as_ref().ok()))
+    Ok(view(account, &state, ready.as_ref().map_err(|reason| *reason)))
 }
 
 fn view(
     account: &Account,
     state: &TuiBackendSnapshot,
-    runtime: Option<&TuiBindingStatus>,
+    runtime: Result<&TuiBindingStatus, TuiV2Unavailable>,
 ) -> Value {
     let mut value = json!(account);
     attach_status(&mut value, account, state, runtime);
@@ -357,19 +340,36 @@ fn attach_status(
     value: &mut Value,
     account: &Account,
     state: &TuiBackendSnapshot,
-    runtime: Option<&TuiBindingStatus>,
+    runtime: Result<&TuiBindingStatus, TuiV2Unavailable>,
 ) {
     value["request_backend"] = json!(state.active);
-    value["tui_direct_required"] = json!(us_claude_direct_required());
     value["request_backend_pending"] = json!((!state.target.is_empty()).then_some(&state.target));
     value["request_backend_revision"] = json!(state.revision);
-    value["tui_v2_available"] = json!(runtime.is_some_and(|status| {
-        let bound = (state.active != TUI_V2 && state.binding.is_empty())
-            || tui_same_binding(&state.binding, &status.key)
-            || (status.idle && status.can_advance(&state.binding));
-        bound && (tui_fixture(account) || status.direct_https)
-    }));
-    value["tui_direct_available"] = json!(runtime.is_some_and(|status| status.direct_https));
+    let reason = if account.status != AccountStatus::Active {
+        Some(TuiV2Unavailable::AccountInactive)
+    } else if let Some(reason) = tui_direct_prerequisite(account) {
+        Some(reason)
+    } else {
+        match runtime {
+            Err(reason) => Some(reason),
+            Ok(status) if !tui_fixture(account) && !status.direct_https => {
+                Some(TuiV2Unavailable::DirectUnavailable)
+            }
+            Ok(status)
+                if !(state.active != TUI_V2 && state.binding.is_empty()
+                    || tui_same_binding(&state.binding, &status.key)
+                    || status.idle && status.can_advance(&state.binding)) =>
+            {
+                Some(TuiV2Unavailable::BindingUnverified)
+            }
+            Ok(_) => None,
+        }
+    };
+    let runtime = runtime.ok();
+    value["tui_v2_available"] = json!(reason.is_none());
+    value["tui_v2_unavailable_reason"] = json!(reason);
+    value["tui_direct_available"] =
+        json!(reason.is_none() && runtime.is_some_and(|status| status.direct_https));
     if state.active == TUI_V2 {
         value["client_system_prompt_policy"] = json!(account.tui_system_prompt_policy);
         value["tui_system_prompt_policy_available"] = json!(runtime.is_some_and(|status| {
@@ -396,16 +396,12 @@ pub(crate) async fn append_view(
     account: &Account,
     value: &mut Value,
 ) -> Result<(), AppError> {
-    if !tui_scope(account) {
+    if !tui_scope(account) && account.request_backend != TUI_V2 {
         return Ok(());
     }
     let state = service.tui_backend(account.id).await?;
-    attach_status(
-        value,
-        account,
-        &state,
-        tui_transition_status(account).await.as_ref().ok(),
-    );
+    let runtime = tui_transition_status(account).await;
+    attach_status(value, account, &state, runtime.as_ref().map_err(|reason| *reason));
     Ok(())
 }
 
@@ -495,7 +491,7 @@ async fn reconcile_account(
     Ok(())
 }
 
-async fn bind_required_direct(
+async fn bind_selected_v2(
     service: &AccountService,
     account: &Account,
     queue: &AccountQueue,
@@ -510,12 +506,6 @@ async fn bind_required_direct(
     let sender = ready_tui_sender(account, deadline, true, None).await?;
     if !sender.idle || tui_native_drain::occupied_v2(service.tui_database(), account.id).await? {
         return Err(busy());
-    }
-    if !state.binding.is_empty()
-        && !tui_same_binding(&state.binding, &sender.key)
-        && !sender.can_advance(&state.binding)
-    {
-        return Err(sender.binding_unavailable());
     }
     let _permit = account_route_config_permit(service, account)
         .await
@@ -538,9 +528,8 @@ pub(super) async fn request_route(
     mut account: Account,
     bootstrap_deadline: Option<Instant>,
 ) -> Result<(Account, Option<TuiRequestRoute>), AppError> {
-    let direct_required = account.is_claude_code() && us_claude_direct_required();
     if !tui_scope(&account) {
-        if direct_required || account.request_backend == TUI_V2 {
+        if account.request_backend == TUI_V2 {
             tui_admission_rejected("tui_route_scope_unavailable");
             return Err(AppError::ServiceUnavailable("V2 环境不可用".into()));
         }
@@ -553,27 +542,15 @@ pub(super) async fn request_route(
     let config = queue.tui_config.lock().await;
     account = service.get_account(account.id).await?;
     let mut state = service.tui_backend(account.id).await?;
-    if direct_required {
-        if account.auth_type != AccountAuthType::Oauth || account.proxy_url.trim().is_empty() {
-            return Err(AppError::ServiceUnavailable(
-                "US Claude 账号直发需要已授权 OAuth 凭据与账号代理".into(),
-            ));
-        }
-        if state.active != TUI_V2 || state.binding.is_empty() {
-            let Some(deadline) =
-                bootstrap_deadline.filter(|_| account.status == AccountStatus::Active)
-            else {
-                tui_admission_rejected("tui_binding_unregistered");
-                return Err(AppError::ServiceUnavailable(
-                    "US Claude 账号的 V2 运行环境等待绑定".into(),
-                ));
-            };
-            state = bind_required_direct(service, &account, &queue, &state, deadline).await?;
-        } else if !state.target.is_empty() {
-            state = service
-                .update_tui_backend(account.id, &state, TUI_V2, "", &state.binding)
-                .await?;
-        }
+    if state.active == TUI_V2
+        && state.binding.is_empty()
+        && state.target.is_empty()
+        && account.status == AccountStatus::Active
+        && !tui_fixture(&account)
+        && let Some(deadline) = bootstrap_deadline
+    {
+        // 只有持久值已经选定 V2 的账号可以在新轮登记首个绑定。
+        state = bind_selected_v2(service, &account, &queue, &state, deadline).await?;
     }
     let route = queue.tui_route.clone().read_owned().await;
     drop(config);

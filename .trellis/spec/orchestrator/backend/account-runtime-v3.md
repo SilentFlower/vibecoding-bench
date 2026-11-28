@@ -8,7 +8,7 @@
 
 ### 2. Signatures
 
-- `PUT /admin/accounts/{id}` 单独提交 `request_backend` 与非负整数 `request_backend_revision`。管理视图返回生效值、待切目标、修订和 `tui_v2_available`。
+- `PUT /admin/accounts/{id}` 单独提交 `request_backend` 与非负整数 `request_backend_revision`。管理视图返回生效值、待切目标、修订、`tui_v2_available` 和 `tui_v2_unavailable_reason`。
 - `GET /internal/v3/transport/{account_id}?wake=false` 读取当前发送器。`NodeTransportInspection` 在节点 `inspect` 操作中携带正整数 `transport_gateway_account`。
 - `GET /internal/v3/transport/{account_id}?wake=false&tui_rollback_generation=<非负整数>` 核验离开 V2 的归属。代次 0 用于历史无代次登记。响应为 `null` 或 `{scope, predecessors, stopped}`，其中 `stopped` 为布尔值。`scope` 及 `predecessors` 的每项均只含 `account_id`、`environment_id`、`generation`、`release_id`、`endpoint`。
 - 账号镜像以 `tui-guard --check` 核验当前节点，以同一程序在发送器分配的 PTY 上启动固定 CLI。探测成功返回 0，隔离初始化失败返回 125。
@@ -16,8 +16,9 @@
 ### 3. Contracts
 
 - 受管 Claude 账号有原生 `native293` 与交互 `tui_v2` 的账号级选择。管理读取只查现有绑定。切入 V2 时，编排确认无运行绑定后可以按需准备该账号。
+- 内核选择由网关账号持久值决定。升级、重启、开户、资料导入及重新启用沿各入口既有选择和默认。系统发行和每环境已有管理员策略供应 V2 能力，历史节点直发名单退出运行合同。
 - V1 和 legacy 按 `POST /v1/messages` 提交的完整历史转发工具结果。持久工具回执由 V2 交互会话登记和认领。请求选号、终态查询和断线恢复只在当前生效为 `tui_v2` 的账号中匹配受支持的 V2 回执。查询内存中的原回复也要核对账号当前后端。
-- 从 V1 切出时，路由读锁和账号活动门禁保护当前 HTTP 请求。历史 V1 回执行退出请求和切换判定。V2 活动轮按原 sender、绑定代次和原回执收尾。V2 新请求按同一账号绑定向受管 CLI 交付完整凭据，模型 HTTPS 仅经该账号代理由 CLI 发起。账号 sender 负责单次许可和连接归属。US 的 Claude 账号设置仅接受交互 V2，中央和 SSH 按同批签名角色和当前管理策略准备。
+- 从 V1 切出时，路由读锁和账号活动门禁保护当前 HTTP 请求。历史 V1 回执行退出请求和切换判定。V2 活动轮按原 sender、绑定代次和原回执收尾。V2 新请求按同一账号绑定向受管 CLI 交付完整凭据，模型 HTTPS 仅经该账号代理由 CLI 发起。账号 sender 负责单次许可和连接归属。中央和 SSH 按同批签名角色和当前管理策略准备。
 - 回切 V1 时，网关在账号路由和活动门禁内确认原 V2 已排空。存在运行绑定时，核验结果须匹配当前实际空闲的发送器。环境已停时，编排复核同账号环境、执行状态及实际角色，SSH 节点使用 `NodeTransportInspection.verify_stopped=true` 在节点锁内核验。核验通过后，网关按原修订提交已有待切目标，已停环境可保持停止。接单开关继续独立控制新请求。
 - SSH 回切所需的跨发行前驱来自同一节点配置、账号、环境和分配修订的已完成维护记录。当前维护为 `rolled_back` 且原账号发行与实际范围一致时，以冻结的原代次和发行查询已完成归档。恢复记录仅提供查询起点，时序和目标发行均须接上实际换版链。
 - 隔离程序读取运行内核的 Landlock ABI。ABI 2 组合目录授权和进程过滤器保护私有文件，允许 CLI 通过本会话获准写入的文件描述符保存配置与历史。已授权的项目工作区可以共享。ABI 3 及以上使用内核的文件截短权限。
@@ -37,6 +38,7 @@ SSH 节点完成更新后，日志中的 `target_account_release` 来自实际�
 | V2 原轮正在交付或等待工具回执 | 待切目标保留，原 sender 继续处理 |
 | V1 工具请求匹配历史 V1 回执 | 按本次完整历史转发 |
 | 节点账号、环境、发行或代次证明不一致 | 拒绝该绑定 |
+| 已选 V2 缺少 OAuth、代理、所需运行能力或同轮直发回执 | 503 并报告实际准备阶段，模型零次 |
 | Landlock ABI 低于 2、规则加载失败或进程过滤器加载失败 | 发送器隔离探测失败。账号切换沿现有未就绪路径返回 |
 
 ### 5. Scenarios and Examples

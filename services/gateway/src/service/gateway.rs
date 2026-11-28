@@ -264,6 +264,14 @@ fn session_hello_probe_session_id(
         .filter(|session| !session.trim().is_empty())
 }
 
+fn unsupported_tui_generation_endpoint() -> AppError {
+    AppError::TuiInput {
+        status: StatusCode::UNPROCESSABLE_ENTITY,
+        code: "claude_generation_endpoint_unsupported",
+        message: "交互运行时 V2 的生成请求请使用 POST /v1/messages",
+    }
+}
+
 fn session_hello_probe_block_response(decision: SessionHelloProbeDecision) -> Option<Response> {
     match decision {
         SessionHelloProbeDecision::Proceed => None,
@@ -2145,17 +2153,10 @@ impl GatewayService {
         let method = req.method().clone();
         let path = req.uri().path().to_string();
         let query = req.uri().query().unwrap_or("").to_string();
-        let direct_only = runtime_transport::us_claude_direct_required();
-        if direct_only
-            && !(method == Method::POST && path == "/v1/messages")
-            && !runtime_transport::direct_claude_metadata_request(method.as_str(), &path)
-        {
-            return Err(AppError::TuiInput {
-                status: StatusCode::UNPROCESSABLE_ENTITY,
-                code: "claude_generation_endpoint_unsupported",
-                message: "US Claude 生成请求请使用 POST /v1/messages",
-            });
-        }
+        let messages_request = method == Method::POST && path == "/v1/messages";
+        let metadata_request = runtime_transport::direct_claude_metadata_request(method.as_str(), &path)
+            && reqwest::Url::parse(&upstream_url_with_base(&self.upstream_base, &path, &query))
+                .is_ok_and(|url| runtime_transport::direct_claude_metadata_request(method.as_str(), url.path()));
         let gemini = req.extensions().get::<Arc<GeminiService>>().cloned();
         let cutover: Option<InferenceCutover> = req.extensions().get().cloned();
         let before_headers = req.extensions().get::<BeforeHeaders>().cloned();
@@ -2346,10 +2347,12 @@ impl GatewayService {
         );
         let cli_status_classifier_summary_only = complete_cli_status_classifier_attribution
             || cli_bg_status_classifier_mode == Some(CliBgStatusClassifierMode::Passthrough);
-        if !direct_only && cli_bg_status_classifier_mode == Some(CliBgStatusClassifierMode::Mock) {
+        let mock_classifier =
+            cli_bg_status_classifier_mode == Some(CliBgStatusClassifierMode::Mock);
+        let classifier_mock_response = |account: Option<&Account>| {
             log_cli_bg_status_classifier_hit(
                 CliBgStatusClassifierMode::Mock,
-                None,
+                account,
                 &headers,
                 &body_map,
                 body_bytes.len(),
@@ -2358,8 +2361,8 @@ impl GatewayService {
                 false,
             );
             diagnostics::local_outcome("mock");
-            return Ok(mock_cli_bg_status_classifier_response(&body_map)?);
-        }
+            mock_cli_bg_status_classifier_response(&body_map)
+        };
 
         if path.starts_with("/v1/messages") {
             let assistant_prefill_config = self.assistant_prefill_intercept_config.read().await;
@@ -2426,9 +2429,9 @@ impl GatewayService {
             && runtime_transport::tui_runtime_configured()
             && let (Some(principal), Some(session)) = (api_token, original_session)
             && !session.starts_with(SERVER_SESSION_PREFIX)
-            && let Some(model) = body_map["model"].as_str()
+            && body_map["model"].is_string()
             && body_map.get("stream").is_none_or(|v| v.is_boolean())
-            && let Some((label, ids)) = super::agent_summary::messages_summary(&body_map)
+            && let Some((_, ids)) = super::agent_summary::messages_summary(&body_map)
             && runtime_transport::tui_agent_header(&native_header_map)
                 .is_ok_and(|hint| hint.is_some())
             && let Some(owner) = summary_account(
@@ -2439,7 +2442,7 @@ impl GatewayService {
             )
             .await?
         {
-            Some((owner, label, model))
+            Some(owner)
         } else {
             None
         };
@@ -2509,8 +2512,8 @@ impl GatewayService {
         } else {
             None
         };
-        let tool_owner = if let Some((owner, ..)) = &summary {
-            Some(*owner)
+        let tool_owner = if let Some(owner) = summary {
+            Some(owner)
         } else if let Some(owner) = replay_owner {
             Some(owner)
         } else if let Some(fork) = &fork {
@@ -2574,27 +2577,6 @@ impl GatewayService {
         };
         // 先冻结本次模式。只有已核对原工具组的进度读取可以获得独立模型预留。
         let native_summary = summary.is_some();
-        if !direct_only
-            && let Some((owner, label, model)) = summary
-            && self
-                .settings_store
-                .get_value("tui_local_agent_summary", "false")
-                .await?
-                == "true"
-        {
-            // 进度读取不占用模型选号、并发和发送许可；上面的原账号、主体及令牌范围仍然适用。
-            if let Some(response) = session_policy_block::check_current().await? {
-                return Ok(response);
-            }
-            diagnostics::selected_account(owner);
-            diagnostics::error_stage("tui_agent_summary");
-            diagnostics::local_outcome("local_response");
-            return Ok(super::gemini::agent_summary_response(
-                label,
-                model,
-                body_map["stream"] == true,
-            ));
-        }
         let request_model = body_map
             .get("model")
             .and_then(|model| model.as_str())
@@ -2689,6 +2671,11 @@ impl GatewayService {
                     // 无可用账号但有上一次的 429 响应，返回给客户端
                     return Ok(last_resp.unwrap());
                 }
+                Err(AppError::ServiceUnavailable(_))
+                    if mock_classifier && !runtime_transport::tui_runtime_configured() =>
+                {
+                    return classifier_mock_response(None);
+                }
                 Err(e @ (AppError::TooManyRequests(_) | AppError::AdmissionLimited { .. })) => {
                     return Err(e);
                 }
@@ -2723,7 +2710,30 @@ impl GatewayService {
                 );
             }
 
-            if !direct_only && path.starts_with("/v1/messages") {
+            let (account, tui_route) = if !metadata_request {
+                let bootstrap_deadline = scheduling_request
+                    .as_ref()
+                    .filter(|_| {
+                        messages_request
+                            && agent_account.is_none()
+                            && !native_summary
+                            && !tui_tool_history::has_result(&body_map)
+                    })
+                    .map(|request| request.deadline());
+                tui_backend::request_route(&self.account_svc, account, bootstrap_deadline).await?
+            } else {
+                (account, None)
+            };
+            let selected_v2 = account.request_backend == TUI_V2;
+            if selected_v2 && !messages_request && !metadata_request {
+                return Err(unsupported_tui_generation_endpoint());
+            }
+            if mock_classifier && !selected_v2 {
+                return classifier_mock_response(Some(&account));
+            }
+            if (!selected_v2 || runtime_transport::tui_fixture(&account))
+                && path.starts_with("/v1/messages")
+            {
                 let warmup_config = *self.warmup_intercept_config.read().await;
                 let classifier_type =
                     detect_auto_mode_classifier_request(&path, &body_map, client_type);
@@ -2824,19 +2834,6 @@ impl GatewayService {
 
             let slot_units = request_slot_units(&path, &body_map);
 
-            let (account, tui_route) = if method == "POST" && path == "/v1/messages" {
-                let bootstrap_deadline = scheduling_request
-                    .as_ref()
-                    .filter(|_| {
-                        agent_account.is_none()
-                            && !native_summary
-                            && !tui_tool_history::has_result(&body_map)
-                    })
-                    .map(|request| request.deadline());
-                tui_backend::request_route(&self.account_svc, account, bootstrap_deadline).await?
-            } else {
-                (account, None)
-            };
             if tool_owner.is_some() && account.request_backend != TUI_V2 {
                 return Err(AppError::BadRequest("工具结果的原执行路径已退场".into()));
             }
@@ -2844,7 +2841,7 @@ impl GatewayService {
                 return Err(AppError::BadRequest("V2 子代理的原执行路径已退场".into()));
             }
 
-            if method == "POST" && path == "/v1/messages" && account.request_backend == TUI_V2 {
+            if messages_request && selected_v2 {
                 let route = tui_route
                     .as_ref()
                     .ok_or_else(|| {
@@ -3054,7 +3051,7 @@ impl GatewayService {
                 }
                 let mut rewrite = UpstreamSessionRewrite::default();
                 // 直发 CLI 持有自己的真实会话。旧上游池不能重写其标题或主会话。
-                if !direct_only
+                if fixture
                     && account.upstream_session_pool_enabled
                     && account.upstream_session_pool_size > 0
                     && client_type == ClientType::ClaudeCode
@@ -4304,6 +4301,13 @@ impl GatewayService {
         scheduling_request: Option<&SchedulingRequest>,
     ) -> Result<Response, AppError> {
         let target_url = upstream_url_with_base(&self.upstream_base, path, query);
+        if account.request_backend == TUI_V2
+            && !reqwest::Url::parse(&target_url)
+                .is_ok_and(|url| runtime_transport::direct_claude_metadata_request(method, url.path()))
+        {
+            // 通用发送只允许固定非生成动作，并以实际解析后的上游路径为准。
+            return Err(unsupported_tui_generation_endpoint());
+        }
 
         debug!("upstream URL: {}", target_url);
 

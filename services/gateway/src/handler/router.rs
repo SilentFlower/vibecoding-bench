@@ -59,7 +59,7 @@ use crate::service::rewriter::{
     CacheControlTtlRewrite, ClaudeCodeContextSanitizerMode, MessageCacheControlRewrite,
 };
 use crate::service::runtime_bridge::{self, RuntimeConfigPermit};
-use crate::service::runtime_transport::us_claude_direct_required;
+use crate::service::runtime_transport::tui_runtime_configured;
 use crate::service::system_update;
 use crate::service::telemetry::TelemetryService;
 use crate::service::tui_backend::TUI_V2;
@@ -99,6 +99,8 @@ use crate::store::token_store::TokenStore;
 const OBSOLETE_SETTINGS_KEYS: &[&str] = &[
     "intercept_warmup_non_stream_aux_enabled",
     "intercept_warmup_non_stream_aux_mode",
+    "tui_direct_only",
+    "tui_local_agent_summary",
 ];
 
 #[derive(Clone)]
@@ -671,7 +673,6 @@ async fn list_accounts(
         "total_pages": total_pages,
         "claude_code_profile_selection_mode": profile_selection_mode,
         "claude_code_version_profile": profile_config.default_profile.key,
-        "tui_direct_required": us_claude_direct_required(),
     })))
 }
 
@@ -700,7 +701,6 @@ fn account_api_value(account: &Account) -> Value {
         };
         value["client_system_prompt_policy"] = json!(policy);
     } else if account.is_claude_code() {
-        value["tui_direct_required"] = json!(us_claude_direct_required());
         crate::service::tui_backend::append_v1_system_prompt(&mut value, &account.request_backend);
     }
     value
@@ -1269,20 +1269,9 @@ async fn create_account(
     if !["claude_code", "antigravity"].contains(&platform) {
         return Err(AppError::BadRequest("账号平台无效".into()));
     }
-    let require_direct = platform == "claude_code" && us_claude_direct_required();
-    let backend = if require_direct {
-        if req
-            .request_backend
-            .as_deref()
-            .is_some_and(|value| value != TUI_V2)
-        {
-            return Err(AppError::BadRequest(
-                "US Claude 账号只支持交互 V2 直发".into(),
-            ));
-        }
-        TUI_V2.to_owned()
-    } else {
-        validate_request_backend(req.request_backend.as_deref().unwrap_or("legacy"))?
+    let backend = match req.request_backend.as_deref().unwrap_or("legacy") {
+        TUI_V2 if platform == "claude_code" && tui_runtime_configured() => TUI_V2.to_owned(),
+        value => validate_request_backend(value)?,
     };
     if platform == "antigravity" && req.auth_type.as_deref() != Some("oauth") {
         return Err(AppError::BadRequest("AGY 账号仅支持原生 OAuth".into()));
@@ -1320,10 +1309,10 @@ async fn create_account(
     if platform != "antigravity" && req.agy_disable_safety_filtering == Some(true) {
         return Err(AppError::BadRequest("原生安全开关仅适用于 AGY 账号".into()));
     }
-    let default_auth = if require_direct { "oauth" } else { "setup_token" };
+    let default_auth = if backend == TUI_V2 { "oauth" } else { "setup_token" };
     let auth_type = req.auth_type.unwrap_or_else(|| default_auth.into()).into();
-    if require_direct && auth_type != AccountAuthType::Oauth {
-        return Err(AppError::BadRequest("US Claude 直发账号需要 OAuth 凭据".into()));
+    if backend == TUI_V2 && auth_type != AccountAuthType::Oauth {
+        return Err(AppError::BadRequest("交互运行时 V2 需要 OAuth 凭据".into()));
     }
     let setup_token = req.setup_token.or(req.token).unwrap_or_default();
     let mut account = Account {
@@ -1439,7 +1428,11 @@ async fn create_account(
     } else {
         state.account_svc.create_account(&mut account).await?;
     }
-    Ok((StatusCode::CREATED, Json(account_api_value(&account))))
+    let mut value = account_api_value(&account);
+    if account.request_backend == TUI_V2 {
+        crate::service::tui_backend::append_view(&state.account_svc, &account, &mut value).await?;
+    }
+    Ok((StatusCode::CREATED, Json(value)))
 }
 
 /// 仅导入已绑定账号的进程实测值，不调用凭据解析或停止发送器。
@@ -1554,16 +1547,6 @@ async fn update_account(
         object.insert("proxy_url".into(), json!(url));
     }
     let mut existing = state.account_svc.get_account(id).await?;
-    if existing.is_claude_code() && us_claude_direct_required() {
-        if updates.get("request_backend").is_some_and(|value| value != TUI_V2) {
-            return Err(AppError::BadRequest(
-                "US Claude 账号只支持交互 V2 直发".into(),
-            ));
-        }
-        if updates.get("auth_type").is_some_and(|value| value != "oauth") {
-            return Err(AppError::BadRequest("US Claude 直发账号需要 OAuth 凭据".into()));
-        }
-    }
     let _tui_config = {
         use crate::service::{runtime_transport::tui_scope, tui_backend};
 
@@ -2151,7 +2134,7 @@ async fn test_account(
     }
     let _credential_activity = state.account_svc.upstream_activity(id).await?;
     let account = state.account_svc.get_account(id).await?;
-    if account.is_antigravity() || (account.is_claude_code() && us_claude_direct_required()) {
+    if account.is_antigravity() || account.request_backend == TUI_V2 {
         let usage = state.account_svc.refresh_usage(id).await?;
         return Ok(Json(json!({"status":"ok","usage":usage})));
     }
@@ -2801,9 +2784,6 @@ async fn get_settings(State(state): State<AppState>) -> Result<Json<serde_json::
         .entry("rewrite_disabled_thinking_models".into())
         .or_insert_with(|| DEFAULT_REWRITE_DISABLED_THINKING_MODELS.to_string());
     settings
-        .entry("tui_local_agent_summary".into())
-        .or_insert_with(|| "false".into());
-    settings
         .entry("intercept_assistant_prefill_enabled".into())
         .or_insert_with(|| DEFAULT_INTERCEPT_ASSISTANT_PREFILL_ENABLED.to_string());
     settings
@@ -3016,7 +2996,6 @@ async fn update_settings(
     for key in &[
         "intercept_warmup_title_enabled",
         "intercept_warmup_suggestion_enabled",
-        "tui_local_agent_summary",
         "intercept_warmup_haiku_probe_enabled",
         "rewrite_disabled_thinking_enabled",
         "intercept_assistant_prefill_enabled",
@@ -5166,60 +5145,36 @@ mod tests {
         assert_eq!(value["fable_weekly_usage_limit_percent"], "50");
     }
 
-    /// 原生进度为默认值。持久设置只接受明确的布尔字符串。
+    /// 旧发送及本地进度设置不能改变 V2 行为。
     #[tokio::test]
-    async fn tui_local_agent_summary_setting_validates_and_persists() {
+    async fn obsolete_tui_delivery_settings_are_not_exposed() {
         let app = test_router().await;
-        for (choice, expected) in [
-            (None, "false"),
-            (Some("true"), "true"),
-            (Some("typo"), "true"),
-            (Some("false"), "false"),
-        ] {
-            if let Some(choice) = choice {
-                let response = app
-                    .clone()
-                    .oneshot(
-                        Request::builder()
-                            .method(Method::PUT)
-                            .uri("/admin/settings")
-                            .header(header::AUTHORIZATION, "Bearer admin")
-                            .header(header::CONTENT_TYPE, "application/json")
-                            .body(Body::from(
-                                serde_json::json!({"tui_local_agent_summary":choice}).to_string(),
-                            ))
-                            .unwrap(),
-                    )
-                    .await
-                    .unwrap();
-                assert_eq!(
-                    response.status(),
-                    if choice == "typo" {
-                        StatusCode::BAD_REQUEST
-                    } else {
-                        StatusCode::OK
-                    }
-                );
-            }
-            let response = app
-                .clone()
-                .oneshot(
-                    Request::builder()
-                        .uri("/admin/settings")
-                        .header(header::AUTHORIZATION, "Bearer admin")
-                        .body(Body::empty())
-                        .unwrap(),
-                )
-                .await
-                .unwrap();
-            let body = body::to_bytes(response.into_body(), 1024 * 1024)
-                .await
-                .unwrap();
-            assert_eq!(
-                serde_json::from_slice::<serde_json::Value>(&body).unwrap()["tui_local_agent_summary"],
-                expected
-            );
-        }
+        let request = |method, body: Body| {
+            Request::builder()
+                .method(method)
+                .uri("/admin/settings")
+                .header(header::AUTHORIZATION, "Bearer admin")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(body)
+                .unwrap()
+        };
+        let updates = json!({"tui_direct_only":"false", "tui_local_agent_summary":"true"});
+        let response = app
+            .clone()
+            .oneshot(request(Method::PUT, Body::from(updates.to_string())))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let response = app
+            .oneshot(request(Method::GET, Body::empty()))
+            .await
+            .unwrap();
+        let body = body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let stored: Value = serde_json::from_slice(&body).unwrap();
+        assert!(stored.get("tui_direct_only").is_none());
+        assert!(stored.get("tui_local_agent_summary").is_none());
     }
 
     #[tokio::test]

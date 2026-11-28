@@ -1,6 +1,6 @@
 //! Gemini入口的账号许可、原生帧保真与跨HTTP工具轮归属。
 mod messages;
-pub(super) use messages::agent_summary_response;
+use messages::agent_summary_response;
 mod receipts;
 mod replay;
 mod websearch;

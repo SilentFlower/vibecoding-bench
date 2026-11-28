@@ -123,8 +123,9 @@ export interface Account {
   request_backend_pending?: RequestBackend | null
   request_backend_revision?: number
   request_backend_wait_reason?: 'draining' | 'runtime_unconfirmed'
-  tui_direct_required?: boolean
+  tui_direct_available?: boolean
   tui_v2_available?: boolean
+  tui_v2_unavailable_reason?: string | null
   tui_system_prompt_policy_available?: boolean
   account_uuid?: string | null
   organization_uuid?: string | null
@@ -834,7 +835,6 @@ export const api = {
       account_counts?: {total:number;active:number;error:number;disabled:number}
       claude_code_profile_selection_mode?: 'client_version' | 'account'
       claude_code_version_profile?: string
-      tui_direct_required?: boolean
     }>('GET', `/admin/accounts?page=${page}&page_size=${pageSize}&q=${encodeURIComponent(query)}&status=${encodeURIComponent(status)}${platform ? `&platform=${encodeURIComponent(platform)}` : ''}`, undefined, signal),
   /** 获取只读调度快照。@param id 账号 ID。@param signal 关闭详情时取消读取。@return 当前状态与真实提交点。 */
   accountScheduling: (id: number, signal?: AbortSignal) =>

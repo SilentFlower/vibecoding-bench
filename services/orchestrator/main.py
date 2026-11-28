@@ -10262,7 +10262,7 @@ def _cc2api_creation_payload(account: dict, profile: dict, observed: Optional[di
         'account_uuid': profile.get('account_uuid'), 'organization_uuid': profile.get('organization_uuid'),
         'subscription_type': profile.get('subscription_type'), 'rate_limit_tier': profile.get('rate_limit_tier'),
         'allow_fast_mode': False, 'billing_mode': 'rewrite',
-        'request_backend': 'tui_v2' if os.environ.get('V3_DEPLOYMENT_ID') == 'us' else 'native293',
+        'request_backend': 'native293',
         'five_hour_usage_limit_percent': _DEFAULT_FIVE_HOUR_USAGE_LIMIT_PERCENT,
         'seven_day_usage_limit_percent': _DEFAULT_SEVEN_DAY_USAGE_LIMIT_PERCENT,
         'upstream_session_pool_enabled': True,

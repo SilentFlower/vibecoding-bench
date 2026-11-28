@@ -371,6 +371,9 @@ pub struct SenderConfig {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub(super) enum TuiV2Unavailable {
+    AccountInactive,
+    OauthRequired,
+    ProxyRequired,
     NotConfigured,
     NotRunning,
     BindingUnverified,
@@ -387,6 +390,9 @@ impl TuiV2Unavailable {
     pub(super) fn into_error(self) -> AppError {
         AppError::ServiceUnavailable(
             match self {
+                Self::AccountInactive => "当前账号未启用，无法准备交互 V2",
+                Self::OauthRequired => "交互运行时 V2 需要已授权的 OAuth 凭据",
+                Self::ProxyRequired => "交互运行时 V2 需要账号代理",
                 Self::NotConfigured | Self::NotRunning => "V2 没有已配置并运行的账号发送器",
                 Self::BindingUnverified => "V2 账号发送器绑定未通过校验",
                 Self::DirectUnavailable => "V2 账号的 CLI 直发未就绪",
@@ -569,6 +575,7 @@ async fn send_with_client(
 /// 已完成环境准备的发送通道；不持有正文或发送许可。
 pub struct PreparedTransport {
     account_id: i64,
+    v2_selected: bool,
     route: PreparedRoute,
     tool_continuation_mode: AgyToolContinuationMode,
     long_agy_generation: bool,
@@ -604,6 +611,7 @@ impl PreparedTransport {
         let client = binding_client(client, &binding, secret)?;
         Ok(Self {
             account_id,
+            v2_selected: false,
             route: PreparedRoute::V3 { client, binding },
             tool_continuation_mode: AgyToolContinuationMode::Claim,
             long_agy_generation: false,
@@ -922,6 +930,7 @@ async fn prepare_transport(
         }
         return Ok(PreparedTransport {
             account_id: account.id,
+            v2_selected: account.request_backend == TUI_V2,
             route: PreparedRoute::Direct(account.proxy_url.clone()),
             tool_continuation_mode: AgyToolContinuationMode::Claim,
             long_agy_generation: false,
@@ -958,11 +967,6 @@ async fn prepare_transport(
 }
 
 const TUI_CANDIDATE_RELEASE: &str = "fixture-tui-v2-candidate";
-
-/// 判断当前受信部署是否要求 Claude 模型只经交互 CLI 发送。@return US 部署是否执行直发合同。
-pub(crate) fn us_claude_direct_required() -> bool {
-    std::env::var("V3_DEPLOYMENT_ID").is_ok_and(|deployment| deployment == "us")
-}
 
 /// 核对通用 HTTP 可承接的非生成动作。@param method 实际方法。@param path 实际路径。@return 可转发非生成请求。
 pub(super) fn direct_claude_metadata_request(method: &str, path: &str) -> bool {
@@ -1303,10 +1307,24 @@ impl TuiBindingStatus {
 }
 
 /// 只读查询可用于变更的同账号绑定证明。@param account 账号。@return 当前状态与前驱。
-pub(super) async fn tui_transition_status(account: &Account) -> Result<TuiBindingStatus, AppError> {
-    probe_tui_account(account, Duration::from_secs(2), None, None)
-        .await
-        .map_err(TuiV2Unavailable::into_error)
+pub(super) async fn tui_transition_status(
+    account: &Account,
+) -> Result<TuiBindingStatus, TuiV2Unavailable> {
+    probe_tui_account(account, Duration::from_secs(2), None, None).await
+}
+
+/// 检查账号自身的直发前置条件。@param account 原账号。@return 未满足的条件。
+pub(super) fn tui_direct_prerequisite(account: &Account) -> Option<TuiV2Unavailable> {
+    if tui_fixture(account) {
+        return None;
+    }
+    if account.auth_type != AccountAuthType::Oauth {
+        return Some(TuiV2Unavailable::OauthRequired);
+    }
+    if account.proxy_url.trim().is_empty() {
+        return Some(TuiV2Unavailable::ProxyRequired);
+    }
+    None
 }
 
 /// 核对离开 V2 所需的空闲和原绑定。@param account 当前账号。@param registered 原登记。
@@ -1394,6 +1412,9 @@ pub(super) async fn tui_receipt_status(
 /// 保存切换时按需唤醒同一账号，以实际 sender 状态核对绑定。
 /// @param account 本次选择的账号。@return 同账号就绪状态。
 pub(super) async fn tui_switch_status(account: &Account) -> Result<TuiBindingStatus, AppError> {
+    if let Some(reason) = tui_direct_prerequisite(account) {
+        return Err(reason.into_error());
+    }
     // 保存可以等待远端只读检查完成，列表和详情仍沿用短预算。
     let status = probe_tui_account(account, Duration::from_secs(12), None, None).await;
     if tui_fixture(account) {
@@ -1574,6 +1595,10 @@ pub(super) async fn ready_tui_sender(
     wake: bool,
     registered: Option<&str>,
 ) -> Result<TuiReadySender, AppError> {
+    if let Some(reason) = tui_direct_prerequisite(account) {
+        super::diagnostics::tui_admission_rejected(reason.admission_branch());
+        return Err(reject_tui(account.id, reason));
+    }
     let deadline_reached = || {
         super::diagnostics::tui_admission_rejected("tui_readiness_deadline");
         AppError::AdmissionLimited { retry_after: 1 }
@@ -2771,6 +2796,7 @@ async fn prepare_existing_binding(
     let client = binding_client(client, &binding, &secret)?;
     Ok(Some(PreparedTransport {
         account_id: account.id,
+        v2_selected: account.request_backend == TUI_V2,
         route: PreparedRoute::V3 { client, binding },
         tool_continuation_mode: AgyToolContinuationMode::Claim,
         long_agy_generation: false,
@@ -2852,6 +2878,7 @@ async fn prepare_from_runtime(
     let client = binding_client(client, &binding, secret)?;
     Ok(PreparedTransport {
         account_id: account.id,
+        v2_selected: account.request_backend == TUI_V2,
         route: PreparedRoute::V3 { client, binding },
         tool_continuation_mode: agy_tool_continuation_mode,
         long_agy_generation: agy_generation_seconds == AGY_REQUEST_SECONDS as u64,
@@ -3124,6 +3151,9 @@ impl PreparedTransport {
         mut submission: NativeSubmission,
         ttfb_timeout: Duration,
     ) -> Result<reqwest::Response, AppError> {
+        if self.v2_selected {
+            return Err(AppError::BadRequest("V2 模型请求须经账号 CLI 直发".into()));
+        }
         submission.source_version.require_executable()?;
         let PreparedRoute::V3 { client, binding } = self.route else {
             return Err(AppError::ServiceUnavailable(
@@ -3199,6 +3229,18 @@ impl PreparedTransport {
         ttfb_timeout: Duration,
         purpose: Option<BackgroundPurpose>,
     ) -> Result<reqwest::Response, AppError> {
+        if self.v2_selected {
+            // 只有与模型生成独立的动作可以使用通用账号传输。
+            let metadata = match purpose {
+                Some(purpose) => purpose != BackgroundPurpose::TokenTest,
+                None => reqwest::Url::parse(&prepared.target_url).is_ok_and(|url| {
+                    direct_claude_metadata_request(&prepared.method, url.path())
+                }),
+            };
+            if !metadata {
+                return Err(AppError::BadRequest("V2 模型请求须经账号 CLI 直发".into()));
+            }
+        }
         let PreparedRoute::V3 { client, binding } = self.route else {
             let PreparedRoute::Direct(proxy_url) = self.route else {
                 unreachable!()
@@ -3943,19 +3985,6 @@ async fn forward(State(state): State<SenderState>, headers: HeaderMap, body: Byt
             if let Some(purpose) = purpose {
                 config.allowed_origin = purpose.validate(&prepared.method, &prepared.target_url)?;
             }
-            if us_claude_direct_required() {
-                let metadata = match purpose {
-                    Some(purpose) => purpose != BackgroundPurpose::TokenTest,
-                    None => reqwest::Url::parse(&prepared.target_url).is_ok_and(|url| {
-                        direct_claude_metadata_request(&prepared.method, url.path())
-                    }),
-                };
-                if !metadata {
-                    return Err(AppError::BadRequest(
-                        "US Claude 模型请求须经账号 CLI 直发".into(),
-                    ));
-                }
-            }
             let deadline = validate_request(&prepared, &config)?;
             state.active.fetch_add(1, Ordering::SeqCst);
             let guard = ActiveRequest(state.active.clone());
@@ -4475,11 +4504,6 @@ async fn native_forward(
         let transition = state.native_transition.clone().read_owned().await;
         let config = read_config(&state.config_path)?;
         authenticate(&headers, &config)?;
-        if us_claude_direct_required() {
-            return Err(AppError::BadRequest(
-                "US Claude 模型请求须经账号 CLI 直发".into(),
-            ));
-        }
         submission.source_version.require_executable()?;
         let pool = &state.native_pool;
         let deadline = validate_request(&submission.request, &config)?;
@@ -5425,6 +5449,7 @@ mod tests {
         );
         let server = tokio::spawn(axum::serve(listener, router).into_future());
         let transport = PreparedTransport {
+            v2_selected: false,
             tool_continuation_mode: AgyToolContinuationMode::Claim,
             long_agy_generation: false,
             tui_predecessors: Vec::new(),
@@ -5490,6 +5515,7 @@ mod tests {
             axum::serve(listener, sender_router(path.to_string_lossy().into_owned())).into_future(),
         );
         let transport = PreparedTransport {
+            v2_selected: false,
             tool_continuation_mode: AgyToolContinuationMode::Claim,
             long_agy_generation: false,
             tui_predecessors: Vec::new(),
@@ -5526,6 +5552,7 @@ mod tests {
             axum::serve(listener, Router::new()).await.unwrap();
         });
         let transport = PreparedTransport {
+            v2_selected: false,
             tool_continuation_mode: AgyToolContinuationMode::Claim,
             long_agy_generation: false,
             tui_predecessors: Vec::new(),
@@ -5579,6 +5606,7 @@ mod tests {
             ("missing-293", false),
         ] {
             let transport = PreparedTransport {
+                v2_selected: false,
                 tool_continuation_mode: AgyToolContinuationMode::Claim,
                 long_agy_generation: false,
                 tui_predecessors: Vec::new(),
@@ -5859,6 +5887,7 @@ mod tests {
             release_id: "synthetic-release".into(),
         };
         let mut transport = PreparedTransport {
+            v2_selected: false,
             tool_continuation_mode: AgyToolContinuationMode::Claim,
             long_agy_generation: false,
             tui_predecessors: Vec::new(),
@@ -5892,6 +5921,7 @@ mod tests {
         assert_eq!(frozen.generation, 5);
         assert!(
             PreparedTransport {
+                v2_selected: false,
                 tool_continuation_mode: AgyToolContinuationMode::Claim,
                 long_agy_generation: false,
                 tui_predecessors: Vec::new(),

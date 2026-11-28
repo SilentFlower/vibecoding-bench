@@ -45,6 +45,7 @@ src/tlsfp/
 
 ### 3. Contracts
 
+- 发版、重启和普通请求保留账号已保存的内核。开户、导入和重新启用沿各入口已有默认。V1 使用原路径。已选 V2 的新请求与续轮核对当前账号 OAuth、代理、绑定与同轮直发能力。管理 DTO 的 `tui_v2_unavailable_reason` 表示实际缺少的条件。
 - 创建、编辑、列表、OAuth 默认与表单重置同步后端值。切换进入现有排空门禁；非 V3 同样检查本地活动。状态快捷操作单独保存该字段，避免用旧 Account 快照覆盖凭据。
 - 当前生效内核为 `native293` 时，管理视图回报只读 `client_system_prompt_policy: "replace"`，与 V2 保存值各自独立。账号页显示默认替换动作。普通 Messages 省略 `system` 时保留 CLI 工作正文，非空业务文本按顺序替换，显式空串或空数组清空工作正文。CLI 身份和计费块仍由运行时组装。
 - 普通准入、账号选择、凭据解析及加权许可仍由 Gateway 所有。原生分支在 Rust 正文/头部/CCH 重写前接管精确 Messages；保留逻辑 JSON 与 HeaderMap 多值，头值在私有信封中按 Latin-1 字节串传递。
@@ -2192,15 +2193,14 @@ transport.submit(prepared, body, ttfb_timeout).await
 ### 2. Signatures
 
 - `agent_summary_response(summary: String, model: &str, streaming: bool) -> Response`
-- 系统设置 `GET/PUT /admin/settings` 的 `tui_local_agent_summary` 接受字符串 `true` 或 `false`，缺省为 `false`，保存后从下一次匹配的 V2 请求开始生效。
 - 成功的本地进度响应为 HTTP 200，响应头 `X-Flower2API-Local-Response: agy_agent_summary`。
 
 ### 3. Contracts
 
-- 鉴权、固定摘要模板与工具结果配对、可用候选校验通过后，本地标签分支生成回执。此时上游模型尝试为 0。V2 还须匹配当前主体、显式会话、可访问的 V2 账号及原先登记的完整工具组。查询只读，真正的工具回执仍可认领一次。
+- 鉴权、固定摘要模板与工具结果配对、可用候选校验通过后，本地标签分支生成回执。此时上游模型尝试为 0。此分支属于 AGY。V2 进度须匹配当前主体、显式会话、可访问的 V2 账号及原先登记的完整工具组。
 - V2 原生模式沿原账号、原模型和原始 Messages 输入独立推理，复用常规发送准入、缓存与用量采集。真实工具回执由原进程单次认领。账号发送器通过 `agent_summary_protocol=1` 宣告支持。未升级的发送器在独立准备前返回 503，正在等待的原工具组可继续。
 - JSON 返回文本、`stop_reason=end_turn` 和明确的零输入、零输出、零缓存读取用量。SSE 在 `message_start` 和 `message_delta` 都提供相同的零用量，并以 `message_stop` 收尾。
-- 外层计费网关从受信任渠道的实际响应中取得回执，用它区分明确零用量与缺失用量。只有本地进度标签成功响应携带此值。该值按已有线协议固定。本地模式的 V2 来源记在内部诊断阶段 `tui_agent_summary`。
+- 外层计费网关从受信任渠道的实际响应中取得回执，用它区分明确零用量与缺失用量。只有本地进度标签成功响应携带此值。该值按已有线协议固定。
 
 ### 4. Validation & Error Matrix
 
@@ -2218,13 +2218,13 @@ transport.submit(prepared, body, ttfb_timeout).await
 ### 6. Tests Required
 
 - `agent_summary_response_provides_local_receipt_and_zero_usage` 核对流式及非流式的回执、内容、零用量与完整终态，并验证普通生成响应头。
-- `verify_tui_cold_history.py --agent-progress <sample.json>` 使用固定 2.1.293 从隔离模型录得的真实父子轮和回执，以及现有服务支持的完整进度模板。在父轮的 `Agent` 和子轮的 `Read` 均等待原回执时，经公开入口核对本地与转发两种模式的 SSE/JSON、用量和尝试归属。进度完成期间父子原档与工具登记保持，原回执各成功一次，异主体、异会话及重复回执为 400。测试通过隔离模型收件核对正文，最终 TLS 写出未采集。
+- `verify_tui_cold_history.py --agent-progress <sample.json>` 使用固定 2.1.293 从隔离模型录得的真实父子轮和回执，以及现有服务支持的完整进度模板。在父轮的 `Agent` 和子轮的 `Read` 均等待原回执时，经公开入口核对 SSE/JSON、用量和一次 CLI 直发。历史本地进度设置的两个值均用同一模型路径。进度完成期间父子原档与工具登记保持，原回执各成功一次，异主体、异会话及重复回执为 400。测试通过隔离模型收件核对正文，最终 TLS 写出未采集。
 
 ## V2 公开会话标题的归属
 
 - 固定 2.1.293 客户端的标题请求具备已知标题系统提示词摘要、单条会话包装和只声明 `title` 的结构化响应。入口核对原生版本、会话、消息形状和空工具集合。模型与预算沿用客户端实际请求。
 - 标题沿公开会话选择账号，在该账号和主体下使用服务端保留的独立执行键。它有自己的预留、响应和用量，原工具登记、主会话档案和回执仍归原轮。标题继续使用普通发送准入和排空规则。
-- 已启用上游会话池时，账号发送器和会话源协商标题映射能力，仍使用公开会话 UUID 作为池键。缺少配套能力时在投递前报告 503。启用本地标题拦截时返回本地 SSE，模型尝试和业务用量为零。
+- 正式 V2 的标题由独立交互 CLI 发送，沿该 CLI 的实际原生会话和账号代理。隔离历史夹具兼测上游会话池和本地标题拦截。
 - 调试模式只协商标题入口和组装快照。标题最终 TLS 写出未采集。
 - `verify_tui_cold_history.py --interleaved-title` 以从隔离模型导出的真实 CLI 标题请求验证转发、本地拦截、会话池和旧发送器拒绝四种模式。各模式核对模型实收、用量、原档字节及原回执的单次提交。
 

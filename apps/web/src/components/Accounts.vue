@@ -6,6 +6,7 @@ import { NumberInput, ChoiceSelect, SearchInput, InfoTooltip, Pagination } from 
 import { useRoute } from 'vue-router';
 import ProxyPicker from './ProxyPicker.vue';
 import ExecutionNodeBadge from './runtime/ExecutionNodeBadge.vue';
+import { tuiV2UnavailableLabel } from './runtime/environmentLabels';
 import PlatformBadge from './PlatformBadge.vue';
 import { nodeApi, type AccountNodeAssignment, type AccountNodeSummary } from './runtime/nodeApi';
 import { api, type ProxyRoute, type Account, type RequestBackend, type OAuthExchangeResult, type UsageWindow, type RuntimeEnvironmentSummary, type OverallWorkStatus } from '../api';
@@ -264,11 +265,7 @@ const deleteTargetId = ref<number | null>(null);
 
 /** 当前编辑的账号（null 表示新建） */
 const editing = ref<Account | null>(null);
-const deploymentDirectRequired = ref(false);
-const claudeDirectRequired = computed(() => editing.value?.tui_direct_required ?? deploymentDirectRequired.value);
-const authOptions = computed(() => claudeDirectRequired.value
-  ? [{value:'oauth',label:'OAuth'}]
-  : [{value:'oauth',label:'OAuth'},{value:'setup_token',label:'Setup Token'}]);
+const authOptions = [{value:'oauth',label:'OAuth'},{value:'setup_token',label:'Setup Token'}];
 let editorGeneration = 0;
 const savingAccount = ref(false);
 const backendSaveIssue = ref<{ otherSaved: boolean; detail: string } | null>(null);
@@ -312,8 +309,8 @@ function selectAccountPlatform(value:string): void {
   if (editing.value || savingAccount.value || value === form.value.platform || !platformOptions.some(item=>item.value===value)) return;
   editorGeneration++;
   form.value.platform=value;
-  form.value.auth_type=value==='antigravity'||claudeDirectRequired.value?'oauth':'setup_token';
-  if (claudeDirectRequired.value) form.value.request_backend=value==='claude_code'?'tui_v2':'legacy';
+  form.value.auth_type=value==='antigravity'?'oauth':'setup_token';
+  form.value.request_backend='legacy';
   form.value.setup_token=''; form.value.access_token=''; form.value.refresh_token=''; form.value.expires_at='';
   form.value.agy_system_prompt_homoglyph_enabled=false;
   form.value.client_system_prompt_policy='independent';
@@ -462,14 +459,13 @@ async function load() {
   try {
     if (props.workspaceAccountId) {
       const account = await api.accountById(props.workspaceAccountId);
-      if (generation === accountLoadGeneration) { accounts.value = [account]; deploymentDirectRequired.value = account.tui_direct_required === true; accountLoadFailed.value = false; void loadOverallStates([account]); void loadAccountNodes(); }
+      if (generation === accountLoadGeneration) { accounts.value = [account]; accountLoadFailed.value = false; void loadOverallStates([account]); void loadAccountNodes(); }
       return;
     }
     const [res, overview] = await Promise.all([api.listAccounts(currentPage.value, pageSize.value, accountQuery.value.trim(), accountFilter.value === 'all' ? '' : accountFilter.value, undefined, platformFilter.value), api.getDashboard().catch(() => null)]);
     if (generation !== accountLoadGeneration) return;
     accountLoadFailed.value = false;
     accounts.value = res.data ?? [];
-    deploymentDirectRequired.value = res.tui_direct_required === true;
     void loadOverallStates(accounts.value);
     void loadAccountNodes();
     accountCounts.value = res.account_counts ?? overview?.accounts ?? null;
@@ -561,14 +557,14 @@ function openCreate() {
     agy_disable_safety_filtering: false,
     name: '',
     email: '',
-    auth_type: claudeDirectRequired.value ? 'oauth' : 'setup_token',
+    auth_type: 'setup_token',
     setup_token: '',
     access_token: '',
     refresh_token: '',
     expires_at: '',
     proxy_url: '',
     billing_mode: 'strip',
-    request_backend: (claudeDirectRequired.value ? 'tui_v2' : 'legacy') as RequestBackend,
+    request_backend: 'legacy' as RequestBackend,
     account_uuid: '',
     organization_uuid: '',
     subscription_type: '',
@@ -646,11 +642,6 @@ function openEdit(a: Account) {
 
 const backendOptions = computed(() => {
   const account = editing.value;
-  if (claudeDirectRequired.value) {
-    const disabled = !!account && account.status !== 'active' && account.request_backend !== 'tui_v2';
-    const description = disabled ? '当前账号未启用' : '经原账号代理由 Claude CLI 直发';
-    return [{ value: 'tui_v2', label: '交互运行时 V2', description, disabled }];
-  }
   const options = [
     { value: 'native293', label: '原生运行时 V1', description: 'Claude Code 2.1.293', disabled: false },
     { value: 'legacy', label: '原有转发', description: '现有转发通道', disabled: false },
@@ -658,7 +649,7 @@ const backendOptions = computed(() => {
   if (account && (account.request_backend_revision !== undefined || account.tui_v2_available
     || account.request_backend === 'tui_v2' || account.request_backend_pending === 'tui_v2')) {
     const disabled = account.status !== 'active' && account.request_backend !== 'tui_v2';
-    const description = disabled ? '当前账号未启用' : account.tui_v2_available ? 'Claude CLI 直发' : '保存时准备 CLI 直发';
+    const description = disabled ? '当前账号未启用' : '由真实 Claude CLI 经账号代理直发';
     options.unshift({ value: 'tui_v2', label: '交互运行时 V2', description, disabled });
   }
   return options;
@@ -1439,7 +1430,7 @@ function applyOAuthResult() {
     expires_at: (!isSetupToken && r.expires_at) ? String(r.expires_at * 1000) : '',
     proxy_url: '',
     billing_mode: 'strip',
-    request_backend: (oauthPlatform.value === 'claude_code' && claudeDirectRequired.value ? 'tui_v2' : 'legacy') as RequestBackend,
+    request_backend: 'legacy' as RequestBackend,
     account_uuid: r.account_uuid || '',
     organization_uuid: r.organization_uuid || '',
     subscription_type: '',
@@ -1689,7 +1680,10 @@ async function copyText(text: string) {
                 <p v-if="editing.request_backend_pending" class="form-help">
                   等待切换到 {{ backendName(editing.request_backend_pending) }}。
                   {{ editing.request_backend_wait_reason === 'runtime_unconfirmed' ? '运行环境状态待确认。' : '原轮排空并经后台核对后生效。' }}
-                  <template v-if="!claudeDirectRequired">选择当前生效方式并保存即可撤销等待。</template>
+                  选择当前生效方式并保存即可撤销等待。
+                </p>
+                <p v-if="form.request_backend === 'tui_v2' && editing.tui_v2_available === false" class="form-help" role="status">
+                  {{ tuiV2UnavailableLabel(editing.tui_v2_unavailable_reason) }}
                 </p>
                 <Button type="button" variant="outline" :disabled="savingAccount" @click="reloadBackend()">刷新转发状态</Button>
               </template>
@@ -1823,7 +1817,7 @@ async function copyText(text: string) {
     <!-- 授权登录：三步表单，真实会话与凭据交接保持原接口；底栏按钮经 form 属性提交当前步骤。 -->
     <ModalDialog v-model:open="showOAuthFlow" class="account-oauth-dialog approved-oauth-dialog" title="授权登录" :description="oauthStep === 'generate' ? '将账号接入工作空间' : oauthStep === 'exchange' ? '完成浏览器授权后，填写返回的授权码' : '授权成功'" :width="440">
       <form v-if="oauthStep === 'generate'" id="account-oauth-step" class="approved-oauth-body" @submit.prevent="generateOAuthUrl">
-        <ChoiceSelect v-model="oauthPlatform" label="授权平台" :options="platformOptions" :disabled="oauthLoading || !!oauthTarget" @update:model-value="oauthMode = 'oauth'" /><ChoiceSelect v-if="oauthPlatform === 'claude_code' && !claudeDirectRequired" :model-value="oauthMode" @update:model-value="value => { if (value === 'oauth' || value === 'setup_token') oauthMode = value; }" label="授权方式" :disabled="oauthLoading" :options="authOptions" />
+        <ChoiceSelect v-model="oauthPlatform" label="授权平台" :options="platformOptions" :disabled="oauthLoading || !!oauthTarget" @update:model-value="oauthMode = 'oauth'" /><ChoiceSelect v-if="oauthPlatform === 'claude_code'" :model-value="oauthMode" @update:model-value="value => { if (value === 'oauth' || value === 'setup_token') oauthMode = value; }" label="授权方式" :disabled="oauthLoading" :options="authOptions" />
         <ProxyPicker v-model="oauthProxy" :current-label="oauthTarget?.proxy_name || publicProxy(oauthTarget?.proxy_url ?? '')"
           :disabled="oauthLoading" :help="oauthTarget ? '默认使用账号当前线路。重新选线后，授权成功时应用到该账号。' : '选择本次授权使用的代理，后续账号配置沿用此线路。'" />
         <p class="oauth-help">{{ oauthMode === 'oauth' ? '授权后支持账号信息与用量查询。' : 'Setup Token 仅用于推理，有效期 1 年。' }}</p>
