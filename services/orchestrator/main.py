@@ -73,6 +73,7 @@ from account_runtime import AccountRuntime, RuntimeBusy, RuntimeCapacityUnavaila
 from account_work_control import AccountWorkCoordinator
 from oauth_refresh_probe import OAUTH_REFRESH_SCRIPT, execute_oauth_refresh_probe
 from account_update_identity import role_release
+from cluster_stopped_api import stopped_node_router
 from cluster_api import cluster_router
 from cluster_service import ClusterService
 from cluster_environment_control import RemoteEnvironmentControl
@@ -8763,6 +8764,7 @@ app.include_router(system_updates_router(lambda: account_runtime))
 app.include_router(projects_router(lambda: projects_service))
 app.include_router(warmup_pi_router(lambda: warmup_pi_service))
 app.include_router(cluster_router(lambda: cluster_service))
+app.include_router(stopped_node_router(lambda: cluster_service))
 app.include_router(migration_router(lambda: migration_operations))
 app.include_router(migration_router(lambda: agy_migrations, agy=True))
 app.include_router(node_transport_router(lambda: cluster_service.transports if cluster_service else None))
