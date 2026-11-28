@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import threading
+
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -15,6 +16,7 @@ from types import SimpleNamespace
 from docker.errors import NotFound
 from starlette.websockets import WebSocket
 from account_runtime import AccountRuntime
+from cluster_update_gate import NodeJobThread
 from cluster_credential_account import read_node_credential_account
 from cluster_credentials_contract import CredentialRefreshStart, CredentialStatusRead
 from cluster_execution_grants import ExecutionGrant, ExecutionScope
@@ -198,7 +200,7 @@ class NodeAccountLogins:
                 value={'protocol':1,'scope':scope.model_dump(),'work':request.work.model_dump(),
                     'phase':'starting','result':None,'start_intent':False}
                 atomic_json(path,value)
-                worker=threading.Thread(target=self._run,args=(request,),daemon=True,name='node-account-login')
+                worker=NodeJobThread(target=self._run,args=(request,),daemon=True,name='node-account-login')
                 self.workers[scope.operation_id]=worker
                 worker.start()
             except BaseException:
