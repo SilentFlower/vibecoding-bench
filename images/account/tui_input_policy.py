@@ -40,8 +40,9 @@ class InputRejection(ValueError):
         self.code = code
 
 
-def direct_model_options(body):
-    """取得当前交互步骤的提供方参数。@param body 已通过 Messages 结构校验的请求。@return 参数对象。"""
+def direct_model_options(body, *, native=False):
+    """取得当前交互步骤的提供方参数。@param body 已通过 Messages 结构校验的请求。
+    @param native 是否为官方客户端原生结构。@return 参数对象。"""
     options = {}
     output = body.get("output_config", {})
     if "format" in output:
@@ -70,6 +71,8 @@ def direct_model_options(body):
         if type(temperature) not in (int, float) or not 0 <= temperature <= 1:
             raise InputRejection("invalid_temperature")
         options["temperature"] = temperature
+    if not native and "context_management" in body:
+        options["context_management"] = body["context_management"]
     return options
 
 

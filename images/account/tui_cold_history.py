@@ -58,6 +58,11 @@ def _history_text(block):
             and _ephemeral_cache_marker(block["cache_control"]))
 
 
+def _cached_tool(tool):
+    return (isinstance(tool, dict) and _ephemeral_cache_marker(tool.get("cache_control"))
+            and ordinary_custom_tool({key: value for key, value in tool.items() if key != "cache_control"}))
+
+
 def _jpeg_dimensions(data):
     offset = 2
     while offset + 4 <= len(data) and data[offset] == 0xff:
@@ -354,7 +359,7 @@ class ColdHistory:
                 return None
         context_management = body.get("context_management")
         # 固定 CLI 在这两款模型的 updates 模式用同一形状声明保留全部思考。
-        if "context_management" in body and (
+        if "context_management" in body and not (direct_options and "context_management" in direct_options) and (
                 context_management != _CLEAR_THINKING_KEEP_ALL
                 or thinking != {"type": "adaptive", "display": "updates"}
                 or body["model"] not in _ADAPTIVE_THINKING_MODELS):
@@ -391,7 +396,14 @@ class ColdHistory:
         if not content or not all(text_block(block) or _inline_image(block, for_paste=True) for block in content):
             return None
         effective_history = _history_with_ttl(history, cache_ttl)
-        cache_blocks = [block for row in effective_history for _, _, _, block in _marked_blocks(_blocks(row))]
+        declared = body.get("tools", [])
+        if direct_options is not None and cache_ttl != "off" and not native_cc:
+            declared = model_body({"tools": declared}, {"sub2api": False, "ttl": cache_ttl, "adaptive": False},
+                                  native=False)["tools"]
+        cache_blocks = [
+            *(tool for tool in declared if _cached_tool(tool)),
+            *(block for row in effective_history for _, _, _, block in _marked_blocks(_blocks(row))),
+        ]
         if cache_ttl != "off" and not cache_blocks:
             return None
         if cache_blocks:
@@ -401,13 +413,13 @@ class ColdHistory:
             ttls = [block["cache_control"].get("ttl", "5m") for block in cache_blocks]
             if ttls != sorted(ttls, key=lambda ttl: ttl != "1h"):
                 return None
-        declared = body.get("tools", [])
         choice = body.get("tool_choice")
         if direct_options and "tool_choice" in direct_options:
             choice = None
         elif "tool_choice" in body and not (_automatic_tools(choice) if declared else choice == {"type": "none"}):
             return None
-        if not all(ordinary_custom_tool(tool) for tool in declared):
+        if not all(ordinary_custom_tool(tool) or (direct_options is not None and not native_cc and _cached_tool(tool))
+                   for tool in declared):
             return None
         system = body.get("system")
         if isinstance(system, list):
@@ -725,6 +737,17 @@ class ColdHistory:
     def has_history_cache_markers(self):
         """检查已确认的历史是否带显式缓存标记。@return 是否需关闭 CLI 自动断点。"""
         return any(marker for row in self.history for marker in _marked_blocks(_blocks(row)))
+
+    def explicit_cache(self):
+        """检查是否由客户明确选择断点。@return 是否需要禁用引擎自动放置断点。"""
+        return self.has_history_cache_markers() or any("cache_control" in tool for tool in self.tools.values())
+
+    def configured_tool_declarations(self):
+        """取得需通过 CLI 参数保留缓存的工具声明。@return 模型的有序声明或空。"""
+        if self.native_cc or not any("cache_control" in tool for tool in self.tools.values()):
+            return None
+        # 声明保留实收映射名，客户端回执继续通过受管 MCP 使用原调用 ID。
+        return [{**tool, "name": name} for name, tool in self.tools.items()]
 
     def matches_history_tool_images(self, native):
         """核对旧工具图文结果。@param native CLI 实际正文。@return 已确认图文仍按原工具 ID 交付。"""

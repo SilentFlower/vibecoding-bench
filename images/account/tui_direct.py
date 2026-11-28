@@ -240,7 +240,16 @@ class _Projection:
             if (block['type'] not in ('thinking', 'redacted_thinking')
                     or not isinstance(block.get('signature' if block['type'] == 'thinking' else 'data'), str)):
                 raise ValueError('直发签名块缺少原生证明')
-            index = self._start(block)
+            if block['type'] == 'thinking':
+                # 同步沿用 Messages 的签名增量。原版把签名交给会话后才向客户端公开。
+                index = self._start({**block, 'thinking': '', 'signature': ''})
+                if block['thinking']:
+                    self._emit({'type': 'content_block_delta', 'index': index,
+                                'delta': {'type': 'thinking_delta', 'thinking': block['thinking']}})
+                self._emit({'type': 'content_block_delta', 'index': index,
+                            'delta': {'type': 'signature_delta', 'signature': block['signature']}})
+            else:
+                index = self._start(block)
             self._emit({'type': 'content_block_stop', 'index': index})
             self.saw_signed = True
 

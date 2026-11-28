@@ -527,7 +527,7 @@ class _Actor:
                     elif plan is not None and thinking.get("type") == "enabled":
                         env["CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING"] = "1"
                         env["MAX_THINKING_TOKENS"] = str(thinking["budget_tokens"])
-                    if launch_plan is not None and launch_plan.has_history_cache_markers():
+                    if launch_plan is not None and launch_plan.explicit_cache():
                         # CLI 的自动断点会与客户前缀同时出现，还可能改变 TTL 顺序。
                         env["DISABLE_PROMPT_CACHING"] = "1"
                     self.process = self.driver.launcher.launch_session(
@@ -1366,6 +1366,10 @@ class _Reserved:
             self.direct_options["tools"] = self.tools
         elif not is_native and (choice := self.direct_options.get("tool_choice")) and choice["type"] == "tool":
             self.direct_options["tool_choice"] = {**choice, "name": MCP_PREFIX + choice["name"]}
+        if actor.direct is not None and actor.cold_history is not None:
+            declarations = actor.cold_history.configured_tool_declarations()
+            if declarations is not None:
+                self.direct_options["tools"] = declarations
         self.cc_fork_scope = (
             _cc_fork_scope(body, reservation)
             if is_native and reservation.get("input_format") == "claude_code"
@@ -1764,7 +1768,9 @@ class SessionDriver:
             body_policy=reservation.get("body_policy"),
             observation=input_observation,
         )
-        direct_options = direct_model_options(body) if self.direct_mode else None
+        input_format = reservation.get("input_format")
+        is_native = native_input(body, input_format)
+        direct_options = direct_model_options(body, native=is_native) if self.direct_mode else None
         # 在认领工具回执之前检查退避期，等待结束后客户端仍能将回执交还原进程。
         check_wait = getattr(self.launcher, "check_provider_backoff", None)
         if check_wait is not None:
@@ -1796,8 +1802,6 @@ class SessionDriver:
         native_body_policy = not policy or not (policy["sub2api"] or policy["adaptive"])
         native_cache_ttl = policy["ttl"] if policy else "off"
         deadline = reservation["deadline_unix_ms"] / 1000
-        input_format = reservation.get("input_format")
-        is_native = native_input(body, input_format)
         native_history_allowed = (self.managed_oauth and reservation.get("native_cold_history") is True
                                   and native_body_policy and agent_hint is None and not is_native)
         cc_fork = is_native and input_format == "claude_code" and agent_hint is None

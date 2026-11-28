@@ -133,3 +133,14 @@ class DirectModelTests(TestCase):
         self.assertEqual([event['type'] for event in self.events],
                          ['message_start', 'content_block_start', 'content_block_delta'])
         self.assertIsNone(self.step.final)
+
+    def test_actual_signed_thinking_uses_public_signature_delta(self):
+        """公开开块和增量可还原原版同一步签名。@return 无。"""
+        self._start()
+        source = {"type": "thinking", "thinking": "实收思考", "signature": "tui-fixture-signature"}
+        self.direct.observe({**self.scope, "blocks": [source]}, signed=True)
+        self.assertEqual(self.events[1]["content_block"], {"type": "thinking", "thinking": "", "signature": ""})
+        self.assertEqual([frame["delta"] for frame in self.events[2:4]],
+                         [{"type": "thinking_delta", "thinking": source["thinking"]},
+                          {"type": "signature_delta", "signature": source["signature"]}])
+        self.assertEqual(self.events[4], {"type": "content_block_stop", "index": 0})
