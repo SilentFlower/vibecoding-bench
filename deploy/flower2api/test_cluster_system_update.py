@@ -5,6 +5,7 @@ import unittest
 from io import BytesIO
 from urllib.error import HTTPError
 from hashlib import sha256
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 from system_update_host import HostDeployment
@@ -76,6 +77,28 @@ class ClusterHostUpdateTests(unittest.TestCase):
         self.host.request = Mock(side_effect=[runtime, gate])
         with self.assertRaisesRegex(ValueError, '重试移除后再更新平台：隔离节点'):
             self.host.drained(self.operation)
+
+    def test_direct_only_release_uses_natural_drain_on_existing_host(self) -> None:
+        """当前候选沿旧宿主已经支持的自然排空入口安装和回退。@return 无。"""
+        dockerfile = (Path(__file__).resolve().parents[2] / 'images/v3/Dockerfile').read_text()
+        control = dockerfile.split('vibebench.role="control"', 1)[1].split('ENTRYPOINT', 1)[0]
+        label = control.split('vibebench.fast-system-update="', 1)[1].split('"', 1)[0]
+        original = {'selection': {'fixture': 'original'}}
+        selected = {'selection': {'fixture': 'selected'}}
+
+        def images(selection):
+            return {
+                'control': {'Config': {'Labels': {'vibebench.fast-system-update':
+                    label if selection == selected['selection'] else '1'}}},
+                'account': {'Config': {'Labels': {'vibebench.fast-system-update': '1'}}},
+            }
+
+        self.host.verify_images = images
+        self.host.request = Mock()
+        self.assertEqual(label, '0')
+        self.assertFalse(self.host.fast_transition(original, selected))
+        self.assertFalse(self.host.fast_transition(selected, original))
+        self.host.request.assert_not_called()
 
     def test_tui_receipts_allow_rolling_and_preserve_nonrolling_guard(self) -> None:
         """旧网关待回执走自然排空，真实活动与同代约束均保留。@return 无。"""

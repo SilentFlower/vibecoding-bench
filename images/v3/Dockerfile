@@ -114,11 +114,12 @@ COPY runtime-build/platform-version.json /app/platform-version.json
 ARG V3_RELEASE
 ARG V3_PARENT_REV
 ARG V3_GATEWAY_REV
+# 旧宿主会依据候选标签主动取消推理。直发切换需要先让已认领工作自然退场。
 LABEL vibebench.product="v3" vibebench.role="control" vibebench.release=$V3_RELEASE \
     vibebench.agy-runtime-protocol="1" \
     vibebench.account-platforms="1" \
     vibebench.system-update-protocol="1" \
-    vibebench.fast-system-update="1" \
+    vibebench.fast-system-update="0" \
     vibebench.local-account-rollout="1" \
     vibebench.project-library-prepare="1" \
     vibebench.credential-ownership-protocol="1" \
