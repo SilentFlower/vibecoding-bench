@@ -58,6 +58,16 @@ class SessionTests(unittest.TestCase):
                 self.assertTrue(plan.has_history_cache_markers())
                 self.assertIsNone(plan.max_tokens)
 
+    def test_direct_prepares_normalized_adaptive_thinking(self):
+        """可原生生成的平台思考设置继续进入直发。@return 无。"""
+        with closing(self._driver()) as driver:
+            driver.managed_oauth = driver.direct_mode = True
+            policy = {"sub2api": False, "adaptive": True, "ttl": "off"}
+            identity = {**self._identity("adaptive-rewrite"), "native_cold_history": True, "body_policy": policy}
+            request = {**self._body(), "model": "claude-sonnet-4-6", "thinking": {"type": "disabled"}}
+            with closing(driver.prepare(identity, encode(request))) as handle:
+                self.assertEqual(handle.actor.cold_history.thinking, {"type": "adaptive", "display": "updates"})
+
     def test_cc_fork_scope_is_bound_to_the_current_receipt_revision(self):
         """完整 CC 分叉按根选项核验，保留旧原回执的读取与提交。@return 无。"""
         key = ("account", "generation", "principal", "session")

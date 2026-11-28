@@ -1781,8 +1781,8 @@ class SessionDriver:
             actor_key = (*actor_key, "agent-summary")
         offered, returned = split_reply(messages)
         policy = reservation.get("body_policy")
-        # disabled 经平台改写后也会呈现 adaptive/updates，仍须与客户端显式指定区分。
-        native_body_policy = not policy or not (policy["sub2api"] or policy["adaptive"])
+        # input_message 已归一顶层思考参数。直发按实际模型的原生计划校验该参数。
+        native_body_policy = not policy or not (policy["sub2api"] or (policy["adaptive"] and not self.direct_mode))
         native_cache_ttl = policy["ttl"] if policy else "off"
         deadline = reservation["deadline_unix_ms"] / 1000
         native_history_allowed = (self.managed_oauth and reservation.get("native_cold_history") is True
