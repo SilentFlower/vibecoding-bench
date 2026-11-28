@@ -85,10 +85,34 @@ class SystemPublishTests(unittest.TestCase):
             return b'a' * 40 + b'\n'
         return b''
 
-    def publish(self, evidence=None) -> dict:
+    def publish(self, evidence=None, *, scope=None) -> dict:
         """调用实际发布协调逻辑。:param evidence: 合成兼容证据。@return 发布结果。"""
         with patch.object(publish_system_release, 'run', self.command_run):
-            return publish_system_release.publish(self.fixture.manifest, self.bundle, self.fixture.key.read_text(), evidence)
+            return publish_system_release.publish(self.fixture.manifest, self.bundle, self.fixture.key.read_text(), evidence, scope=scope)
+
+    def test_maintenance_source_requires_a_delivery_scope(self) -> None:
+        """维护配置缺失应阻断签发，正式配置必须绑定原 US 发行。@return 无。"""
+        path = Path(publish_system_release.__file__).with_name('platform-delivery.json')
+        self.assertEqual(publish_system_release.read_delivery(path),
+            {'deployment': 'us', 'from_release': 'system-ci-46113010461-1'})
+        with self.assertRaises(FileNotFoundError):
+            publish_system_release.read_delivery(self.fixture.root / 'missing.json')
+
+    def test_scoped_release_only_uploads_a_signed_draft(self) -> None:
+        """草稿含真实定向签名，公开发布命令与共享目录写入均为零。@return 无。"""
+        self.install_history(700)
+        scope = {'deployment': 'us', 'from_release': 'system-ci-122-1'}
+        signed = {}
+        def capture(*args, **kwargs):
+            if args[:3] == ('gh', 'release', 'upload') and args[-1].endswith('/scoped-release.sig'):
+                signed.update(verify_signed(Path(args[-2]).read_bytes(), Path(args[-1]).read_bytes(), self.fixture.public))
+            return self.command_run(*args, **kwargs)
+        with patch.object(publish_system_release, 'run', capture):
+            result = publish_system_release.publish(self.fixture.manifest, self.bundle, self.fixture.key.read_text(), scope=scope)
+        self.assertEqual(result['status'], 'scoped_draft')
+        self.assertEqual(signed['scope'], scope)
+        self.assertEqual([entry['release'] for entry in validate_index(signed['catalog'])['releases']], [result['release']])
+        self.assertFalse(any(call[:3] == ('gh', 'release', 'edit') or call[:2] == ('git', 'push') for call in self.calls))
 
     def test_binary_signature_with_json_prefix_remains_opaque(self) -> None:
         """确定性覆盖以左花括号开头的64字节签名。@return None。"""

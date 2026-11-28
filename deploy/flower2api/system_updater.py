@@ -154,19 +154,35 @@ class SystemUpdater:
         self._verified[release] = (identity, copy.deepcopy(value))
         return value
 
+    def _scoped_catalog(self) -> dict | None:
+        # 维护草稿只在签名指定的部署及原安装上可见。共享目录保持独立的防回放序号。
+        try:
+            raw = safe_read(self.root / 'scoped-release.json', INDEX_LIMIT, private=True)
+            signature = safe_read(self.root / 'scoped-release.sig', 64, private=True)
+            delivery = verify_signed(raw, signature, self.policy['public_key'], INDEX_LIMIT)
+            scope = {'deployment': self.policy['deployment'], 'from_release': self.state['current']['release']['release']}
+            if set(delivery) == {'scope', 'catalog'} and delivery['scope'] == scope:
+                catalog = validate_index(delivery['catalog'])
+                if len(catalog['releases']) == 1:
+                    return catalog
+        except (OSError, ValueError):
+            pass
+        return None
+
     def releases(self) -> dict:
         """返回脱敏的已验证版本缓存及最近检查状态。
 
         :return: 版本目录。
         """
         with self.lock:
+            catalog = self._scoped_catalog() or self.state.get('catalog', {})
             fresh = True
             try:
-                validate_index(self.state.get('catalog', {}))
+                validate_index(catalog)
             except ValueError:
                 fresh = False
             rows = []
-            for entry in sorted(self.state.get('catalog', {}).get('releases', []), key=lambda item: item['sequence'], reverse=True)[:8]:
+            for entry in sorted(catalog.get('releases', []), key=lambda item: item['sequence'], reverse=True)[:8]:
                 try:
                     value = self.load_release(entry['release'], entry['manifest']['sha256'])
                     compatible = compatible_data(self.state['current']['release']['data_compatibility'], value['data_compatibility'])
@@ -470,7 +486,7 @@ class SystemUpdater:
             if self.state.get('active_operation') or body['expected_revision'] != self.state['revision']:
                 raise UpdateConflict('平台现场版本已经变化，请刷新后确认')
             if action != 'rollback':
-                catalog = validate_index(self.state.get('catalog', {}))
+                catalog = self._scoped_catalog() or validate_index(self.state.get('catalog', {}))
                 if not any(entry['release'] == body['target_release'] and entry['manifest']['sha256'] == body['target_manifest_sha256']
                         for entry in catalog['releases']):
                     raise ValueError('目标版本不在当前受信目录中，请重新检查版本')

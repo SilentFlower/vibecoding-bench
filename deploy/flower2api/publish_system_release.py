@@ -14,7 +14,7 @@ from system_release import REPO, create_index, create_release, sign_file
 from platform_version import ensure_forward_version, read_version, signed_changes
 from release_ci import validate_publish_source
 from datetime import datetime, timedelta, timezone
-from system_update_contract import INDEX_LIMIT, MANIFEST_LIMIT, REPOSITORY, strict_json, verify_signed, utc_now, validate_index, validate_release
+from system_update_contract import DEPLOYMENT_RE, RELEASE_RE, INDEX_LIMIT, MANIFEST_LIMIT, REPOSITORY, strict_json, verify_signed, utc_now, validate_index, validate_release
 
 
 def run(*arguments: str, data: bytes | None = None, environment: dict | None = None) -> bytes:
@@ -32,13 +32,24 @@ def run(*arguments: str, data: bytes | None = None, environment: dict | None = N
     return result.stdout
 
 
-def publish(manifest: Path, bundle: Path, private_key: str, migration_evidence: Path | None = None) -> dict:
+def read_delivery(path: Path) -> dict:
+    """读取维护分支必需的定向范围。@param path 固定配置文件。@return 部署与原发行。"""
+    scope = strict_json(path.read_bytes(), 1024)
+    if (set(scope) != {'deployment', 'from_release'}
+            or not isinstance(scope['deployment'], str) or not DEPLOYMENT_RE.fullmatch(scope['deployment'])
+            or not isinstance(scope['from_release'], str) or not RELEASE_RE.fullmatch(scope['from_release'])):
+        raise ValueError('定向交付配置需要精确部署和原发行')
+    return scope
+
+
+def publish(manifest: Path, bundle: Path, private_key: str, migration_evidence: Path | None = None, *, scope: dict | None) -> dict:
     """发布当前 Action 的精确发行和有界目录，私钥只存临时私有文件。
 
     :param manifest: 已完成的联合发布清单。
     :param bundle: 同批完整镜像包。
     :param private_key: CI 私有 Ed25519 PEM。
     :param migration_evidence: 真实镜像兼容验收证据；正式入口必需。
+    :param scope: 受版本控制的定向范围，空值发布至共享目录。
     :return: 本次发布事实。
     """
     build = strict_json(manifest.read_bytes())
@@ -77,6 +88,8 @@ def publish(manifest: Path, bundle: Path, private_key: str, migration_evidence: 
             _, raw, _ = selected
             previous = root / 'previous.json'
             previous.write_bytes(raw)
+        if scope and not previous:
+            raise ValueError('定向交付需要已签目录内的原发行')
         if previous:
             # 沿原已签目录定位完整旧清单；版本属于说明展示，安装身份仍以原摘要为准。
             previous_value = strict_json(previous.read_bytes(), INDEX_LIMIT)
@@ -84,6 +97,10 @@ def publish(manifest: Path, bundle: Path, private_key: str, migration_evidence: 
             previous_index = validate_index(previous_value,
                 now=datetime.fromisoformat(previous_value['issued_at'].replace('Z', '+00:00')).timestamp())
             latest = previous_index['releases'][0]
+            if scope:
+                latest = next((item for item in previous_index['releases'] if item['release'] == scope['from_release']), None)
+                if latest is None:
+                    raise ValueError('定向交付的原发行不在已签目录中')
             previous_folder = root / 'previous-release'
             previous_folder.mkdir()
             run('gh', 'release', 'download', latest['release'], '--repo', REPOSITORY,
@@ -93,7 +110,7 @@ def publish(manifest: Path, bundle: Path, private_key: str, migration_evidence: 
                 raise ValueError('原平台版本清单摘要不符')
             ensure_forward_version(release, validate_release(strict_json(previous_raw, MANIFEST_LIMIT)))
         index = root / 'index.json'
-        create_index(root / 'release/system-release.json', previous, index, key)
+        catalog = create_index(root / 'release/system-release.json', None if scope else previous, index, key)
         notes = root / 'notes.md'
         notes.write_text(f'{signed_changes(metadata)}\n\n发行：{release["release"]}\n来源：{build["parent_revision"]}\n\n安装与回退兼容条件见 system-release.json。\n')
         tag = release['release']
@@ -104,6 +121,13 @@ def publish(manifest: Path, bundle: Path, private_key: str, migration_evidence: 
             str(root / 'release/v3.json'), str(bundle))
         if release['schema_version'] == 2:
             run('gh', 'release', 'upload', tag, '--repo', REPOSITORY, str(root / 'release/database-migrations.json'), str(root / 'release/database-compatibility.json'))
+        if scope:
+            # 交付对象和清单摘要一同验签。完整发行仅保存在维护者可读的草稿中。
+            delivery = root / 'scoped-release.json'
+            delivery.write_text(json.dumps({'scope': scope, 'catalog': catalog}, ensure_ascii=False, separators=(',', ':')))
+            signature = sign_file(delivery, key)
+            run('gh', 'release', 'upload', tag, '--repo', REPOSITORY, str(delivery), str(signature))
+            return {'status': 'scoped_draft', 'release': tag, 'deployment': scope['deployment']}
         run('gh', 'release', 'edit', tag, '--repo', REPOSITORY, '--draft=false', '--latest=false')
         blobs = {}
         for name in ('index.json', 'index.sig'):
@@ -192,6 +216,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description='平台手动签名发行')
     parser.add_argument('--check-signing', action='store_true')
     arguments = parser.parse_args()
+    scope = read_delivery(Path(__file__).with_name('platform-delivery.json'))
     check_signing_key()
     if arguments.check_signing:
         print(json.dumps({'status': 'signing_ready'}))
@@ -200,7 +225,7 @@ def main() -> None:
     evidence = REPO / 'releases/database-compatibility.json'
     if not evidence.is_file():
         raise ValueError('真实数据库升级与回退演练证据缺失，停止签名发布')
-    print(json.dumps(publish(REPO / 'releases/v3.json', REPO / 'releases/v3-images.tar.gz', key, evidence), ensure_ascii=False))
+    print(json.dumps(publish(REPO / 'releases/v3.json', REPO / 'releases/v3-images.tar.gz', key, evidence, scope=scope), ensure_ascii=False))
 
 
 if __name__ == '__main__':

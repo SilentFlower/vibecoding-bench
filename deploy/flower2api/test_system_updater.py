@@ -172,6 +172,38 @@ class SystemUpdaterTests(unittest.TestCase):
         self.assertFalse(self.engine.worker.is_alive())
         return self.engine.status()
 
+    def test_scoped_draft_discovery_and_install(self) -> None:
+        """同一份已签草稿只供原部署与原版本安装，切换后恢复公共目录。@return 无。"""
+        bridge = self.engine.state['catalog']
+        public = create_index(self.root / 'releases' / self.old['release'] / 'system-release.json',
+            None, self.fixture.root / 'public.json', self.fixture.key)
+        self.engine.state['catalog'] = public
+        self.engine._persist()
+        path = self.root / 'scoped-release.json'
+        sig = path.with_suffix('.sig')
+        body = self.request()
+        for deployment, original, corrupt in [('other', self.old['release'], False),
+                ('test', self.target['release'], False), ('test', self.old['release'], True),
+                ('test', self.old['release'], False)]:
+            sig.unlink(missing_ok=True)
+            atomic_json(path, {'scope': {'deployment': deployment, 'from_release': original}, 'catalog': bridge})
+            sign_file(path, self.fixture.key)
+            sig.chmod(0o600)
+            if corrupt:
+                raw = sig.read_bytes()
+                sig.write_bytes(bytes([raw[0] ^ 1]) + raw[1:])
+            with self.subTest(deployment=deployment, original=original, corrupt=corrupt):
+                if deployment == 'test' and original == self.old['release'] and not corrupt:
+                    self.assertEqual(self.engine.releases()['releases'][0]['release'], self.target['release'])
+                    self.engine.submit('install', body)
+                    self.assertEqual(self.join()['operation']['phase'], 'succeeded')
+                else:
+                    self.assertEqual(self.engine.releases()['releases'][0]['release'], self.old['release'])
+                    with self.assertRaisesRegex(ValueError, '受信目录'):
+                        self.engine.submit('prepare', body)
+        self.assertEqual(self.engine.releases()['releases'][0]['release'], self.old['release'])
+        self.assertEqual(self.engine.state['catalog'], public)
+
     def test_install_idempotence_and_compatible_account_reuse(self) -> None:
         """一次切换且旧账号来源继续保留，迟到的更旧现场请求拒绝。
 
