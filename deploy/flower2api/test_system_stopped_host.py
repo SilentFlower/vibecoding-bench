@@ -124,12 +124,17 @@ class HistoricalHostTests(TestCase):
     def call(self, scope, token=None):
         """通过真实 Unix 连接发起测试读取。@param scope 证据范围。@param token 测试令牌。@return HTTP/JSON。"""
         with closing(UnixUpdateConnection(self.socket)) as conn:
-            conn.request(
-                "POST",
-                "/maintenance/stopped-environment",
-                body=json.dumps(scope),
-                headers={"Authorization": "Bearer " + (token or self.token), "Content-Type": "application/json"},
-            )
+            try:
+                conn.request(
+                    "POST",
+                    "/maintenance/stopped-environment",
+                    body=json.dumps(scope),
+                    headers={"Authorization": "Bearer " + (token or self.token), "Content-Type": "application/json"},
+                )
+            except BrokenPipeError:
+                # 宿主可以在请求头鉴权时就拒绝。正文写入遇到关闭后仍须读到原 HTTP 回应。
+                if token is None:
+                    raise
             response = conn.getresponse()
             return response.status, json.loads(response.read())
 
