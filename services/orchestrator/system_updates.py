@@ -836,6 +836,26 @@ def system_updates_router(runtime_provider) -> APIRouter:
             raise HTTPException(403, '更新服务证明无效')
         return UPDATE_GATE.state()
 
+    @router.post('/internal/v3/system-updates/stopped-activity')
+    async def stopped_activity(request: Request, body: dict) -> dict:
+        """在同一门禁下读取原进程的环境作业，不进入已经由外层快照持有的环境锁。"""
+        gate = internal_proof(request)
+        if (set(body) != {'operation_id', 'epoch', 'environment_id', 'challenge'}
+                or any(not isinstance(body[k], str) or not re.fullmatch('[a-f0-9]{32}', body[k])
+                       for k in ('environment_id', 'challenge'))
+                or gate.get('phase') != 'blocked' or any(body[k] != gate.get(k) for k in ('operation_id', 'epoch'))
+                or type(gate.get('active')) is not int or gate['active'] != 0):
+            raise HTTPException(409, '原维护门禁或在途活动已变化')
+        runtime = runtime_provider()
+        if runtime is None or not runtime.lock.acquire(blocking=False):
+            raise HTTPException(409, '编排作业状态暂不可读')
+        try:
+            # AccountRuntime 的作业锁是可重入锁。此端点只取内存计数，避免嵌套快照耗尽同步工作线程。
+            jobs = len(runtime.environment_jobs(body['environment_id']))
+        finally:
+            runtime.lock.release()
+        return {'scope': body, 'jobs': jobs}
+
     @router.post('/internal/v3/system-updates/snapshot')
     def snapshot(request: Request, body: RuntimeSnapshotInput | None = None):
         """读取真实排空快照。:param request: 内部证明。:param body: 快照范围。@return 快照。"""
