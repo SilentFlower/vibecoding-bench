@@ -7,13 +7,12 @@ import re
 from stat import S_ISDIR, S_ISREG
 
 from system_update_contract import safe_read, strict_json
+from tui_direct_selection import DIRECT_ACCOUNT_PATH, DIRECT_DIRECTORY, selector_matches
 
 
 POLICY_DIRECTORY = 'tui-managed-policies'
 MANAGED_SETTINGS_PATH = '/etc/claude-code/managed-settings.json'
 MANAGED_MARKETPLACE_PATH = '/opt/flower/managed-plugins'
-DIRECT_DIRECTORY = 'tui-direct'
-DIRECT_ACCOUNT_PATH = '/run/flower/tui-direct'
 
 
 def _trusted(path: Path, *, directory: bool | None = None, sender_readable: bool = False) -> stat_result:
@@ -39,26 +38,18 @@ def _verify_marketplace(marketplace: Path) -> None:
                 directories.append(item)
 
 
-def direct_account_selected(data: Path, *, account_id: int | None, environment_id: str) -> bool:
-    """读取中央节点唯一的直发目标。@param data 节点私有数据根。
-    @param account_id 网关登记的账号。@param environment_id 原环境。@return 是否匹配指定目标。
+def direct_account_selected(data: Path, *, account_id: int | None, environment_id: str,
+                            supports_multiple: bool = True) -> bool:
+    """读所属节点的账号直发选择。@param data 节点私有数据根。
+    @param account_id 网关登记的账号。@param environment_id 原环境。
+    @param supports_multiple 账号镜像支持多账号目录。@return 是否匹配该账号环境。
     """
-    directory = data / DIRECT_DIRECTORY
     try:
-        _trusted(directory, directory=True, sender_readable=True)
-        path = directory / 'account.json'
-        _trusted(path, directory=False, sender_readable=True)
         _trusted(data, directory=True)
-        choice = strict_json(safe_read(path))
     except FileNotFoundError:
         return False
-    target, environment = choice.get('account_id'), choice.get('environment_id')
-    if (type(target) is not int or not 0 < target < 2**63 or not isinstance(environment, str)
-            or not re.fullmatch(r'[a-f0-9]{32}', environment)):
-        raise ValueError('直发开关须指定一个现有账号及其固定环境')
-    if account_id == target and environment_id != environment:
-        raise ValueError('直发开关的目标账号环境已变化')
-    return account_id == target
+    return selector_matches(data / DIRECT_DIRECTORY, account_id=account_id, environment_id=environment_id,
+                            supports_multiple=supports_multiple)
 
 
 def managed_policy(data: Path, *, account_id: int | None, environment_id: str) -> dict | None:

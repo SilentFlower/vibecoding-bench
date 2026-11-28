@@ -203,12 +203,16 @@ impl AccountStore {
         if changed.rows_affected() != 1 {
             return Err(AppError::SchedulingConflict);
         }
+        // 账号状态可在预检查后变化。与修订在同一事务核对新进入 V2 的资格。
+        let enabling_v2 = before.active != "tui_v2" && (active == "tui_v2" || target == "tui_v2");
         let updated = sqlx::query(
-            "UPDATE accounts SET request_backend=$1 WHERE id=$2 AND request_backend=$3",
+            "UPDATE accounts SET request_backend=$1 WHERE id=$2 AND request_backend=$3
+             AND (NOT $4 OR status='active')",
         )
         .bind(active)
         .bind(id)
         .bind(&before.active)
+        .bind(enabling_v2)
         .execute(&mut *tx)
         .await?;
         if updated.rows_affected() != 1 {

@@ -51,6 +51,7 @@ from runtime_names import account_container_prefix
 from storage_maintenance import deduplicate_immutable_tree
 from system_update_gate import UPDATE_GATE, update_open
 from system_update_contract import safe_read, strict_json
+from tui_direct_selection import MULTI_SELECTION_LABEL, MULTI_SELECTION_VERSION
 from tui_direct_version import DIRECT_CLI_VERSION
 from tui_managed_policy import direct_account_selected, managed_policy
 from system_profile import (MAX_CPUINFO_BYTES, generate_computer_profile, generate_system_profile,
@@ -909,8 +910,11 @@ class AccountRuntime:
                                         environment_id=row['environment_id'])
             if tui_policy and (not tui_managed_oauth or image_labels.get('vibebench.tui-managed-policy') != '1'):
                 raise ValueError('Claude 托管策略需要同批正式账号镜像和受管 OAuth sender')
-            tui_direct = bool(tui_policy and direct_account_selected(self.data, account_id=account.get('cc2api_account_id'),
-                                                                     environment_id=row['environment_id']))
+            tui_direct = bool(tui_policy and gateway_configuration.get('status') == 'active'
+                              and direct_account_selected(
+                                  self.data, account_id=account.get('cc2api_account_id'),
+                                  environment_id=row['environment_id'],
+                                  supports_multiple=image_labels.get(MULTI_SELECTION_LABEL) == MULTI_SELECTION_VERSION))
             if tui_direct and (not tui_policy or not tui_policy['managed_order'] or not tui_policy['direct_hook_sha256']
                                or image_labels.get('vibebench.tui-direct-protocol') != '1'):
                 raise ValueError('直发需要同批账号镜像及保留内建 guard 的管理员 Mod')

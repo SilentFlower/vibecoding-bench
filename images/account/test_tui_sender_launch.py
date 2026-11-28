@@ -2,6 +2,7 @@
 
 from base64 import b64decode
 from contextlib import nullcontext
+from hashlib import sha256
 from http.client import HTTPConnection, HTTPResponse
 import json
 import os
@@ -18,10 +19,54 @@ from unittest import TestCase, skipUnless
 from unittest.mock import patch
 
 import tui_sender_launch as launch
+from tui_direct_admin import update_binding
+from tui_direct_selection import DIRECT_DIRECTORY
 
 
 class ManagedOAuthTests(TestCase):
     """受管凭据只随匹配的账号模型请求走原 sender。"""
+
+    @skipUnless(os.geteuid() == 0, '管理员选择器测试需要 root')
+    def test_direct_proxy_uses_each_current_sender_and_node(self):
+        """同节点和跨节点的选择器保持原策略、代次及对应代理。@return 无。"""
+        engine = Path(launch.__file__).with_name('tui-direct-mod') / 'hooks/engine.js'
+        hook = sha256(engine.read_bytes()).hexdigest()
+        with TemporaryDirectory() as directory, patch.dict(os.environ, {
+                'V3_TUI_DIRECT': '1', 'V3_TUI_MANAGED_POLICY': '1'}):
+            root = Path(directory)
+            central, remote = root / 'central', root / 'remote'
+            central.mkdir()
+            remote.mkdir()
+            cases = [(central, 12, 'a' * 32, 3), (central, 21, 'b' * 32, 7), (remote, 13, 'c' * 32, 9)]
+            for node, account, environment, _ in cases:
+                update_binding(node, account_id=account, environment_id=environment, publish=True)
+            for node, account, environment, generation in cases:
+                identity = {'account_id': account, 'environment_id': environment}
+                binding = {**identity, 'generation': generation}
+                proxy = f'socks5://192.0.2.{account}:1080'
+                policy = {**identity, 'managed_order': True, 'direct_hook_sha256': hook}
+                config = {'binding': binding, 'proxy_url': proxy, 'allowed_origin': launch.ACCOUNT_ORIGIN,
+                          'tui_direct': True, 'tui_managed_policy': policy}
+                config_path = root / f'{account}.json'
+                config_path.write_text(json.dumps(config))
+                other = remote if node == central else central
+                with (patch.object(launch, 'DIRECT_SELECTION', node / DIRECT_DIRECTORY),
+                      patch.dict(os.environ, {'V3_SENDER_CONFIG': str(config_path)})):
+                    self.assertEqual(launch.direct_proxy(binding), proxy)
+                    for mismatch in ({'account_id': 22}, {'environment_id': 'd' * 32}, {'generation': generation + 1}):
+                        with self.assertRaisesRegex(ValueError, '账号绑定已变化'):
+                            launch.direct_proxy({**binding, **mismatch})
+                    with patch.object(launch, 'DIRECT_SELECTION', other / DIRECT_DIRECTORY):
+                        with self.assertRaisesRegex(ValueError, '直发开关已关闭'):
+                            launch.direct_proxy(binding)
+                    config_path.write_text(json.dumps({**config, 'tui_managed_policy': {**policy, 'account_id': 23}}))
+                    with self.assertRaisesRegex(ValueError, '管理员 Mod'):
+                        launch.direct_proxy(binding)
+                    config_path.write_text(json.dumps(config))
+                    if account == 12:
+                        update_binding(node, account_id=account, environment_id=environment, publish=False)
+                        with self.assertRaisesRegex(ValueError, '直发开关已关闭'):
+                            launch.direct_proxy(binding)
 
     def test_managed_policy_guard_requires_same_account_and_generation(self):
         """策略守卫只在真实账号模式和本代预留同时成立时启用。@return 无。"""

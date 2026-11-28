@@ -22,6 +22,7 @@ from urllib.parse import urlsplit
 from uuid import UUID
 
 from runtime_files import atomic_json, atomic_text, directory_fd, private_directory
+from tui_direct_selection import DIRECT_ACCOUNT_PATH, selector_matches
 from tui_direct_version import DIRECT_CLI_SHA256, DIRECT_CLI_VERSION
 from tui_messages import (
     BODY_LIMIT, MODEL_PROTOCOL_HEADERS, MODEL_VERSION_HEADERS, OAUTH_FILE_LIMIT,
@@ -37,7 +38,7 @@ STORAGE = Path("/native")
 GUARD = Path("/opt/flower/tui/tui-guard")
 CONNECT_SHIM = GUARD.with_name("tui-connect.so")
 LOCAL_PROVIDER = Path("/run/v3/tui-local-provider.json")
-DIRECT_ACCOUNT = Path('/run/flower/tui-direct/account.json')
+DIRECT_SELECTION = Path(DIRECT_ACCOUNT_PATH)
 _OAUTH_FILE_NAME = ".credentials.json"
 ACCOUNT_ORIGIN = "https://api.anthropic.com"
 _program_lock = Lock()
@@ -199,17 +200,13 @@ def _sender_config():
 
 def _check_direct_policy(config):
     policy = config.get("tui_managed_policy") or {}
+    binding = config["binding"]
     engine = Path(__file__).with_name("tui-direct-mod") / "hooks/engine.js"
     if (config.get("tui_direct") is not True or not _managed_policy_enabled()
+            or any(policy.get(key) != binding[key] for key in ('account_id', 'environment_id'))
             or not policy.get("managed_order") or policy.get("direct_hook_sha256") != sha256(engine.read_bytes()).hexdigest()):
         raise ValueError("账号直发缺少同发行的管理员 Mod")
-    with os.fdopen(os.open(DIRECT_ACCOUNT, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), 'rb') as source:
-        info = os.fstat(source.fileno())
-        if not S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_nlink != 1 or info.st_mode & 0o022:
-            raise ValueError('直发开关须由部署管理员发布')
-        target = json.load(source)
-    if (not isinstance(target, dict) or type(target.get('account_id')) is not int
-            or any(target.get(key) != config['binding'][key] for key in ('account_id', 'environment_id'))):
+    if not selector_matches(DIRECT_SELECTION, account_id=binding['account_id'], environment_id=binding['environment_id']):
         raise ValueError('原账号的直发开关已关闭或改变')
 
 

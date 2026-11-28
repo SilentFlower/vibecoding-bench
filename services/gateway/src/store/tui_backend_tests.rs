@@ -46,6 +46,34 @@ async fn verify_switch_transactions(driver: &str, dsn: &str) {
     assert_eq!(pending.target, "tui_v2");
     assert_eq!(pending.binding, winning.binding);
     assert_eq!(pending.revision, initial.revision + 1);
+    sqlx::query("UPDATE accounts SET status='disabled' WHERE id IN ($1,$2)")
+        .bind(ids[0])
+        .bind(ids[1])
+        .execute(&reopened)
+        .await
+        .unwrap();
+    let disabled = store.tui_backend(ids[1]).await.unwrap();
+    for (id, snapshot, active, target) in [
+        (ids[0], &pending, "tui_v2", ""),
+        (ids[1], &disabled, "native293", "tui_v2"),
+    ] {
+        assert!(
+            store
+                .update_tui_backend(id, snapshot, active, target, "disabled")
+                .await
+                .is_err()
+        );
+        let unchanged = store.tui_backend(id).await.unwrap();
+        assert_eq!(unchanged.active, snapshot.active);
+        assert_eq!(unchanged.target, snapshot.target);
+        assert_eq!(unchanged.revision, snapshot.revision);
+        assert_eq!(unchanged.binding, snapshot.binding);
+    }
+    sqlx::query("UPDATE accounts SET status='active' WHERE id=$1")
+        .bind(ids[0])
+        .execute(&reopened)
+        .await
+        .unwrap();
     let applied = store
         .update_tui_backend(ids[0], &pending, "tui_v2", "", "")
         .await
@@ -62,6 +90,19 @@ async fn verify_switch_transactions(driver: &str, dsn: &str) {
     assert_eq!(
         (other.active.as_str(), other.target.as_str(), other.revision),
         ("native293", "", 0)
+    );
+    sqlx::query("UPDATE accounts SET status='disabled' WHERE id=$1")
+        .bind(ids[0])
+        .execute(&reopened)
+        .await
+        .unwrap();
+    assert_eq!(
+        store
+            .update_tui_backend(ids[0], &applied, "native293", "", "")
+            .await
+            .unwrap()
+            .active,
+        "native293"
     );
     for id in ids {
         sqlx::query("DELETE FROM accounts WHERE id=$1")

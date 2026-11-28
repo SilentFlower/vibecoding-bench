@@ -77,6 +77,28 @@ builder 和 scope 仅接受最长 64 字符的字母、数字、下划线、点�
 
 同步时使用明确的提交和目标分支，并在推送前复核目标中的事件与 job 条件。当前分支文件的本地验证与远端各分支触发规则分别验收。分支同步、正式发行及生产安装各自按明确的 Git/上线授权执行。
 
+## 按账号启用 Claude CLI 直发
+
+先通过系统更新安装同批签名 control 与 account 镜像。在集中部署和各所属 SSH 节点核对实装账号镜像标记 `vibebench.tui-direct-selection=multi-v1`。逐账号重读网关状态、OAuth 类型、原代理、所属节点、环境 ID、环境代次和转发修订。只纳入仍为 active 的 Claude OAuth 账号。使用原账号维护门禁等待 API、CLI 和待续工具轮收口。
+
+节点管理员在原环境发布 `<节点数据根>/tui-managed-policies/<环境ID>/`，让绑定、管理设置及目录市场对应原账号环境。使用同批账号镜像的 `/opt/flower/tui/tui-direct-mod/`，从已有管理员授权合并配置。内建 `sec-default@builtin` 保持启用，直发 Mod 位于 `appendPlugins` 最后。管理员在该节点的 control 或编排容器内执行，`--data-root` 取该容器实际节点数据根：
+
+```sh
+python3 -B /app/tui_direct_admin.py --data-root "$NODE_DATA_ROOT" publish "$GATEWAY_ACCOUNT_ID" "$ENVIRONMENT_ID"
+```
+
+同一节点可以重复发布不同账号。首条写入将已有的合法 `tui-direct/account.json` 一并迁移到 `tui-direct/accounts/<网关账号ID>.json`。发布后，各 sender 只读取自己的记录并核对当前代次和受管策略。账号重新绑定环境时，先按旧环境撤销，再按新的实际归属发布。
+
+已在兼容 V2 的账号可先沿原修订门禁排空到 `native293`。通过 `POST /api/environments/<环境ID>/maintenance` 提交 `operation=stop` 和当前 `expected_generation`，再从同一环境的 `native-preparation` 入口准备正式 sender。重读 `GET /admin/accounts/<网关账号ID>`，确认当前 sender 的 `tui_direct_available=true` 后，用 `PUT` 提交 `request_backend=tui_v2` 和实收 `request_backend_revision`。逐号确认公网 SSE 及同一预留的一次真实模型投递。
+
+按账号回退时，保持其选择记录和托管策略，先用当前修订提交 `native293`。待已接请求及工具回执结束，确认生效后端为 `native293`、无待切换，再在原节点撤销并按当前代次重建该环境：
+
+```sh
+python3 -B /app/tui_direct_admin.py --data-root "$NODE_DATA_ROOT" revoke "$GATEWAY_ACCOUNT_ID" "$ENVIRONMENT_ID"
+```
+
+后续读者继续以多账号目录为准。被撤销账号的历史单选记录保留供审计，绝不能重新作为本代选择使用。另一个账号的转发修订、代理、策略及选择记录各由自己的维护操作控制。
+
 ## 单部署镜像与容器名称切换
 
 正式镜像采用 `flower2api-control/account`，控制 Compose 项目与网络采用 `flower2api-<deployment>`。账号容器采用 `flower2api-<部署哈希前12位>-<环境ID>`，保留 CLI/sender 后缀；最长 sender 名为63字节。部署 ID、持久数据目录、内部所有权标签、V3 配置键、systemd 服务名和签名发行身份沿既有合同保留。本版建立 Flower2API 正式维护基线，当前旧来源和已签材料用于首次交接及失败恢复。后续正式升级与回退从本版基线起算。

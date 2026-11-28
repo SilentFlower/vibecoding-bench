@@ -9,7 +9,7 @@ use tokio::time::{MissedTickBehavior, interval};
 use tracing::{debug, warn};
 
 use crate::error::AppError;
-use crate::model::account::{Account, TuiSystemPromptPolicy};
+use crate::model::account::{Account, AccountStatus, TuiSystemPromptPolicy};
 use crate::service::account::{AccountQueue, AccountService};
 use crate::service::diagnostics::tui_admission_rejected;
 use crate::service::runtime_bridge::{account_config_permit, account_route_config_permit};
@@ -179,7 +179,9 @@ async fn reconcile_locked(
     queue: &AccountQueue,
     state: TuiBackendSnapshot,
 ) -> Result<TuiBackendSnapshot, AppError> {
-    if state.target.is_empty() {
+    if state.target.is_empty()
+        || (state.target == TUI_V2 && state.active != TUI_V2 && account.status != AccountStatus::Active)
+    {
         return Ok(state);
     }
     // 响应头前由路由读锁保护。HTTP 在途由账号活动门禁保护。V2 等工具的会话由 sender 核对。
@@ -274,6 +276,11 @@ pub(crate) async fn change_locked(
     let before = service.tui_backend(account.id).await?;
     if !matches!(target, "legacy" | "native293" | TUI_V2) {
         return Err(AppError::BadRequest("未知转发方式".into()));
+    }
+    if target == TUI_V2 && before.active != TUI_V2 && account.status != AccountStatus::Active {
+        return Err(AppError::BadRequest(
+            "当前账号未启用，无法切换到交互 V2".into(),
+        ));
     }
     let pending = if target == before.active { "" } else { target };
     // 相同意向的重试不推进配置，也不会重新执行 quiesce。

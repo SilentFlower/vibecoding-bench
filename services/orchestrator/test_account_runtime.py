@@ -29,6 +29,8 @@ from physical_features import FEATURE_LABELS, physical_features_summary
 from native_sender import NativePreparationBlocked
 from native_kernel_upgrade import validate_records
 from project_library import digest_json
+from tui_direct_admin import update_binding
+from tui_direct_selection import MULTI_SELECTION_LABEL, MULTI_SELECTION_VERSION
 from tui_managed_policy import (DIRECT_ACCOUNT_PATH, DIRECT_DIRECTORY, MANAGED_MARKETPLACE_PATH, MANAGED_SETTINGS_PATH,
                                 POLICY_DIRECTORY, direct_account_selected, managed_policy)
 import main
@@ -2934,6 +2936,100 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertNotIn('V3_TUI_DIRECT', sender['environment'])
         self.assertFalse({MANAGED_SETTINGS_PATH, MANAGED_MARKETPLACE_PATH}.intersection(
             volume['bind'] for volume in sender['volumes'].values()))
+
+    @unittest.skipUnless(os.geteuid() == 0, '管理员选择器测试需要 root')
+    def test_direct_selection_rebuilds_only_the_drained_account(self) -> None:
+        """同节点两个账号独占策略及代理，撤销只影响选中的账号。@return 无。"""
+        containers = self._isolated_docker()
+        create = self.client.containers.run.side_effect
+        labels = self.client.images.get.return_value.attrs['Config']['Labels']
+        labels.update({
+            'vibebench.tui-sender-protocol': '1', 'vibebench.tui-session-host': '1',
+            'vibebench.tui-managed-oauth': '1', 'vibebench.tui-managed-policy': '1',
+            'vibebench.tui-direct-protocol': '1', 'vibebench.native-runtime': '293-raw-1',
+        })
+
+        def unique_role(image, **options):
+            container = create(image, **options)
+            containers.pop(container.id)
+            container.id = uuid.uuid4().hex
+            containers[container.id] = container
+            return container
+
+        self.client.containers.run.side_effect = unique_role
+        with self.database() as connection:
+            connection.executemany("INSERT INTO accounts(id,name,cc2api_account_id,enabled) VALUES(?,?,?,?)",
+                                   ((2, 'second', 8, 1), (3, 'disabled', 9, 0)))
+        accounts = []
+        environments = {}
+        gateway = {}
+        for application_id, name, gateway_id in ((1, 'synthetic', 7), (2, 'second', 8), (3, 'disabled', 9)):
+            host = f'192.0.2.{gateway_id}'
+            path = f'/admin/runtime/accounts/{gateway_id}/config'
+            gateway[path] = {'auth_type': 'oauth', 'status': 'disabled' if application_id == 3 else 'active',
+                             'proxy_url': f'socks5://{host}:1080', 'request_backend': 'native293', 'concurrency': 1}
+            accounts.append({'id': application_id, 'name': name, 'cc2api_account_id': gateway_id, 'upstream_proxy_scheme': 'socks5',
+                             'upstream_socks5_host': host, 'upstream_socks5_port': 1080,
+                             'upstream_socks5_user': '', 'upstream_socks5_pass': ''})
+            environment = self.runtime._row(name, application_id)['environment_id']
+            environments[gateway_id] = environment
+            bundle = self.root / POLICY_DIRECTORY / environment
+            market = bundle / 'marketplace'
+            (market / '.claude-plugin').mkdir(parents=True)
+            (market / 'guard/.claude-plugin').mkdir(parents=True)
+            (market / 'guard/hooks').mkdir()
+            atomic_json(bundle / 'binding.json', {'account_id': gateway_id, 'environment_id': environment,
+                                                 'plugin': 'guard@approved'})
+            atomic_json(bundle / 'managed-settings.json', {'enabledPlugins': {'guard@approved': True},
+                'extraKnownMarketplaces': {'approved': {'source': {'source': 'directory', 'path': MANAGED_MARKETPLACE_PATH}}},
+                'appendPlugins': ['guard@approved']}, 0o444)
+            atomic_json(market / '.claude-plugin/marketplace.json', {'name': 'approved',
+                'plugins': [{'name': 'guard', 'source': './guard'}]}, 0o444)
+            atomic_json(market / 'guard/.claude-plugin/plugin.json', {'name': 'guard'}, 0o444)
+            atomic_json(market / 'guard/hooks/hooks.json', {'modules': ['./engine.js']}, 0o444)
+            (market / 'guard/hooks/engine.js').write_text('export function register() {}\n')
+            update_binding(self.root, account_id=gateway_id, environment_id=environment, publish=True)
+        self.gateway._request.side_effect = lambda method, path: gateway[path]
+
+        def sender_config(row):
+            return json.loads(self.runtime._sender_config(row).read_bytes())
+
+        first, second, disabled = accounts
+        with (patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sender_active', return_value=0),
+              patch.object(self.runtime, '_running_sender_active', return_value=False),
+              patch.object(self.runtime, '_ensure_version'), patch.dict(os.environ, {'V3_NATIVE_SENDER_MEMORY': '128m'})):
+            with self.assertRaisesRegex(ValueError, '多账号直发需要支持'):
+                self.runtime.ensure(first)
+            labels[MULTI_SELECTION_LABEL] = MULTI_SELECTION_VERSION
+            with self.assertRaisesRegex(ValueError, '认证类型或状态不可用'):
+                self.runtime.ensure(disabled)
+            login, _ = self.runtime.ensure(disabled, allow_inactive_login=True)
+            self.assertNotIn('tui_direct', sender_config(login))
+            a, _ = self.runtime.ensure(first)
+            b, _ = self.runtime.ensure(second)
+            for row, gateway_id in ((a, 7), (b, 8)):
+                config = sender_config(row)
+                self.assertTrue(config['tui_direct'])
+                self.assertEqual(config['binding']['account_id'], gateway_id)
+                self.assertEqual(config['binding']['environment_id'], environments[gateway_id])
+                self.assertEqual(config['tui_managed_policy']['account_id'], gateway_id)
+                self.assertEqual(config['proxy_source'], f'socks5://192.0.2.{gateway_id}:1080')
+                self.assertIn({'Type': 'bind', 'Source': str(self.root / DIRECT_DIRECTORY),
+                               'Destination': DIRECT_ACCOUNT_PATH, 'RW': False},
+                              containers[row['sender_container_id']].attrs['Mounts'])
+            update_binding(self.root, account_id=7, environment_id=environments[7], publish=False)
+            with self.assertRaisesRegex(RuntimeBusy, '排空并停止当前账号环境'):
+                self.runtime.ensure(first)
+            for column in ROLE_COLUMNS.values():
+                containers[a[column]].status = 'exited'
+            reverted, _ = self.runtime.ensure(first)
+            self.assertEqual(reverted['generation'], a['generation'] + 1)
+            self.assertNotIn('tui_direct', sender_config(reverted))
+            second_after, _ = self.runtime.ensure(second)
+            self.assertEqual(second_after['generation'], b['generation'])
+            self.assertEqual(second_after['sender_container_id'], b['sender_container_id'])
+            self.assertTrue(sender_config(second_after)['tui_direct'])
+            self.assertEqual(self.client.containers.run.call_count, 12)
 
     def test_tui_single_model_slot_borrows_only_from_available_ram(self) -> None:
         """保留各角色预算及已冻结 sender 上限，只有确定的余量计入额外驻留位。@return 无。"""
