@@ -31,7 +31,8 @@ from native_kernel_upgrade import validate_records
 from project_library import digest_json
 from tui_direct_admin import update_binding
 from tui_direct_selection import MULTI_SELECTION_LABEL, MULTI_SELECTION_VERSION
-from tui_managed_policy import (DIRECT_ACCOUNT_PATH, DIRECT_DIRECTORY, MANAGED_MARKETPLACE_PATH, MANAGED_SETTINGS_PATH,
+from tui_managed_policy import (DEFAULT_DIRECT_LABEL, DEFAULT_POLICY_DIRECTORY,
+                                DIRECT_ACCOUNT_PATH, DIRECT_DIRECTORY, MANAGED_MARKETPLACE_PATH, MANAGED_SETTINGS_PATH,
                                 POLICY_DIRECTORY, direct_account_selected, managed_policy)
 import main
 
@@ -762,8 +763,8 @@ class AccountRuntimeTests(unittest.TestCase):
                 self.runtime.refresh_physical_features(row)
             self.assertEqual({"previous": True}, json.loads(snapshot.read_text()))
 
-    def _isolated_docker(self, network=None) -> dict:
-        """提供具有独立角色、标签及来源网络的 Docker 替身。@return 容器登记。"""
+    def _isolated_docker(self, network=None, *, unique_roles: bool = False) -> dict:
+        """提供独立角色替身。@param network 可选网络。@param unique_roles 多环境各自建角色。@return 容器登记。"""
         self.runtime.release_id = "test"
         self.client.images.get.return_value.attrs = {"Config": {"Labels": {
             "vibebench.product": "v3", "vibebench.role": "account", "vibebench.release": "test",
@@ -777,7 +778,8 @@ class AccountRuntimeTests(unittest.TestCase):
             """模拟实际独立容器创建，保留配置供断言。"""
             role = options["labels"]["vibebench.role"]
             container = network if role == "account-network" and network is not None else Mock()
-            container.id, container.status, container.labels = role + "-new", "running", options["labels"]
+            container.id = uuid.uuid4().hex if unique_roles else role + "-new"
+            container.status, container.labels = "running", options["labels"]
             container.attrs = {"Mounts": [{"Type": "bind", "Source": source,
                 "Destination": mount["bind"], "RW": mount["mode"] != "ro"}
                 for source, mount in options.get("volumes", {}).items()]}
@@ -2940,8 +2942,7 @@ class AccountRuntimeTests(unittest.TestCase):
     @unittest.skipUnless(os.geteuid() == 0, '管理员选择器测试需要 root')
     def test_direct_selection_rebuilds_only_the_drained_account(self) -> None:
         """同节点两个账号独占策略及代理，撤销只影响选中的账号。@return 无。"""
-        containers = self._isolated_docker()
-        create = self.client.containers.run.side_effect
+        containers = self._isolated_docker(unique_roles=True)
         labels = self.client.images.get.return_value.attrs['Config']['Labels']
         labels.update({
             'vibebench.tui-sender-protocol': '1', 'vibebench.tui-session-host': '1',
@@ -2949,14 +2950,6 @@ class AccountRuntimeTests(unittest.TestCase):
             'vibebench.tui-direct-protocol': '1', 'vibebench.native-runtime': '293-raw-1',
         })
 
-        def unique_role(image, **options):
-            container = create(image, **options)
-            containers.pop(container.id)
-            container.id = uuid.uuid4().hex
-            containers[container.id] = container
-            return container
-
-        self.client.containers.run.side_effect = unique_role
         with self.database() as connection:
             connection.executemany("INSERT INTO accounts(id,name,cc2api_account_id,enabled) VALUES(?,?,?,?)",
                                    ((2, 'second', 8, 1), (3, 'disabled', 9, 0)))
@@ -3030,6 +3023,62 @@ class AccountRuntimeTests(unittest.TestCase):
             self.assertEqual(second_after['sender_container_id'], b['sender_container_id'])
             self.assertTrue(sender_config(second_after)['tui_direct'])
             self.assertEqual(self.client.containers.run.call_count, 12)
+
+    @unittest.skipUnless(os.geteuid() == 0, '发行托管策略权限测试需要 root')
+    def test_release_direct_prepares_on_v2_selection_without_an_account_list(self) -> None:
+        """共享发行策略由账号身份生成。准备 V2 之前只安装原生 V1 所需的 CLI。@return 无。"""
+        containers = self._isolated_docker(unique_roles=True)
+        labels = self.client.images.get.return_value.attrs['Config']['Labels']
+        labels.update({
+            DEFAULT_DIRECT_LABEL: '1', 'vibebench.tui-sender-protocol': '1',
+            'vibebench.tui-session-host': '1', 'vibebench.tui-managed-oauth': '1',
+            'vibebench.tui-managed-policy': '1', 'vibebench.tui-direct-protocol': '1',
+            'vibebench.native-runtime': '293-raw-1',
+        })
+        proxy = 'socks5://192.0.2.7:1080'
+        self.gateway._request.return_value = {'auth_type': 'oauth', 'status': 'active', 'proxy_url': proxy,
+                                              'request_backend': 'native293', 'concurrency': 1}
+        account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': 7, 'upstream_proxy_scheme': 'socks5',
+                   'upstream_socks5_host': '192.0.2.7', 'upstream_socks5_port': 1080,
+                   'upstream_socks5_user': '', 'upstream_socks5_pass': ''}
+        with self.database() as connection:
+            connection.execute("INSERT INTO accounts(id,name,cc2api_account_id) VALUES(2,'second',8)")
+        second = {**account, 'id': 2, 'name': 'second', 'cc2api_account_id': 8, 'upstream_socks5_host': '192.0.2.8'}
+        mod = Path(__file__).resolve().parents[2] / 'images/account/tui-direct-mod'
+        with (patch('tui_managed_policy.DEFAULT_MOD', mod),
+              patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sender_active', return_value=0),
+              patch.object(self.runtime, '_running_sender_active', return_value=False),
+              patch.object(self.runtime, '_ensure_version') as install,
+              patch.dict(os.environ, {'V3_NATIVE_SENDER_MEMORY': '128m'})):
+            row, _ = self.runtime.ensure(account)
+            config = json.loads(self.runtime._sender_config(row).read_bytes())
+            policy = config['tui_managed_policy']
+            self.assertTrue(config['tui_direct_from_release'])
+            self.assertEqual((policy['account_id'], policy['environment_id']), (7, row['environment_id']))
+            self.assertEqual(config['proxy_source'], proxy)
+            self.assertIsNotNone(config['native'])
+            self.assertFalse((self.root / DIRECT_DIRECTORY).exists())
+            self.assertFalse((self.root / POLICY_DIRECTORY).exists())
+            self.assertEqual([item.args[1] for item in install.call_args_list], ['2.1.293'])
+            mount = self.root / DEFAULT_POLICY_DIRECTORY / policy['release_bundle'] / 'marketplace'
+            self.assertIn({'Type': 'bind', 'Source': str(mount), 'Destination': MANAGED_MARKETPLACE_PATH, 'RW': False},
+                          containers[row['sender_container_id']].attrs['Mounts'])
+            binding = self.runtime.transport(account, '', prepare_tui=True)
+            self.assertEqual(binding, config['binding'])
+            self.assertEqual(install.call_args.args[1], '2.1.321')
+            self.assertEqual(self.client.containers.run.call_count, 3)
+            self.assertEqual(self.gateway._request.return_value['request_backend'], 'native293')
+            self.gateway._request.return_value['proxy_url'] = 'socks5://192.0.2.8:1080'
+            other_binding = self.runtime.transport(second, '', prepare_tui=True)
+            other_row = self.runtime._row('second', 2)
+            other = json.loads(self.runtime._sender_config(other_row).read_bytes())
+            self.assertEqual(other['binding'], other_binding)
+            self.assertEqual(other['tui_managed_policy']['release_bundle'], policy['release_bundle'])
+            self.assertEqual((other_binding['account_id'], other_binding['environment_id']), (8, other_row['environment_id']))
+            self.assertNotEqual(other_binding['environment_id'], binding['environment_id'])
+            self.assertEqual(other['proxy_source'], 'socks5://192.0.2.8:1080')
+            self.assertEqual(json.loads(self.runtime._sender_config(row).read_bytes()), config)
+            self.assertEqual(self.client.containers.run.call_count, 6)
 
     def test_tui_single_model_slot_borrows_only_from_available_ram(self) -> None:
         """保留各角色预算及已冻结 sender 上限，只有确定的余量计入额外驻留位。@return 无。"""

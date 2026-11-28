@@ -14512,17 +14512,21 @@ def v3_agy_environment(account_id: int, prepare: bool = False) -> dict:
 
 @app.get("/internal/v3/transport/{account_id}")
 def v3_transport(account_id: int, wake: bool = True, tui_previous_release: bool = False,
-                 tui_oauth_profile: bool = False,
+                 tui_oauth_profile: bool = False, prepare_tui: bool = False,
                  tui_rollback_generation: Annotated[int | None, Query(ge=0)] = None):
     """解析唯一绑定账号并返回受限发送实例。
     :param account_id: Gateway 账号。:param wake: 是否唤醒环境。
     :param tui_previous_release: 是否接受原版回执绑定。:param tui_oauth_profile: 是否读取 V2 OAuth 画像。
+    :param prepare_tui: 从 V2 保存或准备入口准备当前账号的交互 CLI。
     :param tui_rollback_generation: 仅回切时使用的旧登记代次，零表示历史无代次格式。
     :return: 私有传输绑定、回切核验或空值。
     """
     if not account_runtime:
         raise HTTPException(404)
     configuration = account_runtime.gateway._request('GET', f'/admin/runtime/accounts/{account_id}/config')
+    if prepare_tui and (not wake or configuration.get('platform') != 'claude_code'
+                        or configuration.get('auth_type') != 'oauth' or configuration.get('status') != 'active'):
+        raise HTTPException(409, '直发准备需要当前活跃的受管 Claude 账号')
     if tui_rollback_generation is not None and (wake or not V3_ENABLED or not cluster_service
             or configuration.get('request_backend') != 'tui_v2'):
         raise HTTPException(409, '回切核验需要原 V2 账号与只读绑定')
@@ -14543,6 +14547,7 @@ def v3_transport(account_id: int, wake: bool = True, tui_previous_release: bool 
     if len(rows) != 1:
         raise HTTPException(409, "账号没有唯一的 v3 环境绑定")
     account = dict(rows[0])
+    preparation = {'prepare_tui': True} if prepare_tui else {}
     try:
         if cluster_service and cluster_service.store.assignment(account['id'])['kind'] == 'ssh':
             if not wake:
@@ -14551,12 +14556,13 @@ def v3_transport(account_id: int, wake: bool = True, tui_previous_release: bool 
             else:
                 if credential_ownership:
                     credential_ownership.guard(account)
-                binding = cluster_service.prepare_remote(account, account_runtime, cc2api_client, _quota_identity(account))
+                binding = cluster_service.prepare_remote(account, account_runtime, cc2api_client, _quota_identity(account),
+                                                         **preparation)
         elif not wake:
             placement = (lambda current: cluster_service.admit_local(current, allow_node_drain=True)) if cluster_service else None
             binding = account_runtime.existing_transport(account, placement_check=placement)
         else:
-            binding = account_runtime.transport(account, effective_claude_code_version())
+            binding = account_runtime.transport(account, effective_claude_code_version(), **preparation)
         if tui_rollback_generation is not None:
             return cluster_service.tui_rollback_status(account, account_runtime, binding, tui_rollback_generation)
         if binding and configuration.get('request_backend') == 'tui_v2':

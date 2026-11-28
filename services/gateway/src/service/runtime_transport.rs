@@ -393,10 +393,10 @@ impl TuiV2Unavailable {
                 Self::MessagesToolAndUsageEventsUnavailable => {
                     "V2 缺少官方交互终端的完整 Messages 工具和用量事件源"
                 }
+                Self::ReadinessSource => "V2 的账号交互 CLI 或受管策略未就绪",
                 Self::ReadinessUnverified
                 | Self::ReadinessConfig
-                | Self::ReadinessLedger
-                | Self::ReadinessSource => "V2 账号发送器就绪状态待核对",
+                | Self::ReadinessLedger => "V2 账号发送器就绪状态待核对",
             }
             .into(),
         )
@@ -917,6 +917,14 @@ pub async fn prepare(
     account: &Account,
     preparation_timeout: Duration,
 ) -> Result<PreparedTransport, AppError> {
+    prepare_transport(account, preparation_timeout, false).await
+}
+
+async fn prepare_transport(
+    account: &Account,
+    preparation_timeout: Duration,
+    prepare_tui: bool,
+) -> Result<PreparedTransport, AppError> {
     let base = std::env::var("V3_RUNTIME_URL").unwrap_or_default();
     if base.is_empty() {
         if !std::env::var("V3_DEPLOYMENT_ID")
@@ -959,6 +967,7 @@ pub async fn prepare(
         &deployment,
         &release,
         preparation_timeout,
+        prepare_tui,
     )
     .await
 }
@@ -1194,7 +1203,7 @@ async fn tui_transport(
     }
     let fixture = tui_fixture(account);
     let transport = if let Some(wait) = wake_wait {
-        prepare(account, wait).await.map(Some)
+        prepare_transport(account, wait, !fixture).await.map(Some)
     } else {
         prepare_existing_binding(account, registered, include_profile).await
     }
@@ -1382,27 +1391,31 @@ pub(super) async fn tui_receipt_status(
 /// @param account 本次选择的账号。@return 同账号就绪状态。
 pub(super) async fn tui_switch_status(account: &Account) -> Result<TuiBindingStatus, AppError> {
     // 保存可以等待远端只读检查完成，列表和详情仍沿用短预算。
-    match probe_tui_account(account, Duration::from_secs(12), None, None).await {
-        Err(TuiV2Unavailable::NotRunning) if !tui_fixture(account) => {
-            // 查询结果为空只允许按需准备，提交切换仍需核对实际 sender 和原轮归属。
-            let sender = ready_tui_sender(
-                account,
-                Instant::now() + Duration::from_millis(REQUEST_BUDGET_MS),
-                true,
-                None,
-                false,
-            )
-            .await?;
-            Ok(TuiBindingStatus {
-                key: sender.key,
-                idle: sender.idle,
-                system_prompt_policy: sender.system_prompt_policy,
-                direct_https: sender.direct_https,
-                predecessors: sender.predecessors,
-            })
-        }
-        result => result.map_err(TuiV2Unavailable::into_error),
+    let status = probe_tui_account(account, Duration::from_secs(12), None, None).await;
+    if tui_fixture(account) {
+        return status.map_err(TuiV2Unavailable::into_error);
     }
+    match status {
+        Ok(status) if status.direct_https => return Ok(status),
+        Ok(_) | Err(TuiV2Unavailable::NotRunning | TuiV2Unavailable::NotConfigured
+                   | TuiV2Unavailable::ReadinessSource) => {}
+        Err(error) => return Err(error.into_error()),
+    }
+    // 保存 V2 选择时才让编排准备固定交互 CLI，原生 V1 的常规准备无需安装该版本。
+    let sender = ready_tui_sender(
+        account,
+        Instant::now() + Duration::from_millis(REQUEST_BUDGET_MS),
+        true,
+        None,
+    )
+    .await?;
+    Ok(TuiBindingStatus {
+        key: sender.key,
+        idle: sender.idle,
+        system_prompt_policy: sender.system_prompt_policy,
+        direct_https: sender.direct_https,
+        predecessors: sender.predecessors,
+    })
 }
 
 fn reject_tui(account: i64, reason: TuiV2Unavailable) -> AppError {
@@ -1549,14 +1562,13 @@ impl TuiReadySender {
 
 /// 解析账号登记并核验 sender 的实际能力。@param account 已授权账号。
 /// @param deadline 请求的单调时钟截止。@param wake 是否允许沿编排合同唤醒。
-/// @param registered 原回执已登记的绑定。@param direct_only 是否要求正式 sender 直发。
+/// @param registered 原回执已登记的绑定。
 /// @return 原传输及其就绪证明，新轮只使用当前发行。
 pub(super) async fn ready_tui_sender(
     account: &Account,
     deadline: Instant,
     wake: bool,
     registered: Option<&str>,
-    direct_only: bool,
 ) -> Result<TuiReadySender, AppError> {
     let deadline_reached = || {
         super::diagnostics::tui_admission_rejected("tui_readiness_deadline");
@@ -1581,7 +1593,7 @@ pub(super) async fn ready_tui_sender(
             None,
         )
         .await?;
-        if direct_only && !transport.fixture && !direct_https {
+        if !transport.fixture && !direct_https {
             return Err(TuiV2Unavailable::DirectUnavailable);
         }
         Ok((transport, (idle, agent_summary, system_prompt_policy, direct_https)))
@@ -1609,7 +1621,7 @@ pub(super) async fn ready_tui_sender(
         agent_summary,
         system_prompt_policy,
         direct_https,
-        direct_required: direct_only && !fixture,
+        direct_required: !fixture,
         predecessors,
         tui_oauth_profile,
     })
@@ -2119,6 +2131,21 @@ pub(super) fn tui_input_rejection(reason: &str) -> Option<AppError> {
             "unsupported_parameter",
             S::UNPROCESSABLE_ENTITY,
             "当前接口不支持该业务字段或策略",
+        ),
+        (
+            "direct_output_format_unsupported",
+            S::UNPROCESSABLE_ENTITY,
+            "当前交互 CLI 直发无法保留结构化输出格式",
+        ),
+        (
+            "direct_tool_choice_unsupported",
+            S::UNPROCESSABLE_ENTITY,
+            "当前交互 CLI 直发无法指定单个工具",
+        ),
+        (
+            "direct_temperature_unsupported",
+            S::UNPROCESSABLE_ENTITY,
+            "当前交互 CLI 直发无法保留非默认 temperature",
         ),
         (
             "invalid_native_request",
@@ -2716,6 +2743,7 @@ async fn prepare_existing_binding(
 /// @param deployment 部署归属。
 /// @param release 发布归属。
 /// @param preparation_timeout 剩余准备期限。
+/// @param prepare_tui 是否准备本账号的正式交互 CLI。
 /// @return 身份验证后的发送通道。
 async fn prepare_from_runtime(
     account: &Account,
@@ -2725,14 +2753,17 @@ async fn prepare_from_runtime(
     deployment: &str,
     release: &str,
     preparation_timeout: Duration,
+    prepare_tui: bool,
 ) -> Result<PreparedTransport, AppError> {
-    let response = client
+    let request = client
         .get(format!(
             "{}/internal/v3/transport/{}",
             base.trim_end_matches('/'),
             account.id
         ))
-        .query(&[("tui_oauth_profile", wants_tui_oauth_profile(account))])
+        .query(&[("tui_oauth_profile", wants_tui_oauth_profile(account))]);
+    let request = if prepare_tui { request.query(&[("prepare_tui", true)]) } else { request };
+    let response = request
         .bearer_auth(secret)
         .timeout(preparation_timeout.min(Duration::from_secs(120)))
         .send()
@@ -6401,6 +6432,7 @@ mod tests {
                     deployment,
                     release,
                     Duration::from_secs(5),
+                    false,
                 )
                 .await
                 .unwrap();

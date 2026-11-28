@@ -36,7 +36,7 @@ from tui_direct import DirectModel, DirectRejected
 from tui_reconnect import ReceiptCheckpoints, digest
 from tui_input_policy import (
     CONTEXT_BETA, SYSTEM_CLEAR_AT_BETA, SYSTEM_EFFORT_BETA, InputRejection,
-    custom_tool_type, legacy_custom_tool_lists, native_input,
+    custom_tool_type, legacy_custom_tool_lists, native_input, validate_direct,
 )
 from tui_messages import (
     BODY_LIMIT,
@@ -1753,6 +1753,8 @@ class SessionDriver:
             body_policy=reservation.get("body_policy"),
             observation=input_observation,
         )
+        if self.direct_mode:
+            validate_direct(body)
         # 在认领工具回执之前检查退避期，等待结束后客户端仍能将回执交还原进程。
         check_wait = getattr(self.launcher, "check_provider_backoff", None)
         if check_wait is not None:

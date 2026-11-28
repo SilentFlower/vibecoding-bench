@@ -3,7 +3,7 @@
 import json
 import unittest
 
-from tui_input_policy import InputRejection
+from tui_input_policy import InputRejection, validate_direct
 from tui_messages import MessageInputObservation, input_message
 
 
@@ -65,6 +65,18 @@ class InputPolicyTests(unittest.TestCase):
                     json.dumps({**self.body, "metadata": invalid}),
                     session_id=self.session,
                 )
+
+    def test_direct_refuses_only_known_input_changes_before_claim(self):
+        """固定交互 CLI 无法保真的字段给出专用码，常规命名声明和默认参数保持可用。@return 无。"""
+        for parameters, reason in (
+            ({'output_config': {'format': {'type': 'json_schema'}}}, 'direct_output_format_unsupported'),
+            ({'tool_choice': {'type': 'tool', 'name': 'Echo'}}, 'direct_tool_choice_unsupported'),
+            ({'temperature': 0.2}, 'direct_temperature_unsupported'),
+        ):
+            with self.subTest(parameters=parameters), self.assertRaisesRegex(InputRejection, reason):
+                validate_direct({**self.body, **parameters})
+        validate_direct({**self.body, 'output_config': {'effort': 'medium'}, 'tool_choice': {'type': 'auto'},
+                         'temperature': 1})
 
     def test_native_and_api_have_different_allowlists(self):
         """API 根字段与 V1 逐项一致，原生保留扩展和空 MCP，非空服务器声明拒绝。@return 无。"""

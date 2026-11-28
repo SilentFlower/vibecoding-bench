@@ -91,6 +91,15 @@ async fn verify_switch_transactions(driver: &str, dsn: &str) {
         (other.active.as_str(), other.target.as_str(), other.revision),
         ("native293", "", 0)
     );
+    sqlx::query("UPDATE accounts SET status='active' WHERE id=$1")
+        .bind(ids[1])
+        .execute(&reopened)
+        .await
+        .unwrap();
+    let other_applied = store
+        .update_tui_backend(ids[1], &other, "tui_v2", "", "other-binding")
+        .await
+        .unwrap();
     sqlx::query("UPDATE accounts SET status='disabled' WHERE id=$1")
         .bind(ids[0])
         .execute(&reopened)
@@ -104,6 +113,10 @@ async fn verify_switch_transactions(driver: &str, dsn: &str) {
             .active,
         "native293"
     );
+    let independent = store.tui_backend(ids[1]).await.unwrap();
+    assert_eq!(independent.active, "tui_v2");
+    assert_eq!(independent.binding, other_applied.binding);
+    assert_eq!(independent.revision, other_applied.revision);
     for id in ids {
         sqlx::query("DELETE FROM accounts WHERE id=$1")
             .bind(id)

@@ -164,6 +164,24 @@ class NodeExecutionTests(unittest.TestCase):
         self.assertEqual(sentinel, (root / 'projects/sentinel.txt').read_bytes())
         self.assertEqual(identity, read_cli_identity_at(root, self.root / 'profiles/synthetic', '2.1.293'))
 
+    def test_v2_preparation_reaches_only_the_original_node_and_account(self) -> None:
+        """当前账号页申请只向原节点的绑定环境准备交互 CLI。@return 无。"""
+        request = self.request.model_copy(update={'gateway_config': {'auth_type': 'oauth', '_prepare_tui': True}})
+        original = _Runtime.transport
+        calls = []
+
+        def transport(runtime, account, version, *, prepare_tui):
+            calls.append((account['cc2api_account_id'], prepare_tui))
+            return original(runtime, account, version)
+
+        with patch.object(_Runtime, 'transport', transport):
+            with self.assertRaisesRegex(ValueError, '归属不一致'):
+                self.executor.prepare(request.model_copy(update={'node_key': 'b' * 32}))
+            peer = self.executor.prepare(request)
+        self.assertEqual(calls, [(7, True)])
+        self.assertEqual(peer['binding']['environment_id'], 'e' * 32)
+        self.assertEqual(peer['binding']['account_id'], 7)
+
     def test_explicit_bound_login_only_prepares_original_cli_with_inactive_exception(self) -> None:
         """绑定账号显式登录准备保持原绑定及AT-only，仅将原SID交给CLI准备例外。:return: None。"""
         request=self.request.model_copy(update={'cli_only':True,'login_sid':'a'*12,

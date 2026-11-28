@@ -2890,7 +2890,6 @@ impl GatewayService {
                     request.deadline(),
                     wake,
                     (returning_tool && owner.is_some()).then_some(route.binding.as_str()),
-                    self.account_svc.tui_direct_only().await?,
                 )
                 .await?;
                 // 选号与就绪检查期间原进程可能已退出。持原账号路由读锁时按最新回执阶段准备。

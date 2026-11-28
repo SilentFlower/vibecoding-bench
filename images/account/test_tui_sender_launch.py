@@ -67,6 +67,10 @@ class ManagedOAuthTests(TestCase):
                         update_binding(node, account_id=account, environment_id=environment, publish=False)
                         with self.assertRaisesRegex(ValueError, '直发开关已关闭'):
                             launch.direct_proxy(binding)
+                        config_path.write_text(json.dumps({**config, 'tui_direct_from_release': True}))
+                        self.assertEqual(launch.direct_proxy(binding), proxy)
+                        with self.assertRaisesRegex(ValueError, '账号绑定已变化'):
+                            launch.direct_proxy({**binding, 'account_id': 21})
 
     def test_managed_policy_guard_requires_same_account_and_generation(self):
         """策略守卫只在真实账号模式和本代预留同时成立时启用。@return 无。"""

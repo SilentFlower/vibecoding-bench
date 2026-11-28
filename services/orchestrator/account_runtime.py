@@ -53,7 +53,7 @@ from system_update_gate import UPDATE_GATE, update_open
 from system_update_contract import safe_read, strict_json
 from tui_direct_selection import MULTI_SELECTION_LABEL, MULTI_SELECTION_VERSION
 from tui_direct_version import DIRECT_CLI_VERSION
-from tui_managed_policy import direct_account_selected, managed_policy
+from tui_managed_policy import DEFAULT_DIRECT_LABEL, direct_account_selected, managed_policy, shipped_direct_policy
 from system_profile import (MAX_CPUINFO_BYTES, generate_computer_profile, generate_system_profile,
     render_computer_profile, render_system_profile, validate_computer_profile, validate_system_profile,
     verify_computer_profile, verify_system_profile)
@@ -809,7 +809,8 @@ class AccountRuntime:
                allow_login_recovery: bool = False, preserve_proxy: bool = False,
                scenario_resources: bool = False, ownership_source: str | None = None,
                require_quota_mount: bool = True, startup_prewarm: bool = False,
-               prepare_sender: bool = True, native_migration: bool = False, capacity_reserved: bool = False) -> tuple[dict, object]:
+               prepare_sender: bool = True, native_migration: bool = False, capacity_reserved: bool = False,
+               prepare_tui: bool = False) -> tuple[dict, object]:
         """创建或唤醒固定环境，沿用首次固化参数。
 
         :param account: bench 账号或登录草稿
@@ -824,6 +825,7 @@ class AccountRuntime:
         :param prepare_sender: API 准备目标发送器；CLI/管理操作只使用已生效布局
         :param native_migration: 仅环境对账在原维护租约中恢复内置布局。
         :param capacity_reserved: 调用方已在生命周期锁内使用 rollout_capacity 保留本账号容量。
+        :param prepare_tui: 当前账号页切换或 V2 请求需要实际准备交互 CLI。
         :return: 环境记录与 Docker container
         """
         if self.placement:
@@ -908,19 +910,30 @@ class AccountRuntime:
                                     and not (root / 'runtime/sender/tui-local-provider.json').is_file())
             tui_policy = managed_policy(self.data, account_id=account.get('cc2api_account_id'),
                                         environment_id=row['environment_id'])
+            active_oauth = gateway_configuration.get('status') == 'active' and tui_managed_oauth
+            release_direct = image_labels.get(DEFAULT_DIRECT_LABEL) == '1'
+            if active_oauth and release_direct and tui_policy is None:
+                tui_policy = shipped_direct_policy(self.data, account_id=account['cc2api_account_id'],
+                                                   environment_id=row['environment_id'])
             if tui_policy and (not tui_managed_oauth or image_labels.get('vibebench.tui-managed-policy') != '1'):
                 raise ValueError('Claude 托管策略需要同批正式账号镜像和受管 OAuth sender')
-            tui_direct = bool(tui_policy and gateway_configuration.get('status') == 'active'
-                              and direct_account_selected(
-                                  self.data, account_id=account.get('cc2api_account_id'),
-                                  environment_id=row['environment_id'],
-                                  supports_multiple=image_labels.get(MULTI_SELECTION_LABEL) == MULTI_SELECTION_VERSION))
+            tui_direct = False
+            if tui_policy and active_oauth:
+                if release_direct:
+                    # 原管理员策略优先。只有其已授权同批直发钩子时才能提供 V2。
+                    tui_direct = bool(tui_policy['managed_order'] and tui_policy['direct_hook_sha256'])
+                else:
+                    tui_direct = direct_account_selected(
+                        self.data, account_id=account['cc2api_account_id'], environment_id=row['environment_id'],
+                        supports_multiple=image_labels.get(MULTI_SELECTION_LABEL) == MULTI_SELECTION_VERSION,
+                    )
             if tui_direct and (not tui_policy or not tui_policy['managed_order'] or not tui_policy['direct_hook_sha256']
                                or image_labels.get('vibebench.tui-direct-protocol') != '1'):
                 raise ValueError('直发需要同批账号镜像及保留内建 guard 的管理员 Mod')
             account = {**account, "native_sender": native, "native_migration": native_migration,
                        'tui_transport': tui_transport, 'tui_host_memory': tui_budget,
-                       'tui_managed_oauth': tui_managed_oauth, 'tui_managed_policy': tui_policy, 'tui_direct': tui_direct}
+                       'tui_managed_oauth': tui_managed_oauth, 'tui_managed_policy': tui_policy, 'tui_direct': tui_direct,
+                       'tui_direct_from_release': tui_direct and release_direct}
             if native and image_labels.get("vibebench.native-runtime") != "293-raw-1":
                 raise ValueError("账号镜像缺少固定 293 原生能力")
             configuration = None
@@ -958,7 +971,8 @@ class AccountRuntime:
                     restore = restore_policy(native, fingerprint, image_labels.get('vibebench.native-criu') == '1')
                     running = any(current.status == 'running' for current in containers.values())
                     policy_changed = (configuration.get('tui_managed_policy') != tui_policy
-                                      or bool(configuration.get('tui_direct')) != tui_direct)
+                                      or bool(configuration.get('tui_direct')) != tui_direct
+                                      or bool(configuration.get('tui_direct_from_release')) != account['tui_direct_from_release'])
                     if policy_changed and running:
                         raise RuntimeBusy('Claude 托管策略已变更，请先排空并停止当前账号环境')
                     if policy_changed or ((prepare_sender or not running) and (actual_native != native
@@ -1065,7 +1079,8 @@ class AccountRuntime:
         # 只有具备运行额度且已装配同容器 TUI 时，才首次安装其固定版本。
         if tui_budget and not (root / 'cli/2.1.293/.ready').is_file() and version != '2.1.293':
             self._ensure_version(container, '2.1.293')
-        if tui_direct and not (root / 'cli' / DIRECT_CLI_VERSION / '.ready').is_file() and version != DIRECT_CLI_VERSION:
+        needs_direct_cli = tui_direct and (not release_direct or prepare_tui or gateway_configuration.get('request_backend') == 'tui_v2')
+        if needs_direct_cli and not (root / 'cli' / DIRECT_CLI_VERSION / '.ready').is_file() and version != DIRECT_CLI_VERSION:
             self._ensure_version(container, DIRECT_CLI_VERSION)
         # 版本缓存准备不持有环境生命周期锁。
         if version is not None:
@@ -1505,20 +1520,21 @@ class AccountRuntime:
                 shutil.copy2(profile / ".claude.json", home / ".claude.json")
                 os.chown(home / ".claude.json", 1000, 1000, follow_symlinks=False)
 
-    def transport(self, account: dict, version: str) -> dict:
+    def transport(self, account: dict, version: str, *, prepare_tui: bool = False) -> dict:
         """返回只用于服务间调用的当前传输绑定。
 
         :param account: 绑定的 bench 账号
         :param version: 兼容旧调用方的 CLI 版本，不参与 API 环境准备
+        :param prepare_tui: 网关已请求准备固定交互 CLI。
         :return: 当前账号传输绑定，含受限服务秘密
         """
         # 旧发送器只在宿主明确授权期间复用，重建始终使用当前配置的目标镜像。
-        if os.environ.get('V3_UPDATE_GATE_DIR'):
+        if os.environ.get('V3_UPDATE_GATE_DIR') and not prepare_tui:
             binding = self.existing_transport(account, rollout_only=True)
             if binding:
                 return binding
         # API 已持有自己的并发许可，不能在这里等待排空自己；它也不读取 CLI 的额度文件。
-        row, _ = self.ensure(account, require_quota_mount=False)
+        row, _ = self.ensure(account, require_quota_mount=False, prepare_tui=prepare_tui)
         config_path = self._sender_config(row)
         config = _read_json(config_path)
         binding = config["binding"]

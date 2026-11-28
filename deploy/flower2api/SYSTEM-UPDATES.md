@@ -77,29 +77,15 @@ builder 和 scope 仅接受最长 64 字符的字母、数字、下划线、点�
 
 同步时使用明确的提交和目标分支，并在推送前复核目标中的事件与 job 条件。当前分支文件的本地验证与远端各分支触发规则分别验收。分支同步、正式发行及生产安装各自按明确的 Git/上线授权执行。
 
-## 按账号启用 Claude CLI 直发
+## 账号页选择 Claude CLI 直发
 
-先通过系统更新安装同批签名 control 与 account 镜像。在集中部署和各所属 SSH 节点核对实装账号镜像标记 `vibebench.tui-direct-selection=multi-v1`。逐账号重读网关状态、OAuth 类型、原代理、所属节点、环境 ID、环境代次和转发修订。只纳入仍为 active 的 Claude OAuth 账号。使用原账号维护门禁等待 API、CLI 和待续工具轮收口。
+先通过原排空门禁安装同批签名 control 与 account 镜像。集中部署及各所属 SSH 节点使用带 `vibebench.tui-direct-default=1` 的账号镜像。安装保留账号页已有的转发方式和修订。
 
-节点管理员在原环境发布 `<节点数据根>/tui-managed-policies/<环境ID>/`，让绑定、管理设置及目录市场对应原账号环境。使用同批账号镜像的 `/opt/flower/tui/tui-direct-mod/`，从已有管理员授权合并配置。内建 `sec-default@builtin` 保持启用，直发 Mod 位于 `appendPlugins` 最后。管理员在该节点的 control 或编排容器内执行，`--data-root` 取该容器实际节点数据根：
+活跃 Claude OAuth 账号在账号页选择“交互运行时 V2”并保存。使用 API 时，在 `PUT /admin/accounts/<网关账号ID>` 提交 `request_backend=tui_v2` 和该账号实收的 `request_backend_revision`。编排按原代理和归属环境准备同批官方 CLI。节点使用发行的受管策略，已有管理员策略优先。内建 `sec-default@builtin` 仍须启用。
 
-```sh
-python3 -B /app/tui_direct_admin.py --data-root "$NODE_DATA_ROOT" publish "$GATEWAY_ACCOUNT_ID" "$ENVIRONMENT_ID"
-```
+管理接口按真实 sender 显示 `tui_direct_available`。V2 的新请求、原工具续轮和预热均要求当前 sender 与同轮预留确认直发。能力未就绪返回 503。固定 CLI 已实测无法保真的结构化格式、指定单个工具和非默认温度返回各自的 422。验收逐账号关联公网 SSE、原代理、同一预留和一次模型投递。
 
-同一节点可以重复发布不同账号。首条写入将已有的合法 `tui-direct/account.json` 一并迁移到 `tui-direct/accounts/<网关账号ID>.json`。发布后，各 sender 只读取自己的记录并核对当前代次和受管策略。账号重新绑定环境时，先按旧环境撤销，再按新的实际归属发布。
-
-已在兼容 V2 的账号先沿原修订门禁排空到 `native293`。要求本部署的 V2 强制直发时，用 `PUT /admin/settings` 提交 `{"tui_direct_only":"true"}`，通过 `GET /admin/settings` 重读。生效后，新请求、工具续轮和 V2 预热都需要当前 sender 及本轮预留确认 CLI 直发。缺少能力时，网关在投递前返回 503 和直发未就绪说明。
-
-通过 `POST /api/environments/<环境ID>/maintenance` 提交 `operation=stop` 和当前 `expected_generation`，再从同一环境的 `native-preparation` 入口准备正式 sender。重读 `GET /admin/accounts/<网关账号ID>`，确认当前 sender 的 `tui_direct_available=true` 后，用 `PUT` 提交 `request_backend=tui_v2` 和实收 `request_backend_revision`。逐号确认公网 SSE 及同一预留的一次真实模型投递。
-
-按账号回退时，保持其选择记录和托管策略，先用当前修订提交 `native293`。待已接请求及工具回执结束，确认生效后端为 `native293`、无待切换，再在原节点撤销并按当前代次重建该环境：
-
-```sh
-python3 -B /app/tui_direct_admin.py --data-root "$NODE_DATA_ROOT" revoke "$GATEWAY_ACCOUNT_ID" "$ENVIRONMENT_ID"
-```
-
-后续读者继续以多账号目录为准。被撤销账号的历史单选记录保留供审计，绝不能重新作为本代选择使用。另一个账号的转发修订、代理、策略及选择记录各由自己的维护操作控制。
+按账号回退时，在账号页选择“原生运行时 V1”并保存。按原修订保留已接请求与工具回执，待无待切目标后以实际管理状态确认 `native293` 已生效。账号独立保存选择。
 
 ## 单部署镜像与容器名称切换
 

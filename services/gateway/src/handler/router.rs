@@ -88,7 +88,7 @@ use crate::store::settings_store::{
     DEFAULT_SESSION_HELLO_PROBE_FAILURE_COOLDOWN_SECS, DEFAULT_SESSION_HELLO_PROBE_STRICT,
     DEFAULT_SESSION_HELLO_PROBE_SUCCESS_TTL_SECS, DEFAULT_SESSION_HELLO_PROBE_TIMEOUT_SECS,
     DEFAULT_STREAM_KEEPALIVE_ENABLED, DEFAULT_STREAM_KEEPALIVE_INTERVAL_SECS,
-    DEFAULT_STREAM_UPSTREAM_IDLE_TIMEOUT_SECS, SettingsStore, TUI_DIRECT_ONLY_SETTING,
+    DEFAULT_STREAM_UPSTREAM_IDLE_TIMEOUT_SECS, SettingsStore,
     normalize_message_top_field_filter_enabled,
 };
 use crate::store::settings_store::{OBSOLETE_SCHEDULING_KEYS, V3_SCHEDULING_DEFAULTS};
@@ -2772,9 +2772,6 @@ async fn get_settings(State(state): State<AppState>) -> Result<Json<serde_json::
         .entry("tui_local_agent_summary".into())
         .or_insert_with(|| "false".into());
     settings
-        .entry(TUI_DIRECT_ONLY_SETTING.into())
-        .or_insert_with(|| "false".into());
-    settings
         .entry("intercept_assistant_prefill_enabled".into())
         .or_insert_with(|| DEFAULT_INTERCEPT_ASSISTANT_PREFILL_ENABLED.to_string());
     settings
@@ -2988,7 +2985,6 @@ async fn update_settings(
         "intercept_warmup_title_enabled",
         "intercept_warmup_suggestion_enabled",
         "tui_local_agent_summary",
-        TUI_DIRECT_ONLY_SETTING,
         "intercept_warmup_haiku_probe_enabled",
         "rewrite_disabled_thinking_enabled",
         "intercept_assistant_prefill_enabled",
@@ -3676,38 +3672,6 @@ mod tests {
                 .await
                 .unwrap();
             assert_eq!(response.status(), expected);
-        }
-    }
-
-    /// 直发要求由原管理接口持久保存，非法值不改变原部署配置。@return 用例成功时无返回值。
-    #[tokio::test]
-    async fn tui_direct_only_setting_uses_admin_contract() {
-        use crate::store::settings_store::TUI_DIRECT_ONLY_SETTING;
-
-        let (app, _, settings, _) = test_router_with_gateway_and_settings().await;
-        let (status, initial) =
-            account_admin_json(&app, Method::GET, "/admin/settings", json!({})).await;
-        assert_eq!(status, StatusCode::OK);
-        assert_eq!(initial[TUI_DIRECT_ONLY_SETTING], "false");
-        for (input, expected) in [
-            ("true", StatusCode::OK),
-            ("missing", StatusCode::BAD_REQUEST),
-        ] {
-            let (status, _) = account_admin_json(
-                &app,
-                Method::PUT,
-                "/admin/settings",
-                json!({"tui_direct_only": input}),
-            )
-            .await;
-            assert_eq!(status, expected);
-            assert_eq!(
-                settings
-                    .get_value(TUI_DIRECT_ONLY_SETTING, "false")
-                    .await
-                    .unwrap(),
-                "true"
-            );
         }
     }
 

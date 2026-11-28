@@ -645,8 +645,9 @@ const backendOptions = computed(() => {
   const account = editing.value;
   if (account && (account.request_backend_revision !== undefined || account.tui_v2_available
     || account.request_backend === 'tui_v2' || account.request_backend_pending === 'tui_v2')) {
-    const description = account.tui_v2_available ? 'Claude Code 2.1.293' : '保存时核对账号环境';
-    options.unshift({ value: 'tui_v2', label: '交互运行时 V2', description, disabled: false });
+    const disabled = account.status !== 'active' && account.request_backend !== 'tui_v2';
+    const description = disabled ? '当前账号未启用' : account.tui_v2_available ? 'Claude CLI 直发' : '保存时准备 CLI 直发';
+    options.unshift({ value: 'tui_v2', label: '交互运行时 V2', description, disabled });
   }
   return options;
 });

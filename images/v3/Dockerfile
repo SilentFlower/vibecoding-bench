@@ -88,6 +88,7 @@ COPY orchestrator/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 RUN python -c "from zoneinfo import ZoneInfo; [ZoneInfo(name) for name in ('UTC','Asia/Tokyo','Asia/Singapore','Asia/Seoul','Australia/Sydney','Europe/London','Europe/Berlin','Europe/Paris','America/Los_Angeles','America/New_York','America/Chicago')]"
 COPY orchestrator/*.py ./
+COPY images/account/tui-direct-mod ./tui-direct-mod/
 COPY orchestrator/agy_runtime/ ./agy_runtime/
 COPY orchestrator/native_tls_seccomp.json ./
 COPY orchestrator/database-migration-registry.json ./
@@ -213,6 +214,7 @@ LABEL vibebench.product="v3" vibebench.role="account" vibebench.release=$V3_RELE
     vibebench.tui-managed-policy="1" \
     vibebench.tui-direct-protocol="1" \
     vibebench.tui-direct-selection="multi-v1" \
+    vibebench.tui-direct-default="1" \
     vibebench.system-update-protocol="1" vibebench.account-runtime-protocol="1" \
     vibebench.fast-system-update="1" \
     vibebench.credential-ownership-protocol="1" \

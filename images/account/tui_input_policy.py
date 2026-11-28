@@ -40,6 +40,18 @@ class InputRejection(ValueError):
         self.code = code
 
 
+def validate_direct(body):
+    """核对固定交互 CLI 已实测无法保真的入站字段。@param body 已解码请求。@return 无。"""
+    output = body.get('output_config')
+    if isinstance(output, dict) and output.get('format') is not None:
+        raise InputRejection('direct_output_format_unsupported')
+    choice = body.get('tool_choice')
+    if isinstance(choice, dict) and choice.get('type') == 'tool':
+        raise InputRejection('direct_tool_choice_unsupported')
+    if 'temperature' in body and body['temperature'] != 1:
+        raise InputRejection('direct_temperature_unsupported')
+
+
 def _uuid(value):
     return isinstance(value, str) and _UUID.fullmatch(value) is not None
 

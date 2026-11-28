@@ -24,12 +24,15 @@ export function register(on) {
   on('http.fetch', async ($, e, next) => {
     const address = String(e.url ?? e.init?.url)
     if (!/^https?:\/\/(?:[^/?#]*@)?api\.anthropic\.com\.?(?::\d+)?(?:[/?#]|$)/i.test(address)) return next(e)
+    const path = await $.env.get('FLOWER_TUI_DIRECT_BINDING')
+    const required = await $.env.get('FLOWER_TUI_DIRECT_REQUIRED')
+    // 同一账号 sender 仍可服务独立的原生 V1，只有隔离直发进程安装本轮准入。
+    if (typeof path !== 'string' && required !== '1') return next(e)
     const origin = next.origin
     if (origin?.plugin !== 'engine' || origin.tier !== 'core' || !modelURLs.has(address)
         || e.init?.method !== 'POST' || typeof e.init.body !== 'string') {
       return { deny: '当前会话仅允许通过已认领的 Messages 请求访问模型' }
     }
-    const path = await $.env.get('FLOWER_TUI_DIRECT_BINDING')
     if (typeof path !== 'string') return { deny: '当前账号缺少直发绑定' }
     const binding = JSON.parse(await $.fs.read(path))
     const { ticket } = await post($, binding, 'permit', { url: address, body: e.init.body })

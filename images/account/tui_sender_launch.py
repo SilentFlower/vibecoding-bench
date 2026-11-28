@@ -32,6 +32,8 @@ from tui_workspace_launch import WorkspaceLaunchObservation, launch_workspace_cl
 
 
 VERSION = "2.1.293"
+# 上一版已签 Mod 继续用于已有管理员明确发布的策略。发行自动策略核对本批钩子。
+_PREVIOUS_MANAGED_DIRECT_HOOK = "ec3ed74088d5a767696c1d0106588f1ee24ebf39ae789cc04cc918f17b8bc8f8"
 PROGRAM_SHA256 = "8968405e26db478af44eabc4635ab5ca557057b702a54460a59c13e1b253e978"
 INSTALL = Path("/cli") / VERSION
 STORAGE = Path("/native")
@@ -202,11 +204,15 @@ def _check_direct_policy(config):
     policy = config.get("tui_managed_policy") or {}
     binding = config["binding"]
     engine = Path(__file__).with_name("tui-direct-mod") / "hooks/engine.js"
+    allowed_hooks = {sha256(engine.read_bytes()).hexdigest()}
+    if not policy.get('release_bundle'):
+        allowed_hooks.add(_PREVIOUS_MANAGED_DIRECT_HOOK)
     if (config.get("tui_direct") is not True or not _managed_policy_enabled()
             or any(policy.get(key) != binding[key] for key in ('account_id', 'environment_id'))
-            or not policy.get("managed_order") or policy.get("direct_hook_sha256") != sha256(engine.read_bytes()).hexdigest()):
+            or not policy.get("managed_order") or policy.get("direct_hook_sha256") not in allowed_hooks):
         raise ValueError("账号直发缺少同发行的管理员 Mod")
-    if not selector_matches(DIRECT_SELECTION, account_id=binding['account_id'], environment_id=binding['environment_id']):
+    if config.get('tui_direct_from_release') is not True and not selector_matches(
+            DIRECT_SELECTION, account_id=binding['account_id'], environment_id=binding['environment_id']):
         raise ValueError('原账号的直发开关已关闭或改变')
 
 
@@ -604,6 +610,7 @@ def launch_session(
             if direct:
                 url = ACCOUNT_ORIGIN
                 auth["FLOWER_TUI_DIRECT_BINDING"] = str(config_dir / "flower-direct.json")
+                auth["FLOWER_TUI_DIRECT_REQUIRED"] = "1"
         else:
             auth["CLAUDE_CODE_OAUTH_TOKEN"] = bearer
     else:

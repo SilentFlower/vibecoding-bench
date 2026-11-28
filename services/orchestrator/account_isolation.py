@@ -23,7 +23,10 @@ from resource_budget import account_limits, isolated_account_limits, memory_byte
 from runtime_files import atomic_json, directory_fd
 from system_profile import (COMPUTER_PROFILE_LABEL, COMPUTER_PROFILE_VERSION, SYSTEM_PROFILE_DIRECTORY,
     SYSTEM_PROFILE_LABEL, SYSTEM_PROFILE_VERSION)
-from tui_managed_policy import DIRECT_ACCOUNT_PATH, DIRECT_DIRECTORY, MANAGED_MARKETPLACE_PATH, MANAGED_SETTINGS_PATH, POLICY_DIRECTORY
+from tui_managed_policy import (
+    DEFAULT_POLICY_DIRECTORY, DIRECT_ACCOUNT_PATH, DIRECT_DIRECTORY, MANAGED_MARKETPLACE_PATH,
+    MANAGED_SETTINGS_PATH, POLICY_DIRECTORY,
+)
 
 
 ISOLATION_VERSION = 2
@@ -268,6 +271,7 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
         **({'tui_managed_oauth': True} if account.get('tui_managed_oauth') else {}),
         **({'tui_managed_policy': tui_policy} if tui_policy else {}),
         **({'tui_direct': True} if account.get('tui_direct') else {}),
+        **({'tui_direct_from_release': True} if account.get('tui_direct_from_release') else {}),
         'native': native, 'agy': agy, 'native_capture_dir': ('/flows/api/agy-prepared' if agy else '/flows/api/cc-prepared') if (execution or tui_budget) and capture_enabled(fingerprint) else None,
         'native_tls_observer_protocol': observer_protocol,
         'native_criu_enabled': restore['eligible'], 'native_criu_reason': restore['reason'],
@@ -389,13 +393,16 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
             if account.get('tui_managed_oauth'):
                 sender_env['V3_TUI_MANAGED_OAUTH'] = '1'
                 if tui_policy:
-                    policy_root = runtime.host_data / POLICY_DIRECTORY / row['environment_id']
+                    release_bundle = tui_policy.get('release_bundle')
+                    policy_root = (runtime.host_data / DEFAULT_POLICY_DIRECTORY / release_bundle if release_bundle
+                                   else runtime.host_data / POLICY_DIRECTORY / row['environment_id'])
                     sender_mounts[str(policy_root / 'managed-settings.json')] = {'bind': MANAGED_SETTINGS_PATH, 'mode': 'ro'}
                     sender_mounts[str(policy_root / 'marketplace')] = {'bind': MANAGED_MARKETPLACE_PATH, 'mode': 'ro'}
                     sender_env['V3_TUI_MANAGED_POLICY'] = '1'
                     if account.get('tui_direct'):
                         sender_env['V3_TUI_DIRECT'] = '1'
-                        sender_mounts[str(runtime.host_data / DIRECT_DIRECTORY)] = {'bind': DIRECT_ACCOUNT_PATH, 'mode': 'ro'}
+                        if not account.get('tui_direct_from_release'):
+                            sender_mounts[str(runtime.host_data / DIRECT_DIRECTORY)] = {'bind': DIRECT_ACCOUNT_PATH, 'mode': 'ro'}
             else:
                 sender_env['V3_TUI_LOCAL_PROVIDER_CONFIG'] = '/run/v3/tui-local-provider.json'
         sender_env['CCRB_CRIU_REASON'] = restore['reason'] or ''

@@ -33,8 +33,6 @@ pub const DEFAULT_CLAUDE_CODE_PROFILE_SELECTION_MODE_SETTING: &str =
 pub const DEFAULT_ALLOWED_USER_AGENTS_SETTING: &str = DEFAULT_ALLOWED_USER_AGENTS;
 /// Claude Code 上下文风险控制默认仅观测,不改写请求体。
 pub const DEFAULT_CLAUDE_CODE_CONTEXT_SANITIZER_MODE: &str = "report_only";
-/// 部署管理员要求所有生产 V2 模型请求使用受管 CLI 直发。
-pub const TUI_DIRECT_ONLY_SETTING: &str = "tui_direct_only";
 
 /// 系统提示词 `Shell:` 行是否默认真值透传。默认关闭(仍改写为账号预设)。
 pub const DEFAULT_PASSTHROUGH_SHELL: &str = "false";

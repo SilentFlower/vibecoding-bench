@@ -996,7 +996,8 @@ class NodeExecution:
                     runtime.ensure(request.account, prepare_sender=False)
                 binding = None
             else:
-                binding = runtime.transport(request.account, '')
+                options = {'prepare_tui': True} if request.gateway_config.get('_prepare_tui') is True else {}
+                binding = runtime.transport(request.account, '', **options)
             connection = self.database()
             try:
                 row = dict(connection.execute('SELECT * FROM account_environments WHERE environment_id=?',

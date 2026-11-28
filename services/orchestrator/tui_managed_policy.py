@@ -1,16 +1,24 @@
 """读取节点管理员发布、绑定到单个账号环境的 Claude Code 管理策略。"""
 
+import fcntl
 from hashlib import sha256
+import json
+import os
 from os import stat_result
 from pathlib import Path
 import re
 from stat import S_ISDIR, S_ISREG
+from tempfile import TemporaryDirectory
 
+from runtime_files import atomic_text, directory_fd
 from system_update_contract import safe_read, strict_json
 from tui_direct_selection import DIRECT_ACCOUNT_PATH, DIRECT_DIRECTORY, selector_matches
 
 
 POLICY_DIRECTORY = 'tui-managed-policies'
+DEFAULT_POLICY_DIRECTORY = 'tui-direct-policy'
+DEFAULT_DIRECT_LABEL = 'vibebench.tui-direct-default'
+DEFAULT_MOD = Path(__file__).with_name('tui-direct-mod')
 MANAGED_SETTINGS_PATH = '/etc/claude-code/managed-settings.json'
 MANAGED_MARKETPLACE_PATH = '/opt/flower/managed-plugins'
 
@@ -50,6 +58,71 @@ def direct_account_selected(data: Path, *, account_id: int | None, environment_i
         return False
     return selector_matches(data / DIRECT_DIRECTORY, account_id=account_id, environment_id=environment_id,
                             supports_multiple=supports_multiple)
+
+
+def shipped_direct_policy(data: Path, *, account_id: int, environment_id: str) -> dict:
+    """准备同批正式发行的节点默认托管策略。
+
+    :param data: 节点管理员持有的数据根。
+    :param account_id: 当前权威 OAuth 账号。
+    :param environment_id: 当前固定环境。
+    :return: 只授予该账号、环境的受管配置。
+    """
+    _trusted(data, directory=True)
+    plugin = 'flower2api-v2-direct'
+    market = 'flower2api-release'
+    qualified = f'{plugin}@{market}'
+    settings = {
+        'extraKnownMarketplaces': {market: {'source': {'source': 'directory', 'path': MANAGED_MARKETPLACE_PATH}}},
+        'enabledPlugins': {qualified: True}, 'prependPlugins': ['sec-default@builtin'],
+        'appendPlugins': [qualified],
+    }
+    catalog = {'name': market, 'owner': {'name': 'Flower2API'}, 'plugins': [{'name': plugin, 'source': f'./{plugin}'}]}
+
+    def encode(value):
+        return json.dumps(value, ensure_ascii=False, sort_keys=True).encode()
+
+    files = {'managed-settings.json': encode(settings), 'marketplace/.claude-plugin/marketplace.json': encode(catalog)}
+    mod_root = f'marketplace/{plugin}'
+    for relative in ('.claude-plugin/plugin.json', 'hooks/hooks.json', 'hooks/engine.js'):
+        source = DEFAULT_MOD / relative
+        _trusted(source, directory=False)
+        files[f'{mod_root}/{relative}'] = safe_read(source)
+    key = sha256(encode({name: sha256(content).hexdigest() for name, content in files.items()})).hexdigest()
+    root = data / DEFAULT_POLICY_DIRECTORY
+    root.mkdir(mode=0o755, exist_ok=True)
+    _trusted(root, directory=True, sender_readable=True)
+    bundle = root / key
+    # 新版本的不同内容发布到新目录。已运行 sender 的只读绑定继续持有自己的文件。
+    if not bundle.exists():
+        fd = directory_fd(root)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            if not bundle.exists():
+                with TemporaryDirectory(prefix='.publish-', dir=root) as temporary:
+                    stage = Path(temporary)
+                    for name, content in files.items():
+                        target = stage / name
+                        atomic_text(target, content.decode('utf-8'), 0o444)
+                    stage.chmod(0o755)
+                    stage.rename(bundle)
+                    os.fsync(fd)
+        finally:
+            os.close(fd)
+    _trusted(bundle, directory=True, sender_readable=True)
+    market_path = bundle / 'marketplace'
+    _trusted(market_path, directory=True, sender_readable=True)
+    _verify_marketplace(market_path)
+    for name, content in files.items():
+        published = bundle / name
+        _trusted(published, directory=False, sender_readable=True)
+        if safe_read(published) != content:
+            raise ValueError('节点发行托管策略与正式制品不符')
+    return {'account_id': account_id, 'environment_id': environment_id, 'plugin': qualified, 'managed_order': True,
+            'direct_hook_sha256': sha256(files[f'{mod_root}/hooks/engine.js']).hexdigest(),
+            'settings_sha256': sha256(files['managed-settings.json']).hexdigest(),
+            'marketplace_sha256': sha256(files['marketplace/.claude-plugin/marketplace.json']).hexdigest(),
+            'release_bundle': key}
 
 
 def managed_policy(data: Path, *, account_id: int | None, environment_id: str) -> dict | None:

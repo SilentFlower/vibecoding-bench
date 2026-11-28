@@ -584,16 +584,17 @@ class ClusterService:
             raise ValueError('历史节点准备回执身份不一致')
         return result
 
-    def prepare_remote(self, account: dict, runtime, gateway, quota_identity: str) -> dict:
+    def prepare_remote(self, account: dict, runtime, gateway, quota_identity: str, *, prepare_tui: bool = False) -> dict:
         """准备人工归属的远程环境并发布受限中央转发绑定。
 
         :param account: 当前中央账号快照。
         :param runtime: 原中央环境登记器。
         :param gateway: 中央受信网关客户端。
         :param quota_identity: 本次冻结额度身份。
+        :param prepare_tui: 当前受信网关请求准备交互 CLI。
         :return: 仅供网关消费的私有发送器绑定。
         """
-        return self._prepare_remote(account, runtime, gateway, quota_identity, cli_only=False)
+        return self._prepare_remote(account, runtime, gateway, quota_identity, cli_only=False, prepare_tui=prepare_tui)
 
     def _remote_transport_endpoint(self, runtime, node_key: str, environment_id: str, revision: int) -> str:
         base = os.environ.get('V3_RUNTIME_URL', 'http://orchestrator:8000').rstrip('/')
@@ -893,7 +894,8 @@ class ClusterService:
             raise ValueError('已有账号登录准备需要原正账号ID、原绑定及明确SID')
         return self._prepare_remote(account,runtime,gateway,quota_identity,cli_only=True,login_sid=sid)
 
-    def _prepare_remote(self, account: dict, runtime, gateway, quota_identity: str, *, cli_only: bool, login_sid: str | None = None) -> dict:
+    def _prepare_remote(self, account: dict, runtime, gateway, quota_identity: str, *, cli_only: bool,
+                        login_sid: str | None = None, prepare_tui: bool = False) -> dict:
         name = account.get('name')
         if (not isinstance(name, str) or not re.fullmatch('[a-zA-Z0-9_-]{1,128}', name)
                 or account.get('profile_path') != 'profiles/' + name):
@@ -914,6 +916,8 @@ class ClusterService:
                 raise RuntimeBusy('所属节点正在后台准备运行组件，请稍后重试')
             request = self.build_preparation(account, row, node_row['node_key'], assignment['revision'], runtime, gateway, quota_identity,
                 cli_only=cli_only,login_sid=login_sid)
+            if prepare_tui:
+                request = request.model_copy(update={'gateway_config': {**request.gateway_config, '_prepare_tui': True}})
             node = self.connection(node_row['id'])
             node.docker_socket()
             peer = self.deliver_preparation(node_row['id'], node_container_name(runtime.deployment, node_row['node_key']), request)
