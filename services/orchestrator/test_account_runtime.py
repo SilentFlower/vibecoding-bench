@@ -2701,6 +2701,7 @@ class AccountRuntimeTests(unittest.TestCase):
             for role, options in role_options.items():
                 volumes = options.get('volumes', {})
                 if role == 'account-sender':
+                    self.assertEqual(options['environment']['V3_DEPLOYMENT_ID'], self.runtime.deployment)
                     self.assertEqual(volumes[str(socket_dir)], {'bind': '/run/v3/tui-v2', 'mode': 'rw'})
                     self.assertEqual(volumes[str(path.parent)], {'bind': '/run/v3', 'mode': 'ro'})
                 else:

@@ -59,8 +59,10 @@ use crate::service::rewriter::{
     CacheControlTtlRewrite, ClaudeCodeContextSanitizerMode, MessageCacheControlRewrite,
 };
 use crate::service::runtime_bridge::{self, RuntimeConfigPermit};
+use crate::service::runtime_transport::us_claude_direct_required;
 use crate::service::system_update;
 use crate::service::telemetry::TelemetryService;
+use crate::service::tui_backend::TUI_V2;
 use crate::service::tui_receipt_recovery::{self, ReceiptPage, ReceiptView};
 use crate::service::v3_scheduling::{PhaseCounts, SchedulingConfig, now_ms};
 use crate::service::version_profile::{
@@ -669,6 +671,7 @@ async fn list_accounts(
         "total_pages": total_pages,
         "claude_code_profile_selection_mode": profile_selection_mode,
         "claude_code_version_profile": profile_config.default_profile.key,
+        "tui_direct_required": us_claude_direct_required(),
     })))
 }
 
@@ -697,6 +700,7 @@ fn account_api_value(account: &Account) -> Value {
         };
         value["client_system_prompt_policy"] = json!(policy);
     } else if account.is_claude_code() {
+        value["tui_direct_required"] = json!(us_claude_direct_required());
         crate::service::tui_backend::append_v1_system_prompt(&mut value, &account.request_backend);
     }
     value
@@ -1258,7 +1262,6 @@ async fn create_account(
     } else {
         req.proxy_url
     };
-    let backend = validate_request_backend(req.request_backend.as_deref().unwrap_or("legacy"))?;
     if req.email.is_empty() {
         return Err(AppError::BadRequest("email is required".into()));
     }
@@ -1266,6 +1269,21 @@ async fn create_account(
     if !["claude_code", "antigravity"].contains(&platform) {
         return Err(AppError::BadRequest("账号平台无效".into()));
     }
+    let require_direct = platform == "claude_code" && us_claude_direct_required();
+    let backend = if require_direct {
+        if req
+            .request_backend
+            .as_deref()
+            .is_some_and(|value| value != TUI_V2)
+        {
+            return Err(AppError::BadRequest(
+                "US Claude 账号只支持交互 V2 直发".into(),
+            ));
+        }
+        TUI_V2.to_owned()
+    } else {
+        validate_request_backend(req.request_backend.as_deref().unwrap_or("legacy"))?
+    };
     if platform == "antigravity" && req.auth_type.as_deref() != Some("oauth") {
         return Err(AppError::BadRequest("AGY 账号仅支持原生 OAuth".into()));
     }
@@ -1302,7 +1320,11 @@ async fn create_account(
     if platform != "antigravity" && req.agy_disable_safety_filtering == Some(true) {
         return Err(AppError::BadRequest("原生安全开关仅适用于 AGY 账号".into()));
     }
-    let auth_type = req.auth_type.unwrap_or_else(|| "setup_token".into()).into();
+    let default_auth = if require_direct { "oauth" } else { "setup_token" };
+    let auth_type = req.auth_type.unwrap_or_else(|| default_auth.into()).into();
+    if require_direct && auth_type != AccountAuthType::Oauth {
+        return Err(AppError::BadRequest("US Claude 直发账号需要 OAuth 凭据".into()));
+    }
     let setup_token = req.setup_token.or(req.token).unwrap_or_default();
     let mut account = Account {
         platform: platform.into(),
@@ -1532,6 +1554,16 @@ async fn update_account(
         object.insert("proxy_url".into(), json!(url));
     }
     let mut existing = state.account_svc.get_account(id).await?;
+    if existing.is_claude_code() && us_claude_direct_required() {
+        if updates.get("request_backend").is_some_and(|value| value != TUI_V2) {
+            return Err(AppError::BadRequest(
+                "US Claude 账号只支持交互 V2 直发".into(),
+            ));
+        }
+        if updates.get("auth_type").is_some_and(|value| value != "oauth") {
+            return Err(AppError::BadRequest("US Claude 直发账号需要 OAuth 凭据".into()));
+        }
+    }
     let _tui_config = {
         use crate::service::{runtime_transport::tui_scope, tui_backend};
 
@@ -2119,7 +2151,7 @@ async fn test_account(
     }
     let _credential_activity = state.account_svc.upstream_activity(id).await?;
     let account = state.account_svc.get_account(id).await?;
-    if account.is_antigravity() {
+    if account.is_antigravity() || (account.is_claude_code() && us_claude_direct_required()) {
         let usage = state.account_svc.refresh_usage(id).await?;
         return Ok(Json(json!({"status":"ok","usage":usage})));
     }

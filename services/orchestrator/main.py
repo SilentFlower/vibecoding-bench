@@ -10248,7 +10248,7 @@ def update_account_process(aid: int) -> dict:
 
 
 def _cc2api_creation_payload(account: dict, profile: dict, observed: Optional[dict]) -> dict:
-    """构造任务侧首次创建载荷，显式选择原生运行时和额度闸线。
+    """构造任务侧首次创建载荷，沿部署策略选择 Claude 运行时和额度闸线。
 
     :param account: 本地账号。
     :param profile: 已读取的身份与凭据。
@@ -10261,7 +10261,8 @@ def _cc2api_creation_payload(account: dict, profile: dict, observed: Optional[di
         'expires_at': profile['expires_at'], 'proxy_url': _account_proxy_url(account),
         'account_uuid': profile.get('account_uuid'), 'organization_uuid': profile.get('organization_uuid'),
         'subscription_type': profile.get('subscription_type'), 'rate_limit_tier': profile.get('rate_limit_tier'),
-        'allow_fast_mode': False, 'billing_mode': 'rewrite', 'request_backend': 'native293',
+        'allow_fast_mode': False, 'billing_mode': 'rewrite',
+        'request_backend': 'tui_v2' if os.environ.get('V3_DEPLOYMENT_ID') == 'us' else 'native293',
         'five_hour_usage_limit_percent': _DEFAULT_FIVE_HOUR_USAGE_LIMIT_PERCENT,
         'seven_day_usage_limit_percent': _DEFAULT_SEVEN_DAY_USAGE_LIMIT_PERCENT,
         'upstream_session_pool_enabled': True,

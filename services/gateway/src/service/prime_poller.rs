@@ -478,7 +478,7 @@ impl PrimePollerService {
         // 使用实际生效的后端，并让路由读锁覆盖预热，等待中的切换继续由原门禁管理。
         let route = timeout_at(
             deadline,
-            tui_backend::request_route(&self.account_svc, account.clone()),
+            tui_backend::request_route(&self.account_svc, account.clone(), None),
         );
         let (account, route) = match route.await {
             Ok(Ok(route)) => route,

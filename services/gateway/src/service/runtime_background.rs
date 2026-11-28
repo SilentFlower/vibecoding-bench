@@ -93,6 +93,9 @@ pub(crate) async fn execute(
     purpose: BackgroundPurpose,
     tls_profile: TlsProfileId,
 ) -> Result<Response, AppError> {
+    if purpose == BackgroundPurpose::TokenTest && runtime_transport::us_claude_direct_required() {
+        return Err(AppError::BadRequest("US Claude 账号请用 OAuth 用量接口检查凭据".into()));
+    }
     let v3 = !std::env::var("V3_RUNTIME_URL")
         .unwrap_or_default()
         .is_empty()

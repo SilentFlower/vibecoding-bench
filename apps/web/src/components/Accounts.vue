@@ -264,6 +264,11 @@ const deleteTargetId = ref<number | null>(null);
 
 /** 当前编辑的账号（null 表示新建） */
 const editing = ref<Account | null>(null);
+const deploymentDirectRequired = ref(false);
+const claudeDirectRequired = computed(() => editing.value?.tui_direct_required ?? deploymentDirectRequired.value);
+const authOptions = computed(() => claudeDirectRequired.value
+  ? [{value:'oauth',label:'OAuth'}]
+  : [{value:'oauth',label:'OAuth'},{value:'setup_token',label:'Setup Token'}]);
 let editorGeneration = 0;
 const savingAccount = ref(false);
 const backendSaveIssue = ref<{ otherSaved: boolean; detail: string } | null>(null);
@@ -307,7 +312,8 @@ function selectAccountPlatform(value:string): void {
   if (editing.value || savingAccount.value || value === form.value.platform || !platformOptions.some(item=>item.value===value)) return;
   editorGeneration++;
   form.value.platform=value;
-  form.value.auth_type=value==='antigravity'?'oauth':'setup_token';
+  form.value.auth_type=value==='antigravity'||claudeDirectRequired.value?'oauth':'setup_token';
+  if (claudeDirectRequired.value) form.value.request_backend=value==='claude_code'?'tui_v2':'legacy';
   form.value.setup_token=''; form.value.access_token=''; form.value.refresh_token=''; form.value.expires_at='';
   form.value.agy_system_prompt_homoglyph_enabled=false;
   form.value.client_system_prompt_policy='independent';
@@ -456,13 +462,14 @@ async function load() {
   try {
     if (props.workspaceAccountId) {
       const account = await api.accountById(props.workspaceAccountId);
-      if (generation === accountLoadGeneration) { accounts.value = [account]; accountLoadFailed.value = false; void loadOverallStates([account]); void loadAccountNodes(); }
+      if (generation === accountLoadGeneration) { accounts.value = [account]; deploymentDirectRequired.value = account.tui_direct_required === true; accountLoadFailed.value = false; void loadOverallStates([account]); void loadAccountNodes(); }
       return;
     }
     const [res, overview] = await Promise.all([api.listAccounts(currentPage.value, pageSize.value, accountQuery.value.trim(), accountFilter.value === 'all' ? '' : accountFilter.value, undefined, platformFilter.value), api.getDashboard().catch(() => null)]);
     if (generation !== accountLoadGeneration) return;
     accountLoadFailed.value = false;
     accounts.value = res.data ?? [];
+    deploymentDirectRequired.value = res.tui_direct_required === true;
     void loadOverallStates(accounts.value);
     void loadAccountNodes();
     accountCounts.value = res.account_counts ?? overview?.accounts ?? null;
@@ -554,14 +561,14 @@ function openCreate() {
     agy_disable_safety_filtering: false,
     name: '',
     email: '',
-    auth_type: 'setup_token',
+    auth_type: claudeDirectRequired.value ? 'oauth' : 'setup_token',
     setup_token: '',
     access_token: '',
     refresh_token: '',
     expires_at: '',
     proxy_url: '',
     billing_mode: 'strip',
-    request_backend: 'legacy' as RequestBackend,
+    request_backend: (claudeDirectRequired.value ? 'tui_v2' : 'legacy') as RequestBackend,
     account_uuid: '',
     organization_uuid: '',
     subscription_type: '',
@@ -638,11 +645,16 @@ function openEdit(a: Account) {
 }
 
 const backendOptions = computed(() => {
+  const account = editing.value;
+  if (claudeDirectRequired.value) {
+    const disabled = !!account && account.status !== 'active' && account.request_backend !== 'tui_v2';
+    const description = disabled ? '当前账号未启用' : '经原账号代理由 Claude CLI 直发';
+    return [{ value: 'tui_v2', label: '交互运行时 V2', description, disabled }];
+  }
   const options = [
     { value: 'native293', label: '原生运行时 V1', description: 'Claude Code 2.1.293', disabled: false },
     { value: 'legacy', label: '原有转发', description: '现有转发通道', disabled: false },
   ];
-  const account = editing.value;
   if (account && (account.request_backend_revision !== undefined || account.tui_v2_available
     || account.request_backend === 'tui_v2' || account.request_backend_pending === 'tui_v2')) {
     const disabled = account.status !== 'active' && account.request_backend !== 'tui_v2';
@@ -1427,7 +1439,7 @@ function applyOAuthResult() {
     expires_at: (!isSetupToken && r.expires_at) ? String(r.expires_at * 1000) : '',
     proxy_url: '',
     billing_mode: 'strip',
-    request_backend: 'legacy' as RequestBackend,
+    request_backend: (oauthPlatform.value === 'claude_code' && claudeDirectRequired.value ? 'tui_v2' : 'legacy') as RequestBackend,
     account_uuid: r.account_uuid || '',
     organization_uuid: r.organization_uuid || '',
     subscription_type: '',
@@ -1677,7 +1689,7 @@ async function copyText(text: string) {
                 <p v-if="editing.request_backend_pending" class="form-help">
                   等待切换到 {{ backendName(editing.request_backend_pending) }}。
                   {{ editing.request_backend_wait_reason === 'runtime_unconfirmed' ? '运行环境状态待确认。' : '原轮排空并经后台核对后生效。' }}
-                  选择当前生效方式并保存即可撤销等待。
+                  <template v-if="!claudeDirectRequired">选择当前生效方式并保存即可撤销等待。</template>
                 </p>
                 <Button type="button" variant="outline" :disabled="savingAccount" @click="reloadBackend()">刷新转发状态</Button>
               </template>
@@ -1706,7 +1718,7 @@ async function copyText(text: string) {
           <section v-if="!isAgyForm" class="account-form-section"><h3>请求与模型</h3><div class="account-edit-grid"><ChoiceSelect v-model="form.billing_mode" label="Billing 模式" :options="[{value:'strip',label:'清除（Strip）'},{value:'rewrite',label:'重写（Rewrite）'}]" /><label class="approved-field"><span>允许 1M 上下文的模型</span><Input v-model="form.allow_1m_models"  /></label></div><div class="model-presets"><span>模型预设</span><Button type="button" size="sm" variant="secondary" @click="form.allow_1m_models = 'opus'">仅 Opus</Button><Button type="button" size="sm" variant="secondary" @click="form.allow_1m_models = DEFAULT_ALLOW_1M_MODELS">Opus + Sonnet 5</Button><Button type="button" size="sm" variant="secondary" @click="form.allow_1m_models = ''">全部关闭</Button></div><p class="form-help">模型以逗号分隔，按子串匹配。留空关闭 1M 上下文。Sonnet 5 使用完整名称以区分 Sonnet 4.6。</p>
             <Checkbox v-model="form.allow_fast_mode" class="account-check"><strong>允许客户端 Fast Mode</strong><small>允许后保留客户端申请，可能增加计费和限流风险。</small></Checkbox><Checkbox v-model="form.auto_telemetry" class="account-check"><strong>自动遥测</strong><small>由网关代替客户端发送遥测请求。</small></Checkbox><Checkbox v-if="form.auth_type==='oauth'" v-model="form.auto_poll_usage" class="account-check"><strong>自动轮询用量</strong><small>后台定时拉取 OAuth 账号的用量数据。</small></Checkbox></section>
           <section v-if="!isAgyForm" class="account-form-section"><h3>上游 Session 池</h3><Checkbox v-model="form.upstream_session_pool_enabled" class="account-check"><strong>启用 Session 池</strong><small>仅改写发往上游的会话；内部绑定、RPM 与本地缓存仍按真实会话隔离。</small></Checkbox><div class="account-edit-grid three"><NumberInput v-model="numberDrafts.upstream_session_pool_size" label="池容量（0 表示关闭）" :min="0" :max="20" required /><NumberInput v-model="numberDrafts.upstream_session_ttl_minutes" label="活跃 TTL（分钟）" :min="5" :max="1440" required /><ChoiceSelect v-model="form.upstream_session_refresh_policy" label="TTL 刷新策略" :options="[{value:'mapped_request',label:'映射请求刷新'},{value:'owner_only',label:'仅属主刷新'}]" /></div></section>
-          <details v-if="!isAgyForm" class="account-auth-fields account-advanced account-form-section" :open="!editing"><summary>认证与高级配置<ChevronRight :size="14" /></summary><p class="form-help">认证通常由任务或工程创建流程提供。凭证留空保持原值；切换认证方式需要填写对应凭证。</p><div class="account-edit-grid"><ChoiceSelect v-model="form.auth_type" label="认证方式" :options="[{value:'oauth',label:'OAuth'},{value:'setup_token',label:'Setup Token'}]" /><label v-if="form.auth_type==='setup_token'" class="approved-field"><span>Setup Token</span><Input v-model="form.setup_token" type="password" autocomplete="new-password" :required="!editing" :placeholder="editing ? '留空保持不变' : 'sk-ant-oat01-...'" /></label></div><template v-if="form.auth_type!=='setup_token'"><div class="account-edit-grid"><label class="approved-field"><span>Access Token（选填）</span><Input v-model="form.access_token" type="password" autocomplete="new-password" placeholder="留空保持不变" /></label><label class="approved-field"><span>Refresh Token</span><Input v-model="form.refresh_token" type="password" autocomplete="new-password" :required="!editing" placeholder="留空保持不变" /></label></div><label class="approved-field"><span>过期时间（毫秒时间戳）</span><Input v-model="form.expires_at" inputmode="numeric" placeholder="留空清除到期时间" /></label><p v-if="editing?.expires_at" class="form-help">当前过期时间：{{ formatExpiresAt(editing.expires_at) }}</p><p v-if="editing?.auth_error" class="form-help is-danger">最近认证错误：{{ editing.auth_error }}</p></template><div class="account-edit-grid"><ChoiceSelect :model-value="form.subscription_type" @update:model-value="selectSubscription" label="订阅类型" :options="[{value:'',label:'未设置'},{value:'max',label:'Max'},{value:'ultra',label:'Ultra'},{value:'pro',label:'Pro'},{value:'team',label:'Team'},{value:'enterprise',label:'Enterprise'}]" /><label class="approved-field"><span>官方分级</span><Input v-model="form.rate_limit_tier"  /></label></div><div class="account-edit-grid"><label class="approved-field"><span>Account UUID</span><Input v-model="form.account_uuid"  /></label><label class="approved-field"><span>Organization UUID</span><Input v-model="form.organization_uuid"  /></label></div><p class="form-help">修改订阅类型时清除旧分级，可填写新类型的官方分级。</p><div class="account-form-actions"><Button type="button" size="sm" variant="outline" @click="openOAuthFlow()">重新授权</Button></div></details>
+          <details v-if="!isAgyForm" class="account-auth-fields account-advanced account-form-section" :open="!editing"><summary>认证与高级配置<ChevronRight :size="14" /></summary><p class="form-help">认证通常由任务或工程创建流程提供。凭证留空保持原值；切换认证方式需要填写对应凭证。</p><div class="account-edit-grid"><ChoiceSelect v-model="form.auth_type" label="认证方式" :options="authOptions" /><label v-if="form.auth_type==='setup_token'" class="approved-field"><span>Setup Token</span><Input v-model="form.setup_token" type="password" autocomplete="new-password" :required="!editing" :placeholder="editing ? '留空保持不变' : 'sk-ant-oat01-...'" /></label></div><template v-if="form.auth_type!=='setup_token'"><div class="account-edit-grid"><label class="approved-field"><span>Access Token（选填）</span><Input v-model="form.access_token" type="password" autocomplete="new-password" placeholder="留空保持不变" /></label><label class="approved-field"><span>Refresh Token</span><Input v-model="form.refresh_token" type="password" autocomplete="new-password" :required="!editing" placeholder="留空保持不变" /></label></div><label class="approved-field"><span>过期时间（毫秒时间戳）</span><Input v-model="form.expires_at" inputmode="numeric" placeholder="留空清除到期时间" /></label><p v-if="editing?.expires_at" class="form-help">当前过期时间：{{ formatExpiresAt(editing.expires_at) }}</p><p v-if="editing?.auth_error" class="form-help is-danger">最近认证错误：{{ editing.auth_error }}</p></template><div class="account-edit-grid"><ChoiceSelect :model-value="form.subscription_type" @update:model-value="selectSubscription" label="订阅类型" :options="[{value:'',label:'未设置'},{value:'max',label:'Max'},{value:'ultra',label:'Ultra'},{value:'pro',label:'Pro'},{value:'team',label:'Team'},{value:'enterprise',label:'Enterprise'}]" /><label class="approved-field"><span>官方分级</span><Input v-model="form.rate_limit_tier"  /></label></div><div class="account-edit-grid"><label class="approved-field"><span>Account UUID</span><Input v-model="form.account_uuid"  /></label><label class="approved-field"><span>Organization UUID</span><Input v-model="form.organization_uuid"  /></label></div><p class="form-help">修改订阅类型时清除旧分级，可填写新类型的官方分级。</p><div class="account-form-actions"><Button type="button" size="sm" variant="outline" @click="openOAuthFlow()">重新授权</Button></div></details>
           <section v-if="isAgyForm" class="account-form-section">
             <h3>Antigravity 配置</h3><p class="form-help">账号能力来自最近的原生观测。模型服务等待运行环境接入。</p>
             <Checkbox v-model="form.agy_system_prompt_homoglyph_enabled" class="account-check"><strong>系统提示词同形体转换</strong><small>按当前账号保存，开启后转换系统提示词文本。</small></Checkbox>
@@ -1811,7 +1823,7 @@ async function copyText(text: string) {
     <!-- 授权登录：三步表单，真实会话与凭据交接保持原接口；底栏按钮经 form 属性提交当前步骤。 -->
     <ModalDialog v-model:open="showOAuthFlow" class="account-oauth-dialog approved-oauth-dialog" title="授权登录" :description="oauthStep === 'generate' ? '将账号接入工作空间' : oauthStep === 'exchange' ? '完成浏览器授权后，填写返回的授权码' : '授权成功'" :width="440">
       <form v-if="oauthStep === 'generate'" id="account-oauth-step" class="approved-oauth-body" @submit.prevent="generateOAuthUrl">
-        <ChoiceSelect v-model="oauthPlatform" label="授权平台" :options="platformOptions" :disabled="oauthLoading || !!oauthTarget" @update:model-value="oauthMode = 'oauth'" /><ChoiceSelect v-if="oauthPlatform === 'claude_code'" :model-value="oauthMode" @update:model-value="value => { if (value === 'oauth' || value === 'setup_token') oauthMode = value; }" label="授权方式" :disabled="oauthLoading" :options="[{value:'oauth',label:'OAuth'},{value:'setup_token',label:'Setup Token'}]" />
+        <ChoiceSelect v-model="oauthPlatform" label="授权平台" :options="platformOptions" :disabled="oauthLoading || !!oauthTarget" @update:model-value="oauthMode = 'oauth'" /><ChoiceSelect v-if="oauthPlatform === 'claude_code' && !claudeDirectRequired" :model-value="oauthMode" @update:model-value="value => { if (value === 'oauth' || value === 'setup_token') oauthMode = value; }" label="授权方式" :disabled="oauthLoading" :options="authOptions" />
         <ProxyPicker v-model="oauthProxy" :current-label="oauthTarget?.proxy_name || publicProxy(oauthTarget?.proxy_url ?? '')"
           :disabled="oauthLoading" :help="oauthTarget ? '默认使用账号当前线路。重新选线后，授权成功时应用到该账号。' : '选择本次授权使用的代理，后续账号配置沿用此线路。'" />
         <p class="oauth-help">{{ oauthMode === 'oauth' ? '授权后支持账号信息与用量查询。' : 'Setup Token 仅用于推理，有效期 1 年。' }}</p>

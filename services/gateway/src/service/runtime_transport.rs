@@ -974,6 +974,25 @@ async fn prepare_transport(
 
 const TUI_CANDIDATE_RELEASE: &str = "fixture-tui-v2-candidate";
 
+/// 判断当前受信部署是否要求 Claude 模型只经交互 CLI 发送。@return US 部署是否执行直发合同。
+pub(crate) fn us_claude_direct_required() -> bool {
+    std::env::var("V3_DEPLOYMENT_ID").is_ok_and(|deployment| deployment == "us")
+}
+
+/// 核对通用 HTTP 可承接的非生成动作。@param method 实际方法。@param path 实际路径。@return 可转发非生成请求。
+pub(super) fn direct_claude_metadata_request(method: &str, path: &str) -> bool {
+    (method == "POST" && path == "/v1/messages/count_tokens")
+        || (matches!(method, "GET" | "HEAD")
+            && (path == "/v1/models"
+                || path.strip_prefix("/v1/models/").is_some_and(|id| {
+                    !id.is_empty()
+                        && id.bytes().all(|byte| {
+                            byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.')
+                        })
+                })))
+        || (matches!(method, "GET" | "HEAD" | "POST") && super::telemetry::is_telemetry_path(path))
+}
+
 /// 检查是否配置了可信编排登记。@return 是否可读取账号运行绑定。
 pub fn tui_runtime_configured() -> bool {
     std::env::var("V3_RUNTIME_URL").is_ok_and(|value| !value.is_empty())
@@ -3920,6 +3939,19 @@ async fn forward(State(state): State<SenderState>, headers: HeaderMap, body: Byt
             if let Some(purpose) = purpose {
                 config.allowed_origin = purpose.validate(&prepared.method, &prepared.target_url)?;
             }
+            if us_claude_direct_required() {
+                let metadata = match purpose {
+                    Some(purpose) => purpose != BackgroundPurpose::TokenTest,
+                    None => reqwest::Url::parse(&prepared.target_url).is_ok_and(|url| {
+                        direct_claude_metadata_request(&prepared.method, url.path())
+                    }),
+                };
+                if tui_account_model || !metadata {
+                    return Err(AppError::BadRequest(
+                        "US Claude 模型请求须经账号 CLI 直发".into(),
+                    ));
+                }
+            }
             if tui_account_model {
                 if !tui_projection_marker(&headers, TUI_ACCOUNT_MODEL, "1")
                     || purpose.is_some()
@@ -4514,6 +4546,11 @@ async fn native_forward(
         let transition = state.native_transition.clone().read_owned().await;
         let config = read_config(&state.config_path)?;
         authenticate(&headers, &config)?;
+        if us_claude_direct_required() {
+            return Err(AppError::BadRequest(
+                "US Claude 模型请求须经账号 CLI 直发".into(),
+            ));
+        }
         submission.source_version.require_executable()?;
         let pool = &state.native_pool;
         let deadline = validate_request(&submission.request, &config)?;
@@ -4678,6 +4715,29 @@ mod tests {
     use std::path::PathBuf;
     use std::process::{Child, Command, Stdio};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    #[test]
+    fn direct_claude_metadata_guard_only_allows_non_generation_requests() {
+        for (method, path) in [
+            ("POST", "/v1/messages/count_tokens"),
+            ("GET", "/v1/models"),
+            ("GET", "/v1/models/claude-sonnet-4-6"),
+            ("GET", "/api/claude_code/organizations/metrics_enabled"),
+        ] {
+            assert!(direct_claude_metadata_request(method, path), "{method} {path}");
+        }
+        for (method, path) in [
+            ("POST", "/v1/messages"),
+            ("POST", "/v1/messages/"),
+            ("POST", "/v1/messages/batches"),
+            ("GET", "/v1/messages/batches/batch_123"),
+            ("POST", "/v1/complete"),
+            ("POST", "/v1/models/claude-sonnet-4-6"),
+            ("GET", "/v1/models/claude%2fmessages"),
+        ] {
+            assert!(!direct_claude_metadata_request(method, path), "{method} {path}");
+        }
+    }
 
     #[test]
     fn tui_transition_requires_exact_trusted_predecessor() {

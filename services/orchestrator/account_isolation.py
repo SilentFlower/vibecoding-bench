@@ -384,7 +384,8 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
         if tui_socket:
             # 只将事件 socket 子目录挂成可写，配置与绑定仍由控制端发布。
             sender_mounts[str(host_root / 'runtime/sender/tui-v2')] = {'bind': '/run/v3/tui-v2', 'mode': 'rw'}
-        sender_env = {'V3_SENDER_CONFIG': '/run/v3/sender.json', 'TOKIO_WORKER_THREADS': '2'}
+        sender_env = {'V3_SENDER_CONFIG': '/run/v3/sender.json', 'TOKIO_WORKER_THREADS': '2',
+                      'V3_DEPLOYMENT_ID': runtime.deployment}
         if tui_budget:
             # 安装器原子替换版本子目录，挂其父级才能在运行中看到已验收的新 inode。
             # sender 不挂 CLI HOME、项目卷或登录凭据目录；运行准备由原生会话单独核对。

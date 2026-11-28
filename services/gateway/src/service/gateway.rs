@@ -2145,6 +2145,17 @@ impl GatewayService {
         let method = req.method().clone();
         let path = req.uri().path().to_string();
         let query = req.uri().query().unwrap_or("").to_string();
+        let direct_only = runtime_transport::us_claude_direct_required();
+        if direct_only
+            && !(method == Method::POST && path == "/v1/messages")
+            && !runtime_transport::direct_claude_metadata_request(method.as_str(), &path)
+        {
+            return Err(AppError::TuiInput {
+                status: StatusCode::UNPROCESSABLE_ENTITY,
+                code: "claude_generation_endpoint_unsupported",
+                message: "US Claude 生成请求请使用 POST /v1/messages",
+            });
+        }
         let gemini = req.extensions().get::<Arc<GeminiService>>().cloned();
         let cutover: Option<InferenceCutover> = req.extensions().get().cloned();
         let before_headers = req.extensions().get::<BeforeHeaders>().cloned();
@@ -2335,7 +2346,7 @@ impl GatewayService {
         );
         let cli_status_classifier_summary_only = complete_cli_status_classifier_attribution
             || cli_bg_status_classifier_mode == Some(CliBgStatusClassifierMode::Passthrough);
-        if cli_bg_status_classifier_mode == Some(CliBgStatusClassifierMode::Mock) {
+        if !direct_only && cli_bg_status_classifier_mode == Some(CliBgStatusClassifierMode::Mock) {
             log_cli_bg_status_classifier_hit(
                 CliBgStatusClassifierMode::Mock,
                 None,
@@ -2563,7 +2574,8 @@ impl GatewayService {
         };
         // 先冻结本次模式。只有已核对原工具组的进度读取可以获得独立模型预留。
         let native_summary = summary.is_some();
-        if let Some((owner, label, model)) = summary
+        if !direct_only
+            && let Some((owner, label, model)) = summary
             && self
                 .settings_store
                 .get_value("tui_local_agent_summary", "false")
@@ -2711,7 +2723,7 @@ impl GatewayService {
                 );
             }
 
-            if path.starts_with("/v1/messages") {
+            if !direct_only && path.starts_with("/v1/messages") {
                 let warmup_config = *self.warmup_intercept_config.read().await;
                 let classifier_type =
                     detect_auto_mode_classifier_request(&path, &body_map, client_type);
@@ -2813,7 +2825,15 @@ impl GatewayService {
             let slot_units = request_slot_units(&path, &body_map);
 
             let (account, tui_route) = if method == "POST" && path == "/v1/messages" {
-                tui_backend::request_route(&self.account_svc, account).await?
+                let bootstrap_deadline = scheduling_request
+                    .as_ref()
+                    .filter(|_| {
+                        agent_account.is_none()
+                            && !native_summary
+                            && !tui_tool_history::has_result(&body_map)
+                    })
+                    .map(|request| request.deadline());
+                tui_backend::request_route(&self.account_svc, account, bootstrap_deadline).await?
             } else {
                 (account, None)
             };
@@ -3033,7 +3053,9 @@ impl GatewayService {
                     return Ok(response);
                 }
                 let mut rewrite = UpstreamSessionRewrite::default();
-                if account.upstream_session_pool_enabled
+                // 直发 CLI 持有自己的真实会话。旧上游池不能重写其标题或主会话。
+                if !direct_only
+                    && account.upstream_session_pool_enabled
                     && account.upstream_session_pool_size > 0
                     && client_type == ClientType::ClaudeCode
                     && let Some(real_session) = native_session_candidate(

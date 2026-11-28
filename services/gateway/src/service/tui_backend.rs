@@ -5,18 +5,18 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 use tokio::sync::{MutexGuard, OwnedRwLockReadGuard, broadcast};
-use tokio::time::{MissedTickBehavior, interval};
+use tokio::time::{Instant, MissedTickBehavior, interval};
 use tracing::{debug, warn};
 
 use crate::error::AppError;
-use crate::model::account::{Account, AccountStatus, TuiSystemPromptPolicy};
+use crate::model::account::{Account, AccountAuthType, AccountStatus, TuiSystemPromptPolicy};
 use crate::service::account::{AccountQueue, AccountService};
 use crate::service::diagnostics::tui_admission_rejected;
 use crate::service::runtime_bridge::{account_config_permit, account_route_config_permit};
 use crate::service::runtime_transport::{
-    TuiBindingStatus, TuiReadySender, TuiRollbackReadiness, tui_fixture,
+    TuiBindingStatus, TuiReadySender, TuiRollbackReadiness, ready_tui_sender, tui_fixture,
     tui_input_rejection, tui_rollback_readiness, tui_same_binding, tui_scope, tui_switch_status,
-    tui_transition_status,
+    tui_transition_status, us_claude_direct_required,
 };
 use crate::service::system_update::background_admission;
 use crate::service::tui_native_drain::{self, NativeTurn};
@@ -186,6 +186,12 @@ async fn reconcile_locked(
     {
         return Ok(state);
     }
+    if us_claude_direct_required() && state.target != TUI_V2 {
+        // 撤销上一版遗留的兼容切换意向，原轮的生效值和环境绑定继续保留。
+        return service
+            .update_tui_backend(account.id, &state, &state.active, "", &state.binding)
+            .await;
+    }
     // 响应头前由路由读锁保护。HTTP 在途由账号活动门禁保护。V2 等工具的会话由 sender 核对。
     let Ok(_route) = queue.tui_route.try_write() else {
         return Ok(state);
@@ -271,6 +277,11 @@ pub(crate) async fn change_locked(
     target: &str,
     expected: Option<i64>,
 ) -> Result<Value, AppError> {
+    if us_claude_direct_required() && target != TUI_V2 {
+        return Err(AppError::BadRequest(
+            "US Claude 账号只支持交互 V2 直发".into(),
+        ));
+    }
     if !tui_scope(account) {
         return Err(AppError::BadRequest("账号没有已配置的 V2 运行环境".into()));
     }
@@ -349,6 +360,7 @@ fn attach_status(
     runtime: Option<&TuiBindingStatus>,
 ) {
     value["request_backend"] = json!(state.active);
+    value["tui_direct_required"] = json!(us_claude_direct_required());
     value["request_backend_pending"] = json!((!state.target.is_empty()).then_some(&state.target));
     value["request_backend_revision"] = json!(state.revision);
     value["tui_v2_available"] = json!(runtime.is_some_and(|status| {
@@ -483,14 +495,52 @@ async fn reconcile_account(
     Ok(())
 }
 
-/// 冻结请求的生效后端。V1 切换期间只等当前在途请求收尾，V2 允许原交互会话交回结果。
-/// @param service 账号服务。@param account 已选定账号。@return 生效账号及路由快照。
+async fn bind_required_direct(
+    service: &AccountService,
+    account: &Account,
+    queue: &AccountQueue,
+    state: &TuiBackendSnapshot,
+    deadline: Instant,
+) -> Result<TuiBackendSnapshot, AppError> {
+    let busy = || AppError::AdmissionLimited { retry_after: 1 };
+    let _route = queue.tui_route.try_write().map_err(|_| busy())?;
+    if queue.runtime_gate.node_migration_draining() {
+        return Err(busy());
+    }
+    let sender = ready_tui_sender(account, deadline, true, None).await?;
+    if !sender.idle || tui_native_drain::occupied_v2(service.tui_database(), account.id).await? {
+        return Err(busy());
+    }
+    if !state.binding.is_empty()
+        && !tui_same_binding(&state.binding, &sender.key)
+        && !sender.can_advance(&state.binding)
+    {
+        return Err(sender.binding_unavailable());
+    }
+    let _permit = account_route_config_permit(service, account)
+        .await
+        .map_err(|_| busy())?;
+    // 按需启动持有编排自己的许可。启动完成后在账号配置门内重读，防止保存已换批的绑定。
+    let current = ready_tui_sender(account, deadline, false, None).await?;
+    if !current.idle || current.key != sender.key {
+        return Err(current.binding_unavailable());
+    }
+    service
+        .update_tui_backend(account.id, state, TUI_V2, "", &current.key)
+        .await
+}
+
+/// 冻结请求的生效后端。已登记的原工具续轮沿原会话继续。
+/// @param service 账号服务。@param account 已选定账号。@param bootstrap_deadline 首次注册所用的新问截止。
+/// @return 生效账号及路由快照。
 pub(super) async fn request_route(
     service: &AccountService,
     mut account: Account,
+    bootstrap_deadline: Option<Instant>,
 ) -> Result<(Account, Option<TuiRequestRoute>), AppError> {
+    let direct_required = account.is_claude_code() && us_claude_direct_required();
     if !tui_scope(&account) {
-        if account.request_backend == TUI_V2 {
+        if direct_required || account.request_backend == TUI_V2 {
             tui_admission_rejected("tui_route_scope_unavailable");
             return Err(AppError::ServiceUnavailable("V2 环境不可用".into()));
         }
@@ -502,7 +552,29 @@ pub(super) async fn request_route(
     // 登记和冻结在同一序列中。请求读锁不占 HTTP 槽，已有工具续轮可以同时取得读锁。
     let config = queue.tui_config.lock().await;
     account = service.get_account(account.id).await?;
-    let state = service.tui_backend(account.id).await?;
+    let mut state = service.tui_backend(account.id).await?;
+    if direct_required {
+        if account.auth_type != AccountAuthType::Oauth || account.proxy_url.trim().is_empty() {
+            return Err(AppError::ServiceUnavailable(
+                "US Claude 账号直发需要已授权 OAuth 凭据与账号代理".into(),
+            ));
+        }
+        if state.active != TUI_V2 || state.binding.is_empty() {
+            let Some(deadline) =
+                bootstrap_deadline.filter(|_| account.status == AccountStatus::Active)
+            else {
+                tui_admission_rejected("tui_binding_unregistered");
+                return Err(AppError::ServiceUnavailable(
+                    "US Claude 账号的 V2 运行环境等待绑定".into(),
+                ));
+            };
+            state = bind_required_direct(service, &account, &queue, &state, deadline).await?;
+        } else if !state.target.is_empty() {
+            state = service
+                .update_tui_backend(account.id, &state, TUI_V2, "", &state.binding)
+                .await?;
+        }
+    }
     let route = queue.tui_route.clone().read_owned().await;
     drop(config);
     account.request_backend = state.active;

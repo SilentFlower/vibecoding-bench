@@ -255,7 +255,7 @@ class _Callback(BaseHTTPRequestHandler):
         bearer = actor.model_authorization() if model else actor.bearer
         if target.path.startswith('/direct/'):
             bearer = actor.direct.bearer if actor.direct is not None else None
-        if model and actor.direct is not None:
+        if model and (actor.direct is not None or os.environ.get("V3_DEPLOYMENT_ID") == "us"):
             bearer = None
         authorization = self.headers.get("Authorization", "")
         if bearer is None or not authorization.isascii() or not hmac.compare_digest(
@@ -1523,6 +1523,7 @@ class SessionDriver:
             return (
                 not self.closed
                 and self.capacity.snapshot().limit > 0
+                and (os.environ.get("V3_DEPLOYMENT_ID") != "us" or (self.direct_mode and self.managed_oauth))
                 and self.launcher.account_ready()
             )
         except (ValueError, OSError):
