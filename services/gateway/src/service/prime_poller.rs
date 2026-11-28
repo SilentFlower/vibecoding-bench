@@ -1508,7 +1508,8 @@ mod tests {
                     return Json(json!({
                         "environment_id": ENV_ID, "generation": if state.0 == "wrong_binding" { 2 } else { 1 }, "active":0,
                         "tui_v2":{"account_id":1,"release_id":RELEASE,"protocol":1,"ready":state.0 != "unready",
-                            "event_source":"local_unix","idle":true,"reason":"messages_tool_and_usage_events_unavailable"}
+                            "event_source":"local_unix","idle":true,"direct_https_protocol":1,
+                            "reason":"messages_tool_and_usage_events_unavailable"}
                     })).into_response();
                 }
                 let encoded = req.headers()["x-v3-tui-reservation"].as_bytes();
@@ -1518,11 +1519,20 @@ mod tests {
                 assert_eq!(identity["continuation_only"], false);
                 let id = identity["reservation_id"].as_str().unwrap().to_owned();
                 assert!(!req.headers().contains_key(TUI_BODY_POLICY));
+                if action == "tui-v2/prepare" {
+                    assert_eq!(req.headers()[runtime_transport::TUI_DIRECT_HTTPS], "1");
+                    assert_eq!(req.headers()[runtime_transport::TUI_OAUTH_FILE], "1");
+                }
+                if action == "tui-v2/send" {
+                    assert!(req.headers().contains_key(runtime_transport::TUI_OAUTH_FILE));
+                }
                 let body = axum::body::to_bytes(req.into_body(), 4096).await.unwrap();
                 if action == "tui-v2/prepare" {
                     assert_eq!(serde_json::from_slice::<Value>(&body).unwrap(), prime_messages(MODEL));
                     state.1.push(("prepare".into(), id));
-                    return (StatusCode::NO_CONTENT, [("x-v3-tui-handoff-kind", "new")]).into_response();
+                    return (StatusCode::NO_CONTENT, [("x-v3-tui-handoff-kind", "new"),
+                        (runtime_transport::TUI_DIRECT_HTTPS, "1"), (runtime_transport::TUI_OAUTH_FILE, "1"),
+                        (runtime_transport::TUI_MANAGED_OAUTH, "1")]).into_response();
                 }
                 assert!(body.is_empty());
                 assert!(state.1.iter().any(|item| item == &("prepare".into(), id.clone())));
